@@ -66,7 +66,7 @@ dev = [
 
 [tool.ty.environment]
 python-version = "3.11"
-root = ["./src"]
+root = ["./src", "."]
 
 [tool.ty.src]
 exclude = ["build", "src/rc_metastudio/forms/ui_*.py"]

@@ -1,13 +1,14 @@
 """Generate the packaged professional action and analysis SVG families."""
 
 from pathlib import Path
+from collections.abc import Mapping
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ICON_ROOT = ROOT / "src" / "rc_metastudio" / "images" / "icons"
 
 
-def svg(view_box, body):
+def svg(view_box: str, body: str) -> str:
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" '
         f'viewBox="0 0 {view_box}">\n{body.strip()}\n</svg>\n'
@@ -206,7 +207,7 @@ TABLE = {
 }
 
 
-def write_family(directory, view_box, icons):
+def write_family(directory: Path, view_box: str, icons: Mapping[str, str]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for name, body in icons.items():
         (directory / name).write_text(
@@ -214,7 +215,7 @@ def write_family(directory, view_box, icons):
         )
 
 
-def main():
+def main() -> None:
     write_family(ICON_ROOT / "actions", "48 48", ACTIONS)
     write_family(ICON_ROOT / "analyses", "48 48", STANDARD_ANALYSES)
     write_family(ICON_ROOT / "analyses" / "compact", "20 20", COMPACT_ANALYSES)

@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 import adaptive_window
 
@@ -13,6 +14,7 @@ os.environ.setdefault(
 )
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required
 
 prepare_generated_ui_imports()
 
@@ -76,7 +78,9 @@ def _open_data_dialog(
 ):
     import diagnostic_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     monkeypatch.setattr(
         diagnostic_data_form.adaptive_window,
         "available_geometry_for_window",
@@ -119,7 +123,9 @@ def _open_data_dialog(
 def _open_metrics_dialog(monkeypatch, model):
     import diag_metrics
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     monkeypatch.setattr(
         diag_metrics.adaptive_window,
         "available_geometry_for_window",
@@ -144,7 +150,7 @@ def test_diagnostic_data_declares_transactional_overflow_and_reachable_actions(
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
-        assert dialog.layout().indexOf(dialog.buttonBox) >= 0
+        assert required(dialog.layout(), "dialog layout").indexOf(dialog.buttonBox) >= 0
         assert AVAILABLE.contains(dialog.frameGeometry())
         assert (
             dialog.two_by_two_table.horizontalScrollBarPolicy()
@@ -175,10 +181,10 @@ def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
         )
 
         dialog.effect_cbo_box.setFocus()
-        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
+        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
         assert dialog.focusWidget() is dialog.effect_txt_box
 
-        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         dialog.close()
@@ -293,7 +299,13 @@ def test_back_calculation_updates_counts_without_root_growth(monkeypatch):
 
 
 def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -343,7 +355,13 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
 def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
     import diagnostic_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     table = QtWidgets.QTableWidget(1, 1)
 
     class StubForm:
@@ -354,7 +372,9 @@ def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
             return True
 
     table.blockSignals(initially_blocked)
-    diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
+    diagnostic_data_form.DiagnosticDataForm._set_val(
+        cast(diagnostic_data_form.DiagnosticDataForm, StubForm()), 0, 0, 3
+    )
 
     assert table.signalsBlocked() is initially_blocked
     table.deleteLater()
@@ -364,7 +384,13 @@ def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
 def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkeypatch):
     import diagnostic_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     table = QtWidgets.QTableWidget(1, 1)
     table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
 
@@ -381,7 +407,9 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
     monkeypatch.setattr(diagnostic_data_form, "required", fail)
     table.blockSignals(True)
     with pytest.raises(RuntimeError, match="injected item update failure"):
-        diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
+        diagnostic_data_form.DiagnosticDataForm._set_val(
+            cast(diagnostic_data_form.DiagnosticDataForm, StubForm()), 0, 0, 3
+        )
 
     assert table.signalsBlocked()
     table.deleteLater()
@@ -391,7 +419,13 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
 def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
     import diagnostic_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -454,7 +488,13 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
 ):
     import diagnostic_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -548,7 +588,13 @@ def test_diagnostic_metric_availability_preserves_workflow_and_explains_limits(
 
 
 def test_metric_guidance_and_focus_remain_reachable_with_large_font(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))

@@ -1,6 +1,8 @@
 """Small helpers for reading GitHub Actions workflow topology."""
 
+from importlib import util
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import yaml
@@ -16,3 +18,14 @@ def load_workflow(*parts: str) -> dict[str, Any]:
     if True in workflow and "on" not in workflow:
         workflow["on"] = workflow.pop(True)
     return workflow
+
+
+def load_module_from_path(name: str, path: Path) -> ModuleType:
+    """Load a Python module from a file after validating its import spec."""
+
+    spec = util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load module {name!r} from {path}")
+    module = util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

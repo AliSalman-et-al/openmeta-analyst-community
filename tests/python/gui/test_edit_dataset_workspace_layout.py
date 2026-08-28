@@ -1,9 +1,10 @@
 import types
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 pytestmark = pytest.mark.qsettings
 
@@ -14,6 +15,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required
 
 prepare_generated_ui_imports()
 import adaptive_window
@@ -169,15 +171,22 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         qapp.processEvents()
         assert first.geometry() == stable_geometry
         assert first.study_list.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
-        assert first.study_list.horizontalScrollBar().maximum() > 0
+        assert (
+            required(
+                first.study_list.horizontalScrollBar(), "study scrollbar"
+            ).maximum()
+            > 0
+        )
 
         first.edit_tab.setCurrentWidget(first.tab)
         first.activateWindow()
         first.outcome_list.setFocus()
         traversed = set()
         for _ in range(8):
-            QtTest.QTest.keyClick(qapp.focusWidget(), QtCore.Qt.Key.Key_Tab)
-            traversed.add(qapp.focusWidget().objectName())
+            key_click(
+                required(qapp.focusWidget(), "focus widget"), QtCore.Qt.Key.Key_Tab
+            )
+            traversed.add(required(qapp.focusWidget(), "focus widget").objectName())
         assert {
             "add_outcome_btn",
             "follow_up_list",
@@ -265,23 +274,23 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
             assert dialog.buttonBox.isVisible()
             assert dialog.rect().contains(dialog.buttonBox.geometry().center())
 
-        outcome = dialogs[1]
+        outcome = cast(add_new_dialogs.AddNewOutcomeForm, dialogs[1])
         outcome.activateWindow()
         outcome.raise_()
         qapp.processEvents()
         outcome.outcome_name_le.setText(long_name)
         outcome.outcome_name_le.setFocus()
-        QtTest.QTest.keyClick(outcome.outcome_name_le, QtCore.Qt.Key.Key_Tab)
+        key_click(outcome.outcome_name_le, QtCore.Qt.Key.Key_Tab)
         assert outcome.datatype_cbo_box.hasFocus()
         assert outcome.outcome_name_le.text() == long_name
 
-        rename = dialogs[-1]
+        rename = cast(edit_group_name_form.EditCovariateName, dialogs[-1])
         rename.activateWindow()
         rename.raise_()
         qapp.processEvents()
         assert rename.group_name_le.text() == long_name
         rename.group_name_le.setFocus()
-        QtTest.QTest.keyClick(rename.group_name_le, QtCore.Qt.Key.Key_Tab)
+        key_click(rename.group_name_le, QtCore.Qt.Key.Key_Tab)
         assert qapp.focusWidget() in rename.buttonBox.buttons()
     finally:
         qapp.setFont(old_font)

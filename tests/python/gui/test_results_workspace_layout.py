@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from test_types import key_click, required
 import sys
 
 import pytest
@@ -209,7 +210,11 @@ def test_results_workspace_defaults_maximized_and_restores_screen_safe_state(
         )
         assert QtCore.QRect(0, 0, 800, 600).contains(placement["frame_geometry"])
         sizes = restored.results_nav_splitter.sizes()
-        assert sizes[0] / sum(sizes) == pytest.approx(0.25, abs=0.03)
+        total_size = sum(sizes)
+        assert total_size > 0
+        if total_size == 0:
+            pytest.fail("results splitter has no allocated space")
+        assert sizes[0] / total_size == pytest.approx(0.25, abs=0.03)
     finally:
         _dispose(restored, qapp)
 
@@ -265,8 +270,9 @@ def test_results_long_text_reflows_inside_constrained_viewport_without_window_gr
         )
         assert window.geometry() == before
         assert text_item.textWidth() > 0
-        assert text_item.textWidth() <= window.graphics_view.viewport().width()
-        assert window.scene.width() <= window.graphics_view.viewport().width() + 2
+        viewport = required(window.graphics_view.viewport(), "graphics viewport")
+        assert text_item.textWidth() <= viewport.width()
+        assert window.scene.width() <= viewport.width() + 2
     finally:
         _dispose(window, qapp)
 
@@ -322,7 +328,9 @@ def test_results_refit_does_not_dispatch_unrelated_layout_requests(
             super().__init__()
             self.layout_requests = 0
 
-        def event(self, event):
+        # The Qt runtime dispatches this override correctly; the bundled
+        # stubs expose an incompatible descriptor signature.
+        def event(self, event: QtCore.QEvent) -> bool:  # ty: ignore[invalid-method-override]
             if event.type() == QtCore.QEvent.Type.LayoutRequest:
                 self.layout_requests += 1
             return super().event(event)
@@ -450,15 +458,17 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
-        available = dialog.screen().availableGeometry()
+        available = required(dialog.screen(), "dialog screen").availableGeometry()
         assert dialog.frameGeometry().width() <= int(available.width() * 0.9) + 1
         assert dialog.frameGeometry().height() <= int(available.height() * 0.9) + 1
         assert dialog.buttonBox.isVisible()
-        assert dialog.buttonBox.button(
-            QtWidgets.QDialogButtonBox.StandardButton.Apply
+        assert required(
+            dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Apply),
+            "apply button",
         ).isVisible()
-        assert dialog.buttonBox.button(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        assert required(
+            dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+            "ok button",
         ).isVisible()
     finally:
         _dispose(dialog, qapp)
@@ -494,7 +504,7 @@ def test_results_window_presents_summary_references_and_vector_plot_artifacts(
         window.show()
         qapp.processEvents()
         nav_titles = [
-            window.nav_tree.topLevelItem(index).text(0)
+            required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
         assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
@@ -685,7 +695,7 @@ def test_generated_plot_editor_dismissal_never_commits_or_regenerates(
             assert cancel is not None
             cancel.click()
         elif dismissal == "escape":
-            QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+            key_click(dialog, QtCore.Qt.Key.Key_Escape)
         else:
             dialog.close()
         qapp.processEvents()
@@ -802,7 +812,7 @@ def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_edit
             assert dialog.save_btn.toolTip() == "Browse for the plot image save path"
             assert dialog.save_btn.focusPolicy() == QtCore.Qt.FocusPolicy.StrongFocus
             assert dialog.save_btn.hasFocus()
-            QtTest.QTest.keyClick(dialog.save_btn, QtCore.Qt.Key.Key_Space)
+            key_click(dialog.save_btn, QtCore.Qt.Key.Key_Space)
             qapp.processEvents()
             assert dialog.image_path.text() == str(
                 tmp_path

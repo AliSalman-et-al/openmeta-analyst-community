@@ -21,14 +21,26 @@ from analysis_method_labels import (
     normalize_available_method_labels,
 )
 import result_sections
-import plot_capabilities
+from analysis_results import parse_analysis_result
 from study_effect_shapes import (
     effect_triplet as effect_triplet,
     normalize_diagnostic_effects,
     normalize_effect_result,
 )
 from r_call_serialization import require_r_transaction, serialized_r_call
-from meta_globals import *
+from meta_globals import (
+    BINARY,
+    CONTINUOUS,
+    EMPTY_VALS,
+    INVALID_CONFIDENCE_LEVEL_MESSAGE,
+    ONE_ARM_METRICS,
+    PERCENTAGE_DISPLAY_DIGITS,
+    TWO_ARM_METRICS,
+    TYPE_TO_STR_DICT,
+    normalize_confidence_level_params,
+    tabulate,
+    validate_confidence_level,
+)
 
 r_runtime.configure_bundled_r_environment()
 
@@ -161,44 +173,35 @@ class RlibLoader:
             execute_r_function("library", name)
             msg = "%s package successfully loaded" % name
             return (True, msg)
-        except:
-            raise Exception(
+        except Exception as exc:
+            raise RuntimeError(
                 "The %s R package is not installed.\nPlease \
 install this package and then restart RC MetaStudio."
                 % name
-            )
+            ) from exc
 
 
 #################### END OF R Library Loader ####################
 
 
-def RfunctionCaller(function):
-    @serialized_r_call
-    def _RfunctionCaller(*args, **kw):
-        res = function(*args, **kw)
-        return res
-
-    return _RfunctionCaller
-
-
-@RfunctionCaller
+@serialized_r_call
 def get_R_libpaths():
     """Return the library paths visible to R."""
     return list(execute_r_string(".libPaths()"))
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_r_version_string():
     return str(execute_r_string("R.version.string")[0])
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_r_package_version(package_name):
     version = execute_r_function("packageVersion", package_name)
     return str(execute_r_function("as.character", version)[0])
 
 
-@RfunctionCaller
+@serialized_r_call
 def reset_Rs_working_dir():
     """Reset R's working directory to the application data directory."""
 
@@ -211,7 +214,7 @@ def reset_Rs_working_dir():
     execute_r_function("setwd", base_path)
 
 
-@RfunctionCaller
+@serialized_r_call
 def impute_diag_data(diag_data_dict):
     diag_data_dict = normalize_confidence_level_params(diag_data_dict)
 
@@ -229,7 +232,7 @@ def impute_diag_data(diag_data_dict):
     return imputed_2x2
 
 
-@RfunctionCaller
+@serialized_r_call
 def impute_bin_data(bin_data_dict):
     bin_data_dict = normalize_confidence_level_params(bin_data_dict)
     remove_value(None, bin_data_dict)
@@ -242,7 +245,7 @@ def impute_bin_data(bin_data_dict):
     return res_as_dict
 
 
-@RfunctionCaller
+@serialized_r_call
 def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
     conf_level = validate_confidence_level(conf_level)
     remove_value(None, group1_data)
@@ -383,7 +386,7 @@ class R_parse_tools:
 
 
 # This helper derives display-scale values from available study data.
-@RfunctionCaller
+@serialized_r_call
 def impute_cont_data(cont_data_dict, alpha):
 
     # first check that we have some data;
@@ -400,7 +403,7 @@ def impute_cont_data(cont_data_dict, alpha):
     return results
 
 
-@RfunctionCaller
+@serialized_r_call
 def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
     if len(list(cont_data_dict.items())) == 0:
         return {"succeeded": False}
@@ -418,7 +421,7 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 
 
 ##################### DEALING WITH CONFIDENCE LEVEL IN R #######################
-@RfunctionCaller
+@serialized_r_call
 def get_mult_from_r(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     mult = execute_r_function("rcmetar.get.mult.from.conf.level", confidence_level)
@@ -428,7 +431,7 @@ def get_mult_from_r(confidence_level):
     return multiplier
 
 
-@RfunctionCaller
+@serialized_r_call
 def set_global_conf_level(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     new_level = execute_r_function(
@@ -444,7 +447,7 @@ def _r_null_if_none(value):
     return rpy2.rinterface.NULL if value is None else value
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_params(method_name):
     param_list = execute_r_function("rcmetar.method.parameters", str(method_name))
     param_d = {}
@@ -467,7 +470,7 @@ def get_params(method_name):
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_available_methods(
     for_data_type=None, data_obj_name=None, metric=None, workflow="standard"
 ):
@@ -490,12 +493,12 @@ def get_available_methods(
     return normalize_available_method_labels(R_parse_tools.recursioner(methods))
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_method_description(method_name):
     return execute_r_function("rcmetar.method.description", str(method_name))[0]
 
 
-@RfunctionCaller
+@serialized_r_call
 def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
     capabilities = execute_r_function(
         "rcmetar.analysis.plot.capabilities",
@@ -516,7 +519,7 @@ def _analysis_output_path(filename):
     return settings.analysis_output_path(filename)
 
 
-@RfunctionCaller
+@serialized_r_call
 def draw_network(edge_list, unconnected_vertices, network_path=None):
     """
     This draws the parametric network specified by edge_list.
@@ -554,7 +557,7 @@ def draw_network(edge_list, unconnected_vertices, network_path=None):
     return network_path
 
 
-@RfunctionCaller
+@serialized_r_call
 def ma_dataset_to_simple_continuous_robj(
     table_model, var_name="tmp_obj", covs_to_include=None, studies=None
 ):
@@ -598,7 +601,7 @@ def ma_dataset_to_simple_continuous_robj(
     return r_obj
 
 
-@RfunctionCaller
+@serialized_r_call
 def ma_dataset_to_simple_binary_robj(
     table_model,
     var_name="tmp_obj",
@@ -675,7 +678,7 @@ def ma_dataset_to_simple_binary_robj(
     return r_obj
 
 
-@RfunctionCaller
+@serialized_r_call
 def ma_dataset_to_simple_network(
     table_model,
     var_name="tmp_obj",
@@ -801,7 +804,7 @@ def _data_blank_or_none(*args):
     return False
 
 
-@RfunctionCaller
+@serialized_r_call
 def ma_dataset_to_simple_diagnostic_robj(
     table_model,
     var_name="tmp_obj",
@@ -989,7 +992,7 @@ def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
     return cov_str
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_continuous_ma(
     function_name, params, res_name="result", cont_data_name="tmp_obj"
 ):
@@ -998,7 +1001,7 @@ def run_continuous_ma(
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_obj"):
     return _run_RCMetaR_core_analysis(
         bin_data_name, function_name, params, res_name=res_name
@@ -1106,7 +1109,7 @@ def _run_RCMetaR_core_analysis(
     return parse_out_results(result)
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_diagnostic_multi(
     function_names, list_of_params, res_name="result", diag_data_name="tmp_obj"
 ):
@@ -1129,7 +1132,7 @@ def run_diagnostic_multi(
 #    ro.r(statement)
 
 
-@RfunctionCaller
+@serialized_r_call
 def load_vars_for_plot(params_path, return_params_dict=False):
     """
     loads the three necessary (for plot generation) variables
@@ -1151,7 +1154,7 @@ def load_vars_for_plot(params_path, return_params_dict=False):
     return True
 
 
-@RfunctionCaller
+@serialized_r_call
 def write_out_plot_data(params_out_path, plot_data_name="plot.data"):
     execute_r_function(
         "rcmetar.save.plot.data",
@@ -1160,13 +1163,13 @@ def write_out_plot_data(params_out_path, plot_data_name="plot.data"):
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def load_in_R(fpath):
     """loads what is presumed to be .Rdata into the R environment"""
     execute_r_function("load", str(fpath))
 
 
-@RfunctionCaller
+@serialized_r_call
 def update_plot_params(
     plot_params, plot_params_name="params", write_them_out=False, outpath=None
 ):
@@ -1186,7 +1189,7 @@ def update_plot_params(
         execute_r_function("save", **{"list": plot_params_symbol, "file": str(outpath)})
 
 
-@RfunctionCaller
+@serialized_r_call
 def regenerate_plot_data(
     om_data_name="om.data",
     res_name="res",
@@ -1203,7 +1206,7 @@ def regenerate_plot_data(
     ro.globalenv[_r_symbol(plot_data_name)] = plot_data
 
 
-@RfunctionCaller
+@serialized_r_call
 def regenerate_regression_plot_data(
     om_data_name="om.data",
     res_name="res",
@@ -1219,7 +1222,7 @@ def regenerate_regression_plot_data(
     ro.globalenv[_r_symbol(plot_data_name)] = plot_data
 
 
-@RfunctionCaller
+@serialized_r_call
 def generate_reg_plot(file_path, params_name="plot.data"):
     execute_r_function(
         "rcmetar.draw.regression.plot",
@@ -1228,7 +1231,7 @@ def generate_reg_plot(file_path, params_name="plot.data"):
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def generate_forest_plot(file_path, params_name="plot.data"):
     execute_r_function(
         "rcmetar.draw.forest.plot",
@@ -1261,11 +1264,13 @@ def parse_out_results(result):
         # Diagnostic analyses may return several plot parameter objects, so keep
         # this branch broad enough to preserve all named plot metadata.
         if text_n == "images":
-            image_path_d = R_parse_tools.recursioner(text)
+            image_path_d = {} if _r_is_null(text) else R_parse_tools.recursioner(text)
         elif text_n == "display_images":
-            display_image_path_d = R_parse_tools.recursioner(text)
+            display_image_path_d = (
+                {} if _r_is_null(text) else R_parse_tools.recursioner(text)
+            )
         elif text_n == "image_order":
-            image_order = list(text)
+            image_order = None if _r_is_null(text) else list(text)
         elif text_n == "plot_names":
             if _r_is_null(text):
                 image_var_name_d = {}
@@ -1277,7 +1282,9 @@ def parse_out_results(result):
             else:
                 image_params_paths_d = R_parse_tools.recursioner(text)
         elif text_n == "plot_capabilities":
-            plot_capability_d = R_parse_tools.recursioner(text)
+            plot_capability_d = (
+                {} if _r_is_null(text) else R_parse_tools.recursioner(text)
+            )
         elif text_n == "References":
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
@@ -1322,8 +1329,7 @@ def parse_out_results(result):
         "image_order": image_order,
         "plot_capabilities": plot_capability_d,
     }
-    to_return["plot_capabilities"] = plot_capabilities.validate_result(to_return)
-    return to_return
+    return parse_analysis_result(to_return)
 
 
 def _study_names_from_result(result):
@@ -1679,7 +1685,7 @@ def make_weights_str(results):
     return table
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_meta_regression(
     dataset,
     study_names,
@@ -1708,7 +1714,7 @@ def run_meta_regression(
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_diagnostic_workflow(
     workflow,
     function_names,
@@ -1732,7 +1738,7 @@ def run_diagnostic_workflow(
     return parse_out_results(result)
 
 
-@RfunctionCaller
+@serialized_r_call
 def run_workflow_analysis(
     workflow, function_name, params, res_name="result", data_name="tmp_obj"
 ):
@@ -1755,7 +1761,7 @@ def _get_col(m, i):
     return col_vals
 
 
-@RfunctionCaller
+@serialized_r_call
 def diagnostic_effects_for_study(
     tp, fn, fp, tn, metrics=["Spec", "Sens"], conf_level=95.0
 ):
@@ -1775,7 +1781,7 @@ def diagnostic_effects_for_study(
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def continuous_effect_for_study(
     n1,
     m1,
@@ -1809,7 +1815,7 @@ def continuous_effect_for_study(
     )
 
 
-@RfunctionCaller
+@serialized_r_call
 def effect_for_study(
     e1, n1, e2=None, n2=None, two_arm=True, metric="OR", conf_level=95
 ):
@@ -1855,7 +1861,7 @@ def diagnostic_convert_scale(x, metric_name, convert_to="display.scale"):
     return generic_convert_scale(x, metric_name, "diagnostic", convert_to)
 
 
-@RfunctionCaller
+@serialized_r_call
 def generic_convert_scale(
     x, metric_name, data_type, convert_to="display.scale", n1=None
 ):

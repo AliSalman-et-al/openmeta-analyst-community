@@ -25,7 +25,7 @@ TARGETS = {
 }
 
 
-def rendered_targets():
+def rendered_targets() -> dict[Path, str]:
     values = json.loads(CONTRACT.read_text(encoding="utf-8"))["arm_labels"]
     if len(values) != 2 or not all(
         isinstance(value, str) and value for value in values
@@ -37,7 +37,7 @@ def rendered_targets():
     }
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()

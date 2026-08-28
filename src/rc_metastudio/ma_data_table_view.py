@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Custom QTableView with copy, paste, undo, and redo support."""
 
+import copy
 from typing import TYPE_CHECKING, Protocol, cast
 
 from PyQt6 import QtCore, QtWidgets
@@ -60,8 +61,14 @@ class MainGuiProtocol(Protocol):
 # it's easiest to manipulate the model directly
 # on interaction rather than that table_model
 # intermediary
-from ma_dataset import *
-from meta_globals import *
+import meta_globals
+from ma_dataset import Study
+from meta_globals import (
+    BINARY_ONE_ARM_METRICS,
+    CONTINUOUS,
+    CONTINUOUS_ONE_ARM_METRICS,
+    TWO_ARM_METRICS,
+)
 import qt_text
 import tabular_data
 from runtime_types import required

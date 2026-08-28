@@ -1,9 +1,10 @@
 import copy
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 import adaptive_window
 
@@ -14,6 +15,7 @@ os.environ.setdefault(
 )
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, mouse_click, required
 
 prepare_generated_ui_imports()
 AVAILABLE = QtCore.QRect(20, 30, 1024, 640)
@@ -81,7 +83,7 @@ def test_binary_data_declares_transactional_overflow_and_reachable_actions(
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
-        assert dialog.layout().indexOf(dialog.buttonBox) >= 0
+        assert required(dialog.layout(), "dialog layout").indexOf(dialog.buttonBox) >= 0
         assert (
             dialog.raw_data_table.horizontalScrollBarPolicy()
             == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
@@ -112,17 +114,23 @@ def test_binary_data_keyboard_and_accessibility_contract(monkeypatch):
         assert dialog.effect_txt_box.accessibleDescription()
 
         dialog.effect_cbo_box.setFocus()
-        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
+        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
         assert dialog.focusWidget() is dialog.effect_txt_box
 
-        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         _close(app, window, dialog)
 
 
 def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -167,7 +175,9 @@ def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypat
 def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monkeypatch):
     import binary_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     monkeypatch.setattr(
         binary_data_form.adaptive_window,
         "available_geometry_for_window",
@@ -193,10 +203,11 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         dialog.choice2_btn.setFocus()
         app.processEvents()
         mapped = dialog.choice2_btn.mapTo(
-            dialog.content_scroll.viewport(), QtCore.QPoint()
+            required(dialog.content_scroll.viewport(), "content viewport"),
+            QtCore.QPoint(),
         )
         assert (
-            dialog.content_scroll.viewport()
+            required(dialog.content_scroll.viewport(), "content viewport")
             .rect()
             .intersects(QtCore.QRect(mapped, dialog.choice2_btn.size()))
         )
@@ -219,7 +230,9 @@ def test_binary_set_val_restores_table_signal_state(initially_blocked):
             return True
 
     table.blockSignals(initially_blocked)
-    binary_data_form.BinaryDataForm2._set_val(StubForm(), 0, 0, 3)
+    binary_data_form.BinaryDataForm2._set_val(
+        cast(binary_data_form.BinaryDataForm2, StubForm()), 0, 0, 3
+    )
 
     assert table.signalsBlocked() is initially_blocked
     table.deleteLater()
@@ -229,7 +242,9 @@ def test_binary_set_val_restores_table_signal_state(initially_blocked):
 def test_binary_set_val_restores_blocked_state_when_item_update_fails():
     import binary_data_form
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     table = QtWidgets.QTableWidget(1, 1)
     table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
 
@@ -242,7 +257,9 @@ def test_binary_set_val_restores_blocked_state_when_item_update_fails():
 
     table.blockSignals(True)
     with pytest.raises(RuntimeError, match="injected item update failure"):
-        binary_data_form.BinaryDataForm2._set_val(StubForm(), 0, 0, 3)
+        binary_data_form.BinaryDataForm2._set_val(
+            cast(binary_data_form.BinaryDataForm2, StubForm()), 0, 0, 3
+        )
 
     assert table.signalsBlocked()
     table.deleteLater()
@@ -302,9 +319,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
         assert dialog.back_calc_btn.isEnabled()
 
-        QtTest.QTest.mouseClick(
-            dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton
-        )
+        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
@@ -346,8 +361,13 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
     def cancel_choice(chooser):
         chooser.show()
         app.processEvents()
-        QtTest.QTest.mouseClick(
-            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel),
+        mouse_click(
+            required(
+                chooser.buttonBox.button(
+                    QtWidgets.QDialogButtonBox.StandardButton.Cancel
+                ),
+                "cancel button",
+            ),
             QtCore.Qt.MouseButton.LeftButton,
         )
         return chooser.result()
@@ -365,7 +385,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.back_calc_btn.isEnabled()
 
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert _binary_table_snapshot(dialog) == table_before
@@ -396,9 +416,12 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
     def accept_second_choice(chooser):
         chooser.show()
         app.processEvents()
-        QtTest.QTest.mouseClick(chooser.choice2_btn, QtCore.Qt.MouseButton.LeftButton)
-        QtTest.QTest.mouseClick(
-            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+        mouse_click(chooser.choice2_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(
+            required(
+                chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+                "ok button",
+            ),
             QtCore.Qt.MouseButton.LeftButton,
         )
         return chooser.result()
@@ -410,7 +433,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         dialog.clear_form()
         dialog.undoStack.clear()
         dialog.enable_back_calculation_btn()
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert _binary_table_snapshot(dialog)[:6] == ["4", "10", "14", "5", "11", "16"]

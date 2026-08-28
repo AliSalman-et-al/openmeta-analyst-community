@@ -1,6 +1,6 @@
 import textwrap
 
-from _r_driver_support import build_r_driver, run_r_driver
+from ._r_driver_support import build_r_driver, run_r_driver
 
 
 _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(

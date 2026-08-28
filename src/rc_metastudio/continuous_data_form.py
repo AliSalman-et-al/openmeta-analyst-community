@@ -36,7 +36,14 @@ import app_error_handler
 import adaptive_window
 from rc_metastudio import meta_py_r
 import tabular_data
-from meta_globals import *
+from meta_globals import (
+    CONTINUOUS_METRIC_NAMES,
+    CONTINUOUS_ONE_ARM_METRICS,
+    CONTINUOUS_TWO_ARM_METRICS,
+    EMPTY_VALS,
+    is_NaN,
+    is_empty,
+)
 import forms.ui_continuous_data_form
 import forms.ui_continuous_back_calc_result_form
 from runtime_types import required
@@ -81,7 +88,7 @@ def is_list(x):
     try:
         list(x)
         return True
-    except:
+    except TypeError:
         return False
 
 
@@ -513,7 +520,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                         opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
                         opt_cmp_msg="Correlation must be between -1 and +1",
                     )
-            except:
+            # Scale conversion crosses the optional R backend boundary. Any
+            # backend failure makes the user-entered value invalid here.
+            except Exception:
                 return False, False
         return True, display_scale_val
 

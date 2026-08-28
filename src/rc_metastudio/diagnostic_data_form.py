@@ -24,7 +24,14 @@ from rc_metastudio import meta_py_r
 import app_error_handler
 import adaptive_window
 import tabular_data
-from meta_globals import *
+from meta_globals import (
+    DIAGNOSTIC_METRICS,
+    DIAG_FIELDS_TO_RAW_INDICES,
+    EMPTY_VALS,
+    is_NaN,
+    is_a_float,
+    is_empty,
+)
 import calculator_routines as calc_fncs
 from forms.ui_diagnostic_data_form import Ui_DiagnosticDataForm
 from runtime_types import required
@@ -325,13 +332,12 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 except ValueError:
                     int_val = int(calc_fncs.numeric_value(text))
                 return int_val
-        except:
-            # Should never appear....
+        except (ArithmeticError, TypeError, ValueError) as exc:
             msg = "Could not convert %s to integer" % self.two_by_two_table.item(i, j)
             QMessageBox.warning(self, "Warning", msg)
-            raise Exception(
+            raise ValueError(
                 "Could not convert %s to int" % self.two_by_two_table.item(i, j)
-            )
+            ) from exc
 
     def cell_data_invalid(self, celldata_string):
         # ignore blank entries
@@ -642,7 +648,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                         opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
                         opt_cmp_msg="Prevalence must be between 0 and 1.",
                     )
-            except:
+            # Scale conversion crosses the optional R backend boundary. Any
+            # backend failure makes the user-entered value invalid here.
+            except Exception:
                 return False, False
         return True, display_scale_val
 
@@ -773,7 +781,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                     if val is not None:
                         try:
                             val = str(int(val))
-                        except:
+                        except (TypeError, ValueError, OverflowError):
                             val = str(val)
                         item = QTableWidgetItem(val)
                         self.two_by_two_table.setItem(row, col, item)

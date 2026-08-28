@@ -32,7 +32,8 @@ def test_none_is_blank_at_text_boundaries():
     assert meta_form._qt_text(None) == ""
     assert meta_form._qt_dialog_path(None) == ""
     assert main_wizard._qt_item_text(None) == ""
-    assert ma_specs.MA_Specs._enum_item_value(object(), None) == ""
+    specs = ma_specs.MA_Specs.__new__(ma_specs.MA_Specs)
+    assert specs._enum_item_value(None) == ""
 
 
 def test_old_qt_string_and_item_color_apis_stay_inside_compat_boundaries():

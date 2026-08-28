@@ -90,3 +90,20 @@ def test_delete_group_and_remove_group_have_equivalent_mutations():
         right_unit = right_study.outcomes_to_follow_ups["Outcome"]["first"]
         assert left_unit.get_group_names() == right_unit.get_group_names()
         assert left_unit.get_effects_dict() == right_unit.get_effects_dict()
+
+
+def test_rename_group_preserves_effects_when_the_name_contains_a_hyphen():
+    dataset = _dataset(ma_dataset.BINARY)
+    unit = dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
+    original_groups = unit.get_group_names()
+    dataset.change_group_name(original_groups[0], "Usual-care")
+    pair_key = "-".join(("Usual-care", original_groups[1]))
+    unit.effects_dict["OR"][pair_key]["est"] = 0.75
+
+    dataset.change_group_name("Usual-care", "Control")
+
+    renamed_key = "-".join(("Control", original_groups[1]))
+    assert unit.get_group_names() == [original_groups[1], "Control"]
+    assert unit.tx_groups["Control"].name == "Control"
+    assert unit.effects_dict["OR"][renamed_key]["est"] == 0.75
+    assert pair_key not in unit.effects_dict["OR"]

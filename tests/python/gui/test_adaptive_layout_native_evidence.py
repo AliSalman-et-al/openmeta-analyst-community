@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from test_types import required
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -39,9 +41,9 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
     window = adaptive_layout_evidence.QtWidgets.QMainWindow()
     window.show()
     qapp.processEvents()
-    screen = window.screen() or qapp.primaryScreen()
+    screen = required(window.screen() or qapp.primaryScreen(), "screen")
     available = screen.availableGeometry()
-    margins = window.windowHandle().frameMargins()
+    margins = required(window.windowHandle(), "window handle").frameMargins()
     requested = adaptive_layout_evidence.QtCore.QSize(
         available.width() - margins.left() - margins.right() - 1,
         available.height() - margins.top() - margins.bottom() - 1,
@@ -217,7 +219,9 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     spec = importlib.util.spec_from_file_location(
         "evidence_validator_gui", validator_path
     )
+    assert spec is not None
     validator = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
     spec.loader.exec_module(validator)
     constrained_size = adaptive_layout_evidence.CONSTRAINED_WORKSPACE
     constrained = [constrained_size.width(), constrained_size.height()]

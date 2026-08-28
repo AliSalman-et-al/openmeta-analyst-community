@@ -59,6 +59,11 @@ smoke stages. CI can select an individual lane when needed:
 .\scripts\verify-qt6.ps1 -Section RemainingSurfaces
 ```
 
+The verifier runs Ty in strict mode over every maintained Python root:
+`src/rc_metastudio`, `scripts`, `tests`, and the bundled RCMetaR QA tools under
+`r/RCMetaR/inst/qa`. Generated Qt modules are created before the check so GUI
+imports are verified rather than excluded.
+
 ## Work with generated Qt code
 
 Files under `src/rc_metastudio/forms/*.ui` are the editable form sources. Generated Python modules belong under the selected build directory and must not be committed. `scripts/build_qt6.py generate` compiles forms and resources before tests, typing, or packaging.

@@ -37,7 +37,7 @@ import app_error_handler
 import adaptive_window
 import qt_layout
 import qt_text
-import tabular_data
+import csv_import
 from ma_data_table_model import DatasetModel
 from settings import get_default_open_directory
 
@@ -62,11 +62,11 @@ class MainWizardPage(QWizardPage):
 
 
 class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
-    def __init__(self, parent=None, recent_datasets=[]):
+    def __init__(self, parent=None, recent_datasets=None):
         super(WelcomePage, self).__init__(parent)
         self.setupUi(self)
 
-        self.recent_datasets = recent_datasets
+        self.recent_datasets = list(recent_datasets or ())
         self.selected_dataset = None
         qt_layout.configure_primary_action_buttons(
             (
@@ -411,8 +411,6 @@ class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage
 
 ###############################################################################
 
-import csv
-
 
 def _qt_item_text(value):
     return qt_text.to_native_text(value)
@@ -476,6 +474,7 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
 
     def _reset_data(self):
         self.preview_table.clear()
+        self._import_result = None
         self.headers = []
         self.covariate_names = []
         self.covariate_types = []
@@ -503,7 +502,23 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     def _rebuild_display(self):
         self._reset_data()
         try:
-            self.extract_data()
+            file_path = self.file_path
+            if not isinstance(file_path, str) or not file_path:
+                return False
+            self._import_result = csv_import.parse_csv(
+                file_path,
+                expected_headers=self.required_header_labels,
+                has_headers=self._hasHeaders(),
+                from_excel=self._isFromExcel(),
+                delimiter=self._get_delimter(),
+                quotechar=self._get_quotechar(),
+                year_column=DatasetModel.YEAR - 1,
+            )
+            payload = self._import_result.to_payload()
+            self.headers = payload["headers"]
+            self.imported_data = payload["data"]
+            self.covariate_names = payload["covariate_names"]
+            self.covariate_types = payload["covariate_types"]
             if len(self.imported_data) == 0:
                 QMessageBox.warning(self, "Warning", "No data in CSV. Try again.")
                 self.imported_data_ok = False
@@ -511,12 +526,6 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
 
             num_rows = len(self.imported_data)
             num_cols = len(self.imported_data[0])
-            self._handle_covariates_in_extracted_data(
-                num_rows,
-                num_cols,
-                headers=self.headers,
-                expected_headers=self.required_header_labels,
-            )
 
             # set up table
             self.preview_table.setRowCount(num_rows)
@@ -538,9 +547,11 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.preview_table.resizeRowsToContents()
             qt_layout.configure_compact_table(self.preview_table, stretch_columns=True)
 
-            # Validate table entries
-            self._validate_imported_data()
             self.completeChanged.emit()
+        except csv_import.CsvImportError as error:
+            QMessageBox.warning(self, "Warning", str(error))
+            self.imported_data_ok = False
+            return False
         except Exception as e:
             QMessageBox.warning(
                 self,
@@ -550,29 +561,6 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             )
             self.imported_data_ok = False
             return False
-
-    def _validate_imported_data(self):
-        # Make sure there are at least as many columns as required columns
-        # (additional columns are covariates hopefully)
-        #        if self.preview_table.columnCount() < self.required_fmt_table.columnCount():
-        #            QMessageBox.warning(self, "Warning", "There are two few columns in the imported csv, try again with a properly formatted CSV.")
-        #            self._reset_data
-        #            return False
-
-        # Are the years integers?
-        for row in range(len(self.imported_data)):
-            try:
-                # -1 since the imported data doesn't have an 'include' column
-                int(self.imported_data[row][DatasetModel.YEAR - 1])
-            except ValueError:
-                QMessageBox.warning(
-                    self,
-                    "Warning",
-                    "The year at row " + str(row + 1) + " is not an integer number.",
-                )
-                self.imported_data_ok = False
-                return False
-        # More validation??
 
     def _get_required_header_labels(self):
         """
@@ -612,93 +600,9 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         """Imported data is a list of rows. A row is a list of
         cell contents (as strings)"""
 
-        if self.imported_data_ok:
-            return {
-                "headers": self.headers,
-                "data": self.imported_data,
-                "expected_headers": self.required_header_labels,
-                "covariate_names": self.covariate_names,
-                "covariate_types": self.covariate_types,
-            }
-        else:
+        if not self.imported_data_ok or self._import_result is None:
             return None
-
-    def _handle_covariates_in_extracted_data(
-        self, num_rows, num_cols, headers=[], expected_headers=[]
-    ):
-        if num_cols > len(expected_headers):  # Do we have covariates?
-            num_covariates = num_cols - len(expected_headers)
-        else:
-            return None  # no covariates to deal with
-
-        def covariate_name(index, given_name):
-            if str(given_name).strip() == "":
-                return "Covariate " + str(index + 1)
-            else:
-                return given_name
-
-        if self._hasHeaders():
-            covariate_names = headers[len(expected_headers) :]
-        else:
-            covariate_names = [""] * num_covariates
-        self.covariate_names = [
-            covariate_name(i, name) for i, name in enumerate(covariate_names)
-        ]
-
-        def covariate_type(data):
-            for x in data:
-                try:
-                    float(x)
-                except ValueError:
-                    return "factor"  # these types are important to get right (look in covariate constructor)
-            return "continuous"  #
-
-        index_offset = len(expected_headers)
-        for cov_index in range(len(covariate_names)):
-            cov_data = [
-                self.imported_data[row][index_offset + cov_index]
-                for row in range(num_rows)
-            ]
-            self.covariate_types.append(covariate_type(cov_data))
-
-    def extract_data(self):
-        with open(self._get_filepath(), newline="") as csvfile:
-            args_csv_reader = {
-                "delimiter": self._get_delimter(),
-                "quotechar": self._get_quotechar(),
-            }
-            if self._isFromExcel():
-                args_csv_reader = {}
-                args_csv_reader["dialect"] = "excel"
-
-            # set up reader object
-            reader = csv.reader(csvfile, **args_csv_reader)
-
-            self.headers = []
-            self.imported_data = []
-            if self._hasHeaders():
-                self.headers = next(reader, [])
-            for row in reader:
-                self.imported_data.append(row)
-        self._normalize_imported_rows()
-        self.print_extracted_data()
-
-    def _normalize_imported_rows(self):
-        self.imported_data = tabular_data.normalize_rows(
-            self.imported_data, minimum_width=len(self.headers)
-        )
-        if self.headers:
-            num_cols = (
-                len(self.imported_data[0]) if self.imported_data else len(self.headers)
-            )
-            self.headers = self.headers + [""] * (num_cols - len(self.headers))
-
-    def print_extracted_data(self):
-        for row in self.imported_data:
-            pass
-
-    def _get_filepath(self):
-        return self.file_path
+        return self._import_result.to_payload()
 
     def _isFromExcel(self):
         return self.from_excel_chkbx.isChecked()
@@ -738,7 +642,7 @@ Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport
 
 
 class MainWizard(QWizard):
-    def __init__(self, parent=None, path=None, recent_datasets=[]):
+    def __init__(self, parent=None, path=None, recent_datasets=None):
         super(MainWizard, self).__init__(parent)
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
         self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)

@@ -5,6 +5,8 @@ import sys
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+from test_types import required
+
 
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -50,7 +52,7 @@ class FakeActiveWindow(object):
 def _dialog_with_content(text="Content"):
     dialog = QtWidgets.QDialog()
     dialog.setLayout(QtWidgets.QVBoxLayout())
-    dialog.layout().addWidget(QtWidgets.QLabel(text))
+    required(dialog.layout(), "dialog layout").addWidget(QtWidgets.QLabel(text))
     return dialog
 
 
@@ -187,7 +189,7 @@ def test_maximized_workspace_does_not_reapply_window_state_during_show(qapp):
         assert refits_after_registration == []
         assert window.isVisible()
         assert window.windowHandle() is not None
-        assert window.windowHandle().isVisible()
+        assert required(window.windowHandle(), "window handle").isVisible()
     finally:
         window.close()
         qapp.processEvents()
@@ -356,7 +358,8 @@ def test_confidence_level_is_a_compact_transactional_dialog(qapp):
     qapp.processEvents()
 
     try:
-        available = parent.windowHandle().screen().availableGeometry()
+        handle = required(parent.windowHandle(), "parent window handle")
+        available = required(handle.screen(), "parent screen").availableGeometry()
         assert (
             adaptive_window.adaptive_window_state(dialog).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
@@ -366,7 +369,7 @@ def test_confidence_level_is_a_compact_transactional_dialog(qapp):
             is adaptive_window.WindowRole.CONFIDENCE_LEVEL
         )
         assert (
-            dialog.layout().sizeConstraint()
+            required(dialog.layout(), "dialog layout").sizeConstraint()
             == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
         )
         assert not dialog.findChildren(QtWidgets.QScrollArea)
@@ -393,7 +396,8 @@ def test_confidence_level_handles_representative_long_text_and_enlarged_font(qap
     qapp.processEvents()
 
     try:
-        available = dialog.windowHandle().screen().availableGeometry()
+        handle = required(dialog.windowHandle(), "dialog window handle")
+        available = required(handle.screen(), "dialog screen").availableGeometry()
         assert available.contains(dialog.frameGeometry())
         assert dialog.conf_level_label.wordWrap()
         assert dialog.conf_level_label.height() >= dialog.fontMetrics().height()

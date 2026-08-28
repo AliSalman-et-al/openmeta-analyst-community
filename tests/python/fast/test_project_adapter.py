@@ -6,13 +6,15 @@ import sys
 
 import pytest
 
+from rc_metastudio.project_format import JsonObject, JsonValue
+
 
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
 import project_adapter
 
 
-def _multi_arm_project(family: str) -> dict[str, object]:
+def _multi_arm_project(family: str) -> JsonObject:
     data_type = {"binary": 0, "continuous": 1}[family]
     subtype = {"binary": "proportions", "continuous": "means"}[family]
     raw_values = {
@@ -67,6 +69,18 @@ def _multi_arm_project(family: str) -> dict[str, object]:
     }
 
 
+def _object(value: JsonValue) -> JsonObject:
+    if not isinstance(value, dict):
+        raise AssertionError("expected JSON object")
+    return value
+
+
+def _objects(value: JsonValue) -> list[JsonObject]:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise AssertionError("expected JSON object array")
+    return value
+
+
 @pytest.mark.parametrize("family", ["binary", "continuous"])
 def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None:
     project = _multi_arm_project(family)
@@ -74,8 +88,12 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
     dataset = project_adapter.project_to_dataset(copy.deepcopy(project))
     rebuilt = project_adapter.dataset_to_project(dataset)
 
-    expected_units = project["dataset"]["studies"][0]["analysis_units"]
-    rebuilt_units = rebuilt["dataset"]["studies"][0]["analysis_units"]
+    expected_units = _objects(
+        _object(_objects(_object(project["dataset"])["studies"])[0])["analysis_units"]
+    )
+    rebuilt_units = _objects(
+        _object(_objects(_object(rebuilt["dataset"])["studies"])[0])["analysis_units"]
+    )
     assert rebuilt_units == expected_units
     assert list(
         dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"].tx_groups

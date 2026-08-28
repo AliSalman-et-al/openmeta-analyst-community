@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib as mpl
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import FancyBboxPatch
 
@@ -27,9 +28,9 @@ DETAIL_INK = ""
 CURRENT_THEME = "light"
 
 
-def _new_figure(*, width: float = 48, height: float = 48) -> tuple[Figure, object]:
+def _new_figure(*, width: float = 48, height: float = 48) -> tuple[Figure, Axes]:
     figure = Figure(figsize=(width / 72, height / 72), dpi=72, facecolor="none")
-    axes = figure.add_axes((0, 0, 1, 1))
+    axes: Axes = figure.add_axes((0, 0, 1, 1))
     axes.set_xlim(0, 1)
     axes.set_ylim(0, 1)
     axes.axis("off")

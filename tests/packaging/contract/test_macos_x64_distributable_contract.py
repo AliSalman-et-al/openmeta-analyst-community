@@ -187,15 +187,10 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "Analysis(" in spec
     assert "BUNDLE(" in spec
     assert (
-        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")'
-        in spec
+        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")' in spec
     )
     assert (
-        ROOT
-        / "src"
-        / "rc_metastudio"
-        / "images"
-        / "rc-metastudio-app-icon-rounded.png"
+        ROOT / "src" / "rc_metastudio" / "images" / "rc-metastudio-app-icon-rounded.png"
     ).is_file()
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
@@ -204,9 +199,9 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
     assert "a.datas.extend(" not in spec
-    assert 'RCMS_STAGED_R_FRAMEWORK' in spec
-    assert 'a.binaries = adapter_module.filter_pyinstaller_r_binaries' in spec
-    assert 'a.datas = adapter_module.filter_pyinstaller_r_binaries' in spec
+    assert "RCMS_STAGED_R_FRAMEWORK" in spec
+    assert "a.binaries = adapter_module.filter_pyinstaller_r_binaries" in spec
+    assert "a.datas = adapter_module.filter_pyinstaller_r_binaries" in spec
     assert 'copy_tree "$staged_r_framework" "$r_framework"' in build
     assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
@@ -342,9 +337,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
     assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
     assert steps.index(rcc_resolve) < steps.index(
-        steps_by_name[
-            "Build and run the first-green packaged workflow"
-        ]
+        steps_by_name["Build and run the first-green packaged workflow"]
     )
 
 
@@ -477,8 +470,8 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     resources = tmp_path / "Resources"
     binary = resources / "bin/R"
@@ -611,8 +604,8 @@ def test_private_r_config_wrapper_fails_closed_on_upstream_drift(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     resources = tmp_path / "Resources"
     binary = resources / "bin/R"
@@ -634,8 +627,8 @@ def test_private_r_launcher_rejects_unsafe_existing_real_rscript(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     kinds = ["directory"] if os.name == "nt" else ["directory", "nonexec"]
     for kind in kinds:
@@ -893,8 +886,8 @@ def test_official_r_component_resolver_requires_exact_private_payload(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_component", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
     (component / "Payload" / "R.framework").mkdir(parents=True)
@@ -945,8 +938,8 @@ def test_official_r_component_resolver_rejects_invalid_metadata(tmp_path, xml, m
         "r_component_invalid",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "component"
     (component / "Payload/R.framework").mkdir(parents=True)
@@ -961,8 +954,8 @@ def test_official_r_component_resolver_preserves_framework_symlinks_and_rejects_
     spec = importlib.util.spec_from_file_location(
         "r_component_links", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
     framework = component / "Payload/R.framework"
@@ -1006,8 +999,8 @@ def test_official_r_component_resolver_rejects_framework_root_symlink_and_xml_bo
         "r_component_specific_bounds",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "component"
     payload = component / "Payload"
@@ -1058,8 +1051,8 @@ def test_official_r_component_resolver_caps_diagnostic_characters_before_count(
         "r_component_diag_chars",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     # Six entries are below the count cap, but their legal field lengths exceed
     # the total diagnostic character budget unless the resolver truncates them.
@@ -1081,8 +1074,8 @@ def test_official_r_component_resolver_bounds_files_and_rejects_symlinks(tmp_pat
         "r_component_bounds",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     oversized = tmp_path / "oversized"
     oversized.mkdir()

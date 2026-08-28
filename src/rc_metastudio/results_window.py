@@ -54,6 +54,7 @@ from forms import ui_edit_forest_plot
 from rc_metastudio import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities
+from analysis_results import parse_analysis_result
 from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
 import qt_text
 import result_sections
@@ -595,18 +596,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
     def add_text_section(self, title, display_title, text):
-        try:
-            # first add the title
-            qt_item = self.add_title(display_title)
-
-            # now the text
-            text_item_rect, pos = self.create_text_item(
-                str(text), self.position(), wrap=True
-            )
-            self.items_to_coords[id(qt_item)] = pos
-            self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
-        except:
-            pass
+        qt_item = self.add_title(display_title)
+        _, pos = self.create_text_item(str(text), self.position(), wrap=True)
+        self.items_to_coords[id(qt_item)] = pos
+        self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
 
     def generate_pixmap(self, image):
         # now the image
@@ -1255,25 +1248,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
 
 def _normalize_results(results):
-    if not isinstance(results, dict):
+    if results is None:
         return _empty_results()
-
-    normalized = dict(results)
-    normalized["texts"] = dict(normalized.get("texts") or {})
-    normalized["images"] = dict(normalized.get("images") or {})
-    normalized["display_images"] = dict(normalized.get("display_images") or {})
-    normalized["image_var_names"] = dict(normalized.get("image_var_names") or {})
-    normalized["image_params_paths"] = dict(normalized.get("image_params_paths") or {})
-    normalized["plot_capabilities"] = plot_capabilities.validate_result(normalized)
-    extra_display_images = sorted(
-        set(normalized["display_images"]) - set(normalized["images"])
-    )
-    if extra_display_images:
-        raise ValueError(
-            "Display artifacts have no matching plot artifact: %s"
-            % ", ".join(extra_display_images)
-        )
-    normalized.setdefault("image_order", None)
+    normalized = parse_analysis_result(results)
 
     if not normalized["texts"] and not normalized["images"]:
         normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE

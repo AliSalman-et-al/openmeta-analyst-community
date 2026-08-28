@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 import adaptive_window
 
@@ -13,6 +14,7 @@ os.environ.setdefault(
 )
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, key_clicks, mouse_click, required
 
 prepare_generated_ui_imports()
 
@@ -82,11 +84,14 @@ def _open_continuous_dialog(
             recorder["metric_choice_exec"].append(dialog.windowTitle())
             dialog.show()
             app.processEvents()
-            QtTest.QTest.mouseClick(
-                dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton
-            )
-            QtTest.QTest.mouseClick(
-                dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+            mouse_click(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
+            mouse_click(
+                required(
+                    dialog.buttonBox.button(
+                        QtWidgets.QDialogButtonBox.StandardButton.Ok
+                    ),
+                    "ok button",
+                ),
                 QtCore.Qt.MouseButton.LeftButton,
             )
             return dialog.result()
@@ -274,8 +279,13 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         recorder["metric_choice_exec"].append(chooser.windowTitle())
         chooser.show()
         app.processEvents()
-        QtTest.QTest.mouseClick(
-            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel),
+        mouse_click(
+            required(
+                chooser.buttonBox.button(
+                    QtWidgets.QDialogButtonBox.StandardButton.Cancel
+                ),
+                "cancel button",
+            ),
             QtCore.Qt.MouseButton.LeftButton,
         )
         return chooser.result()
@@ -294,7 +304,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         dialog.undoStack.clear()
         recorder["back_calc"].clear()
 
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert recorder["metric_choice_exec"] == ["Population standard deviations"]
@@ -327,10 +337,10 @@ def test_continuous_data_keyboard_and_accessibility_contract(monkeypatch):
         assert dialog.simple_table.accessibleName() == "Continuous group summary data"
 
         dialog.effect_cbo_box.setFocus()
-        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
+        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
         assert dialog.focusWidget() is dialog.effect_txt_box
 
-        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         _close(app, dialog)
@@ -479,7 +489,7 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
             )
             dialog.effect_cbo_box.setCurrentIndex(smd_index)
             dialog.correlation_pre_post.selectAll()
-            QtTest.QTest.keyClicks(dialog.correlation_pre_post, "0.5")
+            key_clicks(dialog.correlation_pre_post, "0.5")
             dialog.g1_pre_post_table.setFocus()
             app.processEvents()
             dialog.g1_pre_post_table.setCurrentCell(0, 1)
@@ -517,7 +527,13 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
 
 
 def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -635,7 +651,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         assert dialog.back_calc_btn.isEnabled()
 
         recorder["back_calc"].clear()
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert dialog.metric_parameter is False
@@ -973,18 +989,20 @@ def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable
         dialog.choice2_btn.setFocus()
         app.processEvents()
         mapped = dialog.choice2_btn.mapTo(
-            dialog.content_scroll.viewport(), QtCore.QPoint()
+            required(dialog.content_scroll.viewport(), "content viewport"),
+            QtCore.QPoint(),
         )
         assert (
-            dialog.content_scroll.viewport()
+            required(dialog.content_scroll.viewport(), "content viewport")
             .rect()
             .intersects(QtCore.QRect(mapped, dialog.choice2_btn.size()))
         )
         label_position = dialog.choice2_label.mapTo(
-            dialog.content_scroll.viewport(), QtCore.QPoint()
+            required(dialog.content_scroll.viewport(), "content viewport"),
+            QtCore.QPoint(),
         )
         assert (
-            dialog.content_scroll.viewport()
+            required(dialog.content_scroll.viewport(), "content viewport")
             .rect()
             .intersects(QtCore.QRect(label_position, dialog.choice2_label.size()))
         )
@@ -992,7 +1010,7 @@ def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable
             "Use unequal population standard deviations"
         )
         assert dialog.choice1_btn.isChecked()
-        QtTest.QTest.mouseClick(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
         assert dialog.choice2_btn.isChecked()
     finally:
         dialog.close()

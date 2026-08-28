@@ -70,7 +70,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             self.outcome_list.setCurrentIndex(outcome_index)
             self.selected_outcome = owner.model.current_outcome
             self.remove_outcome_btn.setEnabled(True)
-        except:
+        except (IndexError, KeyError, ValueError):
             # no outcomes.
             self.selected_outcome = None
 

@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """UI-independent dataset model for studies, outcomes, follow-ups, and groups."""
 
-import pdb
-from PyQt6.QtCore import pyqtRemoveInputHook
 import copy
 import uuid
 
@@ -648,8 +646,10 @@ class Study:
     ):
         try:
             return self.outcomes_to_follow_ups[outcome][follow_up]
-        except:
-            raise Exception("You're trying to access an ma_unit that doesn't exist")
+        except KeyError as exc:
+            raise KeyError(
+                f"No analysis unit exists for outcome {outcome!r} at {follow_up!r}"
+            ) from exc
 
     def add_outcome(self, outcome, follow_up_name="first", group_names=None):
         """Adds a new, blank outcome (i.e., no raw data)"""
@@ -835,17 +835,13 @@ class MetaAnalyticUnit:
         if upper is None:
             upper = self.effects_dict[effect][group_str]["upper"]
 
-        try:
-            se = (upper - est) / mult
-        except:
-            try:
-                se = (est - lower) / mult
-            except:
-                try:
-                    se = (upper - lower) / (2 * mult)
-                except:
-                    se = None
-        return se
+        if upper is not None and est is not None:
+            return (upper - est) / mult
+        if est is not None and lower is not None:
+            return (est - lower) / mult
+        if upper is not None and lower is not None:
+            return (upper - lower) / (2 * mult)
+        return None
 
     def set_effect(self, effect, group_str, value):
         self.effects_dict[effect][group_str]["est"] = value
@@ -897,9 +893,7 @@ class MetaAnalyticUnit:
 
         if convert_to_display_scale is None:
             # Missing conversion metadata indicates an unsupported outcome type.
-            # pyqtRemoveInputHook()
-            # pdb.set_trace()
-            raise Exception(
+            raise ValueError(
                 "calculate_display_effect_and_ci(ma_dataset): convert_to_display_scale is None!"
             )
 
@@ -920,14 +914,7 @@ class MetaAnalyticUnit:
         self.effects_dict[effect][group_str]["display_conf_level"] = conf_level
 
     def get_display_effect(self, effect, group_str):
-        try:
-            if "display_est" in self.effects_dict[effect][group_str]:
-                return self.effects_dict[effect][group_str]["display_est"]
-            else:
-                return None
-        except:
-            pyqtRemoveInputHook()
-            pdb.set_trace()
+        return self.effects_dict[effect][group_str].get("display_est")
 
     def get_display_lower(self, effect, group_str):
         if "display_lower" in self.effects_dict[effect][group_str]:
@@ -1093,39 +1080,36 @@ class MetaAnalyticUnit:
         self.tx_groups.pop(name)
 
     def rename_group(self, old_name, new_name):
-        self.tx_groups[new_name] = self.tx_groups[old_name]
-        self.tx_groups.pop(old_name)
+        if old_name == new_name:
+            return
 
-        ##
-        # also need to deal with the strings for outcome data
-        # i.e., issue #112
-        keys_to_pop = []  # keep track of antiquated group names to be removed
-        for effect in list(self.effects_dict.keys()):
-            for group_str in list(self.effects_dict[effect]):
-                if old_name in group_str:
-                    str_changed = False
-                    cur_group_names = group_str.split("-")
-                    updated_group_strs = []
-                    for cur_group_name in cur_group_names:
-                        if cur_group_name == old_name:
-                            updated_group_strs.append(new_name)
-                            str_changed = True
-                        else:
-                            updated_group_strs.append(cur_group_name)
+        original_group_names = list(self.tx_groups)
+        group = self.tx_groups.pop(old_name)
+        group.name = new_name
+        self.tx_groups[new_name] = group
 
-                    # if the string changed, then we pop
-                    # the old version and add the new
-                    if str_changed:
-                        new_str = "-".join(updated_group_strs)
-                        self.effects_dict[effect][new_str] = self.effects_dict[effect][
-                            group_str
-                        ]
-                        keys_to_pop.append(group_str)
+        # Effect keys are persisted as either one group name or an ordered
+        # ``left-right`` pair. Build the known keys from the group collection;
+        # splitting on "-" corrupts legitimate names such as "Usual-care".
+        key_replacements = {old_name: new_name}
+        for left_group in original_group_names:
+            for right_group in original_group_names:
+                if left_group == right_group:
+                    continue
+                old_key = "-".join((left_group, right_group))
+                new_key = "-".join(
+                    (
+                        new_name if left_group == old_name else left_group,
+                        new_name if right_group == old_name else right_group,
+                    )
+                )
+                if old_key != new_key:
+                    key_replacements[old_key] = new_key
 
-            # now remove any antiquated group names from the effects dictionary
-            for old_group_name in keys_to_pop:
-                if old_group_name in self.effects_dict[effect]:
-                    self.effects_dict[effect].pop(old_group_name)
+        for effect_values in self.effects_dict.values():
+            for old_key, new_key in key_replacements.items():
+                if old_key in effect_values:
+                    effect_values[new_key] = effect_values.pop(old_key)
 
     def get_raw_data_for_group(self, group_name):
         return self.tx_groups[group_name].raw_data

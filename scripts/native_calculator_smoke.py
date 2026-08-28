@@ -10,9 +10,7 @@ import os
 from pathlib import Path
 from pathlib import PurePosixPath
 import sys
-from typing import Callable, TextIO
-
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+from typing import Any, Callable, TextIO
 
 from PIL import Image
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -24,6 +22,13 @@ from rc_metastudio.runtime_types import required
 
 def _phase(name: str) -> None:
     print("RCMS_NATIVE_CALCULATOR_PHASE " + name, flush=True)
+
+
+def _install_backend_stub(
+    backend: object, name: str, implementation: Callable[..., object]
+) -> None:
+    """Install a deliberate runtime test double at the R backend seam."""
+    setattr(backend, name, implementation)
 
 
 def _write_evidence(path: Path, evidence: list[dict[str, object]]) -> None:
@@ -95,7 +100,7 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
     encoded.save(path, format="PNG")
 
 
-def install_native_stub_backend():
+def install_native_stub_backend() -> Any:
     """Install and verify the calculator smoke's non-R backend boundary."""
     from rc_metastudio import meta_py_r_backend
 
@@ -193,22 +198,31 @@ def _run_main() -> int:
     sys.path.append(str(repo_root / "src" / "rc_metastudio"))
     install_native_stub_backend()
 
+    # The application currently loads its GUI modules through their historical
+    # flat names. Use the same identities so runtime ``isinstance`` checks
+    # observe the classes that actually created the dialogs.
     import binary_data_form
     import continuous_data_form
     import diagnostic_data_form
     import launch
     import ma_data_table_model
 
-    binary_data_form.meta_py_r.get_mult_from_r = lambda _level: 1.96
+    _install_backend_stub(
+        binary_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+    )
     setattr(
         binary_data_form.meta_py_r,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    binary_data_form.meta_py_r.impute_bin_data = lambda _data: {"FAIL": True}
-    binary_data_form.meta_py_r.effect_for_study = lambda *args, **kwargs: {
-        "calc_scale": (1.2, 0.8, 1.8)
-    }
+    _install_backend_stub(
+        binary_data_form.meta_py_r, "impute_bin_data", lambda _data: {"FAIL": True}
+    )
+    _install_backend_stub(
+        binary_data_form.meta_py_r,
+        "effect_for_study",
+        lambda *_args, **_kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+    )
     setattr(
         binary_data_form.meta_py_r,
         "effect_triplet",
@@ -219,36 +233,45 @@ def _run_main() -> int:
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    continuous_data_form.meta_py_r.impute_cont_data = lambda _data, _alpha: {
-        "succeeded": False,
-        "comment": "complete input",
-    }
-    continuous_data_form.meta_py_r.continuous_effect_for_study = (
-        lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)}
+    _install_backend_stub(
+        continuous_data_form.meta_py_r,
+        "impute_cont_data",
+        lambda _data, _alpha: {
+            "succeeded": False,
+            "comment": "complete input",
+        },
+    )
+    _install_backend_stub(
+        continuous_data_form.meta_py_r,
+        "continuous_effect_for_study",
+        lambda *_args, **_kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
     )
     setattr(
         continuous_data_form.meta_py_r,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
-    continuous_data_form.meta_py_r.back_calc_cont_data = lambda *args, **kwargs: {
-        "FAIL": True
-    }
+    _install_backend_stub(
+        continuous_data_form.meta_py_r,
+        "back_calc_cont_data",
+        lambda *_args, **_kwargs: {"FAIL": True},
+    )
     setattr(
         diagnostic_data_form.meta_py_r,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    diagnostic_data_form.meta_py_r.impute_diag_data = lambda _data: {
-        "TP": None,
-        "FP": None,
-        "FN": None,
-        "TN": None,
-    }
-    diagnostic_data_form.meta_py_r.diagnostic_effects_for_study = (
-        lambda *args, metrics, **kwargs: {
+    _install_backend_stub(
+        diagnostic_data_form.meta_py_r,
+        "impute_diag_data",
+        lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+    _install_backend_stub(
+        diagnostic_data_form.meta_py_r,
+        "diagnostic_effects_for_study",
+        lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
-        }
+        },
     )
     setattr(
         diagnostic_data_form.meta_py_r,
@@ -486,6 +509,7 @@ def _run_main() -> int:
 
 
 def main() -> int:
+    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     faulthandler.enable()
     faulthandler.dump_traceback_later(30, repeat=True)
     try:

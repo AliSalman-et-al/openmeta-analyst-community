@@ -7,6 +7,8 @@
 
 import os
 import math
+from collections.abc import Callable, Sequence
+from typing import TypeVar, overload
 
 from PyQt6.QtGui import QColor, QUndoCommand
 
@@ -129,7 +131,22 @@ BASE_PATH = str(os.path.abspath(os.getcwd()))
 
 
 # this is a useful function sometimes.
-none_to_str = lambda x: "" if x is None else x
+_Value = TypeVar("_Value")
+
+
+@overload
+def none_to_str(value: None) -> str: ...
+
+
+@overload
+def none_to_str(value: _Value) -> _Value: ...
+
+
+def none_to_str(value: object | None) -> object | str:
+    """Return an empty display value for ``None`` without changing other values."""
+
+    return "" if value is None else value
+
 
 # for diagnostic data -- this dictionary maps
 # the mteric names as they appear in the UI/ure
@@ -155,11 +172,8 @@ DEFAULT_GROUP_NAMES = ["tx A", "tx B"]
 
 
 def equal_close_enough(x, y):
-    THRESHOLD = 1e-4
-    if abs(x - y) < THRESHOLD:
-        return True
-    else:
-        return False
+    threshold = 1e-4
+    return abs(x - y) < threshold
 
 
 ### CONFIDENCE LEVEL STUFF #####
@@ -288,55 +302,59 @@ some useful static methods
 """
 
 
-def seems_sane(xticks):
-    num_list = xticks.split(",")
-    if len(num_list) == 1:
+def seems_sane(xticks: str) -> bool:
+    """Return whether a comma-separated tick list contains only finite numbers."""
+
+    raw_ticks = xticks.split(",")
+    if len(raw_ticks) < 2:
         return False
     try:
-        num_list = [eval(x) for x in num_list]
-    except:
+        ticks = [float(tick.strip()) for tick in raw_ticks]
+    except ValueError:
         return False
-    return True
+    return all(math.isfinite(tick) for tick in ticks)
 
 
-def check_plot_bound(bound):
+def check_plot_bound(bound: str | int | float | None) -> float | bool:
+    if bound is None:
+        return False
     try:
         # errrm... this might cause a problem if
         # bound is 0...
         return float(bound)
-    except:
+    except (TypeError, ValueError):
         return False
 
 
-def is_a_float(s):
+def is_a_float(value: object) -> bool:
     try:
-        float(s)
+        float(value)  # type: ignore[arg-type] -- This predicate intentionally accepts user input of unknown type.
         return True
-    except:
+    except (TypeError, ValueError):
         return False
 
 
-def is_empty(s):
-    return s is None or s == ""
+def is_empty(value: object | None) -> bool:
+    return value is None or value == ""
 
 
-def is_an_int(s):
+def is_an_int(value: object) -> bool:
     try:
-        int(s)
+        int(value)  # type: ignore[call-overload] -- This predicate intentionally accepts user input of unknown type.
         return True
-    except:
+    except (TypeError, ValueError):
         try:
-            value = float(s)
-            return value.is_integer()
-        except:
+            numeric_value = float(value)  # type: ignore[arg-type] -- This predicate intentionally accepts user input of unknown type.
+            return numeric_value.is_integer()
+        except (TypeError, ValueError):
             return False
 
 
-def is_NaN(x):
+def is_NaN(value: object) -> bool:
     # there's no built-in for checking if a number is a NaN in
     # Python < 2.6. checking if a number is equal to itself
     # does the trick, though purportedly does not always work.
-    return x != x
+    return value != value
 
 
 class CommandGenericDo(QUndoCommand):
@@ -345,28 +363,52 @@ class CommandGenericDo(QUndoCommand):
     thunks, if you will -- one for doing and one for undoing.
     """
 
-    def __init__(self, redo_f, undo_f, description=""):
+    def __init__(
+        self,
+        redo_f: Callable[[], None],
+        undo_f: Callable[[], None],
+        description: str = "",
+    ) -> None:
         super(CommandGenericDo, self).__init__(description)
         self.redo_f = redo_f
         self.undo_f = undo_f
 
-    def redo(self):
+    def redo(self) -> None:
         self.redo_f()
 
-    def undo(self):
+    def undo(self) -> None:
         self.undo_f()
 
 
-def tabulate(lists, sep=" | ", return_col_widths=False, align=[]):
-    """Makes a pretty table from the lists in args"""
-    """ each arg is a list """
-    """ if return_max_col_lenths is true, the return type is a tuple of (str, col_widths) """
-    """ align is a list the same length as lists telling how the column should be aligned ('L','R') etc """
+@overload
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str = " | ",
+    return_col_widths: bool = False,
+    align: Sequence[str] | None = None,
+) -> str: ...
 
-    if len(align) != len(lists):
-        align = [
-            "L",
-        ] * len(lists)
+
+@overload
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str,
+    return_col_widths: bool,
+    align: Sequence[str] | None = None,
+) -> str | tuple[str, list[int]]: ...
+
+
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str = " | ",
+    return_col_widths: bool = False,
+    align: Sequence[str] | None = None,
+) -> str | tuple[str, list[int]]:
+    """Render equally sized columns as a plain-text table."""
+
+    column_alignments = list(align) if align is not None else []
+    if len(column_alignments) != len(lists):
+        column_alignments = ["L"] * len(lists)
 
     # covert lists in args to string lists
     string_lists = []
@@ -387,7 +429,7 @@ def tabulate(lists, sep=" | ", return_col_widths=False, align=[]):
             "{0:{align}{width}}".format(
                 x, width=width, align="<" if row_alignment == "L" else ">"
             )
-            for x, width, row_alignment in zip(row, max_lengths, align)
+            for x, width, row_alignment in zip(row, max_lengths, column_alignments)
         ]
         row_str = sep.join(row_str)
         out.append(row_str)

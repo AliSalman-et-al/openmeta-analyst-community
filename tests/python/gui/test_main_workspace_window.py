@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from rc_metastudio.qt6_resources import ensure_application_resources
+from test_types import required
 
 prepare_generated_ui_imports()
 ensure_application_resources()
@@ -34,7 +35,7 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
         assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
         assert state.role is adaptive_window.WindowRole.MAIN
         assert (
-            window.layout().sizeConstraint()
+            required(window.layout(), "workspace layout").sizeConstraint()
             == QtWidgets.QLayout.SizeConstraint.SetNoConstraint
         )
         assert (
@@ -145,7 +146,7 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
             for button in toolbar_buttons
         )
         assert (
-            window.menuAnalysis.style().pixelMetric(
+            required(window.menuAnalysis.style(), "analysis menu style").pixelMetric(
                 QtWidgets.QStyle.PixelMetric.PM_SmallIconSize, None, window.menuAnalysis
             )
             == 18

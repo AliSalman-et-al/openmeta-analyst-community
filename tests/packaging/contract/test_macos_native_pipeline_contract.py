@@ -5,14 +5,14 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from _workflow import load_workflow
+from ._workflow import load_workflow
 
 ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location(
     "resolve_macos_package_target", ROOT / "scripts/resolve_macos_package_target.py"
 )
+assert SPEC is not None and SPEC.loader is not None
 TARGETS = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
 SPEC.loader.exec_module(TARGETS)
 
 
@@ -189,8 +189,8 @@ def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
         "resolve_macos_r_framework_component",
         ROOT / "scripts/resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "R-fw.pkg"
     framework = component / "Payload/R.framework"
@@ -212,8 +212,8 @@ def test_arm64_launcher_adapter_rejects_intel_build_metadata():
         "configure_macos_r_launchers",
         ROOT / "scripts/configure_macos_r_launchers.py",
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
 
     wrapper = launchers.private_config("arm64")

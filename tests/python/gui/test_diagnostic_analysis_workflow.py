@@ -3,6 +3,7 @@
 import os
 import sys
 from pathlib import Path
+from collections.abc import Callable
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
@@ -15,6 +16,14 @@ os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verificat
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
+
+
+def _set_backend(
+    monkeypatch, backend: object, name: str, replacement: Callable[..., object]
+) -> None:
+    """Patch one dynamic R backend function at the test seam."""
+
+    monkeypatch.setattr(backend, name, replacement, raising=False)
 
 
 def _create_diagnostic_dataset(window):
@@ -92,11 +101,13 @@ def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
         def _boom(*args, **kwargs):
             raise ValueError("simulated preparation failure")
 
-        ma_specs.MA_Specs = _boom
+        setattr(ma_specs, "MA_Specs", _boom)
         # QMessageBox.critical (a modal exec) aborts under the offscreen
         # platform, so record the call instead of actually showing it.
-        meta_form.QMessageBox.critical = staticmethod(
-            lambda *args, **kwargs: shown.append(args)
+        setattr(
+            meta_form.QMessageBox,
+            "critical",
+            staticmethod(lambda *args, **kwargs: shown.append(args)),
         )
 
         form = diag_metrics.Diag_Metrics(window.model, parent=window)
@@ -137,14 +148,28 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
         # setup (and the previously-broken translate() call) without real R.
         # populate_cbo_box builds the R data object for feasibility checks, so
         # that entry point has to be stubbed too.
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.hsroc",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.hsroc",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -191,12 +216,26 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
             window.model, "included_studies_have_raw_data", lambda: True
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -247,22 +286,41 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_diagnostic_multi = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated diagnostic failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_diagnostic_multi",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated diagnostic failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
         monkeypatch.setattr(
             ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
         )
@@ -306,20 +364,34 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
 
         def run_metric(method_names, param_vals):
             if len(param_vals) > 1:
@@ -327,19 +399,30 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
             metric = param_vals[0]["measure"]
             if metric == "Sens":
                 raise RuntimeError("HSROC failed to converge")
+            title = "%s Forest plot" % metric
             return {
                 "texts": {
                     "%s Summary" % metric: "%s ok" % metric,
                 },
                 "images": {
-                    "%s Forest plot" % metric: "%s.png" % metric.lower(),
+                    title: "%s.png" % metric.lower(),
                 },
+                "display_images": {},
                 "image_var_names": {},
                 "image_params_paths": {},
-                "image_order": ["%s Forest plot" % metric],
+                "image_order": [title],
+                "plot_capabilities": {
+                    title: {
+                        "plot_kind": "forest",
+                        "editable": False,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
             }
 
-        backend.run_diagnostic_multi = run_metric
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
         monkeypatch.setattr(
             ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
         )
@@ -402,12 +485,22 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
 
         def get_params(method):
             if method == "diagnostic.hsroc":
@@ -436,8 +529,10 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             defaults = {"conf.level": 95.0, "adjust": 0.5, "to": "only0"}
             return (definitions, defaults, list(definitions), {})
 
-        backend.get_params = get_params
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(monkeypatch, backend, "get_params", get_params)
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -455,8 +550,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
                 "image_order": [],
             }
 
-        backend.run_diagnostic_multi = run_diagnostic
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_diagnostic)
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
         monkeypatch.setattr(
             app_error_handler,
             "handle_exception",
@@ -602,25 +697,42 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: (
-            {"conf.level": "float"},
-            {"conf.level": 95.0},
-            ["conf.level"],
-            {},
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
         )
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_params",
+            lambda method: (
+                {"conf.level": "float"},
+                {"conf.level": 95.0},
+                ["conf.level"],
+                {},
+            ),
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
 
         form = window._build_analysis_specs_dialog(
             diag_metrics=["sens", "spec", "lr", "dor"],
@@ -683,11 +795,20 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
             lambda effect=None: effect in ("Sens", "Spec"),
         )
 
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -710,8 +831,10 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
                 "image_order": None,
             }
 
-        backend.ma_dataset_to_simple_diagnostic_robj = build_metric
-        backend.run_diagnostic_multi = run_metric
+        _set_backend(
+            monkeypatch, backend, "ma_dataset_to_simple_diagnostic_robj", build_metric
+        )
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
@@ -900,15 +1023,29 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
             lambda effect=None: effect in ("Sens", "Spec"),
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+                "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -960,13 +1097,27 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+                "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",

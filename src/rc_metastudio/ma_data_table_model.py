@@ -13,7 +13,32 @@ from PyQt6.QtGui import QColor, QIcon
 
 # home-grown
 from ma_dataset import Dataset, Outcome, Study, Covariate
-from meta_globals import *
+from meta_globals import (
+    ALL_METRIC_NAMES,
+    BINARY,
+    BINARY_METRIC_NAMES,
+    BINARY_ONE_ARM_METRICS,
+    BINARY_TWO_ARM_METRICS,
+    CONTINUOUS,
+    CONTINUOUS_METRIC_NAMES,
+    CONTINUOUS_ONE_ARM_METRICS,
+    CONTINUOUS_TWO_ARM_METRICS,
+    DEFAULT_CONF_LEVEL,
+    DEFAULT_GROUP_NAMES,
+    DIAGNOSTIC,
+    DIAGNOSTIC_METRIC_NAMES,
+    DIAGNOSTIC_METRICS,
+    EMPTY_VALS,
+    FACTOR,
+    NUM_DIGITS,
+    ONE_ARM_METRICS,
+    OTHER,
+    STR_TO_TYPE_DICT,
+    is_a_float,
+    is_an_int,
+    is_empty,
+    validate_confidence_level,
+)
 import calculator_routines as calc_fncs
 from rc_metastudio import meta_py_r
 import qt_text
@@ -409,10 +434,7 @@ class DatasetModel(QAbstractTableModel):
         """this method assumes the input can be cast to a float!"""
         float_var = float(float_var)
         precision = num_digits or self.NUM_DIGITS
-        formatted_str = "'%." + str(precision) + "f'"
-        # Keep formatting precision configurable while preserving the existing
-        # quoted display format.
-        return eval(formatted_str + "% float_var")
+        return f"{float_var:.{precision}f}"
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         """
@@ -1588,7 +1610,7 @@ class DatasetModel(QAbstractTableModel):
         )
         try:
             return self.dataset.covariates[cov_index]
-        except:
+        except IndexError:
             return None
 
     def get_covariate_names(self):
@@ -1744,7 +1766,7 @@ class DatasetModel(QAbstractTableModel):
                 return self.dataset.outcome_names_to_follow_ups[self.current_outcome][
                     self.current_time_point
                 ]
-            except:
+            except (KeyError, TypeError):
                 return None
 
     def get_follow_up_name_for_t_point(self, t_point):
@@ -2004,14 +2026,30 @@ class DatasetModel(QAbstractTableModel):
         return self.dataset.is_diag
 
     def set_state(self, state_dict):
-        for key, val in list(state_dict.items()):
-            if key == "conf_level":
-                self.set_conf_level(val)
-            else:
-                exec("self.%s = val" % key)
+        """Restore the persisted table state through the supported fields only."""
 
-        if "conf_level" not in list(state_dict.keys()):
-            self.set_conf_level(DEFAULT_CONF_LEVEL)
+        restored_attributes = {
+            "NAME": "NAME",
+            "YEAR": "YEAR",
+            "RAW_DATA": "RAW_DATA",
+            "OUTCOMES": "OUTCOMES",
+            "HEADERS": "headers",
+            "current_outcome": "current_outcome",
+            "current_time_point": "current_time_point",
+            "current_txs": "current_txs",
+            "current_effect": "current_effect",
+            "study_auto_added": "study_auto_added",
+        }
+        unknown_fields = set(state_dict) - set(restored_attributes) - {"conf_level"}
+        if unknown_fields:
+            names = ", ".join(sorted(unknown_fields))
+            raise ValueError(f"Unsupported table state field(s): {names}")
+
+        for state_name, attribute_name in restored_attributes.items():
+            if state_name in state_dict:
+                setattr(self, attribute_name, state_dict[state_name])
+
+        self.set_conf_level(state_dict.get("conf_level", DEFAULT_CONF_LEVEL))
 
         # Signals emitted by reset_model immediately query visible cells. Keep
         # the column schema synchronized with the restored outcome before that

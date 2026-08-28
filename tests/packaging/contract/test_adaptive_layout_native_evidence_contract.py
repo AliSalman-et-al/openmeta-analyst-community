@@ -3,14 +3,13 @@
 """Release contracts for native adaptive-layout package evidence."""
 
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 from PyQt6 import QtGui
 
-from _workflow import load_workflow
+from ._workflow import load_module_from_path, load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -124,10 +123,7 @@ def test_native_evidence_runner_covers_the_release_review_contract():
 
 def _load_validator():
     validator_path = ROOT / "scripts" / "validate_adaptive_layout_evidence.py"
-    spec = importlib.util.spec_from_file_location("evidence_validator", validator_path)
-    validator = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(validator)
-    return validator
+    return load_module_from_path("evidence_validator", validator_path)
 
 
 def test_native_evidence_validator_matches_qt_half_up_pixel_rounding():

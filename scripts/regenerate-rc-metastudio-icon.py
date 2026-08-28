@@ -23,7 +23,7 @@ SPLASH_MARGIN = 32
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 
-def _alpha_bounds(image):
+def _alpha_bounds(image: QtGui.QImage) -> QtCore.QRect:
     left = image.width()
     top = image.height()
     right = -1
@@ -42,7 +42,7 @@ def _alpha_bounds(image):
     return QtCore.QRect(left, top, right - left + 1, bottom - top + 1)
 
 
-def _render_square_master():
+def _render_square_master() -> QtGui.QImage:
     source = QtGui.QImage(str(ICON_SOURCE_IMAGE)).convertToFormat(
         QtGui.QImage.Format.Format_ARGB32
     )
@@ -75,7 +75,7 @@ def _render_square_master():
     return master
 
 
-def _render_splash():
+def _render_splash() -> QtGui.QImage:
     source = QtGui.QImage(str(SPLASH_SOURCE_IMAGE)).convertToFormat(
         QtGui.QImage.Format.Format_ARGB32
     )
@@ -112,7 +112,7 @@ def _render_splash():
     return splash
 
 
-def _png_bytes(image):
+def _png_bytes(image: QtGui.QImage) -> bytes:
     data = QtCore.QByteArray()
     buffer = QtCore.QBuffer(data)
     buffer.open(QtCore.QIODevice.OpenModeFlag.WriteOnly)
@@ -121,11 +121,11 @@ def _png_bytes(image):
     return bytes(data.data())
 
 
-def _ico_dimension_byte(size):
+def _ico_dimension_byte(size: int) -> int:
     return 0 if size == 256 else size
 
 
-def _write_ico(master):
+def _write_ico(master: QtGui.QImage) -> None:
     frames = []
     for size in ICO_SIZES:
         frame = master.scaled(
@@ -165,7 +165,7 @@ def _write_ico(master):
         output.write(payload)
 
 
-def main():
+def main() -> None:
     app = QtGui.QGuiApplication.instance() or QtGui.QGuiApplication([])
     master = _render_square_master()
     splash = _render_splash()

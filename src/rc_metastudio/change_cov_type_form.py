@@ -5,7 +5,7 @@ from functools import cmp_to_key
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
-from meta_globals import *
+from meta_globals import CONTINUOUS, COV_INTS_TO_STRS, FACTOR
 import app_error_handler
 import adaptive_window
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm

@@ -392,8 +392,8 @@ def test_binary_resource_registers_and_exposes_icon_and_svg(verified_qt6_output)
 
     assert QtCore.QResource.registerResource(str(resource))
     try:
-        assert QtCore.QFile(":/misc/meta.png").exists()
-        assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
+        assert QtCore.QFile.exists(":/misc/meta.png")
+        assert QtCore.QFile.exists(":/icons/actions/about-legal.svg")
     finally:
         assert QtCore.QResource.unregisterResource(str(resource))
 
@@ -409,8 +409,8 @@ def test_application_resource_loader_registers_only_the_binary_collection(
         from PyQt6 import QtCore
 
         assert registration.path == resource.resolve()
-        assert QtCore.QFile(":/misc/meta.png").exists()
-        assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
+        assert QtCore.QFile.exists(":/misc/meta.png")
+        assert QtCore.QFile.exists(":/icons/actions/about-legal.svg")
     finally:
         registration.close()
 

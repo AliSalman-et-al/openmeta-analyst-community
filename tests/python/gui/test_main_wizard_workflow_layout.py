@@ -3,10 +3,10 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import cast
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -16,6 +16,13 @@ from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 import adaptive_window
+from test_types import key_click, mouse_click, required
+
+
+def _page(wizard: QtWidgets.QWizard, page_id: int, page_type):
+    """Narrow a registered generated page at the Qt lookup seam."""
+
+    return cast(page_type, required(wizard.page(page_id), "wizard page"))
 
 
 def _show(wizard, qapp):
@@ -32,8 +39,10 @@ def _frame_tuple(window):
 
 def _assert_page_contract(wizard, expected_buttons):
 
-    page = wizard.currentPage()
-    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    page = required(wizard.currentPage(), "current wizard page")
+    overflow = required(
+        page.findChild(QtWidgets.QScrollArea, "pageScrollArea"), "page scroll area"
+    )
     assert overflow is not None
     assert overflow.widgetResizable()
     for role in expected_buttons:
@@ -42,7 +51,7 @@ def _assert_page_contract(wizard, expected_buttons):
         assert not overflow.isAncestorOf(button)
 
 
-def _assert_multiline_data_type_labels_fit(page):
+def _assert_multiline_data_type_labels_fit(page) -> None:
     for button in page._data_type_buttons():
         line_count = max(1, len(button.text().splitlines()))
         margin = max(
@@ -83,7 +92,7 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
             is adaptive_window.WindowRole.WORKFLOW
         )
 
-        welcome_page = wizard.page(main_wizard.Page_Welcome)
+        welcome_page = _page(wizard, main_wizard.Page_Welcome, main_wizard.WelcomePage)
         for button in (
             welcome_page.create_new_btn,
             welcome_page.import_csv_btn,
@@ -93,13 +102,17 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
             assert button.iconSize() == QtCore.QSize(24, 24)
             assert button.minimumHeight() == 36
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        )
         data_type_page.twoarm_proportions_Button.click()
         wizard.next()
         qapp.processEvents()
         assert _frame_tuple(wizard) == initial_geometry
 
-        metric_page = wizard.page(main_wizard.Page_ChooseMetric)
+        metric_page = _page(
+            wizard, main_wizard.Page_ChooseMetric, main_wizard.ChooseMetricPage
+        )
         metric_page.label_2.setText("A very long translated instruction. " * 80)
         larger_font = QtGui.QFont(metric_page.font())
         larger_font.setPointSize(larger_font.pointSize() + 8)
@@ -122,31 +135,42 @@ def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
         _show(wizard, qapp)
 
         for page_id in wizard.pageIds():
-            page = wizard.page(page_id)
-            overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+            page = required(wizard.page(page_id), "wizard page")
+            overflow = required(
+                page.findChild(QtWidgets.QScrollArea, "pageScrollArea"),
+                "page scroll area",
+            )
             assert overflow is not None, page_id
             assert overflow.widgetResizable() is True
             assert overflow.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus
             assert overflow.widget() is not None
 
-        overflow = wizard.currentPage().findChild(
-            QtWidgets.QScrollArea, "pageScrollArea"
+        overflow = required(
+            required(wizard.currentPage(), "current wizard page").findChild(
+                QtWidgets.QScrollArea, "pageScrollArea"
+            ),
+            "page scroll area",
         )
         for button_id in (
             main_wizard.QWizard.WizardButton.NextButton,
             main_wizard.QWizard.WizardButton.CancelButton,
         ):
-            button = wizard.button(button_id)
+            button = required(wizard.button(button_id), "wizard button")
             assert button.isVisible()
             assert not overflow.isAncestorOf(button)
 
         wizard.resize(500, 330)
-        diagnostic = wizard.currentPage().diagnostic_Button
+        diagnostic = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        ).diagnostic_Button
         diagnostic.setFocus()
         qapp.processEvents()
-        visible_rect = overflow.viewport().rect()
+        visible_rect = required(overflow.viewport(), "overflow viewport").rect()
         control_rect = QtCore.QRect(
-            diagnostic.mapTo(overflow.viewport(), QtCore.QPoint()), diagnostic.size()
+            diagnostic.mapTo(
+                required(overflow.viewport(), "overflow viewport"), QtCore.QPoint()
+            ),
+            diagnostic.size(),
         )
         assert visible_rect.intersects(control_rect)
     finally:
@@ -181,7 +205,9 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             _assert_page_contract(
                 wizard, [main_wizard.QWizard.WizardButton.CancelButton]
             )
-            wizard.currentPage().create_new_btn.click()
+            _page(
+                wizard, main_wizard.Page_Welcome, main_wizard.WelcomePage
+            ).create_new_btn.click()
             qapp.processEvents()
 
         _assert_page_contract(
@@ -191,8 +217,11 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                 main_wizard.QWizard.WizardButton.CancelButton,
             ],
         )
-        _assert_multiline_data_type_labels_fit(wizard.currentPage())
-        wizard.currentPage().twoarm_proportions_Button.click()
+        data_type_page = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        )
+        _assert_multiline_data_type_labels_fit(data_type_page)
+        data_type_page.twoarm_proportions_Button.click()
         wizard.next()
         qapp.processEvents()
         _assert_page_contract(
@@ -203,7 +232,10 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                 main_wizard.QWizard.WizardButton.CancelButton,
             ],
         )
-        wizard.currentPage().label_2.setText("Long translated metric guidance. " * 80)
+        metric_page = _page(
+            wizard, main_wizard.Page_ChooseMetric, main_wizard.ChooseMetricPage
+        )
+        metric_page.label_2.setText("Long translated metric guidance. " * 80)
         wizard.next()
         qapp.processEvents()
 
@@ -215,11 +247,14 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             else main_wizard.QWizard.WizardButton.FinishButton,
         ]
         _assert_page_contract(wizard, outcome_buttons)
-        wizard.currentPage().outcome_name_LineEdit.setText("Outcome")
+        outcome_page = _page(
+            wizard, main_wizard.Page_OutcomeName, main_wizard.OutcomeNamePage
+        )
+        outcome_page.outcome_name_LineEdit.setText("Outcome")
         if path == "csv_import":
             wizard.next()
             qapp.processEvents()
-            page = wizard.currentPage()
+            page = _page(wizard, main_wizard.Page_CsvImport, main_wizard.CsvImportPage)
             page.instructions.setText("Content-rich CSV guidance. " * 100)
             page.preview_table.setRowCount(100)
             page.preview_table.setColumnCount(20)
@@ -233,7 +268,12 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                     main_wizard.QWizard.WizardButton.CancelButton,
                 ],
             )
-            assert page.pageScrollArea.verticalScrollBar().maximum() > 0
+            assert (
+                required(
+                    page.pageScrollArea.verticalScrollBar(), "page scrollbar"
+                ).maximum()
+                > 0
+            )
 
         assert _frame_tuple(wizard) == initial_geometry
     finally:
@@ -249,32 +289,39 @@ def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
     try:
         _show(wizard, qapp)
         wizard.resize(500, 330)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
         diagnostic = page.diagnostic_Button
-        QTest.mouseClick(diagnostic, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(diagnostic, QtCore.Qt.MouseButton.LeftButton)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
         next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
         cancel_button = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
-        QTest.keyClick(diagnostic, QtCore.Qt.Key.Key_Tab)
+        key_click(diagnostic, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Tab)
+        key_click(next_button, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is cancel_button
-        QTest.keyClick(cancel_button, QtCore.Qt.Key.Key_Backtab)
+        key_click(cancel_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Backtab)
+        key_click(next_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
         overflow = page.pageScrollArea
         diagnostic_rect = QtCore.QRect(
-            diagnostic.mapTo(overflow.viewport(), QtCore.QPoint()), diagnostic.size()
+            diagnostic.mapTo(
+                required(overflow.viewport(), "overflow viewport"), QtCore.QPoint()
+            ),
+            diagnostic.size(),
         )
-        assert overflow.viewport().rect().intersects(diagnostic_rect)
+        assert (
+            required(overflow.viewport(), "overflow viewport")
+            .rect()
+            .intersects(diagnostic_rect)
+        )
     finally:
         wizard.close()
         qapp.processEvents()
@@ -286,17 +333,25 @@ def test_return_activates_visible_default_wizard_action(qapp):
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        choice = wizard.currentPage().diagnostic_Button
-        QTest.mouseClick(choice, QtCore.Qt.MouseButton.LeftButton)
+        choice = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        ).diagnostic_Button
+        mouse_click(choice, QtCore.Qt.MouseButton.LeftButton)
         qapp.processEvents()
-        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
+        next_button = cast(
+            QtWidgets.QPushButton,
+            required(
+                wizard.button(main_wizard.QWizard.WizardButton.NextButton),
+                "next button",
+            ),
+        )
         assert next_button.isVisible()
         assert next_button.isEnabled()
         assert next_button.isDefault()
         before_page = wizard.currentId()
 
         assert qapp.focusWidget() is choice
-        QTest.keyClick(choice, QtCore.Qt.Key.Key_Return)
+        key_click(choice, QtCore.Qt.Key.Key_Return)
         qapp.processEvents()
 
         assert wizard.currentId() != before_page
@@ -314,7 +369,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
 
         rendered_icons = {}
         for foreground in ("#111111", "#f5f5f5"):
@@ -364,8 +419,8 @@ def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        page = wizard.currentPage()
-        page.layout().activate()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        required(page.layout(), "data type layout").activate()
         qapp.processEvents()
 
         standard = page.onearm_proportion_Button
@@ -384,23 +439,32 @@ def test_hidden_and_closed_wizards_do_not_react_to_other_wizard_focus(qapp):
     second = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(first, qapp)
-        first_page = first.currentPage()
-        first_scroll = first_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+        first_page = _page(first, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        first_scroll = required(
+            first_page.findChild(QtWidgets.QScrollArea, "pageScrollArea"),
+            "first page scroll area",
+        )
         first_scroll.ensureWidgetVisible(first_page.diagnostic_Button)
         qapp.processEvents()
-        first_scroll_value = first_scroll.verticalScrollBar().value()
+        first_scroll_value = required(
+            first_scroll.verticalScrollBar(), "first scrollbar"
+        ).value()
         first.hide()
         qapp.processEvents()
 
         _show(second, qapp)
-        second.currentPage().onearm_mean_Button.setFocus()
+        second_page = _page(second, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        second_page.onearm_mean_Button.setFocus()
         qapp.processEvents()
-        assert first_scroll.verticalScrollBar().value() == first_scroll_value
+        assert (
+            required(first_scroll.verticalScrollBar(), "first scrollbar").value()
+            == first_scroll_value
+        )
 
         first.close()
-        second.currentPage().twoarm_means_Button.setFocus()
+        second_page.twoarm_means_Button.setFocus()
         qapp.processEvents()
-        assert second.currentPage().twoarm_means_Button.hasFocus()
+        assert second_page.twoarm_means_Button.hasFocus()
     finally:
         first.close()
         second.close()
@@ -427,7 +491,7 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
         wizard.resize(560, 400)
         qapp.processEvents()
         initial_geometry = _frame_tuple(wizard)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_CsvImport, main_wizard.CsvImportPage)
         page.instructions.setText("Long CSV guidance. " * 120)
         page.preview_table.setRowCount(100)
         page.preview_table.setColumnCount(20)
@@ -435,11 +499,19 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
         qapp.processEvents()
         qapp.processEvents()
 
-        overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-        finish = wizard.button(main_wizard.QWizard.WizardButton.FinishButton)
-        cancel = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
+        overflow = required(
+            page.findChild(QtWidgets.QScrollArea, "pageScrollArea"), "page scroll area"
+        )
+        finish = required(
+            wizard.button(main_wizard.QWizard.WizardButton.FinishButton),
+            "finish button",
+        )
+        cancel = required(
+            wizard.button(main_wizard.QWizard.WizardButton.CancelButton),
+            "cancel button",
+        )
         assert _frame_tuple(wizard) == initial_geometry
-        assert overflow.verticalScrollBar().maximum() > 0
+        assert required(overflow.verticalScrollBar(), "page scrollbar").maximum() > 0
         assert finish.isVisible()
         assert cancel.isVisible()
         assert not overflow.isAncestorOf(finish)

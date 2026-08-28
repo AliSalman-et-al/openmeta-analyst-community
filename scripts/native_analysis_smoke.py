@@ -8,8 +8,7 @@ import os
 from pathlib import Path
 import sys
 from types import SimpleNamespace
-
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+from typing import Any, Callable
 
 from PyQt6 import QtCore, QtWidgets, sip
 
@@ -52,19 +51,32 @@ def validate_evidence(path: Path) -> dict[str, object]:
     return evidence
 
 
+def _install_backend_stub(
+    backend: object, name: str, implementation: Callable[..., object]
+) -> None:
+    """Install a deliberately dynamic test double at the R backend seam."""
+    setattr(backend, name, implementation)
+
+
 def main() -> int:
+    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
     sys.path.append(str(repo_root / "src" / "rc_metastudio"))
     from rc_metastudio import meta_py_r_backend
 
     meta_py_r_backend.install_stub_meta_py_r()
-    import app_error_handler
-    import ma_specs
+    from rc_metastudio import app_error_handler, ma_specs
 
     backend = ma_specs.meta_py_r
-    backend.ma_dataset_to_simple_binary_robj = lambda *args, **kwargs: None
-    backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
+    _install_backend_stub(
+        backend, "ma_dataset_to_simple_binary_robj", lambda *_args, **_kwargs: None
+    )
+    _install_backend_stub(
+        backend,
+        "get_available_methods",
+        lambda **_kwargs: {"Random": "binary.random"},
+    )
     setattr(
         backend,
         "get_params",
@@ -75,23 +87,27 @@ def main() -> int:
             {},
         ),
     )
-    backend.get_method_description = lambda method: "Random-effects analysis"
-    backend.get_analysis_plot_capabilities = lambda *args, **kwargs: []
+    _install_backend_stub(
+        backend, "get_method_description", lambda _method: "Random-effects analysis"
+    )
+    _install_backend_stub(
+        backend, "get_analysis_plot_capabilities", lambda *_args, **_kwargs: []
+    )
 
     class Model:
         current_effect = "OR"
         dataset = SimpleNamespace(covariates=[])
 
-        def get_current_outcome_type(self):
+        def get_current_outcome_type(self) -> str:
             return "binary"
 
-        def included_studies_have_raw_data(self):
+        def included_studies_have_raw_data(self) -> bool:
             return True
 
     class Owner(QtWidgets.QWidget):
         results = []
 
-        def analysis(self, _result):
+        def analysis(self, _result: object) -> None:
             self.results.append(_result)
 
     app = app_error_handler.get_or_create_application([])
@@ -99,20 +115,20 @@ def main() -> int:
     baseline = len(app.topLevelWidgets())
     calls = []
 
-    def run_backend(method, parameters):
+    def run_backend(method: str, parameters: dict[str, object]) -> dict[str, object]:
         calls.append({"method": method, "parameters": dict(parameters)})
         return {"texts": {"Summary": "ok"}, "images": {}}
 
-    backend.run_binary_ma = run_backend
-    backend.reset_Rs_working_dir = lambda: None
+    _install_backend_stub(backend, "run_binary_ma", run_backend)
+    _install_backend_stub(backend, "reset_Rs_working_dir", lambda: None)
 
-    def deferred_delete():
+    def deferred_delete() -> None:
         QtCore.QCoreApplication.sendPostedEvents(
             None, QtCore.QEvent.Type.DeferredDelete
         )
         app.processEvents()
 
-    def make_configuration():
+    def make_configuration() -> Any:
         dialog = ma_specs.MA_Specs(Model(), parent=owner, conf_level=95.0)
         dialog.show()
         app.processEvents()

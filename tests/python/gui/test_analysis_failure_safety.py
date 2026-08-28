@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from collections.abc import Callable
 
 import pytest
 from PyQt6 import QtCore, QtWidgets, sip
@@ -15,8 +16,17 @@ REPO_ROOT = os.getcwd()
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import required
 
 prepare_generated_ui_imports()
+
+
+def _set_backend(
+    monkeypatch, backend: object, name: str, replacement: Callable[..., object]
+) -> None:
+    """Patch a dynamic R backend seam without pretending its overloads are uniform."""
+
+    monkeypatch.setattr(backend, name, replacement, raising=False)
 
 
 def test_result_owner_exception_still_deletes_real_specs_and_progress(
@@ -114,22 +124,39 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
     try:
         _create_binary_dataset(window)
 
-        backend.ma_dataset_to_simple_binary_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Binary Random-Effects": "binary.random"
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_binary_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {"Binary Random-Effects": "binary.random"},
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_binary_ma = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated R failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_binary_ma",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated R failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
 
         monkeypatch.setattr(
             ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
@@ -189,22 +216,39 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
             }
         )
 
-        backend.ma_dataset_to_simple_continuous_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Continuous Random-Effects": "continuous.random"
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_continuous_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {"Continuous Random-Effects": "continuous.random"},
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_workflow_analysis = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated recompute failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_workflow_analysis",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated recompute failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_Rs_working_dir", lambda: None)
 
         monkeypatch.setattr(
             ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
@@ -258,13 +302,27 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
             }
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "ma_dataset_to_simple_diagnostic_robj",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -596,7 +654,9 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
 
     form = meta_reg_form.MetaRegForm(Model())
     try:
-        ok_button = form.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button = required(
+            form.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "ok button"
+        )
         assert ok_button.isEnabled() is True
 
         for _covariate, checkbox in form.covs_and_check_boxes:
@@ -686,7 +746,9 @@ def test_safe_application_notify_reports_event_handler_exceptions(
     )
 
     class RaisingWidget(QWidget):
-        def event(self, event):
+        # PyQt's runtime dispatch accepts this exact override; the bundled
+        # stubs expose an incompatible descriptor signature.
+        def event(self, event: QtCore.QEvent) -> bool:  # ty: ignore[invalid-method-override]
             raise RuntimeError("event exploded")
 
     widget = RaisingWidget()

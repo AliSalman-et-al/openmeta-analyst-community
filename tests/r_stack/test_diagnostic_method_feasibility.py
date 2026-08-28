@@ -1,6 +1,6 @@
 import textwrap
 
-from _r_driver_support import build_r_driver, run_r_driver
+from ._r_driver_support import build_r_driver, run_r_driver
 
 
 _DIAGNOSTIC_FEASIBILITY_DRIVER = textwrap.dedent(

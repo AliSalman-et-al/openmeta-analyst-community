@@ -85,9 +85,16 @@ try {
     uv run ty check `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
         --extra-search-path "$BuildRoot/generated/rc_metastudio/forms" `
+        --extra-search-path . `
         --extra-search-path src/rc_metastudio `
-        src/rc_metastudio
-    if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
+        --extra-search-path src `
+        --extra-search-path scripts `
+        --extra-search-path tests/python `
+        --extra-search-path tests/python/gui `
+        --extra-search-path tests/r_stack `
+        --extra-search-path tests/packaging/contract `
+        src/rc_metastudio scripts tests r/RCMetaR/inst/qa
+    if ($LASTEXITCODE -ne 0) { throw "Repository-wide strict type verification failed." }
 
     # Core owns every GUI module except the five deliberately isolated
     # RemainingSurfaces modules, in one process with one QApplication owner.

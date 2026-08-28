@@ -13,7 +13,7 @@ import unicodedata
 import zipfile
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
-from typing import cast
+from typing import TypeGuard, cast
 
 
 PE_X64_MACHINE = 0x8664
@@ -127,9 +127,10 @@ def sha256_file(path: Path) -> str:
 
 
 def _valid_source_provenance(value: object, source_commit: str) -> bool:
+    if not _string_keyed_dict(value):
+        return False
     return (
-        isinstance(value, dict)
-        and value.get("schema_version") == 1
+        value.get("schema_version") == 1
         and value.get("head_sha") == source_commit
         and value.get("working_tree") in {"clean", "dirty"}
         and _valid_sha256(value.get("worktree_sha256"))
@@ -600,7 +601,10 @@ def _validate_runtime_probe(
         )
     python = runtime_probe.get("python", {})
     probe_app_root = _normalized_path(python.get("executable", "")).parent
-    probe_path = lambda value: _probe_relative_path(value, probe_app_root)
+
+    def probe_path(value: object) -> PurePosixPath | None:
+        return _probe_relative_path(value, probe_app_root)
+
     if (
         python.get("version") != EXPECTED_VERSIONS["python"]
         or str(python.get("architecture", "")).lower() not in {"amd64", "x86_64"}
@@ -993,8 +997,12 @@ def _valid_sha256(value: object) -> bool:
     )
 
 
+def _string_keyed_dict(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+
+
 def _valid_sample_projects(value: object) -> bool:
-    if not isinstance(value, dict):
+    if not _string_keyed_dict(value):
         return False
     records = value.get("projects")
     return (
@@ -1002,12 +1010,12 @@ def _valid_sample_projects(value: object) -> bool:
         and _valid_sha256(value.get("manifest_sha256"))
         and isinstance(records, list)
         and bool(records)
-        and len({item.get("project") for item in records if isinstance(item, dict)})
+        and len({item.get("project") for item in records if _string_keyed_dict(item)})
         == len(records)
         and all(
-            isinstance(item, dict)
+            _string_keyed_dict(item)
             and isinstance(item.get("project"), str)
-            and item.get("project", "").endswith(".rcms")
+            and cast(str, item.get("project", "")).endswith(".rcms")
             and _valid_sha256(item.get("sha256"))
             and _valid_sha256(item.get("semantic_sha256"))
             and item.get("opened_in_packaged_application") is True

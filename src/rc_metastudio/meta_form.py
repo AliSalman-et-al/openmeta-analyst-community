@@ -33,7 +33,7 @@ import ui_meta
 import ma_data_table_view
 import ma_data_table_model
 import meta_globals
-from meta_globals import *
+from meta_globals import DEFAULT_DATASET_NAME, DISABLE_NETWORK_STUFF
 import ma_dataset
 import app_error_handler
 import meta_py_r_backend
@@ -44,8 +44,18 @@ import qt_text
 import name_validation
 import project_adapter
 import project_format
-import tabular_data
-from settings import *
+import csv_import
+from settings import (
+    add_file_to_recent_files,
+    get_default_open_directory,
+    get_sample_projects_path,
+    get_setting,
+    get_user_documents_path,
+    load_main_column_widths,
+    load_settings,
+    save_main_window_placement,
+    save_settings,
+)
 from runtime_types import required
 
 # additional forms
@@ -1155,15 +1165,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         metric_names = meta_globals.ALL_METRIC_NAMES
 
         metric_action = QAction(str(metric + ": " + metric_names[metric]), self)
-        try:
-            if str(metric) in metric_names:
-                metric_action.setToolTip(
-                    metric_names[metric]
-                )  # doesn't do anything in OSX?
-                metric_action.setStatusTip(metric_names[metric])
-                metric_action.setData(metric)  # store code for metric in here
-        except:
-            pass
+        metric_action.setToolTip(metric_names[metric])
+        metric_action.setStatusTip(metric_names[metric])
+        metric_action.setData(metric)
         metric_action.setCheckable(True)
         metric_action.toggled.connect(
             app_error_handler.safe_slot(
@@ -1302,9 +1306,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
 
-    def add_new(
-        self, startup_outcome: main_wizard.DatasetInfo | None = None
-    ) -> None:
+    def add_new(self, startup_outcome: main_wizard.DatasetInfo | None = None) -> None:
         redo_f, undo_f = None, None
         if self.cur_dimension == "outcome" and not startup_outcome:
             form = add_new_dialogs.AddNewOutcomeForm(
@@ -1377,7 +1379,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
                     previous_follow_up, follow_up_lbl
                 )
 
-        if redo_f is not None:
+        if redo_f is not None and undo_f is not None:
             next_command = meta_globals.CommandGenericDo(redo_f, undo_f)
             self.tableView.undoStack.push(next_command)
 
@@ -1999,7 +2001,7 @@ class CommandImportCSV(QUndoCommand):
         super(CommandImportCSV, self).__init__(description)
         if main_form is None:
             raise ValueError("CSV import requires a main form")
-        self.imported_data = _normalize_imported_csv_rows(imported_data or [])
+        self.imported_data = csv_import.normalize_import_rows(imported_data or [])
         self.covariate_names = list(covariate_names or [])
         self.covariate_types = list(covariate_types or [])
         self.main_form: MetaForm = main_form
@@ -2059,10 +2061,6 @@ class CommandImportCSV(QUndoCommand):
 
         finally:
             progress_dialog.hide_once(progress_bar)
-
-
-def _normalize_imported_csv_rows(rows):
-    return tabular_data.normalize_rows(rows)
 
 
 ####################### END Undo Command for Import CSV #######################

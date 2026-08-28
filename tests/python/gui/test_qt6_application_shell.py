@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import cast
 import zipfile
 
 import pytest
@@ -20,8 +21,30 @@ pytestmark = pytest.mark.qsettings
 ROOT = Path(__file__).resolve().parents[3]
 
 
+JsonMap = dict[str, object]
+
+
+def _json_map(value: object) -> JsonMap:
+    """Narrow a decoded project object at the JSON boundary."""
+    assert isinstance(value, dict)
+    return cast(JsonMap, value)
+
+
+def _json_maps(value: object) -> list[JsonMap]:
+    """Narrow a decoded JSON array of objects at the test seam."""
+    assert isinstance(value, list)
+    assert all(isinstance(item, dict) for item in value)
+    return cast(list[JsonMap], value)
+
+
+def _json_list(value: object) -> list[object]:
+    """Narrow a decoded JSON array whose members are scalar values."""
+    assert isinstance(value, list)
+    return cast(list[object], value)
+
+
 def _close_shell(app: QtWidgets.QApplication, window: QtWidgets.QMainWindow) -> None:
-    window.current_data_unsaved = False
+    setattr(window, "current_data_unsaved", False)
     window.close()
     app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
@@ -455,16 +478,16 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
     )
     try:
         for sample in sorted((ROOT / "sample_projects").glob("*.rcms")):
-            expected = project_format.load_project(sample).project["dataset"]
+            expected = _json_map(project_format.load_project(sample).project["dataset"])
             assert window.open(str(sample)) is True
-            observed = project_adapter.dataset_to_project(window.model.dataset)[
-                "dataset"
-            ]
+            observed = _json_map(
+                project_adapter.dataset_to_project(window.model.dataset)["dataset"]
+            )
             assert observed["title"] == expected["title"]
             assert observed["analysis_family"] == expected["analysis_family"]
             assert observed["outcomes"] == expected["outcomes"]
-            assert [study["name"] for study in observed["studies"]] == [
-                study["name"] for study in expected["studies"]
+            assert [study["name"] for study in _json_maps(observed["studies"])] == [
+                study["name"] for study in _json_maps(expected["studies"])
             ]
 
         assert window.open(str(ROOT / "sample_projects" / "lymph.rcms")) is True
@@ -532,19 +555,20 @@ def test_structured_project_restores_nondefault_active_selection_without_normali
     import project_format
 
     source = project_format.load_project(ROOT / "sample_projects" / "amino.rcms")
-    project = copy.deepcopy(source.project)
-    for outcome in project["dataset"]["outcomes"]:
+    project = _json_map(copy.deepcopy(source.project))
+    dataset = _json_map(project["dataset"])
+    for outcome in _json_maps(dataset["outcomes"]):
         if outcome["name"] == "nephrotoxic":
-            outcome["follow_ups"].append("second")
-    for study in project["dataset"]["studies"]:
+            _json_list(outcome["follow_ups"]).append("second")
+    for study in _json_maps(dataset["studies"]):
         first = next(
             unit
-            for unit in study["analysis_units"]
+            for unit in _json_maps(study["analysis_units"])
             if unit["outcome"] == "nephrotoxic" and unit["follow_up"] == "first"
         )
         second = copy.deepcopy(first)
         second["follow_up"] = "second"
-        study["analysis_units"].append(second)
+        _json_maps(study["analysis_units"]).append(second)
     state = {
         "schema_version": 1,
         "active_outcome": "nephrotoxic",
@@ -554,7 +578,9 @@ def test_structured_project_restores_nondefault_active_selection_without_normali
         "confidence_level": 90.0,
     }
     selected = tmp_path / "selected.rcms"
-    project_format.save_project(selected, project, state)
+    project_format.save_project(
+        selected, cast(project_format.JsonObject, project), state
+    )
 
     app, window = launch.start_automation()
     monkeypatch.setattr(QtWidgets.QMessageBox, "critical", lambda *_args: None)
@@ -620,9 +646,10 @@ def test_wizard_created_projects_save_as_latest_structured_containers(
         assert window.save_as() is True
         document = project_format.load_project(destination)
         assert document.format_version == project_format.CURRENT_FORMAT_VERSION
-        assert document.project["dataset"]["outcomes"][0]["name"] == "Mortality"
-        assert document.project["dataset"]["summary"]["effect"] == "OR"
-        assert document.project["dataset"]["summary"]["metric_choices"] == ["OR", "RR"]
+        saved_dataset = _json_map(document.project["dataset"])
+        assert _json_maps(saved_dataset["outcomes"])[0]["name"] == "Mortality"
+        assert _json_map(saved_dataset["summary"])["effect"] == "OR"
+        assert _json_map(saved_dataset["summary"])["metric_choices"] == ["OR", "RR"]
     finally:
         _close_shell(app, window)
 
@@ -952,9 +979,10 @@ def test_post_replace_durability_failure_commits_save_and_authorizes_next_action
         assert window.out_path == str(destination)
         assert window.model.analysis_source_path == str(destination)
         assert window.current_data_unsaved is False
-        assert project_format.load_project(destination).project["dataset"]["notes"] == (
-            "save-as installed"
+        saved_dataset = _json_map(
+            project_format.load_project(destination).project["dataset"]
         )
+        assert saved_dataset["notes"] == "save-as installed"
         assert warnings[-1][0] == "Project Saved; Durability Uncertain"
         assert "installed the saved project" in warnings[-1][1]
 
@@ -982,9 +1010,10 @@ def test_post_replace_durability_failure_commits_save_and_authorizes_next_action
             context.setattr(project_format, "_fsync_parent_directory", uncertain)
             assert window.save() is True
         assert window.current_data_unsaved is False
-        assert project_format.load_project(destination).project["dataset"]["notes"] == (
-            "save installed"
+        saved_dataset = _json_map(
+            project_format.load_project(destination).project["dataset"]
         )
+        assert saved_dataset["notes"] == "save installed"
         assert warnings[-1][0] == "Project Saved; Durability Uncertain"
 
         assert window.open(str(ROOT / "sample_projects" / "BCG.rcms")) is True

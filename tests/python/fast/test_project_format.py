@@ -22,6 +22,8 @@ from rc_metastudio.project_format import (
     migrate_to_latest,
     save_project,
     reconstruct_analysis_dataset,
+    JsonObject,
+    JsonValue,
 )
 
 
@@ -30,7 +32,7 @@ SNAPSHOT_DIR = ROOT / "tests/python/fixtures/project_snapshots"
 SAMPLE_DIR = ROOT / "sample_projects"
 
 
-def _minimal_project() -> dict[str, object]:
+def _minimal_project() -> JsonObject:
     return {
         "schema_version": CURRENT_FORMAT_VERSION,
         "dataset": {
@@ -53,7 +55,7 @@ def _minimal_project() -> dict[str, object]:
     }
 
 
-def _minimal_state() -> dict[str, object]:
+def _minimal_state() -> JsonObject:
     return {
         "schema_version": CURRENT_FORMAT_VERSION,
         "active_outcome": None,
@@ -65,8 +67,8 @@ def _minimal_state() -> dict[str, object]:
 
 
 def _group_project(
-    family: str, subtype: str | None, raw_values: list[list[object]]
-) -> dict[str, object]:
+    family: str, subtype: str | None, raw_values: list[list[JsonValue]]
+) -> JsonObject:
     data_type = {"binary": 0, "continuous": 1, "diagnostic": 2}[family]
     return {
         "schema_version": CURRENT_FORMAT_VERSION,
@@ -116,7 +118,7 @@ def _group_project(
     }
 
 
-def _snapshot_project(name: str) -> dict[str, object]:
+def _snapshot_project(name: str) -> JsonObject:
     snapshot = json.loads((SNAPSHOT_DIR / f"{name}.json").read_text("utf-8"))
     return {"schema_version": CURRENT_FORMAT_VERSION, "dataset": snapshot["dataset"]}
 
@@ -125,6 +127,26 @@ def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode(
         "utf-8"
     )
+
+
+def _object(value: JsonValue) -> JsonObject:
+    """Narrow a JSON value at a test mutation/read boundary."""
+
+    if not isinstance(value, dict):
+        raise AssertionError("expected JSON object")
+    return value
+
+
+def _objects(value: JsonValue) -> list[JsonObject]:
+    """Narrow a JSON array whose members are objects."""
+
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise AssertionError("expected JSON object array")
+    return value
+
+
+def _first_study(project: JsonObject) -> JsonObject:
+    return _objects(_object(project["dataset"])["studies"])[0]
 
 
 def _write_archive(path: Path, members: list[tuple[str, bytes]]) -> None:
@@ -140,7 +162,7 @@ def _members(path: Path) -> dict[str, bytes]:
         return {name: archive.read(name) for name in archive.namelist()}
 
 
-def _replace_json_member(path: Path, member: str, value: object) -> None:
+def _replace_json_member(path: Path, member: str, value: JsonValue) -> None:
     members = _members(path)
     members[member] = _json_bytes(value)
     if member != "manifest.json":
@@ -165,12 +187,14 @@ def _replace_raw_member(path: Path, member: str, payload: bytes) -> None:
     _write_archive(path, [(name, members[name]) for name in members])
 
 
-def _first_populated_raw(project: dict[str, object]) -> list[object]:
-    dataset = project["dataset"]
-    for study in dataset["studies"]:
-        for unit in study["analysis_units"]:
-            for group in unit["groups"]:
+def _first_populated_raw(project: JsonObject) -> list[JsonValue]:
+    dataset = _object(project["dataset"])
+    for study in _objects(dataset["studies"]):
+        for unit in _objects(study["analysis_units"]):
+            for group in _objects(unit["groups"]):
                 raw = group["raw_data"]
+                if not isinstance(raw, list):
+                    raise AssertionError("expected raw-data array")
                 if any(value != "" for value in raw):
                     return raw
     raise AssertionError("sample has no populated raw data")
@@ -281,7 +305,7 @@ def test_semantic_validation_rejects_invalid_domain_relationships(
 ) -> None:
     destination = tmp_path / "semantic.rcms"
     project = _snapshot_project("amino.rcms")
-    dataset = project["dataset"]
+    dataset = _object(project["dataset"])
     mutation(dataset)
 
     with pytest.raises(ProjectFormatError, match=message):
@@ -304,7 +328,7 @@ def test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units(
     tmp_path: Path,
     family: str,
     subtype: str,
-    raw_values: list[list[object]],
+    raw_values: list[list[JsonValue]],
 ) -> None:
     destination = tmp_path / f"{family}-multi-arm.rcms"
     project = _group_project(family, subtype, raw_values)
@@ -327,7 +351,7 @@ def test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups(
     tmp_path: Path,
     family: str,
     subtype: str | None,
-    raw_values: list[list[object]],
+    raw_values: list[list[JsonValue]],
 ) -> None:
     project = _group_project(family, subtype, raw_values)
 
@@ -340,10 +364,12 @@ def test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups(
     [("data_type", 99), ("sub_type", "unknown")],
 )
 def test_schema_rejects_values_outside_the_domain_vocabulary(
-    tmp_path: Path, field: str, value: object
+    tmp_path: Path, field: str, value: JsonValue
 ) -> None:
     project = _snapshot_project("amino.rcms")
-    project["dataset"]["outcomes"][0][field] = value
+    dataset = _object(project["dataset"])
+    outcome = _objects(dataset["outcomes"])[0]
+    outcome[field] = value
 
     with pytest.raises(ProjectFormatError, match=field):
         save_project(tmp_path / "vocabulary.rcms", project, _minimal_state())
@@ -410,7 +436,7 @@ def test_semantic_validation_enforces_domain_identity_family_and_numeric_contrac
     tmp_path: Path, sample: str, mutation, message: str
 ) -> None:
     project = _snapshot_project(sample)
-    mutation(project["dataset"])
+    mutation(_object(project["dataset"]))
 
     with pytest.raises(ProjectFormatError, match=message):
         save_project(tmp_path / "invalid-domain.rcms", project, _minimal_state())
@@ -498,12 +524,12 @@ def test_writer_and_reconstruction_normalize_numeric_conversion_overflow(
         reconstruct_analysis_dataset(document)
 
     oversized_project = _snapshot_project("amino.rcms")
-    oversized_project["dataset"]["studies"][0]["year"] = 10**5000
+    _first_study(oversized_project)["year"] = 10**5000
     with pytest.raises(ProjectFormatError, match="portable JSON numeric range"):
         save_project(tmp_path / "oversized.rcms", oversized_project, _minimal_state())
 
     nonfinite_project = _snapshot_project("amino.rcms")
-    nonfinite_project["dataset"]["studies"][0]["sample_size"] = float("inf")
+    _first_study(nonfinite_project)["sample_size"] = float("inf")
     with pytest.raises(ProjectFormatError, match="finite JSON number"):
         save_project(tmp_path / "nonfinite.rcms", nonfinite_project, _minimal_state())
 
@@ -513,7 +539,7 @@ def test_study_sample_size_requires_a_finite_positive_integer_on_save_and_load(
 ) -> None:
     for invalid in (0, -1, 1.5):
         project = _snapshot_project("amino.rcms")
-        project["dataset"]["studies"][0]["sample_size"] = invalid
+        _first_study(project)["sample_size"] = invalid
         with pytest.raises(ProjectFormatError, match="positive integer"):
             save_project(
                 tmp_path / f"save-sample-size-{invalid}.rcms", project, _minimal_state()
@@ -522,13 +548,13 @@ def test_study_sample_size_requires_a_finite_positive_integer_on_save_and_load(
         destination = tmp_path / f"load-sample-size-{invalid}.rcms"
         valid = _snapshot_project("amino.rcms")
         save_project(destination, valid, _minimal_state())
-        valid["dataset"]["studies"][0]["sample_size"] = invalid
+        _first_study(valid)["sample_size"] = invalid
         _replace_json_member(destination, "project.json", valid)
         with pytest.raises(ProjectFormatError, match="positive integer"):
             load_project(destination)
 
     valid = _snapshot_project("amino.rcms")
-    valid["dataset"]["studies"][0]["sample_size"] = 10.0
+    _first_study(valid)["sample_size"] = 10.0
     destination = tmp_path / "valid-sample-size.rcms"
     save_project(destination, valid, _minimal_state())
     assert load_project(destination).project == valid
@@ -741,7 +767,7 @@ def test_failed_atomic_replace_preserves_the_previous_project(
     original = _minimal_project()
     save_project(destination, original, _minimal_state())
     changed = _minimal_project()
-    changed["dataset"]["title"] = "Changed"
+    _object(changed["dataset"])["title"] = "Changed"
 
     def fail_replace(_source: object, _destination: object) -> None:
         raise OSError("injected replace failure")
@@ -761,7 +787,7 @@ def test_pre_replace_failures_preserve_previous_project_and_clean_temporary_file
     original = _minimal_project()
     save_project(destination, original, _minimal_state())
     changed = _minimal_project()
-    changed["dataset"]["title"] = "Changed"
+    _object(changed["dataset"])["title"] = "Changed"
     real_load = project_format.load_project
 
     stages = [
@@ -834,10 +860,10 @@ def test_serialization_and_schema_recursion_errors_use_project_format_boundary(
 
 
 def test_json_nesting_is_bounded_for_manifest_and_project_data(tmp_path: Path) -> None:
-    nested: dict[str, object] = {}
+    nested: JsonObject = {}
     cursor = nested
     for _index in range(project_format.MAX_JSON_NESTING + 2):
-        child: dict[str, object] = {}
+        child: JsonObject = {}
         cursor["child"] = child
         cursor = child
 
@@ -915,7 +941,7 @@ def test_post_replace_directory_fsync_failure_reports_new_file_is_installed(
     destination = tmp_path / "post-replace.rcms"
     save_project(destination, _minimal_project(), _minimal_state())
     changed = _minimal_project()
-    changed["dataset"]["title"] = "Already replaced"
+    _object(changed["dataset"])["title"] = "Already replaced"
     real_fsync = project_format.os.fsync
 
     monkeypatch.setattr(project_format, "_supports_directory_fsync", lambda: True)
@@ -942,7 +968,7 @@ def test_post_replace_directory_close_failure_reports_durability_uncertainty(
 ) -> None:
     destination = tmp_path / "close-failure.rcms"
     changed = _minimal_project()
-    changed["dataset"]["title"] = "Installed before close failure"
+    _object(changed["dataset"])["title"] = "Installed before close failure"
     real_fsync = project_format.os.fsync
 
     monkeypatch.setattr(project_format, "_supports_directory_fsync", lambda: True)
@@ -964,7 +990,9 @@ def test_post_replace_directory_close_failure_reports_durability_uncertainty(
         save_project(destination, changed, _minimal_state())
 
     assert "closing the parent directory handle failed" in str(error.value)
-    assert error.value.__cause__.args == ("directory close",)
+    cause = error.value.__cause__
+    assert cause is not None
+    assert cause.args == ("directory close",)
     assert load_project(destination).project == changed
 
 
@@ -973,7 +1001,7 @@ def test_directory_close_failure_annotates_primary_post_replace_fsync_error(
 ) -> None:
     destination = tmp_path / "fsync-and-close-failure.rcms"
     changed = _minimal_project()
-    changed["dataset"]["title"] = "Installed before both failures"
+    _object(changed["dataset"])["title"] = "Installed before both failures"
     real_fsync = project_format.os.fsync
 
     monkeypatch.setattr(project_format, "_supports_directory_fsync", lambda: True)
@@ -998,7 +1026,9 @@ def test_directory_close_failure_annotates_primary_post_replace_fsync_error(
     ) as error:
         save_project(destination, changed, _minimal_state())
 
-    assert error.value.__cause__.args == ("directory fsync",)
+    cause = error.value.__cause__
+    assert cause is not None
+    assert cause.args == ("directory fsync",)
     assert error.value.__notes__ == [
         "closing the parent directory handle also failed: directory close"
     ]
@@ -1018,10 +1048,10 @@ def test_writer_output_and_current_version_migration_are_deterministic(
     migrated_project, migrated_state = migrate_to_latest(
         CURRENT_FORMAT_VERSION, project, state
     )
-    migrated_project["dataset"]["title"] = "Independent copy"
+    _object(migrated_project["dataset"])["title"] = "Independent copy"
 
     assert first.read_bytes() == second.read_bytes()
-    assert project["dataset"]["title"] == "Example"
+    assert _object(project["dataset"])["title"] == "Example"
     assert migrated_state == state
     with pytest.raises(ProjectFormatError, match="unsupported project format version"):
         migrate_to_latest(999, project, state)

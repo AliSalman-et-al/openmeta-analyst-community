@@ -335,11 +335,18 @@ def test_native_remaining_surface_evidence_rejects_semantic_layout_drift(tmp_pat
 
 def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab(qapp):
     class TabConsumingDialog(QtWidgets.QDialog):
-        def event(self, event):
-            if event.type() in {
-                QtCore.QEvent.Type.KeyPress,
-                QtCore.QEvent.Type.KeyRelease,
-            } and event.key() in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}:
+        def event(  # ty: ignore[invalid-method-override] - PyQt6 test-double stub mismatch.
+            self, event: QtCore.QEvent | None
+        ) -> bool:
+            if (
+                isinstance(event, QtGui.QKeyEvent)
+                and event.type()
+                in {
+                    QtCore.QEvent.Type.KeyPress,
+                    QtCore.QEvent.Type.KeyRelease,
+                }
+                and event.key() in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}
+            ):
                 event.accept()
                 return True
             return super().event(event)
@@ -372,7 +379,11 @@ def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    meta_py_r_backend.install_stub_meta_py_r()
+    # Do not replace a backend already shared by modules collected earlier in
+    # this process. The isolated test still installs the stub on hosts without
+    # an initialized R backend.
+    if meta_py_r_backend._registered_backend() is None:
+        meta_py_r_backend.install_stub_meta_py_r()
     import main_wizard
 
     actions = native_smoke._observe_actions(

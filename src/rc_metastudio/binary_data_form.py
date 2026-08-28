@@ -22,7 +22,14 @@ from PyQt6.QtWidgets import (
 
 from rc_metastudio import meta_py_r
 import tabular_data
-from meta_globals import *
+from meta_globals import (
+    BINARY_METRIC_NAMES,
+    BINARY_ONE_ARM_METRICS,
+    BINARY_TWO_ARM_METRICS,
+    EMPTY_VALS,
+    is_NaN,
+    is_empty,
+)
 import calculator_routines as calc_fncs
 
 import forms.ui_binary_data_form
@@ -217,7 +224,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             for i, R_key in enumerate(["estimate", "lower", "upper"]):
                 try:
                     d["%s" % R_key] = float([d_est, d_lower, d_upper][i])
-                except:
+                except (TypeError, ValueError):
                     d["%s" % R_key] = None
 
             d["conf.level"] = self.global_conf_level

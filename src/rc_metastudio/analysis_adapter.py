@@ -4,13 +4,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, TypeAlias
+from typing import Literal, TypeAlias
 
 from rc_metastudio import meta_py_r
+from analysis_results import AnalysisResult, parse_analysis_result
 
 
 AnalysisValue: TypeAlias = bool | int | float | str | None
+AnalysisFamily: TypeAlias = Literal["binary", "continuous", "diagnostic"]
+AnalysisWorkflow: TypeAlias = Literal[
+    "standard",
+    "cumulative",
+    "leave-one-out",
+    "subgroup",
+    "bootstrap",
+    "meta-regression",
+]
+
+_FAMILY_METRICS: Mapping[AnalysisFamily, frozenset[str]] = {
+    "binary": frozenset(
+        {"OR", "RD", "RR", "AS", "YUQ", "YUY", "PR", "PLN", "PLO", "PAS", "PFT"}
+    ),
+    "continuous": frozenset({"MD", "SMD", "TX Mean"}),
+    "diagnostic": frozenset({"Sens", "Spec", "PLR", "NLR", "DOR"}),
+}
 
 
 @dataclass(frozen=True)
@@ -25,8 +44,8 @@ class AnalysisParameter:
 class AnalysisRequest:
     """A complete, locale-independent analysis invocation."""
 
-    data_type: str
-    workflow: str
+    data_type: AnalysisFamily
+    workflow: AnalysisWorkflow
     method: str
     metric: str | None
     parameters: tuple[AnalysisParameter, ...]
@@ -45,10 +64,14 @@ def make_analysis_request(
 ) -> AnalysisRequest:
     """Validate and freeze values selected by a user-facing configuration."""
 
-    normalized_data_type = _required_text("data type", data_type)
+    normalized_data_type = _analysis_family(data_type)
     normalized_method = _required_text("analysis method", method)
-    normalized_workflow = _required_text("workflow", workflow or "standard")
-    normalized_metric = None if metric is None else _required_text("metric", metric)
+    normalized_workflow = _analysis_workflow(workflow or "standard")
+    normalized_metric = _required_text("metric", metric)
+    if normalized_metric not in _FAMILY_METRICS[normalized_data_type]:
+        raise ValueError(
+            f"metric {normalized_metric!r} is not valid for {normalized_data_type} analysis"
+        )
     normalized_parameters = tuple(
         AnalysisParameter(_required_text("parameter name", name), _native_value(value))
         for name, value in sorted(parameters.items())
@@ -68,6 +91,32 @@ def _required_text(label: str, value: object) -> str:
     return value
 
 
+def _analysis_family(value: object) -> AnalysisFamily:
+    if value == "binary":
+        return "binary"
+    if value == "continuous":
+        return "continuous"
+    if value == "diagnostic":
+        return "diagnostic"
+    raise ValueError(f"unsupported analysis data family: {value!r}")
+
+
+def _analysis_workflow(value: object) -> AnalysisWorkflow:
+    if value == "standard":
+        return "standard"
+    if value == "cumulative":
+        return "cumulative"
+    if value == "leave-one-out":
+        return "leave-one-out"
+    if value == "subgroup":
+        return "subgroup"
+    if value == "bootstrap":
+        return "bootstrap"
+    if value == "meta-regression":
+        return "meta-regression"
+    raise ValueError(f"unsupported analysis workflow: {value!r}")
+
+
 def _native_value(value: object) -> AnalysisValue:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
@@ -77,7 +126,7 @@ def _native_value(value: object) -> AnalysisValue:
     )
 
 
-def execute_analysis_requests(model, requests):
+def execute_analysis_requests(model: object, requests: Sequence[AnalysisRequest]):
     """Execute a frozen set of analysis requests through the R backend."""
     if not requests:
         raise ValueError("No analysis requests were configured.")
@@ -213,7 +262,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
     for request in requests:
         metric = request.metric
         try:
-            metric_result = run_metric(request)
+            metric_result = parse_analysis_result(run_metric(request))
         except Exception as e:
             failures.append((metric, e))
             merged_result["texts"]["%s Error" % metric] = str(e)
@@ -228,7 +277,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
     return merged_result
 
 
-def _empty_diagnostic_result():
+def _empty_diagnostic_result() -> AnalysisResult:
     return {
         "texts": {},
         "images": {},
@@ -240,7 +289,9 @@ def _empty_diagnostic_result():
     }
 
 
-def _merge_diagnostic_result(merged_result, metric_result):
+def _merge_diagnostic_result(
+    merged_result: AnalysisResult, metric_result: AnalysisResult
+) -> None:
     for key in (
         "texts",
         "images",
@@ -253,13 +304,14 @@ def _merge_diagnostic_result(merged_result, metric_result):
 
     image_order = metric_result.get("image_order")
     if image_order:
-        if isinstance(image_order, (list, tuple)):
-            merged_result["image_order"].extend(image_order)
+        merged_order = merged_result["image_order"]
+        if merged_order is None:
+            merged_result["image_order"] = list(image_order)
         else:
-            merged_result["image_order"].append(image_order)
+            merged_order.extend(image_order)
 
 
-def _diagnostic_result_has_successes(result):
+def _diagnostic_result_has_successes(result: AnalysisResult) -> bool:
     return bool(
         result["images"] or any(not key.endswith(" Error") for key in result["texts"])
     )

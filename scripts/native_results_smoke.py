@@ -129,7 +129,7 @@ def _pixel_size(value: object) -> list[int]:
     ]
 
 
-def _image_has_variation(image) -> bool:
+def _image_has_variation(image: Any) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull() or converted.width() < 1 or converted.height() < 1:
         return False
@@ -313,7 +313,7 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
 
 
 def _capture_window(
-    app, window, destination: Path, attempts: int = MAX_CAPTURE_ATTEMPTS
+    app: Any, window: Any, destination: Path, attempts: int = MAX_CAPTURE_ATTEMPTS
 ) -> dict[str, object]:
     from PyQt6 import QtCore, QtGui
 
@@ -442,9 +442,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     from rc_metastudio import meta_py_r_backend
 
     meta_py_r_backend.install_stub_meta_py_r()
-    import app_error_handler
-    import network_view
-    import results_window
+    from rc_metastudio import app_error_handler, network_view, results_window
 
     evidence_root.mkdir(parents=True, exist_ok=True)
     slug = _scale_slug(scale)
@@ -504,10 +502,10 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             },
         )()
 
-        def get_current_follow_up_name(self):
+        def get_current_follow_up_name(self) -> str:
             return "12 months"
 
-        def get_outcome_type(self, _outcome, get_str=False):
+        def get_outcome_type(self, _outcome: Any, get_str: bool = False) -> str:
             return "binary"
 
     setattr(

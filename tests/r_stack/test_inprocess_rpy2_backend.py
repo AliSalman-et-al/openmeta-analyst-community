@@ -30,7 +30,7 @@ exercises the fixes locally without disturbing the stub-backed tests.
 import os
 import textwrap
 
-from _r_driver_support import run_python_driver
+from ._r_driver_support import run_python_driver
 
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

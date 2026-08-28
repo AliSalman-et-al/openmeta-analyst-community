@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from _workflow import load_workflow
+from ._workflow import load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -20,8 +20,9 @@ def _load_source_provenance():
     spec = importlib.util.spec_from_file_location(
         "source_provenance", ROOT / "scripts" / "source_provenance.py"
     )
+    assert spec is not None and spec.loader is not None
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
 

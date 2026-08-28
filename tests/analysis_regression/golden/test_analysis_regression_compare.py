@@ -6,6 +6,7 @@ import sys
 import types
 from contextlib import contextmanager
 from decimal import Decimal
+from types import ModuleType
 import zipfile
 
 import pytest
@@ -13,7 +14,7 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 ROOT = Path(__file__).resolve().parents[3]
 
-from analysis_regression_compare import (
+from analysis_regression_compare import (  # noqa: E402 - legacy module path bootstrap
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
     MISSING_OUTPUT,
@@ -29,8 +30,8 @@ from analysis_regression_compare import (
 )
 
 sys.path.insert(0, os.path.abspath("scripts"))
-import verify_golden_compatibility
-import verify_rcmetar_r_stack
+import verify_golden_compatibility  # noqa: E402 - scripts path bootstrap
+import verify_rcmetar_r_stack  # noqa: E402 - scripts path bootstrap
 
 
 def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
@@ -1039,17 +1040,20 @@ def _import_legacy_golden_modules():
     try:
         for name in ["golden_analysis", "headless_analysis"]:
             sys.modules.pop(name, None)
-        sys.modules["ma_data_table_model"] = types.SimpleNamespace(DatasetModel=object)
-        sys.modules["ma_dataset"] = types.SimpleNamespace(
-            Covariate=lambda name, kind: (name, kind)
-        )
-        sys.modules["meta_globals"] = types.SimpleNamespace(
-            BINARY="binary",
-            CONTINUOUS="continuous",
-            DIAGNOSTIC="diagnostic",
-            VERSION="0.1.0",
-        )
-        r_boundary = types.SimpleNamespace(RlibLoader=lambda: None)
+        model_module = ModuleType("ma_data_table_model")
+        setattr(model_module, "DatasetModel", object)
+        sys.modules["ma_data_table_model"] = model_module
+        dataset_module = ModuleType("ma_dataset")
+        setattr(dataset_module, "Covariate", lambda name, kind: (name, kind))
+        sys.modules["ma_dataset"] = dataset_module
+        globals_module = ModuleType("meta_globals")
+        setattr(globals_module, "BINARY", "binary")
+        setattr(globals_module, "CONTINUOUS", "continuous")
+        setattr(globals_module, "DIAGNOSTIC", "diagnostic")
+        setattr(globals_module, "VERSION", "0.1.0")
+        sys.modules["meta_globals"] = globals_module
+        r_boundary = ModuleType("meta_py_r")
+        setattr(r_boundary, "RlibLoader", lambda: None)
         sys.modules["meta_py_r"] = r_boundary
         sys.modules["rc_metastudio.meta_py_r"] = r_boundary
         import golden_analysis

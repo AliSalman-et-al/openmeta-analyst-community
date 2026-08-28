@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from jsonschema import validate
 
-from _workflow import load_workflow
+from ._workflow import load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[3]
 def load_delivery():
     path = ROOT / "scripts" / "delivery.py"
     spec = importlib.util.spec_from_file_location("delivery_contract_module", path)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
@@ -235,9 +235,7 @@ def test_release_workflows_have_immutable_structured_topology():
         promote, "promote", "Verify RC release set and exact asset digests"
     )
     assert "(cd promotion && sha256sum --check SHA256SUMS)" in verify_rc["run"]
-    assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verify_rc[
-        "run"
-    ]
+    assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verify_rc["run"]
 
     publishers = (
         (
@@ -278,15 +276,18 @@ def test_release_workflows_have_immutable_structured_topology():
         trusted, "sign-submit-macos", "Preserve exact signed bytes and submission ID"
     )
     finalize = workflow_step(
-        trusted, "finalize-macos", "Wait for Apple, then staple and verify preserved bytes"
+        trusted,
+        "finalize-macos",
+        "Wait for Apple, then staple and verify preserved bytes",
     )
     final_launch = workflow_step(
         trusted, "finalize-macos", "Launch final signed and stapled macOS bytes"
     )
-    assert '--mode sign-and-submit' in sign["run"]
-    assert '(cd submitted && shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256")' in sign[
-        "run"
-    ]
+    assert "--mode sign-and-submit" in sign["run"]
+    assert (
+        '(cd submitted && shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256")'
+        in sign["run"]
+    )
     assert preserved["uses"].startswith("actions/upload-artifact@")
     assert preserved["with"] == {
         "name": "submitted-${{ matrix.target }}",
@@ -295,10 +296,8 @@ def test_release_workflows_have_immutable_structured_topology():
         "retention-days": 30,
         "compression-level": 0,
     }
-    assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in finalize[
-        "run"
-    ]
-    assert '--mode finalize' in finalize["run"]
+    assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in finalize["run"]
+    assert "--mode finalize" in finalize["run"]
     assert '--input-archive "submitted/$ARTIFACT"' in finalize["run"]
     assert 'xcrun stapler validate "qualified/$ARTIFACT"' in final_launch["run"]
     assert "codesign --verify --verbose=4" in final_launch["run"]

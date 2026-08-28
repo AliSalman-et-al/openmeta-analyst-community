@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QUndoCommand
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
-from meta_globals import *
+from meta_globals import CALC_NUM_DIGITS, EMPTY_VALS, ERROR_COLOR, OK_COLOR
 from rc_metastudio import meta_py_r
 import qt_text
 from runtime_types import required

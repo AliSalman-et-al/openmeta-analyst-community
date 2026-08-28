@@ -69,7 +69,10 @@ def test_full_r_verifier_drops_unsupported_posix_locale_on_windows():
     assert r_verification_support.verification_base_env(source, platform_name="nt") == {
         "RCMS_SENTINEL": "preserved"
     }
-    assert r_verification_support.verification_base_env(source, platform_name="posix") == source
+    assert (
+        r_verification_support.verification_base_env(source, platform_name="posix")
+        == source
+    )
 
 
 def test_full_r_stack_orchestration_prepares_and_propagates_qt_environment(
@@ -328,13 +331,11 @@ def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
 
 
 def test_installed_version_report_parses_rscript_output(monkeypatch):
-    import importlib.util
-
     spec = importlib.util.spec_from_file_location(
         "validate_RCMetaR_r_manifests", VALIDATOR
     )
+    assert spec is not None and spec.loader is not None
     validator = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(validator)
 
     def fake_run(command, text, stdout, stderr, check):
@@ -362,13 +363,11 @@ def test_installed_version_report_parses_rscript_output(monkeypatch):
 
 
 def test_report_installed_versions_surfaces_rscript_failure(monkeypatch):
-    import importlib.util
-
     spec = importlib.util.spec_from_file_location(
         "validate_RCMetaR_r_manifests", VALIDATOR
     )
+    assert spec is not None and spec.loader is not None
     validator = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(validator)
 
     def fake_run(command, text, stdout, stderr, check):

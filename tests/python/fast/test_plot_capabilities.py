@@ -1,5 +1,6 @@
 import pytest
 
+from analysis_results import parse_analysis_result
 import plot_capabilities
 
 
@@ -73,6 +74,30 @@ def test_validate_result_returns_normalized_descriptors():
     assert capabilities["Regression Plot"] == descriptor(
         plot_kind="regression", regenerator="regression"
     )
+
+
+def test_analysis_result_parser_validates_all_boundary_fields():
+    parsed = parse_analysis_result(
+        {
+            "texts": {"Summary": "ok"},
+            "images": {},
+            "display_images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+            "plot_capabilities": {},
+        }
+    )
+
+    assert parsed["texts"] == {"Summary": "ok"}
+    assert parsed["image_order"] == []
+
+    with pytest.raises(ValueError, match="texts keys and values must be text"):
+        parse_analysis_result({"texts": {"Summary": 42}})
+    with pytest.raises(ValueError, match="image_order must be a list of text"):
+        parse_analysis_result({"image_order": ["Forest Plot", 42]})
+    with pytest.raises(ValueError, match="Display artifacts have no matching"):
+        parse_analysis_result({"display_images": {"Forest Plot": "display.svg"}})
 
 
 def test_option_groups_are_keyed_by_explicit_plot_kind():

@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
+from typing import cast
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
@@ -9,12 +10,13 @@ sys.path.insert(0, os.path.abspath("src"))
 sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
 import pytest
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QHeaderView
 
 pytestmark = pytest.mark.qsettings
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_clicks, required
 
 prepare_generated_ui_imports()
 
@@ -29,6 +31,17 @@ def _window_archetype(widget):
     import adaptive_window
 
     return adaptive_window.adaptive_window_state(widget).policy.archetype.value
+
+
+def _xml_element(parent: ET.Element | None, path: str) -> ET.Element:
+    """Require an element that the fixture's UI contract promises to contain."""
+    return required(parent.find(path) if parent is not None else None, path)
+
+
+def _viewport_width(view: QtWidgets.QAbstractScrollArea) -> int:
+    """Read a measured viewport after Qt has created it."""
+
+    return required(view.viewport(), "scroll viewport").width()
 
 
 @pytest.fixture(autouse=True)
@@ -218,7 +231,10 @@ def test_full_app_import_pads_ragged_csv_rows_into_dataset():
     from PyQt6 import QtWidgets
 
     meta_form = launch._import_meta_form()
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+    )
     window = meta_form.MetaForm()
     try:
         window._handle_wizard_results(
@@ -444,7 +460,9 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
         family_counts[prefix] = len(resource_group.findall("file"))
         for file_node in resource_group.findall("file"):
             alias = file_node.attrib["alias"]
-            resources[f":/{prefix}/{alias}"] = qrc_path.parent / file_node.text
+            resources[f":/{prefix}/{alias}"] = qrc_path.parent / required(
+                file_node.text, "resource path"
+            )
 
     assert family_counts == {
         "icons/actions": 23,
@@ -490,11 +508,15 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             assert expected_ink in source_text
             assert "#243746" not in source_text
 
-        embedded_file = QtCore.QFile(resource_path)
-        assert embedded_file.open(QtCore.QIODevice.OpenModeFlag.ReadOnly)
-        assert bytes(embedded_file.readAll()) == source_path.read_bytes(), (
-            f"{resource_path} is stale; regenerate the checked-in Qt resources"
-        )
+            embedded_file = QtCore.QFile(resource_path)
+            assert embedded_file.open(QtCore.QIODevice.OpenModeFlag.ReadOnly)
+            embedded_bytes = bytes(embedded_file.readAll().data()).replace(
+                b"\r\n", b"\n"
+            )
+            source_bytes = source_path.read_bytes().replace(b"\r\n", b"\n")
+            assert embedded_bytes == source_bytes, (
+                f"{resource_path} is stale; regenerate the checked-in Qt resources"
+            )
 
         icon = QtGui.QIcon(resource_path)
         assert icon.isNull() is False
@@ -2032,8 +2054,9 @@ def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
 
         assert form.covs_and_check_boxes == []
         assert (
-            form.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            required(
+                form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+                "ok button",
             ).isEnabled()
             is False
         )
@@ -2070,7 +2093,7 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
         form = meta_reg_form.MetaRegForm(window.model, parent=window)
         form.show()
         app.processEvents()
-        form.layout().activate()
+        required(form.layout(), "meta-regression layout").activate()
 
         assert form.diagnostic_group_box.isVisible()
         for group_box in (form.diagnostic_group_box, form.groupBox):
@@ -2099,7 +2122,7 @@ def test_diagnostic_metric_dialog_fits_checkbox_group_labels():
         form = diag_metrics.Diag_Metrics(window.model, parent=window)
         form.show()
         app.processEvents()
-        form.layout().activate()
+        required(form.layout(), "diagnostic metrics layout").activate()
 
         assert form.metrics_grp_box.height() >= form.metrics_grp_box.sizeHint().height()
         assert form.height() >= form.sizeHint().height()
@@ -2189,8 +2212,9 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
 
         assert form.cov_subgroup_cbo_box.count() == 0
         assert (
-            form.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            required(
+                form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+                "ok button",
             ).isEnabled()
             is False
         )
@@ -2407,9 +2431,9 @@ def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
         plot_item = next(
             item
             for item in result_window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
-        viewport_width = result_window.graphics_view.viewport().width()
+        viewport_width = _viewport_width(result_window.graphics_view)
         assert plot_item.sceneBoundingRect().width() >= viewport_width * 0.9
         assert plot_item.sceneBoundingRect().width() <= viewport_width
     finally:
@@ -2447,7 +2471,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
 
     try:
         nav_titles = [
-            window.nav_tree.topLevelItem(index).text(0)
+            required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
@@ -2521,7 +2545,7 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
             (
                 item
                 for item in window.scene.items()
-                if isinstance(item, results_window.QGraphicsSvgItem)
+                if isinstance(item, results_window._svg_item_class())
             ),
             key=lambda item: item.scenePos().y(),
         )
@@ -2545,8 +2569,8 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
 
         def assert_plot_fills_viewport(plot_item):
             plot_width = plot_item.sceneBoundingRect().width()
-            assert plot_width >= window.graphics_view.viewport().width() * 0.9
-            assert plot_width <= window.graphics_view.viewport().width()
+            assert plot_width >= _viewport_width(window.graphics_view) * 0.9
+            assert plot_width <= _viewport_width(window.graphics_view)
 
         assert len(svg_items) == 2
         first_width = svg_items[0].sceneBoundingRect().width()
@@ -2580,7 +2604,7 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
         window.results_nav_splitter.splitterMoved.emit(0, 0)
         app.processEvents()
 
-        narrow_viewport_width = window.graphics_view.viewport().width()
+        narrow_viewport_width = _viewport_width(window.graphics_view)
         assert svg_items[0].sceneBoundingRect().width() <= narrow_viewport_width
         assert_sections_are_separated()
     finally:
@@ -2620,11 +2644,11 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         plot_item = next(
             item
             for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
         initial_width = plot_item.sceneBoundingRect().width()
         initial_window_width = window.width()
-        initial_viewport_width = window.graphics_view.viewport().width()
+        initial_viewport_width = _viewport_width(window.graphics_view)
         assert initial_width >= initial_viewport_width * 0.9
         assert initial_width <= initial_viewport_width
 
@@ -2633,7 +2657,7 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         for _ in range(3):
             app.processEvents()
 
-        viewport_width = window.graphics_view.viewport().width()
+        viewport_width = _viewport_width(window.graphics_view)
         assert viewport_width < initial_width
         available_width = viewport_width - window.x_coord - results_window.padding
         assert plot_item.sceneBoundingRect().width() == pytest.approx(available_width)
@@ -2643,7 +2667,7 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
         for _ in range(3):
             app.processEvents()
 
-        grown_viewport_width = window.graphics_view.viewport().width()
+        grown_viewport_width = _viewport_width(window.graphics_view)
         grown_available_width = (
             grown_viewport_width - window.x_coord - results_window.padding
         )
@@ -2696,7 +2720,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         initial_width = plot_item.sceneBoundingRect().width()
         initial_window_width = window.width()
         initial_available_width = (
-            window.graphics_view.viewport().width()
+            _viewport_width(window.graphics_view)
             - window.x_coord
             - results_window.padding
         )
@@ -2707,7 +2731,7 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
             app.processEvents()
         shrunken_width = plot_item.sceneBoundingRect().width()
         shrunken_available_width = (
-            window.graphics_view.viewport().width()
+            _viewport_width(window.graphics_view)
             - window.x_coord
             - results_window.padding
         )
@@ -2719,8 +2743,9 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
         assert plot_item.sceneBoundingRect().width() == pytest.approx(
             initial_width, abs=5
         )
-        assert plot_item.source_pixmap.width() == 1600
-        assert plot_item.source_pixmap.height() == 800
+        source_pixmap = cast(QtGui.QPixmap, getattr(plot_item, "source_pixmap"))
+        assert source_pixmap.width() == 1600
+        assert source_pixmap.height() == 800
     finally:
         window.close()
         app.processEvents()
@@ -2765,7 +2790,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         plot_item = next(
             item
             for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
         initial_width = plot_item.sceneBoundingRect().width()
         weights_title = next(
@@ -2775,7 +2800,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
             and "Weights" in item.toPlainText()
         )
         initial_weights_y = weights_title.scenePos().y()
-        viewport_width = window.graphics_view.viewport().width()
+        viewport_width = _viewport_width(window.graphics_view)
         assert initial_width >= viewport_width * 0.9
         assert initial_width <= viewport_width
 
@@ -2787,7 +2812,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
 
         refreshed_width = plot_item.sceneBoundingRect().width()
         refreshed_height = plot_item.sceneBoundingRect().height()
-        refreshed_viewport_width = window.graphics_view.viewport().width()
+        refreshed_viewport_width = _viewport_width(window.graphics_view)
         assert refreshed_width >= refreshed_viewport_width * 0.9
         assert refreshed_width <= refreshed_viewport_width
         assert refreshed_width / refreshed_height == pytest.approx(2.0)
@@ -2945,7 +2970,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
         app.processEvents()
 
         nav_titles = [
-            window.nav_tree.topLevelItem(index).text(0)
+            required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
         assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
@@ -2957,7 +2982,9 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
         }
         reference_item = sections[long_reference]
         assert (
-            reference_item.document().defaultTextOption().wrapMode()
+            required(reference_item.document(), "reference document")
+            .defaultTextOption()
+            .wrapMode()
             == results_window.QTextOption.WrapMode.WordWrap
         )
     finally:
@@ -3073,8 +3100,13 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
 
         first_event = FakeEvent()
         second_event = FakeEvent()
-        text_items[0].contextMenuEvent(first_event)
-        text_items[0].contextMenuEvent(second_event)
+        text_item = text_items[0]
+        text_item.contextMenuEvent(
+            cast(QtWidgets.QGraphicsSceneContextMenuEvent, first_event)
+        )
+        text_item.contextMenuEvent(
+            cast(QtWidgets.QGraphicsSceneContextMenuEvent, second_event)
+        )
 
         assert first_event.accepted is True
         assert second_event.accepted is True
@@ -3085,10 +3117,13 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
             )
         ]
 
-        FakeMenu.current.aboutToHide.emit()
-        text_items[0].contextMenuEvent(FakeEvent())
+        current_menu = required(FakeMenu.current, "fake context menu")
+        current_menu.aboutToHide.emit()
+        text_item.contextMenuEvent(
+            cast(QtWidgets.QGraphicsSceneContextMenuEvent, FakeEvent())
+        )
         assert len(popups) == 2
-        FakeMenu.current.aboutToHide.emit()
+        required(FakeMenu.current, "fake context menu").aboutToHide.emit()
     finally:
         window.close()
         app.processEvents()
@@ -3207,9 +3242,9 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
                 params_path=params_path,
             )
             handler = window._make_context_menu(artifact, plot_item=None)
-            handler(event)
+            handler(cast(QtWidgets.QGraphicsSceneContextMenuEvent, event))
             assert event.accepted is True
-            FakeMenu.current.aboutToHide.emit()
+            required(FakeMenu.current, "fake context menu").aboutToHide.emit()
             expected_actions = [
                 "Save PDF Image As",
                 "Save PNG Image As",
@@ -3261,7 +3296,7 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
             self.callback = callback
 
         def emit(self):
-            self.callback()
+            required(self.callback, "fake signal callback")()
 
     class FakeDialog(object):
         def __init__(self, plot_params, dialog_image_path, parent=None):
@@ -3327,7 +3362,7 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
         plot_item = next(
             item
             for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
         artifact = window.create_plot_artifact(
             title, str(image_path), params_path=params_path
@@ -3627,8 +3662,6 @@ def test_plot_text_inputs_enforce_publication_readability_limit():
 
 
 def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
-    from PyQt6 import QtTest
-
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3646,7 +3679,7 @@ def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
         assert dialog.plot_params()["fp_col1_str"] == "x" * (PLOT_TEXT_INPUT_LIMIT + 20)
         dialog.col1_str_edit.setFocus()
         dialog.col1_str_edit.selectAll()
-        QtTest.QTest.keyClicks(dialog.col1_str_edit, "replacement")
+        key_clicks(dialog.col1_str_edit, "replacement")
         assert dialog.plot_params()["fp_col1_str"] == "replacement"
     finally:
         dialog.close()
@@ -3833,7 +3866,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         plot_item = next(
             item
             for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
         artifact = window.create_plot_artifact(
             "Regression Plot", image_path, params_path=params_path
@@ -3875,7 +3908,27 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
     class PlotDefaultsForm(object):
-        pass
+        current_param_vals: dict[str, object]
+        style_cbo: QtWidgets.QComboBox
+        show_1: QtWidgets.QCheckBox
+        col1_str_edit: QtWidgets.QLineEdit
+        show_2: QtWidgets.QCheckBox
+        col2_str_edit: QtWidgets.QLineEdit
+        show_3: QtWidgets.QCheckBox
+        col3_str_edit: QtWidgets.QLineEdit
+        show_4: QtWidgets.QCheckBox
+        col4_str_edit: QtWidgets.QLineEdit
+        x_lbl_le: QtWidgets.QLineEdit
+        image_path: QtWidgets.QLineEdit
+        plot_lb_le: QtWidgets.QLineEdit
+        plot_ub_le: QtWidgets.QLineEdit
+        x_ticks_le: QtWidgets.QLineEdit
+        show_summary_line: QtWidgets.QCheckBox
+        show_raw_counts: QtWidgets.QCheckBox
+        show_headers: QtWidgets.QCheckBox
+        show_annotation: QtWidgets.QCheckBox
+        accent_color: QtWidgets.QLineEdit
+        point_size_multiplier: QtWidgets.QDoubleSpinBox
 
     form = PlotDefaultsForm()
     form.current_param_vals = {}
@@ -3921,8 +3974,9 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     assert form.current_param_vals["fp_show_annotation"] is False
     assert form.current_param_vals["fp_col3_str"] == "Treatment"
     assert form.current_param_vals["fp_col4_str"] == "Control"
-    assert form.current_param_vals["fp_display_path"].endswith(".display.svg")
-    assert Path(form.current_param_vals["fp_display_path"]).parent != Path(".")
+    display_path = cast(str, form.current_param_vals["fp_display_path"])
+    assert display_path.endswith(".display.svg")
+    assert Path(display_path).parent != Path(".")
     app.processEvents()
 
 
@@ -3936,6 +3990,19 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
 
     class RegressionPlotForm(object):
         meta_f_str = "meta-regression"
+        current_param_vals: dict[str, object]
+        style_cbo: QtWidgets.QComboBox
+        accent_color: QtWidgets.QLineEdit
+        point_size_multiplier: QtWidgets.QDoubleSpinBox
+        x_lbl_le: QtWidgets.QLineEdit
+        x_ticks_le: QtWidgets.QLineEdit
+        plot_lb_le: QtWidgets.QLineEdit
+        plot_ub_le: QtWidgets.QLineEdit
+        image_path: QtWidgets.QLineEdit
+        show_regression_line: QtWidgets.QCheckBox
+        show_confidence_band: QtWidgets.QCheckBox
+        show_prediction_interval: QtWidgets.QCheckBox
+        show_legend: QtWidgets.QCheckBox
 
     form = RegressionPlotForm()
     form.current_param_vals = {}
@@ -3961,7 +4028,7 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
 
     ma_specs.add_plot_params(form)
 
-    display_path = form.current_param_vals.pop("bp_display_path")
+    display_path = cast(str, form.current_param_vals.pop("bp_display_path"))
     assert display_path.endswith(".display.svg")
     assert Path(display_path).parent != Path(".")
     assert form.current_param_vals == {
@@ -4031,6 +4098,21 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
             "digits": 4,
         }
         _parent = Parent()
+        fixed_effects_radio: QtWidgets.QRadioButton
+        style_cbo: QtWidgets.QComboBox
+        accent_color: QtWidgets.QLineEdit
+        point_size_multiplier: QtWidgets.QDoubleSpinBox
+        x_lbl_le: QtWidgets.QLineEdit
+        x_ticks_le: QtWidgets.QLineEdit
+        plot_lb_le: QtWidgets.QLineEdit
+        plot_ub_le: QtWidgets.QLineEdit
+        image_path: QtWidgets.QLineEdit
+        show_regression_line: QtWidgets.QCheckBox
+        show_confidence_band: QtWidgets.QCheckBox
+        show_prediction_interval: QtWidgets.QCheckBox
+        show_legend: QtWidgets.QCheckBox
+        plot_tab: QtWidgets.QWidget
+        selected: list[object]
 
         def _selected_covariates(self):
             return [covariate]
@@ -4089,7 +4171,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
         raising=False,
     )
 
-    ma_specs.MA_Specs.run_meta_regression(form)
+    ma_specs.MA_Specs.run_meta_regression(cast(ma_specs.MA_Specs, form))
 
     assert calls[0][0] == "prepare"
     assert calls[1][0] == "run"
@@ -4115,6 +4197,8 @@ def test_meta_regression_enables_plots_only_for_one_continuous_covariate():
 
     class Form(object):
         is_meta_regression = True
+        selected: list[object]
+        plot_tab: QtWidgets.QWidget
 
         def _selected_covariates(self):
             return self.selected
@@ -4123,11 +4207,15 @@ def test_meta_regression_enables_plots_only_for_one_continuous_covariate():
     form.plot_tab = QtWidgets.QWidget()
     form.selected = [Covariate(meta_globals.CONTINUOUS)]
 
-    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(
+        cast(ma_specs.MA_Specs, form)
+    )
     assert form.plot_tab.isEnabled()
 
     form.selected.append(Covariate(meta_globals.CONTINUOUS))
-    ma_specs.MA_Specs._update_meta_regression_plot_availability(form)
+    ma_specs.MA_Specs._update_meta_regression_plot_availability(
+        cast(ma_specs.MA_Specs, form)
+    )
     assert not form.plot_tab.isEnabled()
     assert "exactly one continuous covariate" in form.plot_tab.toolTip()
 
@@ -4320,7 +4408,7 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
         plot_item = next(
             item
             for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
+            if isinstance(item, results_window._svg_item_class())
         )
         references_title = next(
             item
@@ -4385,7 +4473,7 @@ def test_results_window_ignores_missing_image_order_entries():
 
     try:
         nav_titles = [
-            window.nav_tree.topLevelItem(index).text(0)
+            required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
@@ -4427,7 +4515,9 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     )
     try:
         nav_titles = [
-            standard_window.nav_tree.topLevelItem(index).text(0)
+            required(
+                standard_window.nav_tree.topLevelItem(index), "navigation item"
+            ).text(0)
             for index in range(standard_window.nav_tree.topLevelItemCount())
         ]
 
@@ -4475,7 +4565,9 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     )
     try:
         nav_titles = [
-            hsroc_window.nav_tree.topLevelItem(index).text(0)
+            required(hsroc_window.nav_tree.topLevelItem(index), "navigation item").text(
+                0
+            )
             for index in range(hsroc_window.nav_tree.topLevelItemCount())
         ]
 
@@ -4594,8 +4686,12 @@ def test_welcome_wizard_recent_action_selects_project(monkeypatch):
         parent=window, recent_datasets=["first.rcms", "second.rcms"]
     )
     try:
-        page = wizard.page(main_wizard.Page_Welcome)
-        action = page.open_recent_btn.menu().actions()[0]
+        page = cast(
+            main_wizard.WelcomePage,
+            required(wizard.page(main_wizard.Page_Welcome), "welcome page"),
+        )
+        menu = required(page.open_recent_btn.menu(), "recent projects menu")
+        action = menu.actions()[0]
 
         page.dataset_selected(action)
 
@@ -4622,7 +4718,10 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
     )
     wizard = main_wizard.MainWizard(parent=window)
     try:
-        page = wizard.page(main_wizard.Page_Welcome)
+        page = cast(
+            main_wizard.WelcomePage,
+            required(wizard.page(main_wizard.Page_Welcome), "welcome page"),
+        )
         monkeypatch.setattr(
             main_wizard.QFileDialog,
             "getOpenFileName",
@@ -4783,7 +4882,10 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
         wizard.show()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
         multiline_buttons = [
             data_type_page.onearm_single_reg_coef_Button,
             data_type_page.onearm_generic_effect_size_Button,
@@ -4808,9 +4910,15 @@ def test_data_type_page_reflows_buttons_without_horizontal_overflow():
         wizard.show()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
         overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-        assert overflow.horizontalScrollBar().maximum() == 0
+        assert (
+            required(overflow.horizontalScrollBar(), "overflow scrollbar").maximum()
+            == 0
+        )
         assert data_type_page.oneArmDataTypesLayout.columnCount() == 2
         assert data_type_page.multiArmDataTypesLayout.columnCount() == 2
     finally:
@@ -4829,7 +4937,10 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
         wizard.show()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
         icon_sizes = {
             button.objectName(): (
                 button.icon().pixmap(button.iconSize()).size(),
@@ -4856,19 +4967,23 @@ def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
         wizard.show()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
-        data_type_page.layout().activate()
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
+        required(data_type_page.layout(), "data type layout").activate()
         app.processEvents()
 
         overflow = data_type_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
         diagnostic_button = data_type_page.diagnostic_Button
         overflow.ensureWidgetVisible(diagnostic_button)
         app.processEvents()
+        viewport = required(overflow.viewport(), "data type viewport")
         diagnostic_rect = QtCore.QRect(
-            diagnostic_button.mapTo(overflow.viewport(), QtCore.QPoint()),
+            diagnostic_button.mapTo(viewport, QtCore.QPoint()),
             diagnostic_button.size(),
         )
-        assert overflow.viewport().rect().intersects(diagnostic_rect)
+        assert viewport.rect().intersects(diagnostic_rect)
     finally:
         wizard.close()
         app.processEvents()
@@ -4879,7 +4994,10 @@ def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
     from PyQt6 import QtWidgets
     import main_wizard
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+    )
     wizard = main_wizard.MainWizard(path=path)
     try:
         assert wizard.wizardStyle() == main_wizard.QWizard.WizardStyle.ModernStyle
@@ -4893,7 +5011,10 @@ def test_wizard_layout_smoke_renders_core_wizard_pages():
     import launch
     from PyQt6 import QtWidgets
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+    )
 
     assert launch.start_wizard_layout_smoke() == 0
     assert [
@@ -4914,7 +5035,10 @@ def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
         wizard.show()
         app.processEvents()
 
-        welcome_page = wizard.page(main_wizard.Page_Welcome)
+        welcome_page = cast(
+            main_wizard.WelcomePage,
+            required(wizard.page(main_wizard.Page_Welcome), "welcome page"),
+        )
         welcome_page.new_dataset()
         app.processEvents()
         stable_body_width = None
@@ -4925,19 +5049,24 @@ def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
             main_wizard.Page_ChooseMetric,
             main_wizard.Page_OutcomeName,
         ]
-        wizard.page(main_wizard.Page_DataType).twoarm_proportions_Button.click()
+        cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        ).twoarm_proportions_Button.click()
 
         for page_id in page_sequence:
             if wizard.currentId() != page_id:
                 wizard.next()
             app.processEvents()
 
-            page = wizard.page(page_id)
-            if page.layout() is not None:
-                page.layout().activate()
+            page = required(wizard.page(page_id), "wizard page")
+            layout = page.layout()
+            if layout is not None:
+                layout.activate()
             app.processEvents()
 
-            page_body_width = page.parentWidget().contentsRect().width()
+            parent_widget = required(page.parentWidget(), "wizard page parent")
+            page_body_width = parent_widget.contentsRect().width()
             if stable_body_width is None:
                 stable_body_width = page_body_width
             assert abs(page_body_width - stable_body_width) <= 4
@@ -4959,16 +5088,16 @@ def test_data_type_page_canonical_form_declares_reflow_and_overflow():
         / "forms"
         / "data_type_page.ui"
     )
-    root = ET.parse(ui_path).getroot().find("widget")
+    root = _xml_element(ET.parse(ui_path).getroot(), "widget")
 
-    assert root.find("./layout").get("name") == "workflowPageLayout"
+    assert _xml_element(root, "./layout").get("name") == "workflowPageLayout"
     assert root.find(".//widget[@name='pageScrollArea']") is not None
     assert (
-        root.find(".//layout[@name='oneArmDataTypesLayout']").get("class")
+        _xml_element(root, ".//layout[@name='oneArmDataTypesLayout']").get("class")
         == "QGridLayout"
     )
     assert (
-        root.find(".//layout[@name='multiArmDataTypesLayout']").get("class")
+        _xml_element(root, ".//layout[@name='multiArmDataTypesLayout']").get("class")
         == "QGridLayout"
     )
     assert root.find("./property[@name='minimumSize']") is None
@@ -5071,7 +5200,10 @@ def test_data_type_page_records_every_supported_selection(button_name, expected)
         wizard.restart()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
         getattr(data_type_page, button_name).click()
         app.processEvents()
 
@@ -5110,15 +5242,18 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
         wizard.restart()
         app.processEvents()
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = cast(
+            main_wizard.DataTypePage,
+            required(wizard.page(main_wizard.Page_DataType), "data type page"),
+        )
         next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
-        assert not next_button.isEnabled()
+        assert not required(next_button, "wizard next button").isEnabled()
 
         data_type_page.twoarm_proportions_Button.click()
         app.processEvents()
 
         assert data_type_page.isComplete()
-        assert next_button.isEnabled()
+        assert required(next_button, "wizard next button").isEnabled()
         assert wizard.get_dataset_info() == {
             "arms": "two",
             "data_type": "binary",
@@ -5131,7 +5266,10 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
         wizard.next()
         app.processEvents()
 
-        metric_page = wizard.page(main_wizard.Page_ChooseMetric)
+        metric_page = cast(
+            main_wizard.ChooseMetricPage,
+            required(wizard.page(main_wizard.Page_ChooseMetric), "metric page"),
+        )
         assert metric_page.metric_cbo_box.count() == len(
             meta_globals.BINARY_TWO_ARM_METRICS
         )
@@ -5141,7 +5279,10 @@ def test_new_project_data_type_selection_populates_metric_defaults_and_results()
 
         wizard.next()
         app.processEvents()
-        outcome_page = wizard.page(main_wizard.Page_OutcomeName)
+        outcome_page = cast(
+            main_wizard.OutcomeNamePage,
+            required(wizard.page(main_wizard.Page_OutcomeName), "outcome page"),
+        )
         outcome_page.outcome_name_LineEdit.setText("Mortality")
 
         results = wizard.get_results()
@@ -5206,7 +5347,10 @@ def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_r
     monkeypatch.setattr(main_wizard.QFileDialog, "getOpenFileName", choose_project)
 
     try:
-        page = wizard.page(main_wizard.Page_Welcome)
+        page = cast(
+            main_wizard.WelcomePage,
+            required(wizard.page(main_wizard.Page_Welcome), "welcome page"),
+        )
         page.open_dataset()
 
         _assert_sample_projects_open_directory(calls[0]["directory"])
@@ -5229,13 +5373,15 @@ def test_about_legal_and_welcome_links_show_current_project_information():
 
         about_dialogs = []
         original_exec = about_legal_dialog.AboutLegalDialog.exec
-        about_legal_dialog.AboutLegalDialog.exec = lambda dialog: about_dialogs.append(
-            dialog
+        setattr(
+            about_legal_dialog.AboutLegalDialog,
+            "exec",
+            lambda dialog: about_dialogs.append(dialog),
         )
         try:
             window.action_about_legal.trigger()
         finally:
-            about_legal_dialog.AboutLegalDialog.exec = original_exec
+            setattr(about_legal_dialog.AboutLegalDialog, "exec", original_exec)
         about_text = about_dialogs[0].content_scroll_area.toPlainText()
         assert _window_archetype(about_dialogs[0]) == "transactional"
         assert "RC MetaStudio" in about_text
@@ -5247,7 +5393,10 @@ def test_about_legal_and_welcome_links_show_current_project_information():
         about_dialogs[0].close()
 
         wizard = main_wizard.MainWizard()
-        welcome = wizard.page(main_wizard.Page_Welcome)
+        welcome = cast(
+            main_wizard.WelcomePage,
+            required(wizard.page(main_wizard.Page_Welcome), "welcome page"),
+        )
         link_text = " ".join(
             [
                 welcome.RCMS_onlineLabel.text(),
@@ -5537,7 +5686,10 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
             "metric_choices": [],
         }
     )
-    page = wizard.page(main_wizard.Page_CsvImport)
+    page = cast(
+        main_wizard.CsvImportPage,
+        required(wizard.page(main_wizard.Page_CsvImport), "CSV import page"),
+    )
     page.initializePage()
     monkeypatch.setattr(
         main_wizard.QFileDialog,
@@ -5572,7 +5724,10 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
             "metric_choices": [],
         }
     )
-    page = wizard.page(main_wizard.Page_CsvImport)
+    page = cast(
+        main_wizard.CsvImportPage,
+        required(wizard.page(main_wizard.Page_CsvImport), "CSV import page"),
+    )
     page.initializePage()
     monkeypatch.setattr(
         main_wizard.QFileDialog,
@@ -5589,7 +5744,7 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
 
     assert shown == []
     assert page.isComplete()
-    assert page.preview_table.item(1, 5).text() == ""
+    assert required(page.preview_table.item(1, 5), "preview item").text() == ""
     _assert_compact_table_fits_visible_cells(page.preview_table)
     assert wizard.get_csv_data()["data"][-1] == ["Beta", "2021", "3", "11", "4", ""]
 
@@ -5610,7 +5765,10 @@ def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
             "metric_choices": [],
         }
     )
-    page = wizard.page(main_wizard.Page_CsvImport)
+    page = cast(
+        main_wizard.CsvImportPage,
+        required(wizard.page(main_wizard.Page_CsvImport), "CSV import page"),
+    )
     page.initializePage()
     monkeypatch.setattr(
         main_wizard.QFileDialog,
@@ -5651,7 +5809,10 @@ def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatc
             "metric_choices": [],
         }
     )
-    page = wizard.page(main_wizard.Page_CsvImport)
+    page = cast(
+        main_wizard.CsvImportPage,
+        required(wizard.page(main_wizard.Page_CsvImport), "CSV import page"),
+    )
     page.initializePage()
     monkeypatch.setattr(
         main_wizard.QFileDialog,
@@ -5659,9 +5820,11 @@ def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatc
         lambda **kwargs: (str(csv_path), "csv files (*.csv)"),
     )
     monkeypatch.setattr(
-        page,
-        "_validate_imported_data",
-        lambda: (_ for _ in ()).throw(ValueError("Year column is missing")),
+        main_wizard.csv_import,
+        "parse_csv",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ValueError("Year column is missing")
+        ),
     )
     monkeypatch.setattr(
         main_wizard.QMessageBox,
@@ -5703,9 +5866,12 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
         wizard.restart()
         app.processEvents()
 
-        page = wizard.page(main_wizard.Page_CsvImport)
+        page = cast(
+            main_wizard.CsvImportPage,
+            required(wizard.page(main_wizard.Page_CsvImport), "CSV import page"),
+        )
         finish_button = wizard.button(main_wizard.QWizard.WizardButton.FinishButton)
-        assert not finish_button.isEnabled()
+        assert not required(finish_button, "wizard finish button").isEnabled()
         monkeypatch.setattr(
             main_wizard.QFileDialog,
             "getOpenFileName",
@@ -5716,7 +5882,7 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
         app.processEvents()
 
         assert page.isComplete()
-        assert finish_button.isEnabled()
+        assert required(finish_button, "wizard finish button").isEnabled()
     finally:
         wizard.close()
         app.processEvents()

@@ -1,7 +1,7 @@
 import os
 import textwrap
 
-from _r_driver_support import build_r_driver, run_r_driver
+from ._r_driver_support import build_r_driver, run_r_driver
 
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

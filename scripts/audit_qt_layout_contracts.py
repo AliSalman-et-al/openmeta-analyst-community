@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 import sys
+from collections.abc import Mapping, Sequence
+from typing import TypeAlias, TypeVar
 import xml.etree.ElementTree as ET
 
 
@@ -158,11 +160,23 @@ class Finding:
     rule: str
     detail: str
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.path}: {self.rule}: {self.detail}"
 
 
-def _managed_root(top_widget):
+_Scope: TypeAlias = ast.AST
+_Assignment: TypeAlias = tuple[int, ast.expr, bool]
+_NodeScopes: TypeAlias = dict[ast.AST, _Scope]
+_NodeConditions: TypeAlias = dict[ast.AST, bool]
+_ScopeParents: TypeAlias = dict[_Scope, _Scope | None]
+_Assignments: TypeAlias = dict[_Scope, dict[str, list[_Assignment]]]
+_Bindings: TypeAlias = dict[str, list[ast.expr]]
+_Definition: TypeAlias = tuple[int, str, bool]
+_Definitions: TypeAlias = dict[_Scope, dict[str, list[_Definition]]]
+_ReachingValue = TypeVar("_ReachingValue")
+
+
+def _managed_root(top_widget: ET.Element) -> bool:
     if top_widget.find("layout") is not None:
         return True
     if top_widget.get("class") == "QMainWindow":
@@ -171,7 +185,9 @@ def _managed_root(top_widget):
     return False
 
 
-def _is_scroll_area_content(widget, parent_map):
+def _is_scroll_area_content(
+    widget: ET.Element, parent_map: Mapping[ET.Element, ET.Element]
+) -> bool:
     parent = parent_map.get(widget)
     return (
         parent is not None
@@ -180,8 +196,8 @@ def _is_scroll_area_content(widget, parent_map):
     )
 
 
-def _dimension_values(prop):
-    values = []
+def _dimension_values(prop: ET.Element) -> list[int]:
+    values: list[int] = []
     for tag in ("width", "height", "number"):
         for node in prop.iter(tag):
             try:
@@ -191,7 +207,9 @@ def _dimension_values(prop):
     return values
 
 
-def _ui_semantic_size_justification(widget):
+def _ui_semantic_size_justification(
+    widget: ET.Element,
+) -> tuple[str, str] | None:
     prop = widget.find("property[@name='RCMS_semantic_size_invariant']/string")
     value = (prop.text or "").strip() if prop is not None else ""
     category, separator, reason = value.partition(":")
@@ -204,21 +222,21 @@ def _ui_semantic_size_justification(widget):
     return category.strip(), reason.strip()
 
 
-def _size_pair(widget, property_name):
+def _size_pair(widget: ET.Element, property_name: str) -> tuple[int, int] | None:
     prop = widget.find(f"property[@name='{property_name}']")
     if prop is None:
         return None
     values = _dimension_values(prop)
-    return tuple(values[:2]) if len(values) >= 2 else None
+    return (values[0], values[1]) if len(values) >= 2 else None
 
 
-def _scalar_dimension(widget, property_name):
+def _scalar_dimension(widget: ET.Element, property_name: str) -> int | None:
     prop = widget.find(f"property[@name='{property_name}']")
     values = _dimension_values(prop) if prop is not None else []
     return values[0] if values else None
 
 
-def _audit_form(path):
+def _audit_form(path: Path) -> list[Finding]:
     findings = []
     try:
         root = ET.parse(path).getroot()
@@ -325,11 +343,11 @@ def _audit_form(path):
     return findings
 
 
-def _relative_source_path(path, source_dir):
+def _relative_source_path(path: Path, source_dir: Path) -> str:
     return path.relative_to(source_dir).as_posix()
 
 
-def _is_generated_source(path, source_dir):
+def _is_generated_source(path: Path, source_dir: Path) -> bool:
     relative = _relative_source_path(path, source_dir)
     parts = set(Path(relative).parts)
     return (
@@ -344,8 +362,10 @@ def _is_generated_source(path, source_dir):
     )
 
 
-def _source_exception(call, lines, relative_path):
-    candidate_lines = []
+def _source_exception(
+    call: ast.Call, lines: Sequence[str], relative_path: str
+) -> tuple[str, str] | None:
+    candidate_lines: list[str] = []
     if 1 <= call.lineno <= len(lines):
         candidate_lines.append(lines[call.lineno - 1])
     if call.lineno >= 2:
@@ -374,7 +394,7 @@ def _source_exception(call, lines, relative_path):
     return category, reason
 
 
-def _call_name(call):
+def _call_name(call: ast.Call) -> str | None:
     if isinstance(call.func, ast.Name):
         return call.func.id
     if isinstance(call.func, ast.Attribute):
@@ -382,7 +402,11 @@ def _call_name(call):
     return None
 
 
-def _static_strings(node, bindings, resolving=None):
+def _static_strings(
+    node: ast.AST,
+    bindings: Mapping[str, Sequence[ast.expr]],
+    resolving: set[str] | None = None,
+) -> set[str]:
     resolving = set() if resolving is None else resolving
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return {node.value}
@@ -392,11 +416,13 @@ def _static_strings(node, bindings, resolving=None):
             for left in _static_strings(node.left, bindings, resolving)
             for right in _static_strings(node.right, bindings, resolving)
         }
-    if isinstance(node, ast.JoinedStr) and all(
-        isinstance(value, ast.Constant) and isinstance(value.value, str)
-        for value in node.values
-    ):
-        return {"".join(value.value for value in node.values)}
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for value in node.values:
+            if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
+                return set()
+            parts.append(value.value)
+        return {"".join(parts)}
     if isinstance(node, ast.IfExp):
         return _static_strings(node.body, bindings, resolving) | _static_strings(
             node.orelse, bindings, resolving
@@ -409,25 +435,29 @@ def _static_strings(node, bindings, resolving=None):
     return set()
 
 
-def _source_scope_index(tree):
+def _source_scope_index(
+    tree: ast.AST,
+) -> tuple[_NodeScopes, _NodeConditions, _ScopeParents, _Assignments]:
     """Index simple assignments without leaking constants across lexical scopes."""
 
-    node_scopes = {}
-    node_conditions = {}
-    scope_parents = {tree: None}
-    assignments = {tree: {}}
+    node_scopes: _NodeScopes = {}
+    node_conditions: _NodeConditions = {}
+    scope_parents: _ScopeParents = {tree: None}
+    assignments: _Assignments = {tree: {}}
 
     class ScopeIndexer(ast.NodeVisitor):
-        def __init__(self):
-            self.scope = tree
+        def __init__(self) -> None:
+            self.scope: _Scope = tree
             self.conditional_depth = 0
 
-        def generic_visit(self, node):
+        def generic_visit(self, node: ast.AST) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             super().generic_visit(node)
 
-        def _visit_scope(self, node):
+        def _visit_scope(
+            self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+        ) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             for decorator in node.decorator_list:
@@ -457,16 +487,16 @@ def _source_scope_index(tree):
             self.scope = previous
             self.conditional_depth = previous_conditional_depth
 
-        def visit_FunctionDef(self, node):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
             self._visit_scope(node)
 
-        def visit_AsyncFunctionDef(self, node):
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
             self._visit_scope(node)
 
-        def visit_ClassDef(self, node):
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
             self._visit_scope(node)
 
-        def visit_Lambda(self, node):
+        def visit_Lambda(self, node: ast.Lambda) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             self.visit(node.args)
@@ -480,7 +510,7 @@ def _source_scope_index(tree):
             self.scope = previous
             self.conditional_depth = previous_conditional_depth
 
-        def visit_Assign(self, node):
+        def visit_Assign(self, node: ast.Assign) -> None:
             node_scopes[node] = self.scope
             for target in node.targets:
                 if isinstance(target, ast.Name):
@@ -489,7 +519,7 @@ def _source_scope_index(tree):
                     )
             self.generic_visit(node)
 
-        def visit_AnnAssign(self, node):
+        def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
             node_scopes[node] = self.scope
             if isinstance(node.target, ast.Name) and node.value is not None:
                 assignments[self.scope].setdefault(node.target.id, []).append(
@@ -497,43 +527,55 @@ def _source_scope_index(tree):
                 )
             self.generic_visit(node)
 
-        def visit_If(self, node):
+        def visit_If(self, node: ast.If) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             self.visit(node.test)
             self._visit_conditional_statements((*node.body, *node.orelse))
 
-        def _visit_conditional_statements(self, statements):
+        def _visit_conditional_statements(
+            self, statements: tuple[ast.AST, ...]
+        ) -> None:
             self.conditional_depth += 1
             for statement in statements:
                 self.visit(statement)
             self.conditional_depth -= 1
 
-        def visit_For(self, node):
+        def _visit_loop(self, node: ast.For | ast.AsyncFor) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             self.visit(node.iter)
             self._visit_conditional_statements((node.target, *node.body, *node.orelse))
 
-        visit_AsyncFor = visit_For
+        def visit_For(self, node: ast.For) -> None:
+            self._visit_loop(node)
 
-        def visit_While(self, node):
+        def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+            self._visit_loop(node)
+
+        def visit_While(self, node: ast.While) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             self.visit(node.test)
             self._visit_conditional_statements((*node.body, *node.orelse))
 
-        def visit_Try(self, node):
+        def _visit_try(self, node: ast.Try | ast.TryStar) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
-            statements = [*node.body, *node.orelse, *node.finalbody]
+            statements: tuple[ast.AST, ...] = tuple(
+                [*node.body, *node.orelse, *node.finalbody]
+            )
             for handler in node.handlers:
-                statements.extend(handler.body)
+                statements += tuple(handler.body)
             self._visit_conditional_statements(statements)
 
-        visit_TryStar = visit_Try
+        def visit_Try(self, node: ast.Try) -> None:
+            self._visit_try(node)
 
-        def visit_Match(self, node):
+        def visit_TryStar(self, node: ast.TryStar) -> None:
+            self._visit_try(node)
+
+        def visit_Match(self, node: ast.Match) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             self.visit(node.subject)
@@ -541,21 +583,27 @@ def _source_scope_index(tree):
                 tuple(statement for case in node.cases for statement in case.body)
             )
 
-        def visit_With(self, node):
+        def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
             node_scopes[node] = self.scope
             node_conditions[node] = bool(self.conditional_depth)
             for item in node.items:
                 self.visit(item.context_expr)
             self._visit_conditional_statements(tuple(node.body))
 
-        visit_AsyncWith = visit_With
+        def visit_With(self, node: ast.With) -> None:
+            self._visit_with(node)
+
+        def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+            self._visit_with(node)
 
     ScopeIndexer().visit(tree)
     return node_scopes, node_conditions, scope_parents, assignments
 
 
-def _may_reaching(candidates, cutoff=None):
-    reaching = []
+def _may_reaching(
+    candidates: Sequence[tuple[int, _ReachingValue, bool]], cutoff: int | None = None
+) -> list[_ReachingValue]:
+    reaching: list[_ReachingValue] = []
     for lineno, value, conditional in sorted(candidates, key=lambda item: item[0]):
         if cutoff is not None and lineno >= cutoff:
             continue
@@ -563,14 +611,19 @@ def _may_reaching(candidates, cutoff=None):
     return reaching
 
 
-def _visible_bindings(call, node_scopes, scope_parents, assignments):
-    scopes = []
+def _visible_bindings(
+    call: ast.Call,
+    node_scopes: _NodeScopes,
+    scope_parents: _ScopeParents,
+    assignments: _Assignments,
+) -> _Bindings:
+    scopes: list[_Scope] = []
     scope = node_scopes[call]
     while scope is not None:
         scopes.append(scope)
         scope = scope_parents[scope]
 
-    visible = {}
+    visible: _Bindings = {}
     for candidate_scope in reversed(scopes):
         for name, candidates in assignments[candidate_scope].items():
             cutoff = call.lineno if candidate_scope is node_scopes[call] else None
@@ -580,8 +633,10 @@ def _visible_bindings(call, node_scopes, scope_parents, assignments):
     return visible
 
 
-def _qfont_definitions(tree, node_scopes, node_conditions):
-    definitions = {}
+def _qfont_definitions(
+    tree: ast.AST, node_scopes: _NodeScopes, node_conditions: _NodeConditions
+) -> _Definitions:
+    definitions: _Definitions = {}
     for node in ast.walk(tree):
         scope = node_scopes.get(node)
         if scope is None:
@@ -631,7 +686,13 @@ def _qfont_definitions(tree, node_scopes, node_conditions):
     return definitions
 
 
-def _symbol_provenance(call, name, definitions, node_scopes, scope_parents):
+def _symbol_provenance(
+    call: ast.Call,
+    name: str,
+    definitions: _Definitions,
+    node_scopes: _NodeScopes,
+    scope_parents: _ScopeParents,
+) -> set[str]:
     scope = node_scopes[call]
     while scope is not None:
         scoped = definitions.get(scope, {}).get(name)
@@ -642,21 +703,26 @@ def _symbol_provenance(call, name, definitions, node_scopes, scope_parents):
     return set()
 
 
-def _attribute_chain(node):
-    parts = []
+def _attribute_chain(node: ast.AST) -> tuple[str, ...]:
+    parts: list[str] = []
     while isinstance(node, ast.Attribute):
         parts.append(node.attr)
         node = node.value
     if isinstance(node, ast.Name):
         parts.append(node.id)
-        return list(reversed(parts))
-    return []
+        return tuple(reversed(parts))
+    return ()
 
 
-def _is_qfont_constructor(call, definitions, node_scopes, scope_parents):
+def _is_qfont_constructor(
+    call: ast.Call,
+    definitions: _Definitions,
+    node_scopes: _NodeScopes,
+    scope_parents: _ScopeParents,
+) -> bool:
     chain = _attribute_chain(call.func)
     if not chain and isinstance(call.func, ast.Name):
-        chain = [call.func.id]
+        chain = (call.func.id,)
     if not chain:
         return False
     provenance = _symbol_provenance(
@@ -664,9 +730,9 @@ def _is_qfont_constructor(call, definitions, node_scopes, scope_parents):
     )
     if len(chain) == 1:
         return "qfont" in provenance
-    if chain[1:] == ["QFont"]:
+    if chain[1:] == ("QFont",):
         return "qtgui" in provenance
-    return chain[1:] == ["QtGui", "QFont"] and "pyqt6" in provenance
+    return chain[1:] == ("QtGui", "QFont") and "pyqt6" in provenance
 
 
 STYLESHEET_FONT_RE = re.compile(
@@ -674,7 +740,9 @@ STYLESHEET_FONT_RE = re.compile(
 )
 
 
-def _audit_source_fonts(path, tree, lines, relative_path):
+def _audit_source_fonts(
+    path: Path, tree: ast.AST, lines: list[str], relative_path: str
+) -> list[Finding]:
     findings = []
     node_scopes, node_conditions, scope_parents, assignments = _source_scope_index(tree)
     qfont_definitions = _qfont_definitions(tree, node_scopes, node_conditions)
@@ -749,7 +817,7 @@ def _audit_source_fonts(path, tree, lines, relative_path):
     return findings
 
 
-def _audit_sources(source_dir):
+def _audit_sources(source_dir: Path) -> list[Finding]:
     findings = []
     if not source_dir.exists():
         return findings
@@ -769,26 +837,26 @@ def _audit_sources(source_dir):
         except SyntaxError as exc:
             findings.append(Finding(path, "invalid-python", str(exc)))
             continue
-        for call in (
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in GUARDED_GEOMETRY_METHODS
-        ):
-            if _source_exception(call, lines, relative) is None:
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(
+                node.func, ast.Attribute
+            ):
+                continue
+            if node.func.attr not in GUARDED_GEOMETRY_METHODS:
+                continue
+            if _source_exception(node, lines, relative) is None:
                 findings.append(
                     Finding(
                         path,
                         "unjustified-geometry-call",
-                        f"{call.func.attr} at line {call.lineno} lacks a valid semantic exception",
+                        f"{node.func.attr} at line {node.lineno} lacks a valid semantic exception",
                     )
                 )
         findings.extend(_audit_source_fonts(path, tree, lines, relative))
     return findings
 
 
-def audit_repository(root):
+def audit_repository(root: Path) -> list[Finding]:
     root = Path(root)
     source_dir = root / "src" / "rc_metastudio"
     forms_dir = source_dir / "forms"
@@ -799,7 +867,7 @@ def audit_repository(root):
     return findings
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     root = Path(args[0]) if args else Path(__file__).resolve().parents[1]
     findings = audit_repository(root)

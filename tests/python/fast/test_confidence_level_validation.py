@@ -9,11 +9,19 @@ sys.path.insert(0, os.path.abspath("src"))
 
 from meta_globals import (
     normalize_confidence_level_params,
+    seems_sane,
     validate_analysis_count,
     validate_analysis_digits,
     validate_correction_factor,
     validate_confidence_level,
 )
+
+
+def test_plot_ticks_accept_only_comma_separated_finite_numbers():
+    assert seems_sane("-1.5, 0, 2e3")
+    assert not seems_sane("1")
+    assert not seems_sane("1, inf")
+    assert not seems_sane("1, __import__('os').getcwd()")
 
 
 def test_validate_confidence_level_accepts_finite_exclusive_percentage():

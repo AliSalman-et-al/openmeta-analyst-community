@@ -1,6 +1,6 @@
 import os
-import sys
 from pathlib import Path
+from test_types import required
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[3]
@@ -25,14 +25,14 @@ def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
             adaptive_window.adaptive_window_state(wizard).policy.archetype
             is adaptive_window.WindowArchetype.WORKFLOW
         )
-        assert wizard.currentPage().findChild(QtWidgets.QScrollArea, "pageScrollArea")
+        page = required(wizard.currentPage(), "current wizard page")
+        assert page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
     finally:
         wizard.close()
         qapp.processEvents()
 
 
 def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_path):
-    import launch
     import main_wizard
 
     for path in ("new_dataset", "csv_import"):
@@ -43,9 +43,10 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
             qapp.processEvents()
             qapp.processEvents()
 
-            page = wizard.currentPage()
-            if page.layout() is not None:
-                page.layout().activate()
+            page = required(wizard.currentPage(), "current wizard page")
+            layout = page.layout()
+            if layout is not None:
+                layout.activate()
             qapp.processEvents()
 
             image_path = tmp_path / ("modern_wizard_%s.png" % path)
@@ -62,7 +63,11 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
                 for y in range(0, image.height(), 8)
             )
             assert wizard.wizardStyle() == QtWidgets.QWizard.WizardStyle.ModernStyle
-            assert page.width() >= page.parentWidget().contentsRect().width() - 4
+            assert (
+                page.width()
+                >= required(page.parentWidget(), "wizard parent").contentsRect().width()
+                - 4
+            )
         finally:
             wizard.close()
             qapp.processEvents()
@@ -82,10 +87,13 @@ def test_parented_application_wizard_does_not_inherit_shell_width(qapp):
         qapp.processEvents()
         qapp.processEvents()
 
-        page = wizard.currentPage()
+        page = required(wizard.currentPage(), "current wizard page")
 
         assert wizard.width() <= int(parent.width() * 0.75)
-        assert page.width() >= page.parentWidget().contentsRect().width() - 4
+        assert (
+            page.width()
+            >= required(page.parentWidget(), "wizard parent").contentsRect().width() - 4
+        )
     finally:
         wizard.close()
         parent.close()
@@ -98,7 +106,7 @@ def test_application_wizard_pages_do_not_use_background_pixmaps(qapp):
     wizard = main_wizard.MainWizard()
     try:
         for page_id in wizard.pageIds():
-            page = wizard.page(page_id)
+            page = required(wizard.page(page_id), "wizard page")
             assert page.pixmap(QtWidgets.QWizard.WizardPixmap.BackgroundPixmap).isNull()
             assert page.pixmap(QtWidgets.QWizard.WizardPixmap.BannerPixmap).isNull()
         assert wizard.pixmap(QtWidgets.QWizard.WizardPixmap.BackgroundPixmap).isNull()

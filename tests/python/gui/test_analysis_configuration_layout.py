@@ -1,13 +1,13 @@
 import json
 import os
 from pathlib import Path
+from typing import cast
 import subprocess
 import sys
 from types import SimpleNamespace
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,6 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required, wait
 
 prepare_generated_ui_imports()
 
@@ -122,9 +123,8 @@ def test_method_parameters_declares_scroll_body_with_actions_outside(qapp):
         assert ui.content_scroll_area.widgetResizable()
         assert ui.content_scroll_area.isAncestorOf(ui.specs_tab)
         assert not ui.content_scroll_area.isAncestorOf(ui.buttonBox)
-        assert dialog.layout().indexOf(ui.buttonBox) > dialog.layout().indexOf(
-            ui.content_scroll_area
-        )
+        layout = required(dialog.layout(), "dialog layout")
+        assert layout.indexOf(ui.buttonBox) > layout.indexOf(ui.content_scroll_area)
     finally:
         dialog.close()
 
@@ -222,48 +222,80 @@ def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
                 assert plot_was_enabled is True
                 assert dialog.plot_tab.isEnabled() is False
 
-            enum_control = dialog.parameter_grp_box.findChild(QtWidgets.QComboBox)
+            enum_control = cast(
+                QtWidgets.QComboBox,
+                required(
+                    dialog.parameter_grp_box.findChild(QtWidgets.QComboBox),
+                    "parameter combo",
+                ),
+            )
             assert enum_control.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             complete_value_width = max(
                 enum_control.fontMetrics().horizontalAdvance(enum_control.itemText(i))
                 for i in range(enum_control.count())
             )
-            assert enum_control.view().minimumWidth() <= 800
-            if complete_value_width > enum_control.view().viewport().width():
+            combo_view = required(enum_control.view(), "parameter combo view")
+            assert combo_view.minimumWidth() <= 800
+            if (
+                complete_value_width
+                > required(combo_view.viewport(), "combo viewport").width()
+            ):
                 enum_control.showPopup()
                 qapp.processEvents()
-                assert enum_control.view().window().frameGeometry().width() <= 800
-                assert enum_control.view().horizontalScrollBar().maximum() > 0
+                assert (
+                    required(combo_view.window(), "combo popup").frameGeometry().width()
+                    <= 800
+                )
+                assert (
+                    required(
+                        combo_view.horizontalScrollBar(), "combo scrollbar"
+                    ).maximum()
+                    > 0
+                )
                 enum_control.hidePopup()
-            editable_value = dialog.parameter_grp_box.findChild(QtWidgets.QLineEdit)
             if data_type != "diagnostic":
+                editable_value = cast(
+                    QtWidgets.QLineEdit,
+                    required(
+                        dialog.parameter_grp_box.findChild(QtWidgets.QLineEdit),
+                        "editable value",
+                    ),
+                )
                 assert editable_value.text() == "complete editable value"
-                dialog.content_scroll_area.verticalScrollBar().setValue(0)
+                required(
+                    dialog.content_scroll_area.verticalScrollBar(), "vertical scrollbar"
+                ).setValue(0)
                 editable_value.setFocus()
                 qapp.processEvents()
-                visible_region = dialog.content_scroll_area.viewport().rect()
+                visible_region = required(
+                    dialog.content_scroll_area.viewport(), "content viewport"
+                ).rect()
                 control_center = editable_value.mapTo(
-                    dialog.content_scroll_area.viewport(),
+                    required(dialog.content_scroll_area.viewport(), "content viewport"),
                     editable_value.rect().center(),
                 )
                 assert visible_region.contains(control_center)
-            assert dialog.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            assert required(
+                dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+                "ok button",
             ).isVisible()
-            assert dialog.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            assert required(
+                dialog.buttonBox.button(
+                    QtWidgets.QDialogButtonBox.StandardButton.Cancel
+                ),
+                "cancel button",
             ).isVisible()
 
             dialog.method_cbo_box.setFocus()
-            initial_focus = qapp.focusWidget()
-            QTest.keyClick(initial_focus, QtCore.Qt.Key.Key_Tab)
+            initial_focus = required(qapp.focusWidget(), "initial focus")
+            key_click(initial_focus, QtCore.Qt.Key.Key_Tab)
             qapp.processEvents()
-            forward_focus = qapp.focusWidget()
+            forward_focus = required(qapp.focusWidget(), "forward focus")
             assert forward_focus is not initial_focus
-            QTest.keyClick(forward_focus, QtCore.Qt.Key.Key_Backtab)
+            key_click(forward_focus, QtCore.Qt.Key.Key_Backtab)
             qapp.processEvents()
             assert qapp.focusWidget() is not forward_focus
-            assert dialog.isAncestorOf(qapp.focusWidget())
+            assert dialog.isAncestorOf(required(qapp.focusWidget(), "current focus"))
     finally:
         for dialog in dialogs:
             dialog.close()
@@ -288,11 +320,16 @@ def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatc
     dialog = ma_specs.MA_Specs(_AnalysisModel("binary"), conf_level=95.0)
     try:
         dialog.show()
-        QTest.qWait(1)
+        wait(1)
         qapp.processEvents()
 
         assert dialog.frameGeometry().width() <= 1728
-        assert dialog.content_scroll_area.horizontalScrollBar().maximum() == 0
+        assert (
+            required(
+                dialog.content_scroll_area.horizontalScrollBar(), "horizontal scrollbar"
+            ).maximum()
+            == 0
+        )
     finally:
         dialog.close()
 
@@ -337,7 +374,7 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             return [study]
 
     parent = QtWidgets.QWidget()
-    parent.meta_subgroup = lambda _covariate: None
+    setattr(parent, "meta_subgroup", lambda _covariate: None)
     regression = meta_reg_form.MetaRegForm(Model(), parent=parent)
     subgroup = meta_subgroup_form.MetaSubgroupForm(Model(), parent=parent)
 
@@ -370,24 +407,30 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         assert subgroup.cov_subgroup_cbo_box.currentText() == long_name
         choice = subgroup.cov_subgroup_cbo_box
         subgroup.move(available.right() - 20, available.top() + 40)
-        original_column_width = choice.view().sizeHintForColumn(0)
+        choice_view = cast(
+            QtWidgets.QAbstractItemView, required(choice.view(), "choice view")
+        )
+        original_column_width = choice_view.sizeHintForColumn(0)
         enlarged = QtGui.QFont(choice.font())
         enlarged.setPointSize(enlarged.pointSize() + 6)
         choice.setFont(enlarged)
         choice.showPopup()
         qapp.processEvents()
         qapp.processEvents()
-        popup = choice.view().window()
+        popup = required(choice_view.window(), "choice popup")
         assert available.contains(popup.frameGeometry())
-        assert choice.view().textElideMode() == QtCore.Qt.TextElideMode.ElideNone
+        assert choice_view.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
         assert (
-            choice.view().horizontalScrollBarPolicy()
+            choice_view.horizontalScrollBarPolicy()
             == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
-        assert choice.view().horizontalScrollBar().maximum() > 0
+        assert (
+            required(choice_view.horizontalScrollBar(), "choice scrollbar").maximum()
+            > 0
+        )
         assert choice.itemData(0, QtCore.Qt.ItemDataRole.ToolTipRole) == long_name
         assert choice.toolTip() == long_name
-        assert choice.view().sizeHintForColumn(0) > original_column_width
+        assert choice_view.sizeHintForColumn(0) > original_column_width
         choice.hidePopup()
         assert (
             adaptive_window.adaptive_window_state(covariate_type).policy.archetype
@@ -420,13 +463,14 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     combo.resize(180, combo.sizeHint().height())
     combo.show()
     qapp.processEvents()
-    initial_width = combo.view().minimumWidth()
+    combo_view = required(combo.view(), "combo view")
+    initial_width = combo_view.minimumWidth()
 
     font = QtGui.QFont(combo.font())
     font.setPointSize(font.pointSize() + 6)
     combo.setFont(font)
     qapp.processEvents()
-    font_width = combo.view().minimumWidth()
+    font_width = combo_view.minimumWidth()
 
     class WideChromeStyle(QtWidgets.QProxyStyle):
         def pixelMetric(self, metric, option=None, widget=None):
@@ -442,8 +486,10 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     qapp.processEvents()
     try:
         assert font_width > initial_width
-        assert combo.view().minimumWidth() > font_width
-        assert combo.view().window().frameGeometry().width() <= 2000
+        assert combo_view.minimumWidth() > font_width
+        assert (
+            required(combo_view.window(), "combo popup").frameGeometry().width() <= 2000
+        )
         assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
             1
         )
@@ -455,7 +501,9 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
 def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
     import adaptive_controls
 
-    available = QtCore.QRect(qapp.primaryScreen().availableGeometry())
+    available = QtCore.QRect(
+        required(qapp.primaryScreen(), "primary screen").availableGeometry()
+    )
     combo = adaptive_controls.AdaptiveComboBox()
     combo.addItems(["short", "complete choice " * 80])
     combo.resize(180, combo.sizeHint().height())
@@ -463,6 +511,7 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
     controller = adaptive_controls.configure_choice_control(combo)
     combo.show()
     qapp.processEvents()
+    combo_view = required(combo.view(), "combo view")
     baseline = (
         controller.measurement_applied_count,
         controller.tooltip_scan_applied_count,
@@ -479,8 +528,12 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
             controller.popup_clamp_applied_count - baseline[2],
         )
         assert applied == (1, 1, 1)
-        assert available.contains(combo.view().window().frameGeometry())
-        assert combo.view().horizontalScrollBar().maximum() > 0
+        assert available.contains(
+            required(combo_view.window(), "combo popup").frameGeometry()
+        )
+        assert (
+            required(combo_view.horizontalScrollBar(), "combo scrollbar").maximum() > 0
+        )
         assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
             1
         )
@@ -601,13 +654,13 @@ def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch
 
     accepted = make_dialog()
     accepted.method_cbo_box.setFocus()
-    QTest.keyClick(accepted.method_cbo_box, QtCore.Qt.Key.Key_Return)
+    key_click(accepted.method_cbo_box, QtCore.Qt.Key.Key_Return)
     qapp.processEvents()
     assert accepted.result() == QtWidgets.QDialog.DialogCode.Accepted
 
     cancelled = make_dialog()
     cancelled.method_cbo_box.setFocus()
-    QTest.keyClick(cancelled.method_cbo_box, QtCore.Qt.Key.Key_Escape)
+    key_click(cancelled.method_cbo_box, QtCore.Qt.Key.Key_Escape)
     qapp.processEvents()
     assert cancelled.result() == QtWidgets.QDialog.DialogCode.Rejected
     accepted.close()
@@ -735,7 +788,11 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
             return {"texts": {"Summary": "ok"}, "images": {}}
 
         monkeypatch.setattr(backend, backend_name, capture)
-        metric = "DOR" if data_type == "diagnostic" else "OR"
+        metric = {
+            "binary": "OR",
+            "continuous": "SMD",
+            "diagnostic": "DOR",
+        }[data_type]
         mutable_parameters = {"conf.level": 90.5, "measure": metric}
         request = analysis_adapter.make_analysis_request(
             data_type=data_type,
@@ -749,7 +806,9 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
         mutable_parameters["conf.level"] = 1.0
         mutable_parameters["measure"] = "MUTATED"
 
-        analysis_adapter.execute_analysis_requests(_AnalysisModel(data_type), (request,))
+        analysis_adapter.execute_analysis_requests(
+            _AnalysisModel(data_type), (request,)
+        )
 
         rendered = repr(calls)
         assert "90.5" in rendered

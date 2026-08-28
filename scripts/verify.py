@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 if __package__:
-    from . import r_verification_support as r_support
+    from scripts import r_verification_support as r_support
 else:
     import r_verification_support as r_support
 

@@ -41,8 +41,28 @@ import qt_text
 import plot_capabilities
 from plot_text import apply_plot_text_input_limits
 from plot_defaults import apply_default_forest_arm_labels
-from meta_globals import *
-from settings import *
+from meta_globals import (
+    ANALYSIS_COUNT_MAX,
+    ANALYSIS_DIGITS_MAX,
+    ANALYSIS_DIGITS_MIN,
+    ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS,
+    ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS,
+    ANALYSIS_NUMERIC_MAX,
+    ANALYSIS_NUMERIC_MIN,
+    ANALYSIS_POSITIVE_INTEGER_PARAMS,
+    CONFIDENCE_LEVEL_DISPLAY_MAX,
+    CONTINUOUS,
+    DIAG_METRIC_NAMES_D,
+    ONE_ARM_METRICS,
+    check_plot_bound,
+    seems_sane,
+    validate_analysis_count,
+    validate_analysis_digits,
+    validate_analysis_float,
+    validate_confidence_level,
+    validate_correction_factor,
+)
+from settings import analysis_output_path
 
 _fromUtf8 = lambda s: s
 

@@ -10,7 +10,7 @@ import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
-from typing import cast
+from typing import Any, cast
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -79,16 +79,16 @@ def _surface_capture_order() -> tuple[str, ...]:
     return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
 
 
-def _qt_message_handler(message_type, context, message) -> None:
+def _qt_message_handler(message_type: Any, context: Any, message: str | None) -> None:
     """Keep native Qt diagnostics visible even when a warning is fatal."""
     location = ""
     if context.file:
         location = " (%s:%s)" % (context.file, context.line)
-    payload = "Qt %s%s: %s\n" % (message_type.name, location, message)
+    payload = "Qt %s%s: %s\n" % (message_type.name, location, message or "")
     os.write(2, payload.encode("utf-8", errors="backslashreplace"))
 
 
-def _rect(rect) -> dict[str, int]:
+def _rect(rect: Any) -> dict[str, int]:
     return {
         "x": rect.x(),
         "y": rect.y(),
@@ -97,7 +97,7 @@ def _rect(rect) -> dict[str, int]:
     }
 
 
-def _has_variation(image) -> bool:
+def _has_variation(image: Any) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull():
         return False
@@ -493,9 +493,12 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
             )
 
 
-def _surface_factories():
+def _surface_factories() -> dict[str, Any]:
     from PyQt6 import QtCore, QtGui
 
+    # Match the flat module identities used by the running application. Mixing
+    # package and flat imports creates duplicate Qt class objects and invalid
+    # runtime ``isinstance`` checks.
     import about_legal_dialog
     import add_new_dialogs
     import change_cov_type_form
@@ -510,7 +513,7 @@ def _surface_factories():
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
 
-        def __init__(self, _dataset, _covariate):
+        def __init__(self, _dataset: Any, _covariate: Any) -> None:
             super().__init__(2, 3)
 
     setattr(change_cov_type_form, "CovModel", PreviewModel)
@@ -539,7 +542,7 @@ def _surface_factories():
     }
 
 
-def _capture(window, destination: Path, evidence_root: Path) -> dict[str, object]:
+def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, object]:
     # QWidget.grab() synchronously paints the real hosted widget without
     # depending on desktop/screen-recording permissions in macOS CI.
     pixmap = window.grab()
@@ -557,7 +560,9 @@ def _capture(window, destination: Path, evidence_root: Path) -> dict[str, object
     }
 
 
-def _show_and_prepare(app, window, QtCore, QtWidgets, QTest) -> None:
+def _show_and_prepare(
+    app: Any, window: Any, QtCore: Any, QtWidgets: Any, QTest: Any
+) -> None:
     window.show()
     window.activateWindow()
     window.raise_()
@@ -579,7 +584,7 @@ def _show_and_prepare(app, window, QtCore, QtWidgets, QTest) -> None:
             app.processEvents()
 
 
-def _widget_identity(window, widget) -> str:
+def _widget_identity(window: Any, widget: Any) -> str:
     if widget is None or widget is window or not window.isAncestorOf(widget):
         return ""
     if widget.objectName():
@@ -589,7 +594,7 @@ def _widget_identity(window, widget) -> str:
 
 
 def _observe_focus_traversal(
-    app, window, QtCore, QtGui, QtWidgets
+    app: Any, window: Any, QtCore: Any, QtGui: Any, QtWidgets: Any
 ) -> dict[str, object]:
     tab_focus = QtCore.Qt.FocusPolicy.TabFocus
     focusables = [
@@ -672,7 +677,7 @@ def _observe_focus_traversal(
     }
 
 
-def _snapshot_edit_state(window, QtWidgets) -> tuple:
+def _snapshot_edit_state(window: Any, QtWidgets: Any) -> tuple[Any, ...]:
     return (
         tuple(
             (editor.objectName(), editor.text())
@@ -699,14 +704,14 @@ def _snapshot_edit_state(window, QtWidgets) -> tuple:
     )
 
 
-def _delete_window(app, window, QtCore, QtWidgets) -> None:
+def _delete_window(app: Any, window: Any, QtCore: Any, QtWidgets: Any) -> None:
     window.close()
     window.deleteLater()
     QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
-def _button_for_roles(box, roles):
+def _button_for_roles(box: Any, roles: Any) -> Any:
     return next(
         (button for button in box.buttons() if box.buttonRole(button) in roles),
         None,
@@ -714,7 +719,7 @@ def _button_for_roles(box, roles):
 
 
 def _observe_actions(
-    app, factory, surface_id, QtCore, QtWidgets, QTest
+    app: Any, factory: Any, surface_id: str, QtCore: Any, QtWidgets: Any, QTest: Any
 ) -> dict[str, object]:
     contract = ACTION_CONTRACTS[surface_id]
     if contract == "none":
@@ -840,7 +845,7 @@ def _observe_actions(
         _delete_window(app, reject_dialog, QtCore, QtWidgets)
 
 
-def _observe_overflow(window, QtWidgets) -> str:
+def _observe_overflow(window: Any, QtWidgets: Any) -> str:
     if isinstance(window, QtWidgets.QSplashScreen):
         if window.pixmap().isNull():
             raise RuntimeError("splash overflow evidence has no pixmap")
@@ -865,7 +870,7 @@ def _observe_overflow(window, QtWidgets) -> str:
     raise RuntimeError("remaining surface overflow behavior is not classified")
 
 
-def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
+def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, object]:
     controller = getattr(window, "_adaptive_window_controller", None)
     if not isinstance(controller, adaptive_window.AdaptiveWindowController):
         raise RuntimeError("remaining surface has no live adaptive controller")

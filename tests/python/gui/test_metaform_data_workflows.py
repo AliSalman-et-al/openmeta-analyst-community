@@ -2,19 +2,21 @@ import os
 import sys
 import math
 import copy
+from typing import cast
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
 
 import pytest
 from PyQt6.QtWidgets import QDialog
+from test_types import key_click, required
 
 
 REPO_ROOT = os.getcwd()
 
 
 def test_data_table_return_moves_vertically_from_selected_cells():
-    from PyQt6 import QtCore, QtTest
+    from PyQt6 import QtCore
 
     import launch
 
@@ -25,13 +27,13 @@ def test_data_table_return_moves_vertically_from_selected_cells():
         model = window.model
 
         table.setCurrentIndex(model.index(0, model.NAME))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Return)
+        key_click(table, QtCore.Qt.Key.Key_Return)
         assert table.currentIndex() == model.index(1, model.NAME)
 
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Enter)
+        key_click(table, QtCore.Qt.Key.Key_Enter)
         assert table.currentIndex() == model.index(2, model.NAME)
 
-        QtTest.QTest.keyClick(
+        key_click(
             table, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.ShiftModifier
         )
         assert table.currentIndex() == model.index(1, model.NAME)
@@ -40,7 +42,7 @@ def test_data_table_return_moves_vertically_from_selected_cells():
 
 
 def test_data_table_return_commits_editor_and_moves_down_same_column():
-    from PyQt6 import QtCore, QtTest, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     import launch
 
@@ -57,7 +59,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
         assert editor is not None
 
         editor.setText("Alpha")
-        QtTest.QTest.keyClick(editor, QtCore.Qt.Key.Key_Return)
+        key_click(editor, QtCore.Qt.Key.Key_Return)
         app.processEvents()
 
         assert _cell_text(model, 0, model.NAME) == "Alpha"
@@ -67,7 +69,7 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
 
 
 def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatch):
-    from PyQt6 import QtCore, QtTest
+    from PyQt6 import QtCore
 
     import launch
 
@@ -84,7 +86,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.NAME))
 
-        QtTest.QTest.keyClick(
+        key_click(
             table, QtCore.Qt.Key.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier
         )
         app.processEvents()
@@ -98,7 +100,7 @@ def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatc
 
 
 def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
-    from PyQt6 import QtCore, QtTest
+    from PyQt6 import QtCore
 
     import launch
     import ma_data_table_model
@@ -129,7 +131,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
 
         table.setFocus()
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Delete)
+        key_click(table, QtCore.Qt.Key.Key_Delete)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -139,7 +141,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
 
         table.setCurrentIndex(model.index(0, model.RAW_DATA[0]))
-        QtTest.QTest.keyClick(table, QtCore.Qt.Key.Key_Backspace)
+        key_click(table, QtCore.Qt.Key.Key_Backspace)
         app.processEvents()
 
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
@@ -257,11 +259,18 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         callback_errors = []
 
         def accept_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                binary_data_form.BinaryDataForm2,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(), "binary edit dialog"
+                ),
+            )
             opened_dialogs.append(dialog)
             try:
                 dialog.raw_data_table.setCurrentCell(0, 0)
-                dialog.raw_data_table.item(0, 0).setText(count)
+                required(dialog.raw_data_table.item(0, 0), "raw data item").setText(
+                    count
+                )
                 dialog.accept()
             except Exception as error:
                 callback_errors.append(error)
@@ -277,11 +286,16 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         assert committed.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
 
         def reject_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                binary_data_form.BinaryDataForm2,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(), "binary edit dialog"
+                ),
+            )
             opened_dialogs.append(dialog)
             try:
                 dialog.raw_data_table.setCurrentCell(0, 0)
-                dialog.raw_data_table.item(0, 0).setText("8")
+                required(dialog.raw_data_table.item(0, 0), "raw data item").setText("8")
                 dialog.reject()
             except Exception as error:
                 callback_errors.append(error)
@@ -387,10 +401,17 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         callback_errors = []
 
         def accept_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                continuous_data_form.ContinuousDataForm,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(), "continuous edit dialog"
+                ),
+            )
             try:
                 dialog.simple_table.setCurrentCell(0, 1)
-                dialog.simple_table.item(0, 1).setText(decimal)
+                required(
+                    dialog.simple_table.item(0, 1), "continuous data item"
+                ).setText(decimal)
                 dialog.accept()
             except Exception as error:
                 callback_errors.append(error)
@@ -528,9 +549,16 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         window.current_data_unsaved = False
 
         def accept_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                diagnostic_data_form.DiagnosticDataForm,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(), "diagnostic edit dialog"
+                ),
+            )
             dialog.two_by_two_table.setCurrentCell(0, 0)
-            dialog.two_by_two_table.item(0, 0).setText(count)
+            required(
+                dialog.two_by_two_table.item(0, 0), "diagnostic data item"
+            ).setText(count)
             dialog.accept()
 
         QtCore.QTimer.singleShot(0, accept_edit)
@@ -836,7 +864,7 @@ def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals
         _create_binary_dataset(window)
         model = window.model
         table = window.tableView
-        QApplication.clipboard().setText(
+        required(QApplication.clipboard(), "clipboard").setText(
             "Étude Ω\t2020\t1\t10\t\t12\r\nBeta\t2021\t2\t20\t3\t30\r\n"
         )
 
@@ -850,7 +878,7 @@ def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals
         model.add_covariate("Dose", "continuous", {"Étude Ω": None, "Beta": None})
         table.synchronize_column_widths()
         comma_decimal = model.index(0, model.columnCount() - 1)
-        QApplication.clipboard().setText("1,25\r\n")
+        required(QApplication.clipboard(), "clipboard").setText("1,25\r\n")
         table.paste_from_clipboard(comma_decimal)
 
         assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
@@ -878,7 +906,7 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
             "warning",
             lambda *args, **kwargs: warnings.append(args),
         )
-        QApplication.clipboard().setText("1\tnot numeric")
+        required(QApplication.clipboard(), "clipboard").setText("1\tnot numeric")
 
         assert table.paste_from_clipboard(model.index(0, model.RAW_DATA[0])) is False
 
@@ -917,7 +945,7 @@ def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch)
         )
         monkeypatch.setattr(model, "setData", lambda *args, **kwargs: False)
         model.last_data_error = "Simulated commit failure."
-        QApplication.clipboard().setText("Alpha")
+        required(QApplication.clipboard(), "clipboard").setText("Alpha")
 
         assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
 
@@ -967,7 +995,9 @@ def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypat
             return real_set_data(*args, **kwargs)
 
         monkeypatch.setattr(model, "setData", fail_after_first_write)
-        QApplication.clipboard().setText("Alpha\r\nBeta\r\nGamma")
+        required(QApplication.clipboard(), "clipboard").setText(
+            "Alpha\r\nBeta\r\nGamma"
+        )
 
         assert table.paste_from_clipboard(origin) is False
 
@@ -1814,12 +1844,12 @@ def test_confidence_level_dialog_rejects_represented_100_percent():
 
     import conf_level_dialog
 
-    app = QApplication.instance() or QApplication([])
+    _app = required(QApplication.instance() or QApplication([]), "application")
     dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
     try:
         spinbox = dialog.conf_level_spinbox
 
-        spinbox.lineEdit().setText("100")
+        required(spinbox.lineEdit(), "confidence level edit").setText("100")
         spinbox.interpretText()
 
         assert spinbox.maximum() == 99.9

@@ -5,6 +5,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 from PIL import Image
@@ -40,6 +41,17 @@ def _load_native_calculator_smoke():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _table_item(table: QTableWidget, row: int, column: int) -> QTableWidgetItem:
+    item = table.item(row, column)
+    assert item is not None
+    return item
+
+
+def _required(value, message: str = "expected Qt object"):
+    assert value is not None, message
+    return value
 
 
 def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path, qapp):
@@ -116,7 +128,9 @@ def test_native_calculator_capture_falls_back_when_screen_grab_is_null(tmp_path,
             encoded.load()
             assert encoded.format == "PNG"
             assert encoded.mode == "RGBA"
-            assert len(encoded.getcolors(maxcolors=encoded.width * encoded.height)) > 2
+            colors = encoded.getcolors(maxcolors=encoded.width * encoded.height)
+            assert colors is not None
+            assert len(colors) > 2
     finally:
         dialog.close()
         qapp.processEvents()
@@ -147,6 +161,14 @@ def test_native_calculator_png_encoding_never_calls_qt_save(tmp_path):
 
 def test_native_calculator_installs_stub_without_loading_real_rpy2(monkeypatch):
     smoke = _load_native_calculator_smoke()
+    from rc_metastudio import meta_py_r_backend
+
+    def register_backend(backend):
+        monkeypatch.setitem(sys.modules, "rc_metastudio.meta_py_r", backend)
+        monkeypatch.setitem(sys.modules, "meta_py_r", backend)
+        return backend
+
+    monkeypatch.setattr(meta_py_r_backend, "_register_backend", register_backend)
     monkeypatch.delitem(sys.modules, "rpy2.rinterface", raising=False)
     backend = smoke.install_native_stub_backend()
     assert backend._oma_stub_backend is True
@@ -387,48 +409,61 @@ def test_calculator_cell_validators_accept_native_qt6_text():
     import continuous_data_form
     import diagnostic_data_form
 
-    assert binary_data_form.BinaryDataForm2._cell_data_not_valid(None, "  ") is None
-    assert binary_data_form.BinaryDataForm2._cell_data_not_valid(None, " 1 ") is None
+    binary_form = cast(binary_data_form.BinaryDataForm2, None)
+    continuous_form = cast(continuous_data_form.ContinuousDataForm, None)
+    diagnostic_form = cast(diagnostic_data_form.DiagnosticDataForm, None)
     assert (
-        binary_data_form.BinaryDataForm2._cell_data_not_valid(None, "1.5")
+        binary_data_form.BinaryDataForm2._cell_data_not_valid(binary_form, "  ") is None
+    )
+    assert (
+        binary_data_form.BinaryDataForm2._cell_data_not_valid(binary_form, " 1 ")
+        is None
+    )
+    assert (
+        binary_data_form.BinaryDataForm2._cell_data_not_valid(binary_form, "1.5")
         == "Expected a whole number (count), but a decimal value was entered."
     )
 
     assert (
         continuous_data_form.ContinuousDataForm._cell_data_not_valid(
-            None, " 1.25 ", "mean"
+            continuous_form, " 1.25 ", "mean"
         )
         is None
     )
     assert (
-        continuous_data_form.ContinuousDataForm._cell_data_not_valid(None, "", "mean")
+        continuous_data_form.ContinuousDataForm._cell_data_not_valid(
+            continuous_form, "", "mean"
+        )
         is None
     )
     for value in ("5", "5.0", "5,0"):
         assert (
             continuous_data_form.ContinuousDataForm._cell_data_not_valid(
-                None, value, "N"
+                continuous_form, value, "N"
             )
             is None
         )
     for value in ("5.5", "5,5", "-1", "nan", "inf"):
         assert "N must be" in (
             continuous_data_form.ContinuousDataForm._cell_data_not_valid(
-                None, value, "N"
+                continuous_form, value, "N"
             )
             or ""
         ) or "numeric" in (
             continuous_data_form.ContinuousDataForm._cell_data_not_valid(
-                None, value, "N"
+                continuous_form, value, "N"
             )
             or ""
         )
 
     assert (
-        diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, " 2 ") is None
+        diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(
+            diagnostic_form, " 2 "
+        )
+        is None
     )
     assert (
-        diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(None, "-1")
+        diagnostic_data_form.DiagnosticDataForm.cell_data_invalid(diagnostic_form, "-1")
         == "Counts cannot be negative."
     )
 
@@ -468,11 +503,11 @@ def test_consistency_checker_uses_qt6_foreground_api(qapp):
     )
 
     assert checker.run() == "Rows must sum!"
-    assert table.item(0, 0).foreground().color() == calc_fncs.ERROR_COLOR
+    assert _table_item(table, 0, 0).foreground().color() == calc_fncs.ERROR_COLOR
 
-    table.item(0, 2).setText("3")
+    _table_item(table, 0, 2).setText("3")
     assert checker.run() is None
-    assert table.item(0, 0).foreground().color() == calc_fncs.OK_COLOR
+    assert _table_item(table, 0, 0).foreground().color() == calc_fncs.OK_COLOR
 
 
 def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch):
@@ -634,15 +669,16 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
         conf_level=95.0,
     )
 
-    assert not form.raw_data_table.horizontalHeader().isHidden()
-    assert not form.raw_data_table.verticalHeader().isHidden()
+    table = _required(form.raw_data_table)
+    assert not _required(table.horizontalHeader()).isHidden()
+    assert not _required(table.verticalHeader()).isHidden()
     assert [
-        form.raw_data_table.horizontalHeaderItem(col).text()
-        for col in range(form.raw_data_table.columnCount())
+        _required(table.horizontalHeaderItem(col)).text()
+        for col in range(table.columnCount())
     ] == ["Event", "No Event", "Total"]
     assert [
-        form.raw_data_table.verticalHeaderItem(row).text()
-        for row in range(form.raw_data_table.rowCount())
+        _required(table.verticalHeaderItem(row)).text()
+        for row in range(table.rowCount())
     ] == ["Group 1", "Group 2", "Total"]
     assert form.raw_data_table.maximumHeight() >= form.raw_data_table.minimumHeight()
     assert [
@@ -678,14 +714,14 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
         conf_level=95.0,
     )
 
-    table = form.raw_data_table
+    table = _required(form.raw_data_table)
 
     assert form.event_lbl_3.isHidden()
     assert table.maximumWidth() > table.minimumWidth()
     assert table.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Expanding
 
     required_height = (
-        table.horizontalHeader().height()
+        _required(table.horizontalHeader()).height()
         + sum(table.rowHeight(row) for row in range(table.rowCount()))
         + 2 * table.frameWidth()
     )
@@ -700,12 +736,13 @@ def _assert_calculator_table_grid_fills_width(qapp, table):
     qapp.processEvents()
 
     section_width = sum(
-        table.horizontalHeader().sectionSize(column)
+        _required(table.horizontalHeader()).sectionSize(column)
         for column in range(table.columnCount())
     )
 
     assert (
-        table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+        _required(table.horizontalHeader()).sectionResizeMode(0)
+        == QHeaderView.ResizeMode.Stretch
     )
     assert section_width >= table.viewport().width() - 1
 
@@ -716,7 +753,7 @@ def _assert_calculator_table_content_columns_fill_width(qapp, table):
     calculator.show()
     qapp.processEvents()
 
-    header = table.horizontalHeader()
+    header = _required(table.horizontalHeader())
     section_width = sum(
         header.sectionSize(column) for column in range(table.columnCount())
     )
@@ -859,7 +896,7 @@ def test_continuous_effect_fields_fit_metric_domain_samples(
     )
     for field in fields.values():
         margins = field.textMargins()
-        frame = field.style().pixelMetric(
+        frame = _required(field.style()).pixelMetric(
             QStyle.PixelMetric.PM_DefaultFrameWidth, None, field
         )
         required = (
@@ -895,7 +932,7 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
 
     form.show()
     qapp.processEvents()
-    header = form.raw_data_table.horizontalHeader()
+    header = _required(_required(form.raw_data_table).horizontalHeader())
     assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
     for column in range(form.raw_data_table.columnCount()):
@@ -920,7 +957,7 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
         field = fields["effect"]
         widths[metric] = field.minimumWidth()
         margins = field.textMargins()
-        frame = field.style().pixelMetric(
+        frame = _required(field.style()).pixelMetric(
             QStyle.PixelMetric.PM_DefaultFrameWidth, None, field
         )
         for sample in calculator_routines.binary_effect_display_samples(metric):
@@ -959,7 +996,7 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
         mult=1.96,
     )
     text_margins = ratio_field.textMargins()
-    frame_width = ratio_field.style().pixelMetric(
+    frame_width = _required(ratio_field.style()).pixelMetric(
         QStyle.PixelMetric.PM_DefaultFrameWidth, None, ratio_field
     )
     required_rendered_width = (
@@ -1045,19 +1082,21 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
 
     table = form.raw_data_table
     form.current_item_data = 6
-    table.item(0, 0).setText("7")
+    _table_item(table, 0, 0).setText("7")
     qapp.processEvents()
 
     assert warnings == []
-    assert table.item(0, 0).text() == "7"
-    assert table.item(0, 1).text() == "14"
-    assert table.item(0, 2).text() == "21"
-    assert table.item(2, 0).text() == "15"
-    assert table.item(2, 1).text() == "28"
-    assert table.item(2, 2).text() == "43"
+    assert _table_item(table, 0, 0).text() == "7"
+    assert _table_item(table, 0, 1).text() == "14"
+    assert _table_item(table, 0, 2).text() == "21"
+    assert _table_item(table, 2, 0).text() == "15"
+    assert _table_item(table, 2, 1).text() == "28"
+    assert _table_item(table, 2, 2).text() == "43"
     assert form.ma_unit.get_raw_data_for_group("Group 1") == [7, 21]
     assert not form.inconsistencyLabel.isVisible()
-    assert form.buttonBox.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+    assert _required(
+        form.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+    ).isEnabled()
 
 
 class FakeDiagnosticMAUnit:
@@ -1117,10 +1156,11 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
 
     form.show()
     qapp.processEvents()
-    header = form.two_by_two_table.horizontalHeader()
+    table = _required(form.two_by_two_table)
+    header = _required(table.horizontalHeader())
     assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
-    for column in range(form.two_by_two_table.columnCount()):
+    for column in range(table.columnCount()):
         assert header.sectionSize(column) >= header.sectionSizeHint(column)
 
 
@@ -1204,21 +1244,23 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
         conf_level=95.0,
     )
 
-    table = form.two_by_two_table
+    table = _required(form.two_by_two_table)
     form.current_item_data = 1
-    table.item(0, 0).setText("5")
+    _table_item(table, 0, 0).setText("5")
     qapp.processEvents()
 
     assert warnings == []
-    assert table.item(0, 0).text() == "5"
-    assert table.item(0, 2).text() == "8"
-    assert table.item(1, 2).text() == "6"
-    assert table.item(2, 0).text() == "7"
-    assert table.item(2, 1).text() == "7"
-    assert table.item(2, 2).text() == "14"
+    assert _table_item(table, 0, 0).text() == "5"
+    assert _table_item(table, 0, 2).text() == "8"
+    assert _table_item(table, 1, 2).text() == "6"
+    assert _table_item(table, 2, 0).text() == "7"
+    assert _table_item(table, 2, 1).text() == "7"
+    assert _table_item(table, 2, 2).text() == "14"
     assert form.ma_unit.raw_data == [5.0, 2.0, 3.0, 4.0]
     assert not form.inconsistencyLabel.isVisible()
-    assert form.buttonBox.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+    assert _required(
+        form.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+    ).isEnabled()
 
 
 class FakeContinuousMAUnit:
@@ -1287,8 +1329,8 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     form.resize(360, form.height())
     form.show()
     qapp.processEvents()
-    table = form.simple_table
-    header = table.horizontalHeader()
+    table = _required(form.simple_table)
+    header = _required(table.horizontalHeader())
     assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert not header.stretchLastSection()
     assert (
@@ -1340,19 +1382,21 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
     qapp.processEvents()
 
     displayed_values = [
-        form.simple_table.item(0, column).text()
+        _table_item(form.simple_table, 0, column).text()
         for column in range(form.simple_table.columnCount())
     ]
     assert "2.604729426373378" not in displayed_values
     assert "3.4972319657703745e-249" not in displayed_values
-    assert form.simple_table.item(0, 2).text() == "2.6047"
+    assert _table_item(form.simple_table, 0, 2).text() == "2.6047"
 
     natural_width = sum(
         max(
-            form.simple_table.horizontalHeader().sectionSizeHint(column),
-            form.simple_table.sizeHintForColumn(column),
+            _required(_required(form.simple_table).horizontalHeader()).sectionSizeHint(
+                column
+            ),
+            _required(form.simple_table).sizeHintForColumn(column),
         )
-        for column in range(form.simple_table.columnCount())
+        for column in range(_required(form.simple_table).columnCount())
     )
     assert form.simple_table.minimumWidth() < natural_width * 2
     assert (

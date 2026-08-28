@@ -13,7 +13,7 @@ import plistlib
 import stat
 import subprocess
 import sys
-from typing import Any, cast
+from typing import Any, TypeGuard, cast
 import unicodedata
 import zipfile
 
@@ -148,7 +148,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _valid_r_kit_derivation(manifest, derivation, target):
+def _valid_r_kit_derivation(manifest: Any, derivation: Any, target: str) -> bool:
     manifest_files = {
         record.get("path"): record
         for record in manifest.get("files", [])
@@ -648,7 +648,9 @@ def _codesign_observation(app_root: Path) -> dict:
     )
     detail_text = details.stdout + details.stderr
     if details.returncode != 0:
-        raise MacOSDeploymentInspectionError("app bundle signature details are unreadable")
+        raise MacOSDeploymentInspectionError(
+            "app bundle signature details are unreadable"
+        )
     runtime = "runtime" in detail_text.lower()
     entitlements = subprocess.run(
         ["codesign", "-d", "--entitlements", ":-", str(app_root)],
@@ -1381,8 +1383,7 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
         and _valid_sha256(sample_projects.get("manifest_sha256"))
         and isinstance(sample_records, list)
         and bool(sample_records)
-        and len({item.get("project") for item in sample_records})
-        == len(sample_records)
+        and len({item.get("project") for item in sample_records}) == len(sample_records)
         and all(
             isinstance(item.get("project"), str)
             and item.get("project", "").endswith(".rcms")
@@ -1745,6 +1746,10 @@ def inspect_archive(
                 raise MacOSDeploymentInspectionError(
                     f"ZIP qualification input is missing or changed: {member}"
                 )
+            if archived_payload is None:
+                raise MacOSDeploymentInspectionError(
+                    f"ZIP qualification input is missing: {member}"
+                )
             embedded_hashes[relative] = hashlib.sha256(archived_payload).hexdigest()
         direct_manifest_path = embedded_files.get(
             "qualification/direct-r-build-manifest.json"
@@ -1752,7 +1757,9 @@ def inspect_archive(
         direct_manifest = None
         if direct_manifest_path is not None:
             direct_manifest = validate_direct_build_manifest(
-                json.loads(bundle.read(prefix + "qualification/direct-r-build-manifest.json")),
+                json.loads(
+                    bundle.read(prefix + "qualification/direct-r-build-manifest.json")
+                ),
                 target=target,
             )
             validate_direct_build_archive_inputs(
@@ -1897,10 +1904,14 @@ def _valid_sha256(value: object) -> bool:
     )
 
 
+def _string_keyed_dict(value: object) -> TypeGuard[dict[str, object]]:
+    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+
+
 def _contains_expected_hashes(actual: object, expected: dict[str, str]) -> bool:
-    return isinstance(actual, dict) and all(
-        actual.get(path) == digest for path, digest in expected.items()
-    )
+    if not _string_keyed_dict(actual):
+        return False
+    return all(actual.get(path) == digest for path, digest in expected.items())
 
 
 def validate_macos_surface_records(scales: object) -> None:

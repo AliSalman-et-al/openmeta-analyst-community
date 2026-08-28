@@ -1,8 +1,9 @@
-import importlib.util
 import shutil
 import sys
 import tomllib
 from pathlib import Path
+
+from ._workflow import load_module_from_path
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -30,11 +31,8 @@ def read_description_fields(path):
 
 
 def load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
+    module = load_module_from_path(name, path)
     sys.modules[name] = module
-    spec.loader.exec_module(module)
     return module
 
 

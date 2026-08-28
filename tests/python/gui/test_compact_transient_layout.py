@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import cast
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required
 
 prepare_generated_ui_imports()
 LONG_VALUE = "A representative translated value with complete required content " * 20
@@ -67,13 +69,17 @@ def _remaining_surface_inventory():
         for line_edit in window.findChildren(QtWidgets.QLineEdit):
             line_edit.setText(LONG_VALUE)
         if kind == "choice":
-            combo = window.findChild(QtWidgets.QComboBox)
+            combo = required(window.findChild(QtWidgets.QComboBox), "choice combo")
             combo.addItem(LONG_VALUE)
             combo.setCurrentText(LONG_VALUE)
         if kind == "progress":
-            window.progress_bar.setFormat("Loading analysis resources: %p%")
+            progress_control = cast(
+                QtWidgets.QProgressBar,
+                required(getattr(window, "progress_bar", None), "progress bar"),
+            )
+            progress_control.setFormat("Loading analysis resources: %p%")
         if kind == "splash":
-            window.showMessage(LONG_VALUE)
+            cast(QtWidgets.QSplashScreen, window).showMessage(LONG_VALUE)
     return surfaces
 
 
@@ -203,12 +209,12 @@ def test_long_choice_values_remain_available_without_widening_the_dialog(qapp):
                 == LONG_VALUE
             )
             assert (
-                combo.view().horizontalScrollBarPolicy()
+                required(combo.view(), "choice view").horizontalScrollBarPolicy()
                 == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
             )
             assert (
                 dialog.frameGeometry().width()
-                < dialog.screen().availableGeometry().width()
+                < required(dialog.screen(), "dialog screen").availableGeometry().width()
             )
         finally:
             dialog.close()
@@ -225,7 +231,7 @@ def test_choice_control_state_is_typed_and_rejects_stale_ownership(qapp):
     owner = adaptive_controls.AdaptiveComboBox()
     stale_target = adaptive_controls.AdaptiveComboBox()
     controller = adaptive_controls.configure_choice_control(owner)
-    stale_target._adaptive_choice_controller = controller
+    setattr(stale_target, "_adaptive_choice_controller", controller)
     with pytest.raises(LookupError, match="stale ownership"):
         adaptive_controls.choice_control_controller(stale_target)
 
@@ -236,7 +242,6 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
     import add_new_dialogs
     import change_cov_type_form
     import edit_group_name_form
-    from PyQt6.QtTest import QTest
 
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
@@ -281,12 +286,17 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
         initial.setFocus()
         qapp.processEvents()
         assert qapp.focusWidget() is initial, name
-        box = dialog.findChild(QtWidgets.QDialogButtonBox)
-        ok = box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
-        cancel = box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        box = required(dialog.findChild(QtWidgets.QDialogButtonBox), "button box")
+        ok = required(
+            box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok), "ok button"
+        )
+        cancel = required(
+            box.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel),
+            "cancel button",
+        )
         assert ok.isVisible() and ok.isDefault(), name
         assert cancel.isVisible(), name
-        QTest.keyClick(initial, QtCore.Qt.Key.Key_Tab)
+        key_click(initial, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is not initial, name
         for control in dialog.findChildren(QtWidgets.QAbstractButton):
@@ -298,7 +308,7 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
                 continue
             assert view.accessibleName().strip(), (name, view.objectName())
         initial.setFocus()
-        QTest.keyClick(initial, QtCore.Qt.Key.Key_Return)
+        key_click(initial, QtCore.Qt.Key.Key_Return)
         qapp.processEvents()
         assert accepted == [name], name
         dialog.deleteLater()
@@ -311,7 +321,10 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
                 editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)
             ],
             "models": [
-                (view.model().rowCount(), view.model().columnCount())
+                (
+                    required(view.model(), "view model").rowCount(),
+                    required(view.model(), "view model").columnCount(),
+                )
                 for view in dialog.findChildren(QtWidgets.QAbstractItemView)
                 if view.model() is not None
             ],
@@ -319,7 +332,7 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
         dialog.rejected.connect(lambda surface=name: rejected.append(surface))
         dialog.show()
         qapp.processEvents()
-        QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         qapp.processEvents()
         assert rejected == [name], name
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected, name
@@ -329,7 +342,10 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
                 editor.text() for editor in dialog.findChildren(QtWidgets.QLineEdit)
             ],
             "models": [
-                (view.model().rowCount(), view.model().columnCount())
+                (
+                    required(view.model(), "view model").rowCount(),
+                    required(view.model(), "view model").columnCount(),
+                )
                 for view in dialog.findChildren(QtWidgets.QAbstractItemView)
                 if view.model() is not None
             ],
@@ -349,8 +365,9 @@ def test_about_legal_has_explicit_overflow_and_reachable_action(qapp):
     dialog.resize(420, 300)
     _show(dialog, qapp)
     try:
-        close_button = dialog.buttonBox.button(
-            QtWidgets.QDialogButtonBox.StandardButton.Close
+        close_button = required(
+            dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Close),
+            "close button",
         )
         import adaptive_window
 
@@ -358,7 +375,12 @@ def test_about_legal_has_explicit_overflow_and_reachable_action(qapp):
             adaptive_window.adaptive_window_state(dialog).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert dialog.content_scroll_area.verticalScrollBar().maximum() > 0
+        assert (
+            required(
+                dialog.content_scroll_area.verticalScrollBar(), "vertical scrollbar"
+            ).maximum()
+            > 0
+        )
         assert close_button.isVisible()
         assert not dialog.content_scroll_area.isAncestorOf(close_button)
         assert dialog.content_scroll_area.lineWrapMode() != (

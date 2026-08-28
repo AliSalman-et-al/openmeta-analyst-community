@@ -1,6 +1,6 @@
 import textwrap
 
-from _r_driver_support import REPO_ROOT, run_r_driver
+from ._r_driver_support import REPO_ROOT, run_r_driver
 
 
 _METRIC_LABEL_DRIVER = textwrap.dedent(

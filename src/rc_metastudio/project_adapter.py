@@ -5,10 +5,12 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+from collections.abc import Mapping
+from typing import Protocol
 
 import ma_dataset
 import two_way_dict
+from project_format import JsonObject, JsonValue
 
 
 _FAMILY_NAMES = {0: "binary", 1: "continuous", 2: "diagnostic"}
@@ -18,7 +20,19 @@ class ProjectAdapterError(ValueError):
     """The application model cannot be represented as a structured project."""
 
 
-def _portable_value(value: Any) -> Any:
+class ProjectStateModel(Protocol):
+    """Workspace fields that are durable in a project archive."""
+
+    current_outcome: str | None
+    current_txs: list[str]
+    current_effect: str | None
+
+    def get_current_follow_up_name(self) -> str | None: ...
+
+    def get_global_conf_level(self) -> float: ...
+
+
+def _portable_value(value: object) -> JsonValue:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     if isinstance(value, (list, tuple)):
@@ -30,8 +44,10 @@ def _portable_value(value: Any) -> Any:
     )
 
 
-def _entered_effects(effects: dict[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
+def _entered_effects(
+    effects: Mapping[str, Mapping[str, Mapping[str, object]]],
+) -> JsonObject:
+    result: JsonObject = {}
     required = {
         "est",
         "lower",
@@ -41,7 +57,7 @@ def _entered_effects(effects: dict[str, Any]) -> dict[str, Any]:
         "display_upper",
     }
     for metric, comparisons in effects.items():
-        kept_comparisons = {}
+        kept_comparisons: JsonObject = {}
         for comparison, values in comparisons.items():
             kept = {
                 key: _portable_value(value)
@@ -57,10 +73,10 @@ def _entered_effects(effects: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def dataset_to_project(dataset: ma_dataset.Dataset) -> dict[str, Any]:
+def dataset_to_project(dataset: ma_dataset.Dataset) -> JsonObject:
     """Return latest-version project data for an application dataset."""
 
-    outcomes = []
+    outcomes: list[JsonValue] = []
     families = set()
     for name in dataset.get_outcome_names():
         outcome = dataset.get_outcome_obj(name)
@@ -88,9 +104,9 @@ def dataset_to_project(dataset: ma_dataset.Dataset) -> dict[str, Any]:
             "a project must contain outcomes from exactly one supported analysis family"
         )
 
-    studies = []
+    studies: list[JsonValue] = []
     for study in dataset.studies:
-        units = []
+        units: list[JsonValue] = []
         for outcome_name in sorted(study.outcomes_to_follow_ups):
             for follow_up, unit in sorted(
                 study.outcomes_to_follow_ups[outcome_name].items(),
@@ -148,7 +164,7 @@ def dataset_to_project(dataset: ma_dataset.Dataset) -> dict[str, Any]:
     }
 
 
-def model_to_state(model: Any) -> dict[str, Any]:
+def model_to_state(model: ProjectStateModel) -> JsonObject:
     """Capture only durable, project-scoped working state."""
 
     return {
@@ -161,82 +177,168 @@ def model_to_state(model: Any) -> dict[str, Any]:
     }
 
 
-def project_to_dataset(project: dict[str, Any]) -> ma_dataset.Dataset:
+def _object(value: JsonValue, location: str) -> JsonObject:
+    if not isinstance(value, dict):
+        raise ProjectAdapterError(f"{location} must be an object")
+    return value
+
+
+def _array(value: JsonValue, location: str) -> list[JsonValue]:
+    if not isinstance(value, list):
+        raise ProjectAdapterError(f"{location} must be an array")
+    return value
+
+
+def _text(value: JsonValue, location: str) -> str:
+    if not isinstance(value, str):
+        raise ProjectAdapterError(f"{location} must be text")
+    return value
+
+
+def _optional_text(value: JsonValue, location: str) -> str | None:
+    if value is None:
+        return None
+    return _text(value, location)
+
+
+def _integer(value: JsonValue, location: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProjectAdapterError(f"{location} must be an integer")
+    return value
+
+
+def _optional_integer(value: JsonValue, location: str) -> int | None:
+    if value is None:
+        return None
+    return _integer(value, location)
+
+
+def _boolean(value: JsonValue, location: str) -> bool:
+    if not isinstance(value, bool):
+        raise ProjectAdapterError(f"{location} must be boolean")
+    return value
+
+
+def _number(value: JsonValue, location: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProjectAdapterError(f"{location} must be numeric")
+    return float(value)
+
+
+def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
     """Rebuild an application dataset from validated project data."""
 
-    source = project["dataset"]
+    source = _object(project["dataset"], "dataset")
     dataset = ma_dataset.Dataset(
-        title=source["title"],
-        is_diag=source["is_diagnostic"],
+        title=_text(source["title"], "dataset title"),
+        is_diag=_boolean(source["is_diagnostic"], "diagnostic flag"),
         summary=copy.deepcopy(source["summary"]),
     )
-    dataset.notes = source["notes"]
+    dataset.notes = _text(source["notes"], "dataset notes")
+    outcome_items = [
+        _object(item, "outcome") for item in _array(source["outcomes"], "outcomes")
+    ]
     outcomes = {
-        item["name"]: ma_dataset.Outcome(
-            item["name"], item["data_type"], sub_type=item["sub_type"]
+        _text(item["name"], "outcome name"): ma_dataset.Outcome(
+            _text(item["name"], "outcome name"),
+            _integer(item["data_type"], "outcome data type"),
+            sub_type=_optional_text(item["sub_type"], "outcome subtype"),
         )
-        for item in source["outcomes"]
+        for item in outcome_items
     }
     dataset.outcome_names_to_follow_ups = {}
-    for item in source["outcomes"]:
+    for item in outcome_items:
+        outcome_name = _text(item["name"], "outcome name")
         mapping = two_way_dict.TwoWayDict()
-        for index, follow_up in enumerate(item["follow_ups"]):
-            mapping[index] = follow_up
-        dataset.outcome_names_to_follow_ups[item["name"]] = mapping
+        for index, follow_up in enumerate(
+            _array(item["follow_ups"], "outcome follow-ups")
+        ):
+            mapping[index] = _optional_text(follow_up, "follow-up")
+        dataset.outcome_names_to_follow_ups[outcome_name] = mapping
+
+    covariate_items = [
+        _object(item, "covariate")
+        for item in _array(source["covariates"], "covariates")
+    ]
     dataset.covariates = [
         ma_dataset.Covariate(
-            item["name"],
-            "continuous" if item["data_type"] == 1 else "factor",
-            stable_id=item["stable_id"],
+            _text(item["name"], "covariate name"),
+            "continuous"
+            if _integer(item["data_type"], "covariate data type") == 1
+            else "factor",
+            stable_id=_optional_text(item["stable_id"], "covariate stable id"),
         )
-        for item in source["covariates"]
+        for item in covariate_items
     ]
-    for covariate, item in zip(dataset.covariates, source["covariates"], strict=True):
-        covariate.stable_id = item["stable_id"]
+    for covariate, item in zip(dataset.covariates, covariate_items, strict=True):
+        covariate.stable_id = _optional_text(item["stable_id"], "covariate stable id")
 
-    for item in source["studies"]:
+    for study_value in _array(source["studies"], "studies"):
+        item = _object(study_value, "study")
         study = ma_dataset.Study(
-            item["id"], item["name"], item["year"], include=item["include"]
+            _integer(item["id"], "study id"),
+            _text(item["name"], "study name"),
+            _optional_integer(item["year"], "study year"),
+            include=_boolean(item["include"], "study inclusion"),
         )
-        study.N = item["sample_size"]
-        study.notes = item["notes"]
-        study.manually_excluded = item["manually_excluded"]
-        study.covariate_dict = copy.deepcopy(item["covariates"])
+        study.N = copy.deepcopy(item["sample_size"])
+        study.notes = _text(item["notes"], "study notes")
+        study.manually_excluded = _boolean(
+            item["manually_excluded"], "manual exclusion"
+        )
+        study.covariate_dict = copy.deepcopy(
+            _object(item["covariates"], "study covariates")
+        )
         study.outcomes = [outcomes[name] for name in outcomes]
-        for unit_data in item["analysis_units"]:
-            outcome = outcomes[unit_data["outcome"]]
-            group_names = [group["name"] for group in unit_data["groups"]]
+        for unit_value in _array(item["analysis_units"], "analysis units"):
+            unit_data = _object(unit_value, "analysis unit")
+            outcome_name = _text(unit_data["outcome"], "analysis unit outcome")
+            outcome = outcomes[outcome_name]
+            group_items = [
+                _object(group, "analysis group")
+                for group in _array(unit_data["groups"], "analysis groups")
+            ]
+            group_names = [
+                _text(group["name"], "analysis group name") for group in group_items
+            ]
             raw_data = [
-                copy.deepcopy(group["raw_data"]) for group in unit_data["groups"]
+                copy.deepcopy(_array(group["raw_data"], "group raw data"))
+                for group in group_items
             ]
             unit = ma_dataset.MetaAnalyticUnit(
                 outcome, raw_data=raw_data, group_names=group_names
             )
-            for group_data in unit_data["groups"]:
-                unit.tx_groups[group_data["name"]].id = group_data["id"]
-            for metric, comparisons in unit_data["entered_effects"].items():
-                for comparison, values in comparisons.items():
+            for group_data in group_items:
+                group_name = _text(group_data["name"], "analysis group name")
+                unit.tx_groups[group_name].id = _integer(
+                    group_data["id"], "analysis group id"
+                )
+            entered_effects = _object(unit_data["entered_effects"], "entered effects")
+            for metric, comparisons_value in entered_effects.items():
+                comparisons = _object(comparisons_value, "effect comparisons")
+                for comparison, values_value in comparisons.items():
                     if comparison not in unit.effects_dict[metric]:
                         raise ProjectAdapterError(
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
+                    values = _object(values_value, "effect values")
                     unit.effects_dict[metric][comparison].update(copy.deepcopy(values))
-            study.outcomes_to_follow_ups.setdefault(unit_data["outcome"], {})[
-                unit_data["follow_up"]
-            ] = unit
+            follow_up = _optional_text(unit_data["follow_up"], "unit follow-up")
+            study.outcomes_to_follow_ups.setdefault(outcome_name, {})[follow_up] = unit
         dataset.studies.append(study)
     return dataset
 
 
-def state_to_model_state(
-    dataset: ma_dataset.Dataset, state: dict[str, Any]
-) -> dict[str, Any]:
+def state_to_model_state(dataset: ma_dataset.Dataset, state: JsonObject) -> JsonObject:
     """Translate portable durable state to the table model's typed state keys."""
 
-    outcome = state["active_outcome"]
-    follow_up = state["active_follow_up"]
-    groups = list(state["active_groups"])
-    effect = state["active_effect"]
+    outcome = _optional_text(state["active_outcome"], "active outcome")
+    follow_up = _optional_text(state["active_follow_up"], "active follow-up")
+    groups = [
+        _text(group, "active group")
+        for group in _array(state["active_groups"], "active groups")
+    ]
+    effect = _optional_text(state["active_effect"], "active effect")
     if outcome is None and dataset.get_outcome_names():
         outcome = dataset.get_outcome_names()[0]
         follow_up_mapping = dataset.outcome_names_to_follow_ups[outcome]
@@ -251,7 +353,8 @@ def state_to_model_state(
         available_groups = list(first_unit.tx_groups) if first_unit is not None else []
         groups = available_groups[:1] if dataset.is_diag else available_groups[:2]
         summary = dataset.summary if isinstance(dataset.summary, dict) else {}
-        effect = summary.get("effect")
+        effect_value = summary.get("effect")
+        effect = effect_value if isinstance(effect_value, str) else None
         if effect is None and not dataset.is_diag:
             effect = "OR" if dataset.get_outcome_type(outcome) == 0 else "SMD"
     time_point = None
@@ -263,5 +366,5 @@ def state_to_model_state(
         "current_txs": groups,
         "current_effect": effect,
         "study_auto_added": False,
-        "conf_level": state["confidence_level"],
+        "conf_level": _number(state["confidence_level"], "confidence level"),
     }

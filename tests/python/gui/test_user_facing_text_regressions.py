@@ -1,10 +1,12 @@
 from pathlib import Path
 import importlib
 import sys
+from typing import cast
 
 from PyQt6 import QtCore, QtWidgets
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import required
 
 prepare_generated_ui_imports()
 
@@ -68,7 +70,13 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
     sys.path.insert(0, str(ROOT / "src" / "forms"))
     from ui_meta import Ui_MainWindow
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     window = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(window)
@@ -88,12 +96,20 @@ def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
     sys.path.insert(0, str(ROOT / "src" / "forms"))
     from meta_form import MetaForm
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     window = MetaForm()
 
     try:
         assert window.createPopupMenu() is None
-        assert window.toolBar.toggleViewAction().isEnabled()
+        assert required(
+            window.toolBar.toggleViewAction(), "toolbar toggle action"
+        ).isEnabled()
     finally:
         window.close()
         window.deleteLater()
@@ -145,14 +161,20 @@ def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy(
     sys.path.insert(0, str(ROOT / "src"))
     import conf_level_dialog
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
     dialog.show()
     app.processEvents()
 
     try:
         assert (
-            dialog.layout().sizeConstraint()
+            required(dialog.layout(), "dialog layout").sizeConstraint()
             == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
         )
         import adaptive_window

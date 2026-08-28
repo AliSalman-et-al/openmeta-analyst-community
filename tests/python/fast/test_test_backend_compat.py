@@ -15,6 +15,14 @@ def test_test_backend_compat_installs_stub_backend(monkeypatch):
     monkeypatch.setenv("RCMS_STUB_BACKEND", "1")
 
     import test_backend_compat
+    import meta_py_r_backend
+
+    def register_backend(backend):
+        monkeypatch.setitem(sys.modules, "rc_metastudio.meta_py_r", backend)
+        monkeypatch.setitem(sys.modules, "meta_py_r", backend)
+        return backend
+
+    monkeypatch.setattr(meta_py_r_backend, "_register_backend", register_backend)
 
     meta_py_r = test_backend_compat.install()
 
