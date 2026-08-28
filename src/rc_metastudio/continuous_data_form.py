@@ -12,7 +12,6 @@
 # many fields that do not ultimately belong in the raw_data --
 # it's mostly imputation going on here.
 # import pdb
-import sys
 import copy
 from contextlib import ExitStack
 
@@ -153,7 +152,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.impute_data()
         self.enable_back_calculation_btn()
 
-        print(("current effect: %s" % str(self.cur_effect)))
         # Hide pre-post for SMD until it is implemented
         if self.cur_effect not in ["MD", "SMD"]:
             self.grp_box_pre_post.setVisible(False)
@@ -212,9 +210,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.effect_cbo_box.setView(effect_view)
         effect_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._effect_popup = required(
-            effect_view.window(), "continuous metric popup"
-        )
+        self._effect_popup = required(effect_view.window(), "continuous metric popup")
         self._effect_popup.installEventFilter(self)
         correlation_width = (
             self.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
@@ -480,7 +476,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
         self.try_to_update_cur_outcome()
         self.set_current_effect()
-        self.enable_txt_box_input()
 
         self.metric_parameter = None  # zusammen
         self.enable_back_calculation_btn()  # zusammen
@@ -520,7 +515,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                     )
             except:
                 return False, False
-        print(("Val_str: %s" % val_str))
         return True, display_scale_val
 
     def _get_txt_from_val_str(self, val_str):
@@ -549,7 +543,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             val_str, new_text
         )
         if no_errors is False:
-            print("There was an error while in val_changed")
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
@@ -574,7 +567,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 display_scale_val = None
         except ValueError:
             # Ignore incomplete numeric input while the user is still editing.
-            print("fail.")
             return None
 
         calc_scale_val = meta_py_r.continuous_convert_scale(
@@ -588,7 +580,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         elif val_str == "upper":
             self.ma_unit.set_upper(self.cur_effect, self.group_str, calc_scale_val)
         elif val_str == "correlation_pre_post":
-            print("ok -- correlation set to %s" % self.correlation_pre_post.text())
             # Recompute the estimates
             self.impute_pre_post_data(self.g1_pre_post_table, 0)
             self.impute_pre_post_data(self.g2_pre_post_table, 1)
@@ -770,7 +761,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
         row, col = row_index, var_index
         if is_NaN(val):  # get out quick
-            print("%s is not a number" % val)
             return
 
         try:
@@ -785,13 +775,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
                 ###self._disable_row_if_filled(table, row, col)
         except:
-            print("Unexpected error:", sys.exc_info()[0])
-            print(
-                (
-                    "Got to except in _set_val when trying to set (%d,%d) to %s"
-                    % (row, col, str(val))
-                )
-            )
+            pass
             # raise
 
     def _disable_row_if_filled(self, table, row, col):
@@ -799,10 +783,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         with QSignalBlocker(table):
             N_col = table.columnCount()
 
-            print(("Row is filled? %s" % str(self._table_row_filled(table, row))))
-
             if self._table_row_filled(table, row):
-                print(("Disabling row... %d" % row))
                 for col in range(N_col):
                     self._disable_cell(table, row, col)
 
@@ -836,12 +817,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def restore_ma_unit(self, old_ma_unit):
         """Restores the ma_unit data and resets the form"""
         self.ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
-        print(
-            (
-                "Restored ma_unit data: %s"
-                % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups))
-            )
-        )
 
         self.initialize_form()  # clear form first
         self.update_raw_data()
@@ -923,17 +898,12 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             alpha = self.conf_level_to_alpha()
             results_from_r = meta_py_r.impute_cont_data(cur_dict, alpha)
 
-            print("Raw results from R (imputation): %s" % results_from_r)
-            print(results_from_r)
-
-            print("Results from r succeeded?:", results_from_r["succeeded"])
             if results_from_r["succeeded"]:
                 computed_vals = results_from_r["output"]
                 # and then iterate over the columns again,
                 # populating the table with any available
                 # computed fields
 
-                print("Computed vals:", computed_vals)
                 for var_index, var_name in enumerate(var_names):
                     self._set_val(
                         row_index,
@@ -941,11 +911,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                         computed_vals[self._imputation_field_name(var_name)],
                     )
                 self._copy_raw_data_from_table_to_ma_unit()
-            else:
-                try:
-                    print(("Why didn't it succeed?: '%s'" % results_from_r["comment"]))
-                except KeyError:
-                    pass
         self._fit_tables_to_contents()
 
     def conf_level_to_alpha(self):
@@ -1015,8 +980,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.conf_level_to_alpha(),
         )
 
-        print("imputation results from R: %s" % results_from_r)
-
         if not results_from_r["succeeded"]:
             if (
                 old_ma_unit is not None
@@ -1028,8 +991,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 )
             self._fit_tables_to_contents()
             return None
-
-        print("Prepost-imputation succeeded")
 
         ###
         # first update the simple table
@@ -1159,7 +1120,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         try:
             return calc_fncs.numeric_value(item.text())
         except ValueError:
-            print(("Could not convert %s to float" % item))
             return None
 
     def no_val(self, x):
@@ -1211,12 +1171,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 self.cur_effect, self.group_str, est, low, high, mult=self.mult
             )
             self.set_current_effect()
-
-    def enable_txt_box_input(self):
-        """Enables text boxes if they are empty, disables them otherwise"""
-        pass
-        # meta_globals.enable_txt_box_input(self.effect_txt_box, self.low_txt_box,
-        #                                  self.high_txt_box, self.correlation_pre_post)
 
     def _capture_back_calculation_state(self):
         return {
@@ -1336,14 +1290,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         command._back_calculation_commit_token = token
         try:
             self.undoStack.push(command)
-        except BaseException as error:
+        except BaseException:
             if self._back_calculation_command_is_committed(
                 command, token, committed_state, prior_index
             ):
-                print(
-                    "Back-calculation undo command committed despite a "
-                    "post-commit push exception: %s" % error
-                )
                 return
             raise
 
@@ -1396,39 +1346,37 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             ma_unit=self.ma_unit,
             use_old_value=False,
         )
-        old_correlation = self._get_correlation_str()
-
         # Choose metric parameter if not already chosen
         if (
             engage
             and self.metric_parameter is None
             and self.cur_effect in ["MD", "SMD"]
         ):
-            print(
-                (
-                    "need to choose metric parameter because it is %s"
-                    % str(self.metric_parameter)
-                )
-            )
             if self.cur_effect == "MD":
-                info = "In order to perform back-calculation most accurately, we need to know something about the assumptions about the two population standard deviations.\n*Are we assuming that both of the population standard deviations are the same (as in most parametric data analysis techniques)"
-                option0_txt = "yes (default)."
-                option1_txt = "no"
+                info = (
+                    "Back-calculation depends on the relationship between the "
+                    "two population standard deviations.\n\n"
+                    "Should RC MetaStudio assume they are equal?"
+                )
+                option0_txt = "Yes (default)"
+                option1_txt = "No"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
-                dialog.setWindowTitle("Population SD Assumptions")
+                dialog.setWindowTitle("Population standard deviations")
                 if not dialog.exec():
                     raise _BackCalculationCancelled()
                 self.metric_parameter = True if dialog.getChoice() == 0 else False
             elif self.cur_effect == "SMD":
-                info = "In order to perform back-calculation most accurately, we need to know if the the bias in the SMD been corrected i.e. should we use Hedge's g or Cohen's d when performing the back calculation?"
+                info = (
+                    "Which standardized mean difference should RC MetaStudio use "
+                    "for back-calculation?"
+                )
                 option0_txt = "Hedges' g (default)"
                 option1_txt = "Cohen's d"
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
-                dialog.setWindowTitle("SMD Bias Correction")
+                dialog.setWindowTitle("Standardized mean difference")
                 if not dialog.exec():
                     raise _BackCalculationCancelled()
                 self.metric_parameter = True if dialog.getChoice() == 0 else False
-            print(("metric_parameter is now %s" % str(self.metric_parameter)))
 
         def build_data_dicts():
             var_names = self.get_column_header_strs()
@@ -1486,7 +1434,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 new_item_available(old_data[i], new_data[i])
                 for i in range(len(new_data))
             ]
-            print(("Comparison:", comparison))
             if any(comparison):
                 changed = True
             else:
@@ -1533,11 +1480,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         imputed = meta_py_r.back_calc_cont_data(
             group1_data, group2_data, effect_data, self.conf_level
         )
-        print(("Imputed data: ", imputed))
 
         # Leave if there was a failure
         if "FAIL" in imputed:
-            print("Failure to impute")
             self.back_calc_btn.setEnabled(False)
             return None
 
@@ -1576,7 +1521,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
                 )
                 option0_txt = keys_to_names[key] + " = " + str(value[0])
                 option1_txt = keys_to_names[key] + " = " + str(value[1])
-                print(("Options (0,1)", value[0], value[1]))
 
                 dialog = ChooseBackCalcResultForm(info, option0_txt, option1_txt)
                 if dialog.exec():
@@ -1637,7 +1581,6 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         old_correlation = self._get_correlation_str()
 
         self.metric_parameter = None
-        self.enable_txt_box_input()  # }
 
         with ExitStack() as signal_blockers:
             for widget in self.entry_widgets:
@@ -1716,11 +1659,9 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
     ####### Undo framework ############
     def undo(self):
-        print("undoing....")
         self.undoStack.undo()
 
     def redo(self):
-        print("redoing....")
         self.undoStack.redo()
 
 

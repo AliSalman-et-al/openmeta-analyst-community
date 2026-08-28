@@ -1,3 +1,0 @@
-# Use SVG Masters for Functional Icons
-
-Every Functional Icon will have a canonical checked-in SVG master embedded through Qt resources, including Statistical Concept Icons first explored with ImageGen and then simplified into deterministic vector geometry. Each master will use a transparent, theme-neutral treatment tested on light and dark neutral backgrounds rather than separate theme variants. Raster derivatives will be added only when a verified packaging or platform seam requires them, preserving crisp scaling and a self-contained icon set across Windows, macOS, and Linux while leaving existing Brand Assets unchanged.

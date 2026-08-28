@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
 
-pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 
 ROOT = Path(__file__).resolve().parents[3]

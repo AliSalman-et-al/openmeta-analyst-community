@@ -3,7 +3,6 @@
 """Render and export meta-analysis results."""
 
 import gzip
-import random
 import re
 from collections import namedtuple
 from PyQt6.QtCore import (
@@ -528,11 +527,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         self.images = results["images"]
         self.display_images = results["display_images"]
-        print("images returned from analytic routine: %s" % self.images)
         self.image_order = None
         if "image_order" in results:
             self.image_order = results["image_order"]
-            print("image display order: %s" % self.image_order)
 
         self.params_paths = {}
         if "image_params_paths" in results:
@@ -574,16 +571,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 )
 
     def add_image_section(self, title, display_title, image):
-        print("title: %s; image: %s" % (title, image))
-        cur_y = max(0, self.y_coord)
-        print("cur_y: %s" % cur_y)
         params_path = None
         if self.params_paths is not None and title in self.params_paths:
             params_path = self.params_paths[title]
 
         artifact = self.create_plot_artifact(title, image, params_path=params_path)
         if not artifact.can_display():
-            print("Skipping image that Qt could not load: %s" % image)
             return
 
         qt_item = self.add_title(display_title)
@@ -603,9 +596,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
     def add_text_section(self, title, display_title, text):
         try:
-            print("title: %s; text: %s" % (title, text))
-            cur_y = max(0, self.y_coord)
-            print("cur_y: %s" % cur_y)
             # first add the title
             qt_item = self.add_title(display_title)
 
@@ -702,7 +692,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
 
     def add_title(self, title):
-        print("Adding title")
         text = QGraphicsTextItem(str(title))
         title_font = QFont(self.font())
         title_font.setBold(True)
@@ -715,7 +704,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         document.setDefaultTextOption(text_option)
         text.setTextWidth(self._text_wrap_width())
         self._wrapped_text_items.append(text)
-        print("  title at: %s" % self.y_coord)
         self.scene.addItem(text)
         self._layout_items.append(text)
         qt_item = QTreeWidgetItem(self.nav_tree, [title])
@@ -726,7 +714,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.scene.width(),
             self.y_coord + text.boundingRect().height() + padding,
         )
-        print(("  Setting position at (%.2f,%.2f)" % (self.x_coord, self.y_coord)))
         text.setPos(self.position())  #####
         self.y_coord += text.boundingRect().height()
         return qt_item
@@ -745,7 +732,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return max(bounding_height, document_height, line_height)
 
     def item_clicked(self, item, column):
-        print(self.items_to_coords[id(item)])
         self.graphics_view.centerOn(self.items_to_coords[id(item)])
 
     def create_text_item(self, text, position, wrap=False):
@@ -1006,8 +992,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.y_coord + item.boundingRect().size().height() + padding,
         )
 
-        print("creating item @:%s" % position)
-
         # item.setMatrix(matrix)
         self.scene.clearSelection()
         self.scene.addItem(item)
@@ -1059,7 +1043,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.y_coord + scaled_height + padding,
         )
 
-        print("creating item @:%s" % position)
         self.scene.clearSelection()
         self.scene.addItem(item)
         self._svg_plot_items.append(item)

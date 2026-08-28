@@ -2,8 +2,6 @@ import copy
 import os
 import sys
 
-import pytest
-
 
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
@@ -34,7 +32,6 @@ def _dataset(data_type=ma_dataset.DIAGNOSTIC):
     return dataset
 
 
-@pytest.mark.fast
 def test_copy_preserves_and_isolates_the_complete_dataset_graph():
     source = _dataset()
     cloned = source.copy()
@@ -64,21 +61,22 @@ def test_copy_preserves_and_isolates_the_complete_dataset_graph():
     assert source.covariates[0].name == "Region"
     assert source.studies[0].name == "Study 1"
     assert source_unit.tx_groups[source_unit.get_group_names()[0]].raw_data[0] == 3
-    assert source_unit.effects_dict["Sens"][source_unit.get_group_names()[0]]["est"] == 0.75
+    assert (
+        source_unit.effects_dict["Sens"][source_unit.get_group_names()[0]]["est"]
+        == 0.75
+    )
 
 
-@pytest.mark.fast
-def test_group_deletion_handles_empty_datasets_and_keeps_public_behaviors(capsys):
+def test_group_deletion_is_a_no_op_for_empty_datasets():
     dataset = ma_dataset.Dataset()
 
     dataset.delete_group("missing")
-    assert capsys.readouterr().out == ""
-
     dataset.remove_group("missing")
-    assert capsys.readouterr().out == "removed group: missing. cur groups: []\n"
+
+    assert dataset.studies == []
+    assert dataset.get_group_names() == []
 
 
-@pytest.mark.fast
 def test_delete_group_and_remove_group_have_equivalent_mutations():
     deleted = _dataset(ma_dataset.BINARY)
     removed = copy.deepcopy(deleted)

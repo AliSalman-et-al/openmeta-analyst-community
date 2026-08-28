@@ -542,7 +542,6 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self._validate_imported_data()
             self.completeChanged.emit()
         except Exception as e:
-            print(e)
             QMessageBox.warning(
                 self,
                 "Could not import CSV",
@@ -622,7 +621,6 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
                 "covariate_types": self.covariate_types,
             }
         else:
-            print("Something went wrong while trying to import from csv")
             return None
 
     def _handle_covariates_in_extracted_data(
@@ -630,7 +628,6 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
     ):
         if num_cols > len(expected_headers):  # Do we have covariates?
             num_covariates = num_cols - len(expected_headers)
-            print(("There are %d covariates" % num_covariates))
         else:
             return None  # no covariates to deal with
 
@@ -697,10 +694,8 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self.headers = self.headers + [""] * (num_cols - len(self.headers))
 
     def print_extracted_data(self):
-        print("Data extracted from csv:")
-        print((self.headers))
         for row in self.imported_data:
-            print((str(row)))
+            pass
 
     def _get_filepath(self):
         return self.file_path
@@ -923,7 +918,6 @@ class MainWizard(QWizard):
         information["selected_dataset"] = self.get_selected_dataset()
         information["csv_data"] = self.get_csv_data()
 
-        print(("Information from wizard: %s" % str(information)))
         return information
 
 

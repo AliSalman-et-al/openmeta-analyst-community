@@ -169,16 +169,6 @@ class WorkspaceEdit:
     roles: tuple[int, ...]
 
 
-def DebugHelper(function):
-    def _DebugHelper(*args, **kw):
-        print(("Entered %s" % function.__name__))
-        res = function(*args, **kw)
-        print(("Left %s" % function.__name__))
-        return res
-
-    return _DebugHelper
-
-
 class DatasetModel(QAbstractTableModel):
     workspaceEditCommitted = pyqtSignal(WorkspaceEdit)
     outcomeChanged = pyqtSignal()
@@ -237,7 +227,6 @@ class DatasetModel(QAbstractTableModel):
 
         self.update_current_group_names()
 
-        print("calling update column indices from ma_data_table_model init")
         self.update_column_indices()
 
         # Default binary effect until the active outcome selection provides one.
@@ -324,7 +313,6 @@ class DatasetModel(QAbstractTableModel):
 
     def set_current_metric(self, metric):
         self.current_effect = metric
-        print("OK! metric updated.")
 
     def update_current_outcome(self):
         outcome_names = self.dataset.get_outcome_names()
@@ -409,7 +397,6 @@ class DatasetModel(QAbstractTableModel):
             raws = [col + offset for col in range(6)]
             outcomes = [9, 10, 11]
             if sub_type == "generic_effect":  # generic effect and se
-                print("Detected generic effect outcome in update_column_indices")
                 raws = []
                 outcomes = [offset, offset + 1]  # effect and se
         else:  # diagnostic
@@ -540,7 +527,6 @@ class DatasetModel(QAbstractTableModel):
                         d_est_and_se = ma_unit.get_display_effect_and_se(
                             eff, grp, conv_to_disp_scale
                         )
-                        print(("DEST AND SE: %s" % str(d_est_and_se)))
                         outcome_val = d_est_and_se[outcome_index]
                     else:  # normal case of no outcome subtype
                         d_est_and_ci = ma_unit.get_display_effect_and_ci(
@@ -554,7 +540,6 @@ class DatasetModel(QAbstractTableModel):
                         self.format_float(outcome_val, num_digits=num_digits)
                     )  # issue #31
                 else:  # This is the diagnostic case
-                    study_index = index.row()
                     # note that we do things quite differently in the diagnostic case,
                     # because there is no notion of a 'current effect'. instead,
                     # we always show sensitivity and specificity. thus we parse
@@ -728,13 +713,11 @@ class DatasetModel(QAbstractTableModel):
             prev_est, prev_lower, prev_upper = [
                 binary_display_scale(x) for x in [prev_est, prev_lower, prev_upper]
             ]
-            print(("Previous binary: %s" % str([prev_est, prev_lower, prev_upper])))
         elif data_type == CONTINUOUS:
             # prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(self.current_effect, group_str)
             prev_est, prev_lower, prev_upper = [
                 continuous_display_scale(x) for x in [prev_est, prev_lower, prev_upper]
             ]
-            print(("Previous continuous: %s" % str([prev_est, prev_lower, prev_upper])))
         elif data_type == DIAGNOSTIC:
             m_str = "Sens" if col in self.OUTCOMES[:3] else "Spec"
             # prev_est, prev_lower, prev_upper = ma_unit.get_display_effect_and_ci(m_str, group_str)
@@ -745,7 +728,6 @@ class DatasetModel(QAbstractTableModel):
                 meta_py_r.diagnostic_convert_scale(x, m_str, convert_to="display.scale")
                 for x in [prev_est, prev_lower, prev_upper]
             ]
-            print(("Previous diagnostic: %s" % str([prev_est, prev_lower, prev_upper])))
 
         # here we check if there is raw data for this study;
         # if there is, we don't allow entry of outcomes
@@ -765,8 +747,6 @@ class DatasetModel(QAbstractTableModel):
                 delta = float("-inf")
             else:
                 delta = abs(new_val - d[col])
-                print("new val {0}, prev val {1}".format(new_val, d[col]))
-                print("DELTA {0}".format(delta))
             epsilon = 10e-6
             if delta > epsilon:
                 return (
@@ -993,13 +973,10 @@ class DatasetModel(QAbstractTableModel):
                 )
 
         elif column in self.OUTCOMES:
-            print(("Value %s in outcomes" % str(_to_text_value(value))))
-
             row = index.row()
 
             converted_ok = False
             if qt_text.is_blank(value):
-                delete_value = True
                 display_scale_val = None
                 calc_scale_val = None
             else:
@@ -1017,15 +994,12 @@ class DatasetModel(QAbstractTableModel):
                 # Directly entered effects are accepted even if raw data also exist.
                 display_scale_val, converted_ok = _to_double(normalized_value)
 
-                print(("Display scale value: %s" % str(display_scale_val)))
-
             if display_scale_val is None or converted_ok:
                 if not self.is_diag():
                     # note that we convert from the display/continuous
                     # scale on which the metric is assumed to have been
                     # entered into the 'calculation' scale (e.g., log)
                     calc_scale_val = None
-                    print(("Input value is %s" % str(display_scale_val)))
 
                     if self.current_effect == "PFT":
                         e1, n1, e2, n2 = self.get_cur_raw_data_for_study(
@@ -1066,7 +1040,6 @@ class DatasetModel(QAbstractTableModel):
                             # ma_unit.set_display_se(self.current_effect, group_str, display_scale_val)
                     else:  # normal case
                         if column == self.OUTCOMES[0]:  # estimate
-                            print(("Setting estimate: %s" % str(calc_scale_val)))
                             ma_unit.set_effect(
                                 self.current_effect, group_str, calc_scale_val
                             )
@@ -1081,7 +1054,6 @@ class DatasetModel(QAbstractTableModel):
                                 self.current_effect, group_str, calc_scale_val
                             )
                             # ma_unit.set_display_upper(self.current_effect, group_str, display_scale_val)
-                        print("calculating se")
 
                         # in normal case, only calculate SE when all data is filled in
                         if None not in ma_unit.get_entered_effect_and_ci(
@@ -1090,7 +1062,6 @@ class DatasetModel(QAbstractTableModel):
                             se = ma_unit.calculate_SE_if_possible(
                                 self.current_effect, group_str, mult=self.mult
                             )
-                            print(("setting se to %s" % str(se)))
                         else:
                             se = None
                         ma_unit.set_SE(self.current_effect, group_str, se)
@@ -1170,16 +1141,10 @@ class DatasetModel(QAbstractTableModel):
         if not self.is_diag() and column != self.INCLUDE_STUDY:
             group_str = self.get_cur_group_str()
 
-            print(group_str)
-            print(
-                "ok checking it; cur outcome: %s. cur group: %s"
-                % (self.current_outcome, group_str)
-            )
             if self.current_outcome is not None:
                 effect_d = self.get_current_ma_unit_for_study(index.row()).effects_dict[
                     self.current_effect
                 ][group_str]
-                print(effect_d)
 
                 # if the study has not been explicitly excluded by the user, then we automatically
                 # include it once it has sufficient data.
@@ -1624,7 +1589,6 @@ class DatasetModel(QAbstractTableModel):
         try:
             return self.dataset.covariates[cov_index]
         except:
-            print("There is no covariate at that index")
             return None
 
     def get_covariate_names(self):
@@ -1733,8 +1697,6 @@ class DatasetModel(QAbstractTableModel):
         return prev_outcome
 
     def get_next_follow_up(self):
-        print("\nfollow-ups for outcome:")
-        print(self.dataset.outcome_names_to_follow_ups[self.current_outcome])
         t_point = self.current_time_point
         if self.current_time_point >= max(
             self.dataset.outcome_names_to_follow_ups[self.current_outcome].keys()
@@ -1747,7 +1709,6 @@ class DatasetModel(QAbstractTableModel):
             # require a lookup by sorted display order.
             t_point += 1
         follow_up_name = self.get_follow_up_name_for_t_point(t_point)
-        print("\nt_point; name: %s, %s" % (t_point, follow_up_name))
         return (t_point, follow_up_name)
 
     def get_previous_follow_up(self):
@@ -1821,11 +1782,9 @@ class DatasetModel(QAbstractTableModel):
             self._next_group_index(group_names)
 
         next_txs = [group_names[self.tx_index_a], group_names[self.tx_index_b]]
-        print("new tx group indices a, b: %s, %s" % (self.tx_index_a, self.tx_index_b))
         return next_txs
 
     def _next_group_indices(self, group_names):
-        print("\ngroup names: %s" % group_names)
         if self.tx_index_b < len(group_names) - 1:
             self.tx_index_b += 1
         else:
@@ -1845,7 +1804,6 @@ class DatasetModel(QAbstractTableModel):
 
     def outcome_has_follow_up(self, outcome, follow_up):
         if outcome is None:
-            print("Tried to reference None outcome")
             return None
         outcome_d = self.dataset.outcome_names_to_follow_ups[outcome]
 
@@ -1865,9 +1823,6 @@ class DatasetModel(QAbstractTableModel):
         self.current_txs = group_names
         self.tx_index_a = self.dataset.get_group_names().index(group_names[0])
         self.tx_index_b = self.dataset.get_group_names().index(group_names[1])
-        print(
-            "\ncurrent tx group index a, b: %s, %s" % (self.tx_index_a, self.tx_index_b)
-        )
 
     def get_group_names(self):
         return self.dataset.get_group_names()
@@ -2005,8 +1960,6 @@ class DatasetModel(QAbstractTableModel):
         # given the outcome data type
         data_type = data_model.get_outcome_type(d["current_outcome"])
 
-        print(("data_type: ", data_type))
-
         all_txs = data_model.get_group_names()
 
         if data_type == DIAGNOSTIC:
@@ -2138,7 +2091,6 @@ class DatasetModel(QAbstractTableModel):
             data_for_arm_two and not data_for_arm_one
         )
 
-    @DebugHelper
     def try_to_update_outcomes(self):
         for study_index in range(len(self.dataset.studies)):
             self.update_outcome_if_possible(study_index)
@@ -2398,7 +2350,6 @@ class DatasetModel(QAbstractTableModel):
         cur_ma_unit = self.get_current_ma_unit_for_study(study_index)
 
         if None in cur_ma_unit.get_effect_and_se(effect, group_str, self.mult):
-            print("study %s does not have a point estimate" % study_index)
             return False
 
         return "ok -- has all point estimates"
@@ -2560,8 +2511,6 @@ class DatasetModel(QAbstractTableModel):
             )
 
         for index, x in enumerate(ma_units):
-            print(("Recalculating display scale for ma_unit %d" % index))
-
             if current_data_type in [BINARY, CONTINUOUS]:
                 if current_data_type == BINARY:
                     convert_to_display_scale = binary_display_scale
@@ -2585,13 +2534,9 @@ class DatasetModel(QAbstractTableModel):
                         mult=self.mult,
                         check_if_necessary=True,
                     )
-        print("Finished calculating display effect and cis")
 
     def _get_conv_to_display_scale(self, data_type, effect, n1=None):
         """Returns appropriate conv_to_display_scale function"""
-
-        if None in [data_type, effect]:
-            print("_get_conv_to_display_scale got None for either data_type, or effect")
 
         if data_type == BINARY:
             conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(
@@ -2614,11 +2559,6 @@ class DatasetModel(QAbstractTableModel):
         self, display_scale_val=None, data_type=None, effect=None, n1=None
     ):
         """Gets the calc-scale value of the given display_scale value"""
-
-        if None in [display_scale_val, data_type, effect]:
-            print(
-                "_get_calc_scale_value got None for either display_scale_val, data_type, or effect"
-            )
 
         calc_scale_val = None
         if data_type == BINARY:
@@ -2644,14 +2584,11 @@ class DatasetModel(QAbstractTableModel):
         conf_lev = validate_confidence_level(conf_lev)
 
         self.conf_level = conf_lev
-        print(("Set confidence level to: %f" % conf_lev))
 
         self.mult = meta_py_r.get_mult_from_r(conf_lev)
-        print(("mult is now: %s" % str(self.mult)))
 
         # set in R as well
-        new_cl_in_R = meta_py_r.set_global_conf_level(conf_lev)
-        print(("Set confidence level in R to: %f" % new_cl_in_R))
+        meta_py_r.set_global_conf_level(conf_lev)
 
         self.confLevelChanged.emit()
 
@@ -2661,5 +2598,4 @@ class DatasetModel(QAbstractTableModel):
         return self.conf_level
 
     def get_mult(self):
-        print(("mult is %s" % str(self.mult)))
         return self.mult

@@ -1,0 +1,66 @@
+{
+  "manifest": "compatibility-exceptions",
+  "schema_version": 1,
+  "accepted_exception_required_fields": [
+    "id",
+    "status",
+    "affected_workflows",
+    "reason",
+    "approved_by",
+    "approved_at",
+    "before_behavior",
+    "after_behavior"
+  ],
+  "accepted_exception_requires_one_of": [
+    "follow_up",
+    "expires_at"
+  ],
+  "exceptions": [
+    {
+      "id": "inference-method-output-section",
+      "status": "accepted",
+      "ids": [
+        "amino-binary-random",
+        "continuous-random",
+        "lymph-diagnostic-random-dor",
+        "amino-binary-cumulative",
+        "amino-binary-leave-one-out",
+        "continuous-cumulative",
+        "continuous-leave-one-out",
+        "amino-binary-meta-regression",
+        "continuous-meta-regression",
+        "amino-binary-subgroup",
+        "continuous-subgroup"
+      ],
+      "affected_workflows": ["all curated golden analysis workflows"],
+      "reason": "PR #349 intentionally exposes the selected inference method in result output.",
+      "approved_by": "Ali Salman",
+      "approved_at": "2026-07-19",
+      "before_behavior": "Result output did not identify the selected inference method.",
+      "after_behavior": "Result output includes a dedicated Inference Method section.",
+      "follow_up": "Retain as a permanent, reviewed post-port analysis-output addition.",
+      "accepted_classifications": ["text_artifact_drift"],
+      "accepted_details": ["Unexpected text section Inference Method was produced."]
+    },
+    {
+      "id": "meta-regression-output-improvements",
+      "status": "accepted",
+      "ids": [
+        "amino-binary-meta-regression",
+        "continuous-meta-regression"
+      ],
+      "affected_workflows": ["binary meta-regression", "continuous meta-regression"],
+      "reason": "PR #349 intentionally improves meta-regression summary and reference text.",
+      "approved_by": "Ali Salman",
+      "approved_at": "2026-07-19",
+      "before_behavior": "The frozen baseline used the earlier meta-regression summary and reference wording.",
+      "after_behavior": "Meta-regression reports the reviewed improved summary and references.",
+      "follow_up": "Retain this reviewed analysis-output improvement.",
+      "accepted_classifications": ["text_artifact_drift"],
+      "accepted_details": [
+        "Text section References changed.",
+        "Text section Summary changed."
+      ]
+    }
+  ]
+}

@@ -13,8 +13,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_RCMetaR_r_manifests.py"
-DEPENDENCY_MANIFEST = Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
-DRIFT_MANIFEST = Path("docs") / "verification" / "RCMetaR-statistical-drift.json"
+DEPENDENCY_MANIFEST = Path("config/r-dependencies.json")
+DRIFT_MANIFEST = Path("config/r-statistical-drift.json")
 RCMetaR_PACKAGE = REPO_ROOT / "r" / "RCMetaR"
 RCMetaR_R_DIR = RCMetaR_PACKAGE / "R"
 RCMetaR_DESCRIPTION = RCMetaR_PACKAGE / "DESCRIPTION"
@@ -44,9 +44,10 @@ def test_shared_r_verification_support_resolves_home_and_normalizes_windows_loca
     rscript.parent.mkdir(parents=True)
     rscript.write_text("", encoding="utf-8")
 
-    assert support.resolve_rscript(
-        "Rscript", env={"RCMS_R_HOME": str(r_home), "PATH": ""}
-    ) == rscript.resolve()
+    assert (
+        support.resolve_rscript("Rscript", env={"RCMS_R_HOME": str(r_home), "PATH": ""})
+        == rscript.resolve()
+    )
     source = {
         "LC_ALL": "C.UTF-8",
         "LC_CTYPE": "C.utf8",
@@ -222,9 +223,11 @@ RCMetaR_PUBLIC_EXPORTS = {
 }
 
 
-def copy_verification_docs(tmp_path):
-    docs_root = tmp_path / "docs" / "verification"
-    shutil.copytree(REPO_ROOT / "docs" / "verification", docs_root)
+def copy_manifest_config(tmp_path):
+    config_root = tmp_path / "config"
+    config_root.mkdir()
+    shutil.copyfile(REPO_ROOT / DEPENDENCY_MANIFEST, tmp_path / DEPENDENCY_MANIFEST)
+    shutil.copyfile(REPO_ROOT / DRIFT_MANIFEST, tmp_path / DRIFT_MANIFEST)
     return tmp_path
 
 
@@ -265,7 +268,7 @@ def test_RCMetaR_r_manifests_validate():
 
 
 def test_direct_and_app_bundle_dependencies_must_stay_separate(tmp_path):
-    root = copy_verification_docs(tmp_path)
+    root = copy_manifest_config(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["app_r_bundle_dependencies"].append(
@@ -286,7 +289,7 @@ def test_direct_and_app_bundle_dependencies_must_stay_separate(tmp_path):
 
 
 def test_drift_manifest_preserves_review_record_schema(tmp_path):
-    root = copy_verification_docs(tmp_path)
+    root = copy_manifest_config(tmp_path)
     manifest_path = root / DRIFT_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["reviewed_drift_required_fields"].remove("independent_validation_signal")
@@ -302,7 +305,7 @@ def test_drift_manifest_preserves_review_record_schema(tmp_path):
 
 
 def test_manifest_records_empty_direct_build_dependency_scope(tmp_path):
-    root = copy_verification_docs(tmp_path)
+    root = copy_manifest_config(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for dependency in manifest["direct_RCMetaR_dependencies"]:
@@ -318,7 +321,7 @@ def test_manifest_records_empty_direct_build_dependency_scope(tmp_path):
 
 
 def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
-    root = copy_verification_docs(tmp_path)
+    root = copy_manifest_config(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     for dependency in manifest["direct_RCMetaR_dependencies"]:
@@ -654,8 +657,8 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
         assert command == [str(fake_r), "RHOME"]
         return subprocess.CompletedProcess(command, 0, stdout=str(r_home), stderr="")
 
-    monkeypatch.setattr(verifier.shutil, "which", fake_which)
-    monkeypatch.setattr(verifier.subprocess, "run", fake_run)
+    monkeypatch.setattr(verifier.r_support.shutil, "which", fake_which)
+    monkeypatch.setattr(verifier.r_support.subprocess, "run", fake_run)
 
     resolved = verifier.resolve_rscript("Rscript", env={"PATH": ""})
 
@@ -782,41 +785,6 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
     assert "igraph" not in fields["Imports"]
     assert "Hmisc" not in fields["Imports"]
     assert "exportPattern" not in RCMetaR_NAMESPACE.read_text(encoding="utf-8")
-
-
-def test_custom_grid_forest_engine_is_retired():
-    source_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in RCMetaR_R_DIR.glob("*.R")
-    )
-
-    retired_function_defs = {
-        "forest.plot",
-        "draw.forest.plot",
-        "draw.data.col",
-        "two.forest.plots",
-        "create.grobs",
-        "calc.viewport.layout",
-        "calc.forest.plot.size",
-        "draw.normal.CI",
-        "draw.summary.CI",
-        "draw.summary.CI.no.scaled.diamond",
-    }
-    defined_functions = set(LEGACY_EXPORT_PATTERN.findall(source_text))
-
-    assert defined_functions.isdisjoint(retired_function_defs)
-    assert "fp_legacy_renderer" not in source_text
-    assert re.search(r"\b(?:grid\.|grid[A-Z_a-z])", source_text) is None
-
-
-def test_RCMetaR_source_uses_namespace_imports_instead_of_attach_calls():
-    package_attach_pattern = re.compile(r"\b(?:library|require)\s*\(")
-
-    offenders = []
-    for path in RCMetaR_R_DIR.glob("*.R"):
-        if package_attach_pattern.search(path.read_text(encoding="utf-8")):
-            offenders.append(path.relative_to(REPO_ROOT).as_posix())
-
-    assert offenders == []
 
 
 def test_RCMetaR_namespace_exports_only_core_interface():

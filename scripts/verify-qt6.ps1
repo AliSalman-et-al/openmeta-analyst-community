@@ -65,8 +65,6 @@ try {
     }
 
     if ($Section -eq "RemainingSurfaces") {
-        uv run python scripts/validate_qt6_surface_inventory.py --check-document
-        if ($LASTEXITCODE -ne 0) { throw "Native Qt6 surface inventory validation failed." }
         uv run pytest -W error @remainingSurfaceTests
         if ($LASTEXITCODE -ne 0) { throw "Qt6 remaining-surface tests failed." }
 
@@ -84,7 +82,7 @@ try {
         return
     }
 
-    $qtModules = @(uv run python scripts/import_qt_modules.py --root . --list)
+    $qtModules = @(uv run python scripts/check_qt_modules.py --root .)
     if ($LASTEXITCODE -ne 0 -or $qtModules.Count -eq 0) { throw "Handwritten Qt module discovery failed." }
     uv run ty check `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
@@ -93,29 +91,6 @@ try {
         --extra-search-path scripts `
         $qtModules
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
-
-    $dependencyInputs = @("pyproject.toml", "uv.lock")
-    $dependencyInputs += Get-ChildItem -File -ErrorAction SilentlyContinue `
-        -Path "requirements*.txt", "constraints*.txt" | ForEach-Object { $_.FullName }
-    uv run python -W error scripts/qt6_port.py strict --root . $dependencyInputs
-    if ($LASTEXITCODE -ne 0) { throw "Qt6 strict dependency policy failed." }
-    uv run python -W error scripts/qt6_port.py strict --root . `
-        --expected-snapshot config/qt6-strict-source-backlog.json `
-        --report "$BuildRoot/strict-source-findings.json" `
-        src/rc_metastudio
-    if ($LASTEXITCODE -ne 0) { throw "Qt6 authoritative source backlog drifted." }
-    uv run python -W error -m rc_metastudio.qt6_cutover
-    if ($LASTEXITCODE -ne 0) { throw "Qt6 final zero-legacy audit failed." }
-    uv run python scripts/import_qt_modules.py --build-root $BuildRoot --report "$BuildRoot/qt-module-imports.json"
-    if ($LASTEXITCODE -ne 0) { throw "Warnings-as-errors Qt module import audit failed." }
-
-    $codemodSources = Get-ChildItem src/rc_metastudio -File -Filter *.py |
-        Where-Object { $_.Name -notin @("qt6_port_tools.py", "qt6_cutover.py") } |
-        ForEach-Object { $_.FullName }
-    uv run python -W error scripts/qt6_port.py codemod --check --report docs/verification/qt6-codemod-second-run.json $codemodSources
-    if ($LASTEXITCODE -ne 0) { throw "Qt6 second codemod run was not empty." }
-    uv run python scripts/validate_qt6_surface_inventory.py --check-document
-    if ($LASTEXITCODE -ne 0) { throw "Native Qt6 surface inventory validation failed." }
 
     # Core owns every GUI module except the five deliberately isolated
     # RemainingSurfaces modules, in one process with one QApplication owner.

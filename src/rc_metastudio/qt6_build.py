@@ -450,6 +450,14 @@ def _load_generated_form(module_path: Path) -> type[_GeneratedForm]:
     return cast(type[_GeneratedForm], module.Ui_AboutLegalDialog)
 
 
+def _smoke_inputs(build_root: Path) -> tuple[Path, Path]:
+    module_path = build_root / "generated/rc_metastudio/forms/ui_about_legal.py"
+    resource_path = build_root / "resources/icons.rcc"
+    if module_path.is_file() and resource_path.is_file():
+        return module_path, resource_path
+    return generate(build_root)
+
+
 def smoke(
     build_root: Path,
     exit_after_ms: int,
@@ -458,7 +466,7 @@ def smoke(
 ) -> dict[str, str | bool]:
     """Launch a visible native Qt6 form and return user-observable evidence."""
 
-    module_path, resource_path = generate(build_root)
+    module_path, resource_path = _smoke_inputs(build_root)
     if not QtCore.QResource.registerResource(str(resource_path)):
         raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
 

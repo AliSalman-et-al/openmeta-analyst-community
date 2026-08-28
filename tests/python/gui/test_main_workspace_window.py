@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
@@ -309,7 +309,7 @@ finally:
 """
     expected_platform = "windows" if sys.platform == "win32" else "cocoa"
     evidence_by_factor = {}
-    for factor in ("1", "1.25", "1.5", "1.75"):
+    for factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment.pop("QT_QPA_PLATFORM", None)
         environment["QT_SCALE_FACTOR"] = factor

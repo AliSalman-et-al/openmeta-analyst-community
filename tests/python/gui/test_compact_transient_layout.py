@@ -26,7 +26,6 @@ def _show(window, qapp):
 def _remaining_surface_inventory():
     import about_legal_dialog
     import add_new_dialogs
-    import adaptive_controls
     import edit_group_name_form
     import launch
     import ma_specs
@@ -111,75 +110,74 @@ def test_complete_compact_transactional_inventory_is_content_preferred(
     import adaptive_window
 
     original_font = QtGui.QFont(qapp.font())
-    for enlarged_font in (False, True):
+    scenarios = ((False, (1600, 1000)), (True, (800, 600)))
+    for enlarged_font, available_size in scenarios:
         font = QtGui.QFont(original_font)
         if enlarged_font:
             font.setPointSize(max(16, font.pointSize() + 6))
         qapp.setFont(font)
-        for available_size in ((800, 600), (1024, 640), (1600, 1000)):
-            available = QtCore.QRect(0, 0, *available_size)
-            monkeypatch.setattr(
-                adaptive_window,
-                "available_geometry_for_window",
-                lambda _window, bounds=available: bounds,
-            )
-            surfaces = _remaining_surface_inventory()
-            try:
-                for name, kind, window in surfaces:
-                    _show(window, qapp)
-                    expected = (
-                        adaptive_window.WindowArchetype.TRANSIENT
-                        if kind in ("progress", "splash")
-                        else adaptive_window.WindowArchetype.TRANSACTIONAL
-                    )
-                    assert (
-                        adaptive_window.adaptive_window_state(window).policy.archetype
-                        is expected
-                    ), name
-                    assert available.contains(window.frameGeometry()), name
+        available = QtCore.QRect(0, 0, *available_size)
+        monkeypatch.setattr(
+            adaptive_window,
+            "available_geometry_for_window",
+            lambda _window, bounds=available: bounds,
+        )
+        surfaces = _remaining_surface_inventory()
+        try:
+            for name, kind, window in surfaces:
+                _show(window, qapp)
+                expected = (
+                    adaptive_window.WindowArchetype.TRANSIENT
+                    if kind in ("progress", "splash")
+                    else adaptive_window.WindowArchetype.TRANSACTIONAL
+                )
+                assert (
+                    adaptive_window.adaptive_window_state(window).policy.archetype
+                    is expected
+                ), name
+                assert available.contains(window.frameGeometry()), name
 
-                    if kind in ("compact", "choice"):
-                        assert not window.findChildren(QtWidgets.QScrollArea), name
-                        _assert_content_preferred_outer_size(window, available, 0.90)
-                        button_box = window.findChild(QtWidgets.QDialogButtonBox)
-                        for role in (
-                            QtWidgets.QDialogButtonBox.StandardButton.Ok,
-                            QtWidgets.QDialogButtonBox.StandardButton.Cancel,
-                        ):
-                            assert button_box.button(role).isVisible(), (name, role)
-                        for editor in window.findChildren(QtWidgets.QLineEdit):
-                            assert editor.isVisible() and editor.isEnabled(), name
-                    elif kind == "about":
-                        assert isinstance(
-                            window.content_scroll_area, QtWidgets.QTextBrowser
-                        )
-                        close = window.buttonBox.button(
-                            QtWidgets.QDialogButtonBox.StandardButton.Close
-                        )
-                        assert close.isVisible()
-                        assert not window.content_scroll_area.isAncestorOf(close)
-                        assert (
-                            "GPL-3.0-or-later"
-                            in window.content_scroll_area.toPlainText()
-                        )
-                    elif kind == "progress":
-                        _assert_content_preferred_outer_size(window, available, 1.0)
-                        frame = window.frameGeometry()
-                        assert frame.width() < available.width() * 0.60, name
-                        assert frame.height() < available.height() * 0.30, name
-                        assert window.isSizeGripEnabled() is False
-                        initial = QtCore.QRect(frame)
-                        window.progress_bar.setValue(window.progress_bar.maximum())
-                        qapp.processEvents()
-                        assert window.frameGeometry() == initial, name
-                    else:
-                        assert not window.pixmap().isNull()
-                        assert window.size() == _pixmap_logical_size(window.pixmap())
-            finally:
-                for _name, _kind, window in surfaces:
-                    window.close()
-                    window.deleteLater()
-                qapp.processEvents()
+                if kind in ("compact", "choice"):
+                    assert not window.findChildren(QtWidgets.QScrollArea), name
+                    _assert_content_preferred_outer_size(window, available, 0.90)
+                    button_box = window.findChild(QtWidgets.QDialogButtonBox)
+                    for role in (
+                        QtWidgets.QDialogButtonBox.StandardButton.Ok,
+                        QtWidgets.QDialogButtonBox.StandardButton.Cancel,
+                    ):
+                        assert button_box.button(role).isVisible(), (name, role)
+                    for editor in window.findChildren(QtWidgets.QLineEdit):
+                        assert editor.isVisible() and editor.isEnabled(), name
+                elif kind == "about":
+                    assert isinstance(
+                        window.content_scroll_area, QtWidgets.QTextBrowser
+                    )
+                    close = window.buttonBox.button(
+                        QtWidgets.QDialogButtonBox.StandardButton.Close
+                    )
+                    assert close.isVisible()
+                    assert not window.content_scroll_area.isAncestorOf(close)
+                    assert (
+                        "GPL-3.0-or-later" in window.content_scroll_area.toPlainText()
+                    )
+                elif kind == "progress":
+                    _assert_content_preferred_outer_size(window, available, 1.0)
+                    frame = window.frameGeometry()
+                    assert frame.width() < available.width() * 0.60, name
+                    assert frame.height() < available.height() * 0.30, name
+                    assert window.isSizeGripEnabled() is False
+                    initial = QtCore.QRect(frame)
+                    window.progress_bar.setValue(window.progress_bar.maximum())
+                    qapp.processEvents()
+                    assert window.frameGeometry() == initial, name
+                else:
+                    assert not window.pixmap().isNull()
+                    assert window.size() == _pixmap_logical_size(window.pixmap())
+        finally:
+            for _name, _kind, window in surfaces:
+                window.close()
+                window.deleteLater()
+            qapp.processEvents()
     qapp.setFont(original_font)
 
 
@@ -505,7 +503,7 @@ app.processEvents()
 print("COMPACT_LAYOUT=" + json.dumps(payload), flush=True)
 """
     expected_roles = ["transactional"] * 9 + ["transient"] * 4
-    for scale_factor in ("1", "1.5", "2"):
+    for scale_factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment.update(
             {

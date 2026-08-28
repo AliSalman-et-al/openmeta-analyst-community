@@ -182,7 +182,6 @@ def get_setting(field):
     try:
         return _get_setting_helper(field)
     except (TypeError, ValueError, json.JSONDecodeError):
-        print("Invalid value for setting '%s'; resetting only that field" % field)
         update_setting(field, SETTING_SPECS[field].default)
         return _get_setting_helper(field)
 
@@ -228,9 +227,6 @@ def _get_setting_helper(field):
 
 def save_settings():
     """Mark completion after callers' setValue writes without forcing RegFlushKey."""
-    print("saved settings", flush=True)
-    print("RCMS_SETTINGS_PHASE before-former-sync", flush=True)
-    print("RCMS_SETTINGS_PHASE after-former-sync", flush=True)
 
 
 def migrate_workspace_layout_settings():
@@ -428,7 +424,7 @@ def _screen_safe_geometry(frame_geometry, available_geometries):
 
 
 def load_workspace_placement(group, available_geometries=None, default_maximized=True):
-    """Load one Workspace role through the shared ADR 0196 policy."""
+    """Load a workspace placement and clamp it to an available screen."""
     migrate_workspace_layout_settings()
     settings = QSettings()
     geometry = _read_frame_geometry(settings, group + "/frame_geometry")
@@ -701,16 +697,13 @@ def load_settings():
             field
         ) or field_is_toplevel_child_group_keys(field)
         if not setting_present:
-            print(("Filling in setting for %s" % field))
             update_setting(field, value)
 
     save_settings()
-    print("loaded settings")
     return settings
 
 
 def reset_settings():
-    print("Resetting settings to default")
     settings = QSettings()
     settings.clear()
 
@@ -815,7 +808,6 @@ def make_base_path():
     success = QDir().mkpath(base_path)
     if not success:
         raise Exception("Could not create base path at %s" % base_path)
-    print(("Made base path: %s" % base_path))
     return base_path
 
 
@@ -831,7 +823,6 @@ def get_base_path(normalize=False):
     )
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
-    print(("Base path is: %s" % base_path))
     return base_path
 
 
@@ -852,7 +843,6 @@ def make_r_tmp():
     success = QDir().mkpath(r_tmp_path)
     if not success:
         raise Exception("Could not create r_tmp path at %s" % r_tmp_path)
-    print(("Made r_tmp_path at %s" % r_tmp_path))
     return r_tmp_path
 
 
@@ -876,17 +866,15 @@ def to_posix_path(path):
 
 def clear_r_tmp():
     r_tmp_dir = get_r_tmp_path(normalize=True)
-    print(("Clearing %s" % r_tmp_dir))
     if not os.path.isdir(r_tmp_dir):
         return
     for file_p in os.listdir(r_tmp_dir):
         file_path = os.path.join(r_tmp_dir, file_p)
         try:
             if os.path.isfile(file_path):
-                print(("deleting %s" % file_path))
                 os.unlink(file_path)  # same as remove
-        except Exception as e:
-            print(e)
+        except Exception:
+            pass
 
 
 def get_user_documents_path():

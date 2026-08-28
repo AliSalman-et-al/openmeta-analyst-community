@@ -25,7 +25,6 @@ PACKAGE_INPUT_PATTERNS = (
     "r/*",
     "src/*",
     "tests/packaging/*",
-    "tests/python/fast/test_qt6_cutover_finalization.py",
     "tests/python/fast/test_qt6_build_slice.py",
     "tests/python/fast/test_project_format.py",
     "tests/python/fast/test_qt_text_boundaries.py",
@@ -69,7 +68,7 @@ PACKAGE_INPUT_PATTERNS = (
     "scripts/test-package-download-retry.ps1",
     "scripts/validate_adaptive_layout_evidence.py",
     "scripts/delivery.py",
-    "docs/verification/RCMetaR-r-dependencies.json",
+    "config/r-dependencies.json",
     "delivery/targets.json",
 )
 

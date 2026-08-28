@@ -10,13 +10,11 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 import pytest
 
-pytestmark = [pytest.mark.fast, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 
-def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
+def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch):
     import settings
-
-    capsys.readouterr()
 
     class UnexpectedSettings:
         def __init__(self):
@@ -25,12 +23,6 @@ def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
     monkeypatch.setattr(settings, "QSettings", UnexpectedSettings)
 
     settings.save_settings()
-
-    assert capsys.readouterr().out.splitlines() == [
-        "saved settings",
-        "RCMS_SETTINGS_PHASE before-former-sync",
-        "RCMS_SETTINGS_PHASE after-former-sync",
-    ]
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows registry contract")

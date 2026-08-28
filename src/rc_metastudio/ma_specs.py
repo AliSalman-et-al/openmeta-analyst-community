@@ -37,7 +37,6 @@ from analysis_method_labels import (
 import app_error_handler
 from rc_metastudio import meta_py_r
 import progress_bar as progress_dialog
-import qt_layout
 import qt_text
 import plot_capabilities
 from plot_text import apply_plot_text_input_limits
@@ -253,7 +252,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         self.data_type = self.model.get_current_outcome_type()
         self._setup_covariates_tab()
-        print("data type: %s" % self.data_type)
         if self.data_type != "binary":
             self.disable_bin_only_fields()
             if self.data_type == "diagnostic":
@@ -377,7 +375,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self._focus_reveal_connected = False
 
     def cancel(self):
-        print("(cancel)")
         self.reject()
 
     def _setup_covariates_tab(self):
@@ -647,12 +644,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # first, let's fire up a progress bar
         bar = MetaProgress(self)
         bar.show()
-        result = None
-
         try:
-            if self.data_type == "binary":
-                data_type = BINARY
-
             if self.data_type not in ["binary", "continuous"]:
                 raise ValueError(
                     "Network Analysis can currently only be done with binary or continuous data"
@@ -767,9 +759,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self.show_4.setEnabled(False)
 
     def method_changed(self):
-        parameter_layout = self.parameter_grp_box.layout()
-        if parameter_layout is not None:
-            print(("Layout items count before: %d" % parameter_layout.count()))
         self.clear_param_ui()
         self.current_widgets = []
         if self.available_method_d is None:
@@ -841,11 +830,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
             self.available_method_d
         )
 
-        print(
-            "\n\navailable %s methods: %s"
-            % (self.data_type, ", ".join(list(self.available_method_d.keys())))
-        )
-
         # print("----------------------------------\nAvailable methods dictionary:",self.available_method_d)
 
         # issue #110 -- this is NOT a general/good/flexible solution
@@ -878,9 +862,7 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                     method_names.remove("Diagnostic Fixed-Effect Peto")
                     # QMessageBox.warning(self.parent(), "Warning", "Removed Peto")
                 except:
-                    print(
-                        "Couldn't remove 'Diagnostic Fixed-Effect Peto' for some reason... don't know why"
-                    )
+                    pass
 
         method_names.sort(reverse=True)
 
@@ -981,7 +963,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         self._schedule_local_reflow()
 
     def add_param(self, layout, cur_grid_row, name, value):
-        print("adding param. name: %s, value: %s" % (name, value))
         if isinstance(value, list):
             # then it's an enumeration of values
             self.add_enum(layout, cur_grid_row, name, value)
@@ -994,10 +975,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
         # should we add an array type?
         elif value.lower() == "string":
             self.add_text_box(layout, cur_grid_row, name)
-        else:
-            print("unknown type! throwing up. bleccch.")
-            print("name:%s. value: %s" % (name, value))
-            # throw exception here
 
     def add_enum(self, layout, cur_grid_row, name, values):
         """
@@ -1072,7 +1049,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
                 raise RuntimeError("analysis parameter signal has no combo-box sender")
             x = self._enum_item_value(combo_box.itemData(index))
             self.current_param_vals[name] = to_type(x)
-            print(str(self.current_param_vals) + " -> weirdo sender thing")
 
         return set_param
 
@@ -1212,7 +1188,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         def set_param(x):
             self.current_param_vals[name] = to_type(x)
-            print(self.current_param_vals)
 
         return set_param
 
@@ -1296,8 +1271,6 @@ class MA_Specs(QDialog, forms.ui_ma_specs.Ui_Dialog):
 
         # override conf.level with global conf.level
         self.current_defaults["conf.level"] = self.conf_level
-
-        print(self.current_defaults)
 
     def _register_shared_diagnostic_param(
         self, name, definition, default, metadata=None
@@ -1536,9 +1509,7 @@ def _execute_analysis_requests(model, requests):
 def _run_diagnostic_backend(workflow, method_names, parameter_values):
     if workflow == "standard":
         return meta_py_r.run_diagnostic_multi(method_names, parameter_values)
-    return meta_py_r.run_diagnostic_workflow(
-        workflow, method_names, parameter_values
-    )
+    return meta_py_r.run_diagnostic_workflow(workflow, method_names, parameter_values)
 
 
 def _run_binary_request(request):

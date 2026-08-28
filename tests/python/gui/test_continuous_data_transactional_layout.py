@@ -181,7 +181,7 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
 
         dialog.enable_back_calculation_btn(engage=True)
 
-        assert recorder["metric_choice_exec"] == ["Population SD Assumptions"]
+        assert recorder["metric_choice_exec"] == ["Population standard deviations"]
         assert recorder["back_calc"] == []
     finally:
         _close(app, dialog)
@@ -297,7 +297,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
-        assert recorder["metric_choice_exec"] == ["Population SD Assumptions"]
+        assert recorder["metric_choice_exec"] == ["Population standard deviations"]
         assert recorder["back_calc"] == []
         assert dialog.metric_parameter is None
         assert unit.raw_data == raw_before

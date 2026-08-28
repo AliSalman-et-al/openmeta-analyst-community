@@ -446,7 +446,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
                                 add=c(params$adjust, 0), to=c(as.character(params$to), "none")),
         
                       # For "NLR", switch ai with bi, and ci with di
-                      # in order to use rma.mh with measure "RR"          
+                      # Required by rma.mh when measure is "RR".
             "NLR" = rma.mh(ai=diagnostic.data@FN, bi=diagnostic.data@TP, 
                                 ci=diagnostic.data@TN, di=diagnostic.data@FP, slab=diagnostic.data@study.names,
                                 level=params$conf.level, digits=params$digits, measure="RR",

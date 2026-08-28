@@ -1,3 +1,0 @@
-# Defer release artifact signing
-
-Code signing and notarization are not gates for the first public Qt6 release. The two macOS application builds must nevertheless remain compatible with the hardened runtime and the future Developer ID signing, notarization, and stapling pipeline while the Apple Developer certificate application is pending. Windows Authenticode signing is out of scope for this cutover. Until signing is added, release documentation will identify the artifacts as unsigned and give users accurate platform-specific launch guidance without weakening application security settings programmatically.

@@ -1,11 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #!/usr/bin/env python3
-"""The maintained source verification entry point.
-
-The runner deliberately owns only orchestration.  The checks themselves remain
-in their existing build, pytest, and R-verification modules.
-"""
+"""Run the maintained source verification lanes."""
 
 from __future__ import annotations
 
@@ -31,7 +27,9 @@ def discover_repo_root(start: Path | None = None) -> Path:
     if current.is_file():
         current = current.parent
     for candidate in (current, *current.parents):
-        if (candidate / "pyproject.toml").is_file() and (candidate / "scripts").is_dir():
+        if (candidate / "pyproject.toml").is_file() and (
+            candidate / "scripts"
+        ).is_dir():
             return candidate
     raise VerificationError(f"could not discover repository root from {current}")
 
@@ -46,8 +44,8 @@ SMOKE_TESTS = (
     "test_golden_summary_parser_reads_current_RCMetaR_summary_display",
     "tests/python/fast/test_project_format.py::"
     "test_all_committed_samples_match_the_frozen_semantics_and_round_trip",
-    "tests/python/fast/test_qt6_cutover_finalization.py::"
-    "test_final_cutover_audit_has_zero_active_legacy_findings",
+    "tests/python/fast/test_qt6_build_slice.py::"
+    "test_binary_resource_registers_and_exposes_icon_and_svg",
 )
 
 
@@ -116,8 +114,6 @@ def prepare_qt_environment(build_root: Path) -> dict[str, str]:
 
 
 def preflight(env: dict[str, str]) -> None:
-    write_step("Validating golden baseline manifests")
-    run([sys.executable, "scripts/validate_golden_baseline_manifests.py"], env=env)
     write_step("Collecting pytest nodes with strict marker validation")
     run(
         [
@@ -127,7 +123,7 @@ def preflight(env: dict[str, str]) -> None:
             "--strict-markers",
             "tests",
             "--collect-only",
-            "-q",
+            "-qq",
         ],
         env=env,
     )
@@ -197,7 +193,8 @@ def run_source_lane(args: argparse.Namespace, *, smoke: bool) -> None:
     if smoke:
         write_step("Running smoke pytest nodes")
         run_pytest(list(SMOKE_TESTS), env=env)
-        run_default_r_evidence(args)
+        if not args.skip_r_evidence:
+            run_default_r_evidence(args)
     else:
         write_step("Running fast and golden pytest lanes")
         run_pytest(
@@ -205,7 +202,8 @@ def run_source_lane(args: argparse.Namespace, *, smoke: bool) -> None:
             env=env,
             workers=args.fast_workers,
         )
-        run_default_r_evidence(args)
+        if not args.skip_r_evidence:
+            run_default_r_evidence(args)
 
 
 def run_full_r_stack(args: argparse.Namespace) -> None:
@@ -243,14 +241,18 @@ def parser() -> argparse.ArgumentParser:
 
     def add_source_options(subparser: argparse.ArgumentParser) -> None:
         subparser.add_argument("--sync", action="store_true")
-        subparser.add_argument("--require-r-evidence", action="store_true")
+        r_evidence = subparser.add_mutually_exclusive_group()
+        r_evidence.add_argument("--require-r-evidence", action="store_true")
+        r_evidence.add_argument("--skip-r-evidence", action="store_true")
         add_rscript_options(subparser)
 
     smoke = subparsers.add_parser("smoke", help="run the representative smoke lane")
     add_source_options(smoke)
     smoke.add_argument("--build-root", default=DEFAULT_BUILD_ROOT, type=Path)
 
-    fast = subparsers.add_parser("fast", help="run fast, golden, and Default R Evidence")
+    fast = subparsers.add_parser(
+        "fast", help="run fast, golden, and Default R Evidence"
+    )
     add_source_options(fast)
     fast.add_argument(
         "--fast-workers",

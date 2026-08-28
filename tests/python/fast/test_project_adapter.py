@@ -67,9 +67,6 @@ def _multi_arm_project(family: str) -> dict[str, object]:
     }
 
 
-@pytest.mark.fast
-@pytest.mark.small
-@pytest.mark.release_readiness
 @pytest.mark.parametrize("family", ["binary", "continuous"])
 def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None:
     project = _multi_arm_project(family)

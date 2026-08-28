@@ -230,23 +230,17 @@ class ConsistencyChecker:
     def _color_row(self, row):
         self.table.blockSignals(True)
         for col in range(3):
-            print("setting row: %s, col: %s" % (row, col))
             set_table_item_text_color(self.table.item(row, col), ERROR_COLOR)
         self.table.blockSignals(False)
 
     def _color_col(self, col):
         self.table.blockSignals(True)
         for row in range(3):
-            print("setting row: %s, col: %s" % (row, col))
             set_table_item_text_color(self.table.item(row, col), ERROR_COLOR)
         self.table.blockSignals(False)
 
     def _row_is_populated(self, row):
-
-        result = not True in [self._is_empty_cell(row, col) for col in range(3)]
-        if result:
-            print("Row %d is populated" % row)
-        return result
+        return not True in [self._is_empty_cell(row, col) for col in range(3)]
 
     def _col_is_populated(self, col):
         return not True in [self._is_empty_cell(row, col) for row in range(3)]
@@ -469,12 +463,10 @@ class CommandFieldChanged(QUndoCommand):
                     self.parent, "calculator command owner"
                 ).enable_back_calculation_btn()
         else:
-            print("Restoring new ma_unit")
             required(self.restore_new_f, "calculator redo callback")()
             # self.parent.enable_back_calculation_btn() ##
 
     def undo(self):
-        print("Restoring old ma_unit")
         required(self.restore_old_f, "calculator undo callback")()
         # self.parent.enable_back_calculation_btn() ##
 
@@ -562,9 +554,7 @@ def evaluate(
             QMessageBox.warning(parent, "Warning", msg)
             raise Exception("error")
     else:  # something other than est, lower, upper (like correlation or prevalence)
-        print(("Result of correlation evaluation is: %s" % str(opt_cmp_fn(new_text))))
         if not opt_cmp_fn(new_text):
             QMessageBox.warning(parent, "Warning", opt_cmp_msg)
-            print("raising exception")
             raise Exception("error")
     return parsed_value  # display_scale_val

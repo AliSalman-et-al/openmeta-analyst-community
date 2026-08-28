@@ -61,7 +61,7 @@ jobs:
           reason="no Qt6 integration verification inputs changed"
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|docs/verification/*|r/*|scripts/*|src/*|tests/*)
+              .github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|r/*|scripts/*|src/*|tests/*)
                 run_windows=true
                 reason="matched $file"
                 break
@@ -164,7 +164,7 @@ jobs:
         run: uv cache prune --ci
 
   source-fast-targets:
-    name: Source Fast Verification (${{ matrix.target }})
+    name: Source and Platform Verification (${{ matrix.target }})
     needs: change-classifier
     if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
     timeout-minutes: 90
@@ -207,7 +207,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-default-library-cache
-          key: r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'scripts/verify_rcmetar_r_default.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+          key: r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'scripts/verify_rcmetar_r_default.py', 'config/r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Provision macOS native R build libraries
         if: ${{ matrix.platform == 'macos' }}
@@ -279,15 +279,18 @@ jobs:
             --github-env "$GITHUB_ENV" \
             --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
 
-      - name: Run Fast Verification on Windows
+      # Platform-neutral Python and golden contracts run once. The macOS jobs
+      # own native Qt generation, the compiled rpy2 bridge, a representative
+      # application smoke slice, and real Default R evidence on each host ISA.
+      - name: Run Platform-Neutral Python Verification
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
-        run: uv run --locked python scripts\verify.py fast --require-r-evidence
+        run: uv run --locked python scripts\verify.py fast --skip-r-evidence
 
-      - name: Run Fast Verification on macOS
+      - name: Run Native Platform Smoke and R Evidence
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
-        run: uv run --no-sync python scripts/verify.py fast --require-r-evidence
+        run: uv run --no-sync python scripts/verify.py smoke --require-r-evidence
 
       - name: Prune uv cache
         if: ${{ always() }}
@@ -327,7 +330,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-library-cache
-          key: r-full-stack-v1-windows-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION', 'scripts/verify_rcmetar_r_stack.py') }}
+          key: r-full-stack-v1-windows-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'config/r-dependencies.json', 'r/RCMetaR/DESCRIPTION', 'scripts/verify_rcmetar_r_stack.py') }}
 
       - name: Run Full R Stack Evidence
         run: uv run --locked python scripts\verify.py r-stack

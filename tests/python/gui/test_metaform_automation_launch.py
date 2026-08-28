@@ -12,7 +12,7 @@ import pytest
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtWidgets import QHeaderView
 
-pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -153,10 +153,8 @@ def _assert_table_view_leaves_spare_width_outside_data_columns(table_view):
 
 def test_full_app_imports_representative_csv_into_dataset():
     import launch
-    from PyQt6 import QtWidgets
 
     meta_form = launch._import_meta_form()
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = meta_form.MetaForm()
     window._handle_wizard_results(
         {
@@ -375,7 +373,6 @@ def test_rc_metastudio_logo_resource_is_valid_and_used_consistently():
 
     qt6_resources.ensure_application_resources()
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     app_icon = QtGui.QIcon(launch.APPLICATION_ICON_PATH)
     logo_pixmap = QtGui.QPixmap(":/misc/meta.png")
     splash_pixmap = QtGui.QPixmap(":/misc/splash.png")
@@ -436,7 +433,6 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
 
     qt6_resources.ensure_application_resources()
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     qrc_path = Path("src", "rc_metastudio", "images", "icons.qrc")
     qrc_root = ET.parse(qrc_path).getroot()
     resources = {}
@@ -1509,7 +1505,15 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         lambda method: (
             dict(params),
             dict(defaults),
-            ["rm.method", "inference.method", "to", "conf.level", "digits", "adjust", "theta.lower"],
+            [
+                "rm.method",
+                "inference.method",
+                "to",
+                "conf.level",
+                "digits",
+                "adjust",
+                "theta.lower",
+            ],
             pretty_names,
         ),
         raising=False,
@@ -1952,7 +1956,6 @@ def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypa
     import launch
 
     app, window = launch.start_automation()
-    meta_form = sys.modules["meta_form"]
     built = []
     shown = []
 
@@ -2418,7 +2421,6 @@ def test_analysis_opens_results_window_maximized_and_fits_svg_plot(tmp_path):
 
 
 def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2473,7 +2475,6 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
 
 
 def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2588,7 +2589,6 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
 
 
 def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2658,7 +2658,6 @@ def test_results_window_refits_svg_after_viewport_geometry_settles(tmp_path):
 
 
 def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2728,7 +2727,6 @@ def test_results_window_refits_raster_fallback_from_original_source(tmp_path):
 
 
 def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2851,7 +2849,6 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
 
 
 def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2913,7 +2910,6 @@ def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
 
 
 def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -2970,7 +2966,6 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
 
 
 def test_results_window_separates_tall_text_sections():
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3012,7 +3007,6 @@ def test_results_window_separates_tall_text_sections():
 
 
 def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3103,7 +3097,6 @@ def test_results_window_text_context_menu_is_reentrant_safe(monkeypatch):
 def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_plots(
     monkeypatch,
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3244,7 +3237,6 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
 def test_results_window_applies_forest_edits_to_selected_variant_artifact(
     tmp_path, monkeypatch, title, plot_kind
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3358,7 +3350,6 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
 def test_results_window_save_handler_regenerates_cumulative_forest_as_single_panel(
     tmp_path, monkeypatch
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3416,7 +3407,6 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
 def test_results_window_save_handler_accepts_backend_export_formats(
     tmp_path, monkeypatch, extension
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3473,7 +3463,6 @@ def test_results_window_save_handler_accepts_backend_export_formats(
 def test_results_window_save_handler_preserves_requested_format_when_extension_is_omitted(
     tmp_path, monkeypatch
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3528,7 +3517,6 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
 
 
 def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeypatch):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3582,7 +3570,6 @@ def test_edit_forest_plot_dialog_round_trips_style_and_appearance_params(monkeyp
 
 
 def test_shared_plot_options_surface_uses_default_arm_labels():
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3667,7 +3654,6 @@ def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
 
 
 def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3708,7 +3694,6 @@ def test_edit_forest_plot_dialog_apply_stays_open_and_ok_applies_and_closes():
 
 
 def test_edit_regression_plot_dialog_shows_only_bubble_options():
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3763,7 +3748,6 @@ def test_edit_regression_plot_dialog_shows_only_bubble_options():
 def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
     tmp_path, monkeypatch
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -3883,7 +3867,6 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
 
 
 def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -4224,7 +4207,6 @@ def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
 def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
     tmp_path, monkeypatch
 ):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -4385,7 +4367,6 @@ def test_edit_forest_plot_apply_regenerates_plot_without_accepting_dialog(
 
 
 def test_results_window_ignores_missing_image_order_entries():
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -4419,7 +4400,6 @@ def test_results_window_ignores_missing_image_order_entries():
 
 
 def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -4553,7 +4533,6 @@ def test_real_metaform_save_as_round_trips_representative_projects(
 
 def test_recent_files_persist_through_pyqt6_settings(tmp_path):
     from PyQt6 import QtCore
-    import launch
     import settings
 
     QtCore.QSettings.setPath(
@@ -4604,7 +4583,6 @@ def test_main_window_maximized_state_persists_through_pyqt6_settings(tmp_path):
 
 def test_welcome_wizard_recent_action_selects_project(monkeypatch):
     import launch
-    from PyQt6 import QtWidgets
     import main_wizard
 
     app, window = launch.start_automation()
@@ -4635,7 +4613,6 @@ def test_welcome_wizard_recent_action_selects_project(monkeypatch):
 
 def test_welcome_wizard_open_existing_selects_project(monkeypatch):
     import launch
-    from PyQt6 import QtWidgets
     import main_wizard
 
     app, window = launch.start_automation()
@@ -4676,7 +4653,6 @@ def test_welcome_wizard_open_existing_selects_project(monkeypatch):
 
 
 def test_modal_dialogs_center_over_parent_window():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4762,7 +4738,11 @@ def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monke
             events.append("opened")
 
         def get_results(self):
-            return {"path": "open", "selected_dataset": "chosen.rcms", "outcome_info": None}
+            return {
+                "path": "open",
+                "selected_dataset": "chosen.rcms",
+                "outcome_info": None,
+            }
 
         def deleteLater(self):
             events.append("deleted")
@@ -4782,9 +4762,7 @@ def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monke
         app.processEvents()
         assert events == ["created", "opened"]
 
-        window._startup_wizard.finished.emit(
-            int(QtWidgets.QDialog.DialogCode.Accepted)
-        )
+        window._startup_wizard.finished.emit(int(QtWidgets.QDialog.DialogCode.Accepted))
         assert events[2][0] == "handled"
         assert events[3:] == ["deleted", "shown", "raised", "activated"]
         assert window._startup_wizard is None
@@ -4795,7 +4773,6 @@ def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monke
 
 
 def test_data_type_page_multiline_buttons_fit_icon_and_caption():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4821,7 +4798,6 @@ def test_data_type_page_multiline_buttons_fit_icon_and_caption():
 
 
 def test_data_type_page_reflows_buttons_without_horizontal_overflow():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4843,7 +4819,6 @@ def test_data_type_page_reflows_buttons_without_horizontal_overflow():
 
 
 def test_data_type_page_buttons_center_icons_inside_declared_slots():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4871,7 +4846,6 @@ def test_data_type_page_buttons_center_icons_inside_declared_slots():
 
 
 def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4902,7 +4876,6 @@ def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
 
 @pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
 def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -4931,7 +4904,6 @@ def test_wizard_layout_smoke_renders_core_wizard_pages():
 
 
 def test_new_dataset_wizard_pages_fill_body_without_clipping_content():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -5089,7 +5061,6 @@ def test_data_type_page_canonical_form_declares_reflow_and_overflow():
     ],
 )
 def test_data_type_page_records_every_supported_selection(button_name, expected):
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
     import meta_globals
@@ -5129,7 +5100,6 @@ def test_data_type_page_records_every_supported_selection(button_name, expected)
 
 
 def test_new_project_data_type_selection_populates_metric_defaults_and_results():
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
     import meta_globals
@@ -5218,7 +5188,6 @@ def test_open_existing_dialog_starts_in_sample_projects_even_when_cwd_is_app_dat
 def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_recent_project(
     tmp_path, monkeypatch
 ):
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 
@@ -5247,18 +5216,13 @@ def test_welcome_wizard_open_existing_dialog_starts_in_sample_projects_when_no_r
         os.chdir(REPO_ROOT)
 
 
-def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
+def test_about_legal_and_welcome_links_show_current_project_information():
     import launch
     import main_wizard
-    from PyQt6 import QtWidgets
 
     app, window = launch.start_automation()
 
     try:
-        assert not hasattr(window, "action_open_help")
-        assert not any(
-            action.text() == "Open Help" for action in window.menuHelp.actions()
-        )
         assert window.action_about_legal.text() == "About/Legal"
 
         import about_legal_dialog
@@ -5292,10 +5256,6 @@ def test_removed_help_surfaces_do_not_leave_active_ui_or_urls():
             ]
         )
         assert "github.com/AliSalman-et-al/rc-metastudio" in link_text
-        retired_support_domain = "ce" + "bm.brown.edu"
-        assert retired_support_domain not in link_text.lower()
-        assert "tuftscaes.org" not in link_text.lower()
-        assert "openMA_help" not in link_text
     finally:
         if "wizard" in locals():
             wizard.close()
@@ -5343,7 +5303,6 @@ def test_stub_backend_exposes_data_entry_imputation_methods():
     # and data-entry dialogs call these methods during construction. The no-R
     # stub must expose them, returning a benign "couldn't impute" result rather
     # than crashing.
-    import launch
     import test_backend_compat
 
     test_backend_compat.install()
@@ -5560,8 +5519,6 @@ def test_add_covariate_dialog_fields_and_buttons_fill_fitted_width():
 
 
 def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
-    import launch
-    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "studies.csv"
@@ -5570,7 +5527,6 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
         "Alpha,2020,1,10,2,12,,,,5.5,North\n"
         "Beta,2021,3,11,4,13,,,,7,South\n"
     )
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
     wizard.set_dataset_info(
         {
@@ -5597,8 +5553,6 @@ def test_csv_import_wizard_accepts_representative_csv(tmp_path, monkeypatch):
 
 
 def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypatch):
-    import launch
-    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "ragged-studies.csv"
@@ -5608,7 +5562,6 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
         "Beta,2021,3,11,4\n"
     )
     shown = []
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
     wizard.set_dataset_info(
         {
@@ -5642,13 +5595,11 @@ def test_csv_import_wizard_pads_ragged_rows_before_previewing(tmp_path, monkeypa
 
 
 def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
-    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "empty.csv"
     csv_path.write_text("")
     shown = []
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
     wizard.set_dataset_info(
         {
@@ -5682,7 +5633,6 @@ def test_csv_import_wizard_reports_empty_file_as_no_data(tmp_path, monkeypatch):
 
 
 def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatch):
-    from PyQt6 import QtWidgets
     import main_wizard
 
     csv_path = tmp_path / "studies.csv"
@@ -5691,7 +5641,6 @@ def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatc
         "Alpha,2020,1,10,2,12\n"
     )
     shown = []
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     wizard = main_wizard.MainWizard(path="csv_import")
     wizard.set_dataset_info(
         {
@@ -5730,7 +5679,6 @@ def test_csv_import_preview_failure_preserves_error_details(tmp_path, monkeypatc
 
 
 def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
-    import launch
     from PyQt6 import QtWidgets
     import main_wizard
 

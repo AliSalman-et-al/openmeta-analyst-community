@@ -131,17 +131,6 @@ def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():
     assert f"{retired_package_author} \\email" not in package_rd
 
 
-def test_release_readiness_text_does_not_invert_current_identity():
-    changelog = read_text("CHANGELOG.md")
-    inventory = read_text("docs", "release", "third-party-inventory.md")
-
-    assert "Original RC MetaStudio Project" not in changelog
-    assert "Original RC MetaStudio Project" not in inventory
-    assert "away from `.rcms`, RCMetaR" not in changelog
-    assert "Original OpenMeta[Analyst] Project" in changelog
-    assert "Original OpenMeta[Analyst] Project" in inventory
-
-
 def test_gitignore_uses_current_release_artifact_patterns():
     ignored = {
         line.strip()

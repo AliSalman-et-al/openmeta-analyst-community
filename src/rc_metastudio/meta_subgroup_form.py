@@ -26,7 +26,6 @@ class MetaSubgroupForm(QDialog, forms.ui_cov_subgroup_dlg.Ui_cov_subgroup_dialog
         )
 
     def cancel(self):
-        print("(cancel)")
         self.reject()
 
     def get_selected_cov(self):

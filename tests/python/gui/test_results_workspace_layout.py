@@ -5,7 +5,7 @@ import sys
 import pytest
 from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
 
-pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

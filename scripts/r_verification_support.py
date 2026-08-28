@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 
-DEPENDENCY_MANIFEST = Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
+DEPENDENCY_MANIFEST = Path("config/r-dependencies.json")
 R_BINARY_POLICY = Path("scripts") / "r_binary_policy.R"
 R_POLICY_LOADER = Path("scripts") / "r_dependency_policy.py"
 
@@ -130,9 +130,7 @@ def common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
     return candidates
 
 
-def resolve_rscript(
-    name: str, env: dict[str, str] | None = None
-) -> Path | None:
+def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path | None:
     active_env = dict(os.environ) if env is None else env
     explicit = bool(name and name != "Rscript")
     if explicit:

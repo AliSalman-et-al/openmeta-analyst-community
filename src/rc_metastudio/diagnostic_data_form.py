@@ -269,12 +269,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self, currentRow, currentColumn, previousRow, previousColumn
     ):
         self.current_item_data = self._get_int(currentRow, currentColumn)
-        print(
-            (
-                "Current item data @ (%d, %d) is: %s"
-                % (currentRow, currentColumn, str(self.current_item_data))
-            )
-        )
 
     def setup_back_calculation_feedback(self):
         inconsistency_palette = QPalette()
@@ -362,7 +356,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     def _set_val(self, row, col, val):
         if is_NaN(val):  # get out quick
-            print("%s is not a number" % val)
             return
 
         try:
@@ -380,7 +373,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                     self._raw_count_cell_is_editable(row, col),
                 )
         except:
-            print(("Got to except in _set_val when trying to set (%d,%d)" % (row, col)))
+            pass
 
     def _set_vals(self, computed_d):
         """Sets values in table widget"""
@@ -470,12 +463,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def restore_ma_unit(self, old_ma_unit):
         """Restores the ma_unit data and resets the form"""
         self.ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
-        print(
-            (
-                "Restored ma_unit data: %s"
-                % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups))
-            )
-        )
 
         self.initialize_form()  # clear form first
         self._update_raw_data()
@@ -582,16 +569,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def update_2x2_table(self, imputed_dict):
         """Fill in entries in 2x2 table and add data to ma_unit"""
 
-        print("Updating 2x2......")
-
         # reset relevant column and sums column if we have new data
         if imputed_dict["TP"] and imputed_dict["FN"]:
-            print(("TP, FN:", imputed_dict["TP"], imputed_dict["FN"]))
-            print("clearing col 0 and 2")
             self.clear_column(0)
             self.clear_column(2)
         if imputed_dict["TN"] and imputed_dict["FP"]:
-            print("clearing col 1 and 2")
             self.clear_column(1)
             self.clear_column(2)
 
@@ -612,7 +594,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _update_ma_unit(self):
         """Copy data from data table to the MA_unit"""
 
-        print("updating ma unit....")
         raw_dict = self.get_raw_diag_data()  # values are floats or None
         for field in raw_dict.keys():
             i = DIAG_FIELDS_TO_RAW_INDICES[field]
@@ -716,7 +697,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 display_scale_val = None
         except ValueError:
             # Ignore incomplete numeric input while the user is still editing.
-            print("fail.")
             return None
 
         calc_scale_val = meta_py_r.diagnostic_convert_scale(
@@ -781,7 +761,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         self.cur_effect = str(self.effect_cbo_box.currentText())
         self.set_current_effect()
 
-        self.enable_txt_box_input()
         self.enable_back_calculation_btn()
         self._mark_table_consistent()
 
@@ -791,7 +770,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             field_index = 0
             for col in (0, 1):
                 for row in (0, 1):
-                    val = self.ma_unit.get_raw_data_for_group(self.group_str)[field_index]
+                    val = self.ma_unit.get_raw_data_for_group(self.group_str)[
+                        field_index
+                    ]
                     if val is not None:
                         try:
                             val = str(int(val))
@@ -822,9 +803,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             mult=self.mult,
         )
 
-    def print_effects_dict_from_ma_unit(self):
-        print(self.ma_unit.get_effects_dict())
-
     def _update_data_table(self):
         """Try to calculate rest of 2x2 table from existing cells"""
 
@@ -833,7 +811,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 signal_blockers.enter_context(QSignalBlocker(widget))
             params = self._get_table_vals()
             computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
-            print("Computed Params", computed_params)
             if computed_params:
                 self._set_vals(computed_params)  # computed --> table widget
 
@@ -846,13 +823,11 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 )
                 prev_str = str(prevalence)[:7]
                 self.prevalence_txt_box.setText("%s" % prev_str)
-                self.enable_txt_box_input()
         self._grow_all_raw_data_columns_to_contents()
 
     def clear_column(self, col):
         """Clears out column in table and ma_unit"""
 
-        print(("Clearing column %d" % col))
         for row in range(3):
             self._set_val(row, col, None)
 
@@ -901,13 +876,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             restore_new_f=restore_new_f, restore_old_f=restore_old_f, parent=self
         )
         self.undoStack.push(command)
-
-    def enable_txt_box_input(self):
-        """Enables text boxes if they are empty, disables them otherwise"""
-
-        # meta_globals.enable_txt_box_input(self.effect_txt_box, self.low_txt_box,
-        #                                  self.high_txt_box, self.prevalence_txt_box)
-        pass
 
     #    def set_clear_btn_color(self):
     #        if calc_fncs._input_fields_disabled(self.two_by_two_table, self.text_boxes):
@@ -973,7 +941,6 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                 new_item_available(old_data[i], new_data[i])
                 for i in range(len(new_data))
             ]
-            print(("Comparison:", comparison))
             if any(comparison):
                 changed = True
             else:
@@ -981,16 +948,13 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             return changed
 
         diag_data = build_dict()
-        print(("Diagnostic Data for back-calculation: ", diag_data))
 
         # if diag_data is not None:
 
         imputed = meta_py_r.impute_diag_data(diag_data)
-        print("imputed data: %s" % imputed)
 
         # Leave if nothing was imputed
         if not (imputed["TP"] or imputed["TN"] or imputed["FP"] or imputed["FN"]):
-            print("Nothing could be imputed")
             self.back_calc_Btn.setEnabled(False)
             return None
 
@@ -1028,11 +992,9 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     ####### Undo framework ############
     def undo(self):
-        print("undoing....")
         self.undoStack.undo()
 
     def redo(self):
-        print("redoing....")
         self.undoStack.redo()
 
     #################################

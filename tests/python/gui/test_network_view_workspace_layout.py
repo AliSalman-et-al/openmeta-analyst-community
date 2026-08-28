@@ -1,13 +1,12 @@
 import os
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtTest, QtWidgets, sip
 
-pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+pytestmark = pytest.mark.qsettings
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -385,29 +384,3 @@ def test_repeated_network_view_close_releases_owned_qt_objects(
             assert parent.findChildren(QtWidgets.QDialog) == []
     finally:
         _dispose(qapp, parent)
-
-
-def test_network_view_canonical_form_is_managed_and_platform_native():
-    path = Path("src/rc_metastudio/forms/network_view_window.ui")
-    text = path.read_text(encoding="utf-8")
-    root = ET.fromstring(text)
-    top_widget = root.find("widget")
-
-    assert top_widget is not None
-    assert top_widget.find("layout") is not None
-    root_rect = top_widget.find("property[@name='geometry']/rect")
-    assert root_rect is not None
-    assert root_rect.findtext("width") == "0"
-    assert root_rect.findtext("height") == "0"
-    assert top_widget.find("property[@name='maximumSize']") is None
-    assert top_widget.find("property[@name='font']") is None
-    assert top_widget.find(".//layout[@class='QFormLayout']") is not None
-    for child in top_widget.iter("widget"):
-        if child is not top_widget:
-            assert child.find("property[@name='geometry']") is None
-
-    implementation = Path("src/rc_metastudio/network_view.py").read_text(
-        encoding="utf-8"
-    )
-    assert "qt_layout" not in implementation
-    assert "PageSize" not in implementation

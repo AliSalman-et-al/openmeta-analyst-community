@@ -96,7 +96,6 @@ class Diag_Metrics(QDialog, forms.ui_diagnostic_metrics.Ui_diag_metric):
         for metric in self.SELECTABLE_METRICS:
             checkbox = self._metric_checkbox(metric)
             if checkbox.isEnabled() and checkbox.isChecked():
-                print(metric)
                 selected_metrics.append(metric)
 
         return selected_metrics

@@ -15,9 +15,7 @@ def test_repository_satisfies_canonical_qt_layout_contract():
     assert audit_qt_layout_contracts.audit_repository(ROOT) == []
 
 
-def test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers(
-    tmp_path, monkeypatch
-):
+def test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers(tmp_path):
     forms = tmp_path / "src" / "rc_metastudio" / "forms"
     forms.mkdir(parents=True)
     (forms / "bad.ui").write_text(
@@ -140,12 +138,6 @@ qualified = domain.QFont('Consolas', 12)
 """,
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        audit_qt_layout_contracts,
-        "TOP_LEVEL_FORM_INVENTORY",
-        {"bad.ui": (("bad.py", "Bad", "TRANSACTIONAL"),)},
-    )
-
     findings = audit_qt_layout_contracts.audit_repository(tmp_path)
 
     rules = {finding.rule for finding in findings}
@@ -157,7 +149,6 @@ qualified = domain.QFont('Consolas', 12)
     assert "unjustified-geometry-call" in rules
     assert "legacy-sizing-helper" in rules
     assert "platform-font" in rules
-    assert "window-archetype" in rules
     assert any(finding.path == nested for finding in findings)
     assert any(
         finding.path == aliased and "Font hard-codes" in finding.detail
@@ -177,7 +168,7 @@ qualified = domain.QFont('Consolas', 12)
     assert sum("stylesheet font" in detail for detail in font_details) >= 8
 
 
-def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path, monkeypatch):
+def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path):
     forms = tmp_path / "src" / "rc_metastudio" / "forms"
     forms.mkdir(parents=True)
     (forms / "allowed.ui").write_text(
@@ -237,10 +228,4 @@ swatch.setFixedSize(style_metric)
 """,
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        audit_qt_layout_contracts,
-        "TOP_LEVEL_FORM_INVENTORY",
-        {"allowed.ui": (("network_view.py", "Allowed", "MAIN"),)},
-    )
-
     assert audit_qt_layout_contracts.audit_repository(tmp_path) == []

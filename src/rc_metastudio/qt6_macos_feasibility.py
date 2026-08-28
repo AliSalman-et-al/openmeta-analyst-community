@@ -1319,7 +1319,7 @@ def _prepare_private_r_framework(
             "--evidence",
             str(evidence_dir / "r-profile-quarantine.json"),
             "--dependency-manifest",
-            str(ROOT / "docs/verification/RCMetaR-r-dependencies.json"),
+            str(ROOT / "config/r-dependencies.json"),
             "--r-version",
             EXPECTED_VERSIONS["r"],
             "--architecture",

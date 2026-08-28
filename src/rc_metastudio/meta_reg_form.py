@@ -42,7 +42,6 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
         )
 
     def cancel(self):
-        print("(cancel)")
         self.reject()
 
     def run_meta_reg(self):
@@ -116,7 +115,8 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
             run_with_missing = QMessageBox.warning(
                 self,
                 "Missing Covariate Values",
-                "Some studies do not have values for the covariate(s) you have selected. Do you want me to run the regression without them (i.e., drop studies with missing values)?",
+                "Some studies have no value for a selected covariate. "
+                "Run the regression without those studies?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
@@ -159,11 +159,8 @@ class MetaRegForm(QDialog, forms.ui_meta_reg.Ui_cov_reg_dialog):
 
     def _populate_chk_boxes(self):
         self.covs_and_check_boxes = []
-        studies = self.model.get_studies(only_if_included=True)
-
         chk_box_layout = QGridLayout()
         for cov in self.model.dataset.covariates:
-            cov_vals = [study.covariate_dict[cov.name] for study in studies]
             # note that we're *allowing* empty strings
             chk_box = QCheckBox(cov.name)
             if len(self.covs_and_check_boxes) == 0:

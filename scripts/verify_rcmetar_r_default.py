@@ -6,7 +6,6 @@ import argparse
 import importlib.util
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,9 +16,13 @@ from typing import Any
 
 def load_r_support() -> ModuleType:
     support_path = Path(__file__).resolve().parent / "r_verification_support.py"
-    spec = importlib.util.spec_from_file_location("rcms_r_verification_support", support_path)
+    spec = importlib.util.spec_from_file_location(
+        "rcms_r_verification_support", support_path
+    )
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"could not load shared R verification support: {support_path}")
+        raise RuntimeError(
+            f"could not load shared R verification support: {support_path}"
+        )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -161,9 +164,7 @@ def dependency_cache_key(
 
 def direct_archive_versions(root: Path) -> dict[str, str]:
     manifest = json.loads(
-        (
-            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
-        ).read_text(encoding="utf-8")
+        (root / "config/r-dependencies.json").read_text(encoding="utf-8")
     )
     return {
         dependency["name"]: dependency["installed_version"]
@@ -187,9 +188,7 @@ def verification_base_env(
 
 def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
     manifest = json.loads(
-        (
-            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
-        ).read_text(encoding="utf-8")
+        (root / "config/r-dependencies.json").read_text(encoding="utf-8")
     )
     cran_packages = []
     archive_packages = {}

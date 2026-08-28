@@ -13,7 +13,7 @@ import sys
 from typing import cast
 
 
-SCALE_FACTORS = (1.0, 1.25, 1.5, 1.75)
+SCALE_FACTORS = (1.0, 1.5)
 TOLERANCE = 0.02
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_ROOT = ROOT / "build/qt6-verification/native-remaining-surfaces"
@@ -37,13 +37,23 @@ ACTION_CONTRACTS = {
     "startup-splash": "none",
 }
 
+TRANSIENT_SURFACES = frozenset(
+    {"analysis-progress", "import-progress", "shared-progress", "startup-splash"}
+)
+SPECIAL_OVERFLOW = {
+    "about-legal": "text-browser",
+    "change-covariate-type": "bounded-table",
+    "main-wizard": "page-scroll-area",
+    "startup-splash": "screen-bounded-pixmap",
+}
+
 
 def _slug(scale: float) -> str:
     return str(scale).replace(".", "_")
 
 
 def _scale_label(scale: float) -> str:
-    labels = {1.0: "1.0", 1.25: "1.25", 1.5: "1.5", 1.75: "1.75"}
+    labels = {1.0: "1.0", 1.5: "1.5"}
     try:
         return labels[scale]
     except KeyError as exc:
@@ -59,9 +69,7 @@ def _record_path(root: Path, scale: float) -> Path:
 
 
 def _surface_record_path(root: Path, scale: float, surface_id: str) -> Path:
-    return root / ".surface-records" / (
-        "scale-%s-%s.json" % (_slug(scale), surface_id)
-    )
+    return root / ".surface-records" / ("scale-%s-%s.json" % (_slug(scale), surface_id))
 
 
 def _surface_capture_order() -> tuple[str, ...]:
@@ -104,15 +112,28 @@ def _has_variation(image) -> bool:
 
 
 def _remaining_surface_ids() -> set[str]:
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from validate_qt6_surface_inventory import load_and_validate
+    return set(ACTION_CONTRACTS)
 
-    inventory = load_and_validate()
-    return {
-        surface["id"]
-        for surface in inventory["surfaces"]
-        if surface["evidence"] == "remaining-native"
-    }
+
+def _expected_layout_contract(surface_id: str) -> tuple[str, str, str, str, str]:
+    """Return the durable layout semantics for one captured surface."""
+    if surface_id not in ACTION_CONTRACTS:
+        raise ValueError("unknown remaining native surface: %s" % surface_id)
+    if surface_id in TRANSIENT_SURFACES:
+        role, archetype, owner = "TRANSIENT", "transient", "application"
+    elif surface_id == "main-wizard":
+        role, archetype, owner = (
+            "WORKFLOW",
+            "workflow",
+            "window-manager-after-first-show",
+        )
+    else:
+        role = (
+            "CONFIDENCE_LEVEL" if surface_id == "confidence-level" else "TRANSACTIONAL"
+        )
+        archetype, owner = "transactional", "application-first-use"
+    overflow = SPECIAL_OVERFLOW.get(surface_id, "content-preferred")
+    return role, archetype, owner, overflow, "content_preferred"
 
 
 def _canonical_member(root: Path, value: object) -> Path:
@@ -155,16 +176,10 @@ def _validated_rect(value: object, label: str) -> dict[str, int]:
 
 
 def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, object]]:
-    """Validate a relocated four-scale evidence directory fail closed."""
+    """Validate relocated native evidence at standard and fractional scale."""
     from PyQt6 import QtGui
 
     expected_ids = _remaining_surface_ids()
-    inventory = json.loads(
-        (ROOT / "docs/verification/native-qt6-surface-inventory.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    contracts = {item["id"]: item for item in inventory["surfaces"]}
     records = []
     seen_capture_paths: set[str] = set()
     for scale in SCALE_FACTORS:
@@ -221,18 +236,23 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 )
             if surface["screen_clamped"] is not True:
                 raise ValueError("remaining-surface %s escaped its screen" % surface_id)
-            contract = contracts[surface_id]
-            if surface["role"] != contract["role"]:
-                raise ValueError("remaining-surface %s role drifted" % surface_id)
-            if surface["archetype"] != contract["archetype"]:
-                raise ValueError("remaining-surface %s archetype drifted" % surface_id)
-            if surface["geometry_owner"] != contract["geometry_owner"]:
-                raise ValueError(
-                    "remaining-surface %s geometry ownership drifted" % surface_id
+            contract = tuple(
+                surface[field]
+                for field in (
+                    "role",
+                    "archetype",
+                    "geometry_owner",
+                    "overflow",
+                    "first_use_behavior",
                 )
-            if surface["overflow"] != contract["overflow"]:
+            )
+            if any(not isinstance(value, str) or not value for value in contract):
                 raise ValueError(
-                    "remaining-surface %s overflow contract drifted" % surface_id
+                    "remaining-surface %s layout contract is malformed" % surface_id
+                )
+            if contract != _expected_layout_contract(surface_id):
+                raise ValueError(
+                    "remaining-surface %s layout contract drifted" % surface_id
                 )
             expected_application_owner = surface["geometry_owner"] in {
                 "application",
@@ -247,7 +267,7 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 "MAIN": "maximized",
                 "NETWORK_VIEW": "screen_fraction",
                 "RESULTS": "maximized",
-            }.get(contract["role"], "content_preferred")
+            }.get(surface["role"], "content_preferred")
             if surface["first_use_behavior"] != expected_first_use:
                 raise ValueError(
                     "remaining-surface %s first-use behavior drifted" % surface_id
@@ -319,9 +339,7 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 raise ValueError("remaining-surface %s PNG is blank" % surface_id)
         records.append(record)
     if len(seen_capture_paths) != len(SCALE_FACTORS) * len(expected_ids):
-        raise ValueError(
-            "remaining-surface evidence does not contain 60 unique captures"
-        )
+        raise ValueError("remaining-surface evidence capture count is incomplete")
     return records
 
 
@@ -1021,8 +1039,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
     if not fragments:
         raise RuntimeError("remaining-surface inventory is empty")
     common = {
-        key: fragments[0][key]
-        for key in ("qpa", "scale_factor", "tab_focus_behavior")
+        key: fragments[0][key] for key in ("qpa", "scale_factor", "tab_focus_behavior")
     }
     if any(
         any(fragment[key] != value for key, value in common.items())
@@ -1076,7 +1093,7 @@ def main() -> int:
         return 0
     if args.scale is not None:
         if args.scale not in SCALE_FACTORS:
-            raise ValueError("scale must be one of the four required factors")
+            raise ValueError("scale must be a required native evidence factor")
         if args.surface is not None:
             _capture_surface(args.scale, args.evidence_root, args.surface)
             return 0
@@ -1104,7 +1121,7 @@ def main() -> int:
             env=environment,
             check=True,
         )
-    records = validate_evidence(args.evidence_root)
+    validate_evidence(args.evidence_root)
     print(
         "validated %s remaining native Qt6 surfaces at %s"
         % (len(_remaining_surface_ids()), ", ".join(map(str, SCALE_FACTORS)))

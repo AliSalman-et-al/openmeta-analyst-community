@@ -226,7 +226,7 @@ def load_R_libraries(app, splash=None, phase_callback=None):
         app.processEvents()
 
     _emit_automation_phase(phase_callback, "r-library-paths:start")
-    meta_py_r.get_R_libpaths()  # print the lib paths
+    meta_py_r.get_R_libpaths()
     _emit_automation_phase(phase_callback, "r-library-paths:complete")
     rloader = meta_py_r.RlibLoader()
 
@@ -323,10 +323,7 @@ def start():
         )
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-wizard-layout-smoke":
         return _run_automation_smoke(start_wizard_layout_smoke)
-    if (
-        len(startup_argv) > 1
-        and startup_argv[1] == "--automation-startup-wizard-smoke"
-    ):
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-startup-wizard-smoke":
         if len(startup_argv) != 4:
             raise SystemExit(
                 "--automation-startup-wizard-smoke requires an evidence path "
@@ -422,7 +419,6 @@ def _create_interactive_shell(app, meta_factory, r_loader):
         r_loader(app, splash)
 
         time_elapsed = time.time() - splash_starttime
-        print("It took %s seconds to load the R libraries" % time_elapsed)
         if time_elapsed < SPLASH_DISPLAY_TIME:
             QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
 
@@ -1997,7 +1993,9 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
             if wizard is None or not wizard.isVisible():
                 raise SystemExit("Startup wizard did not become visible.")
             if not meta.open(sample_path):
-                raise SystemExit("Startup wizard could not open project: %s" % sample_path)
+                raise SystemExit(
+                    "Startup wizard could not open project: %s" % sample_path
+                )
             wizard.accept()
 
         def verify_workspace():
@@ -2049,7 +2047,9 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
         QtCore.QTimer.singleShot(30_000, lambda: app.exit(124))
         exit_code = app.exec()
         if not result["completed"]:
-            raise SystemExit("Startup wizard smoke timed out before producing evidence.")
+            raise SystemExit(
+                "Startup wizard smoke timed out before producing evidence."
+            )
         return exit_code
     finally:
         _dispose_new_top_levels(app, baseline_ids)

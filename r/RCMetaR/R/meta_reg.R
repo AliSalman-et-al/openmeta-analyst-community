@@ -366,7 +366,7 @@ g.meta.regression <- function(
   disable.plots = FALSE)
 {
 	# This is s a thin wrapper to metafor's meta regression functionality
-	# in order to let R do the dummy coding for us
+	# Let R create the dummy variables.
 	#
 	# mods: list(numeric=c(...numeric moderators...),
 	#            categorical=c(...categorical moderators...),

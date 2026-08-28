@@ -145,20 +145,8 @@ def test_native_calculator_png_encoding_never_calls_qt_save(tmp_path):
         assert encoded.getpixel((6, 4)) == (211, 31, 69, 255)
 
 
-def test_native_calculator_installs_stub_before_legacy_gui_imports(monkeypatch):
+def test_native_calculator_installs_stub_without_loading_real_rpy2(monkeypatch):
     smoke = _load_native_calculator_smoke()
-    source = (ROOT / "scripts" / "native_calculator_smoke.py").read_text(
-        encoding="utf-8"
-    )
-
-    install_at = source.index("\n    install_native_stub_backend()\n")
-    for gui_import in (
-        "import binary_data_form",
-        "import continuous_data_form",
-        "import diagnostic_data_form",
-    ):
-        assert install_at < source.index(gui_import)
-
     monkeypatch.delitem(sys.modules, "rpy2.rinterface", raising=False)
     backend = smoke.install_native_stub_backend()
     assert backend._oma_stub_backend is True

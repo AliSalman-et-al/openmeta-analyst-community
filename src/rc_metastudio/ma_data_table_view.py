@@ -24,7 +24,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-print("In ma_data_table_view: importing forms")
 import binary_data_form
 import continuous_data_form
 import diagnostic_data_form
@@ -61,7 +60,6 @@ class MainGuiProtocol(Protocol):
 # it's easiest to manipulate the model directly
 # on interaction rather than that table_model
 # intermediary
-import ma_dataset
 from ma_dataset import *
 from meta_globals import *
 import qt_text
@@ -82,16 +80,6 @@ def _connect_action(action, callback):
 
 def _to_text(value):
     return qt_text.to_native_text(value)
-
-
-def DebugHelper(function):
-    def _DebugHelper(*args, **kw):
-        print(("Entered %s" % function.__name__))
-        res = function(*args, **kw)
-        print(("Left %s" % function.__name__))
-        return res
-
-    return _DebugHelper
 
 
 def _restore_table_selection(table, selected_cells, current_cell):
@@ -276,10 +264,8 @@ class MADataTable(QtWidgets.QTableView):
         raw_data_columns = self.model().RAW_DATA
         outcomes_columns = self.model().OUTCOMES
 
-        sort_by_col = self.model().get_current_outcome_type()
         data_type = self.model().get_current_outcome_type()
 
-        print("right click @ column: %s" % column_clicked)
         context_menu = QMenu(self)
 
         # add a covariate anywhere
@@ -508,8 +494,6 @@ class MADataTable(QtWidgets.QTableView):
         if not selected_indexes:
             return
         upper_left_index = self._upper_left(selected_indexes)
-        lower_right_index = self._lower_right(selected_indexes)
-
         self.paste_from_clipboard(upper_left_index)
         self._enable_analysis_menus_if_appropriate()
 
@@ -599,24 +583,12 @@ class MADataTable(QtWidgets.QTableView):
         finally:
             del signal_blocker
 
-    def rowMoved(self, row, oldIndex, newIndex):
-        pass
-
-    def displayed_ma_changed(self):
-        cur_outcome = self.model().current_outcome
-        cur_follow_up = self.model().current_time_point
-
     def cell_content_changed(self, edit):
         index = edit.index
         old_val = edit.old_value
         new_val = edit.new_value
         study_added = edit.added_study_id
         # Only make a cell edit if the old values and new values are different
-        try:
-            print(("Old val: %s, new val: %s" % (_to_text(old_val), _to_text(new_val))))
-        except AttributeError:
-            print(("old val: %s, new val: %s" % (str(old_val), str(new_val))))
-
         if not self._new_eq_old(old_val, new_val):
             cell_edit = CommandCellEdit(
                 self, index, old_val, new_val, added_study=study_added
@@ -732,8 +704,6 @@ class MADataTable(QtWidgets.QTableView):
 
         lower_row = upper_left_index.row() + len(new_content)
         lower_col = upper_left_index.column() + len(new_content[0])
-        print("lower row: %s, lower col: %s" % (lower_row, lower_col))
-        num_studies_pre_paste = len(self.model().dataset)
         studies_pre_paste = list(self.model().dataset.studies)
         lower_right_index = self.model().createIndex(lower_row - 1, lower_col - 1)
         old_content = self._str_to_matrix(
@@ -741,11 +711,6 @@ class MADataTable(QtWidgets.QTableView):
                 upper_left_index, lower_right_index, to_clipboard=False
             )
         )
-
-        print("old content: %s" % old_content)
-        print("new content: %s" % new_content)
-        print("upper left index:")
-        print(self._print_index(upper_left_index))
 
         paste_command = CommandPaste(
             self,
@@ -797,13 +762,6 @@ class MADataTable(QtWidgets.QTableView):
         cast to python Unicode strings and returned. If the to_clipboard flag is true, the contents will
         also be copied to the system clipboard
         """
-        print(
-            "upper left index: %s, upper right index: %s"
-            % (
-                self._print_index(upper_left_index),
-                self._print_index(lower_right_index),
-            )
-        )
         text_matrix = []
 
         # +1s are because range() is right interval exclusive
@@ -824,7 +782,6 @@ class MADataTable(QtWidgets.QTableView):
         if to_clipboard:
             clipboard = required(QApplication.clipboard(), "application clipboard")
             clipboard.setText(copied_str)
-        print("copied str: %s" % copied_str)
         return copied_str
 
     def paste_contents(self, upper_left_index, source_content):
@@ -953,17 +910,7 @@ class MADataTable(QtWidgets.QTableView):
         for study in studies:
             if study.include and (not study.manually_excluded):
                 num_included += 1
-            print(
-                (
-                    "included: %s, manually excluded: %s"
-                    % (str(study.include), str(study.manually_excluded))
-                )
-            )
-        print(("num included: %d" % num_included))
         return num_included
-
-    def _print_index(self, index):
-        print("(%s, %s)" % (index.row(), index.column()))
 
     def _add_new_row(self):
         """
@@ -1031,19 +978,12 @@ class MADataTable(QtWidgets.QTableView):
         if there are not enough studies to contain the content, this will
         add them.
         """
-        origin_row, origin_col = upper_left_index.row(), upper_left_index.column()
+        origin_row = upper_left_index.row()
         num_existing_studies = len(self.model().dataset)
 
         num_to_add = len(content) - num_existing_studies - origin_row
 
-        last_id = -1
-        for i in range(num_to_add):
-            # first let's give this a default study name, in case
-            # none has been provided
-            tmp_study_name = "study %s" % (num_existing_studies + i)
-            study_index = self.model().createIndex(
-                num_existing_studies + i, self.model().NAME
-            )
+        for _ in range(num_to_add):
             study_id = self.model().dataset.max_study_id() + 1
             new_study = Study(study_id)
             self.model().dataset.add_study(new_study)
@@ -1096,20 +1036,6 @@ class CommandCellEdit(QUndoCommand):
             (current.row(), current.column()) if current.isValid() else None
         )
 
-        debug_params = dict(
-            first_call=True,
-            original_content=original_content,
-            new_content=new_content,
-            row=index.row(),
-            col=index.column(),
-            ma_data_table_view=ma_data_table_view,
-            added_study=added_study,
-            something_else=added_study,
-        )
-
-        print(("CommandCellEdit created with parameters: %s" % str(debug_params)))
-
-    @DebugHelper
     def redo(self):
         index = self._get_index()
 
@@ -1153,7 +1079,6 @@ class CommandCellEdit(QUndoCommand):
         self.ma_data_table_view.dataDirtied.emit()
         self._restore_selection()
 
-    @DebugHelper
     def undo(self):
         # in this case, the original editing action
         # had the effect of appending a row to the spreadsheet.
@@ -1240,9 +1165,6 @@ class CommandPaste(QUndoCommand):
         # is this the first time?
         self.first_call = True
 
-        print("CommandPaste created")
-
-    @DebugHelper
     def redo(self):
         # Snapshot before any row growth so every paste mutation shares one
         # rollback boundary.
@@ -1294,7 +1216,6 @@ class CommandPaste(QUndoCommand):
         if message is not None:
             self.ma_data_table_view._report_model_data_error(message)
 
-    @DebugHelper
     def undo(self):
         if self.added_study is not None:
             self.ma_data_table_view.model().remove_study(self.added_study)
@@ -1338,16 +1259,12 @@ class CommandEditMAUnit(QUndoCommand):
         self.study_index = study_index
         self.ma_data_table_view = table_view
 
-        print("CommandEditMAunit created")
-
-    @DebugHelper
     def undo(self):
         self.model.set_current_ma_unit_for_study(self.study_index, self.old_ma_unit)
         self.model.reset_model()
         self.table_view.synchronize_column_widths()
         self.ma_data_table_view.dataDirtied.emit()
 
-    @DebugHelper
     def redo(self):
         self.model.set_current_ma_unit_for_study(self.study_index, self.new_ma_unit)
         self.model.reset_model()
@@ -1365,8 +1282,6 @@ class CommandSort(QUndoCommand):
         self.col = col
         self.reverse = reverse_order
         self.previous_order = None
-
-        print("CommandSort created")
 
     def redo(self):
         self.previous_order = self.model.get_ordered_study_ids()

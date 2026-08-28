@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """R bridge for RCMetaR calls through rpy2."""
 
-print("Entering meta_py_r for import probably")
 import math
 import os
 import re
@@ -23,7 +22,7 @@ from analysis_method_labels import (
 import result_sections
 import plot_capabilities
 from study_effect_shapes import (
-    effect_triplet,
+    effect_triplet as effect_triplet,
     normalize_diagnostic_effects,
     normalize_effect_result,
 )
@@ -31,28 +30,20 @@ from r_call_serialization import require_r_transaction, serialized_r_call
 from meta_globals import *
 
 r_runtime.configure_bundled_r_environment()
-print(("the path: %s" % os.getenv("PATH")))
 
 try:
-    print("importing from rpy2")
     # will fail if not properly configured
     # Import failure here usually means the local R/rpy2 runtime is incomplete.
     # from rpy2 import robjects as ro
     import rpy2.robjects as ro
 
-    print("succesfully imported from rpy2")
-except Exception as e:
-    print(e)
-    print("rpy2 import problem")
+except Exception:
     # pyqtRemoveInputHook()
     # pdb.set_trace()
     raise Exception("rpy2 not properly installed!")
-    print(e)
-print("importing rpy2.robjects")
 import rpy2.robjects
 import rpy2.rinterface
 
-print("succesfully imported rpy2.robjects")
 
 try:
     import rpy2.rinterface_lib.conversion as _rpy2_conversion
@@ -93,11 +84,9 @@ def _r_is_null(r_object):
 def execute_r_string(r_str):
     require_r_transaction()
     try:
-        print(("Executing: %s\n" % r_str))
         return ro.r(r_str)
     except Exception as e:
         # reset working directory in r then raise the error, hope this will address issue #244
-        print("something bad happened in R")
         reset_Rs_working_dir()
         raise e
 
@@ -110,9 +99,6 @@ def execute_r_function(function_name, *args, **kwargs):
 
 #################### R Library Loader ####################
 class RlibLoader:
-    def __init__(self):
-        print("R Libary loader (RlibLoader) initialized...")
-
     def load_metafor(self):
         return self._load_r_lib("metafor")
 
@@ -132,7 +118,6 @@ class RlibLoader:
         try:
             execute_r_function("library", name)
             msg = "%s package successfully loaded" % name
-            print(msg)
             return (True, msg)
         except:
             raise Exception(
@@ -148,7 +133,6 @@ install this package and then restart RC MetaStudio."
 def RfunctionCaller(function):
     @serialized_r_call
     def _RfunctionCaller(*args, **kw):
-        print(("Using rpy2 interface to R to call %s" % function.__name__))
         res = function(*args, **kw)
         return res
 
@@ -157,13 +141,8 @@ def RfunctionCaller(function):
 
 @RfunctionCaller
 def get_R_libpaths():
-    """Returns the libpaths that R looks at, sanity check to make sure it sees the right paths"""
-
-    libpaths = execute_r_string(".libPaths()")
-    print("R Lib paths:")
-    for i, path in enumerate(libpaths):
-        print(("%d: %s" % (i, path)))
-    return list(libpaths)
+    """Return the library paths visible to R."""
+    return list(execute_r_string(".libPaths()"))
 
 
 @RfunctionCaller
@@ -180,7 +159,6 @@ def get_r_package_version(package_name):
 @RfunctionCaller
 def reset_Rs_working_dir():
     """Reset R's working directory to the application data directory."""
-    print("resetting R working dir")
 
     # Fix paths issue in windows
     import settings
@@ -188,16 +166,11 @@ def reset_Rs_working_dir():
     base_path = settings.get_base_path()
     base_path = settings.to_posix_path(base_path)
 
-    print(("Trying to set base_path to %s" % base_path))
     execute_r_function("setwd", base_path)
-
-    print(("Set R's working directory to %s" % base_path))
 
 
 @RfunctionCaller
 def impute_diag_data(diag_data_dict):
-    print("computing 2x2 table via R...")
-    print(diag_data_dict)
     diag_data_dict = normalize_confidence_level_params(diag_data_dict)
 
     # rpy2 doesn't know how to handle None types.
@@ -210,7 +183,6 @@ def impute_diag_data(diag_data_dict):
     two_by_two = execute_r_function("rcmetar.impute.diagnostic", dataf)
 
     imputed_2x2 = R_parse_tools.rlist_to_pydict(two_by_two)
-    print(("Imputed 2x2: %s" % str(imputed_2x2)))
 
     return imputed_2x2
 
@@ -371,7 +343,6 @@ class R_parse_tools:
 # This helper derives display-scale values from available study data.
 @RfunctionCaller
 def impute_cont_data(cont_data_dict, alpha):
-    print("computing continuous data via R...")
 
     # first check that we have some data;
     # if not, there's no sense in trying to
@@ -408,7 +379,6 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
 @RfunctionCaller
 def get_mult_from_r(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
-    alpha = 1 - float(confidence_level) / 100.0
     mult = execute_r_function("rcmetar.get.mult.from.conf.level", confidence_level)
     multiplier = float(mult[0])
     if not math.isfinite(multiplier):
@@ -527,7 +497,6 @@ def draw_network(edge_list, unconnected_vertices, network_path=None):
         graph = execute_r_function("graph.empty")
 
     if len(unconnected_vertices) > 0:
-        print(unconnected_vertices)
         graph = execute_r_function(
             "add.vertices",
             graph,
@@ -570,8 +539,6 @@ def ma_dataset_to_simple_continuous_robj(
     if (
         not table_model.current_effect in ONE_ARM_METRICS
     ) and table_model.included_studies_have_raw_data():
-        print("we have raw data... parsing, parsing, parsing")
-
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
         data_kwargs.update(
             {
@@ -584,12 +551,8 @@ def ma_dataset_to_simple_continuous_robj(
             }
         )
 
-    else:
-        print("no raw data (or one-arm)... using effects")
-
     r_obj = execute_r_function("rcmetar.create.continuous.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
-    print("ok.")
     return r_obj
 
 
@@ -635,8 +598,6 @@ def ma_dataset_to_simple_binary_robj(
 
     # first try and construct an object with raw data
     if include_raw_data and table_model.included_studies_have_raw_data():
-        print("ok; raw data has been entered for all included studies")
-
         # now figure out the raw data
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
 
@@ -667,18 +628,8 @@ def ma_dataset_to_simple_binary_robj(
             }
         )
 
-    elif table_model.included_studies_have_point_estimates():
-        print("not sufficient raw data, but studies have point estimates...")
-
-    else:
-        print(
-            "there is neither sufficient raw data nor entered effects/CIs. I cannot run an analysis."
-        )
-        # The raised exception is surfaced to the caller as the user-facing error.
-
     r_obj = execute_r_function("rcmetar.create.binary.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
-    print("ok.")
     return r_obj
 
 
@@ -714,12 +665,10 @@ def ma_dataset_to_simple_network(
             if not _data_blank_or_none(*raw_data):
                 groups_to_include.append(group)
                 break
-    print(("groups to include: %s" % str(groups_to_include)))
 
     ############ Make 'treatments' data frame in R ###################
 
-    # different id scheme in future? instead of just numbers?
-    ids, descriptions = list(range(len(groups_to_include))), groups_to_include
+    descriptions = groups_to_include
     treatments = {
         "id": [x.replace(" ", "_") for x in descriptions],  # ids, ""
         "description": descriptions,
@@ -848,8 +797,6 @@ def ma_dataset_to_simple_diagnostic_robj(
 
     # first try and construct an object with raw data
     if table_model.included_studies_have_raw_data():
-        print("ok; raw data has been entered for all included studies")
-
         # grab the raw data; the order is
         # tp, fn, fp, tn
         raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
@@ -864,10 +811,7 @@ def ma_dataset_to_simple_diagnostic_robj(
             }
         )
 
-    elif table_model.included_studies_have_point_estimates(effect=metric):
-        print("not sufficient raw data, but studies have point estimates...")
-
-    else:
+    elif not table_model.included_studies_have_point_estimates(effect=metric):
         raise ValueError(
             "Diagnostic analysis requires either complete TP/FN/FP/TN counts "
             "or complete entered effect estimates and confidence intervals "
@@ -876,7 +820,6 @@ def ma_dataset_to_simple_diagnostic_robj(
 
     r_obj = execute_r_function("rcmetar.create.diagnostic.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
-    print("ok.")
     return r_obj
 
 
@@ -1136,7 +1079,6 @@ def run_diagnostic_multi(
     )
     ro.globalenv[_r_symbol(res_name)] = result
 
-    print("Got here is run diagnostic multi w/o error")
     return parse_out_results(result)
 
 
@@ -1158,9 +1100,7 @@ def load_vars_for_plot(params_path, return_params_dict=False):
         cur_path = "%s.%s" % (params_path, var)
         if os.path.exists(cur_path):
             load_in_R(cur_path)
-            print("loaded %s" % cur_path)
         else:
-            print("Could not load %s" % cur_path)
             return False
 
     if return_params_dict:
@@ -1249,7 +1189,6 @@ def generate_reg_plot(file_path, params_name="plot.data"):
 
 @RfunctionCaller
 def generate_forest_plot(file_path, params_name="plot.data"):
-    print("generating a forest plot....")
     execute_r_function(
         "rcmetar.draw.forest.plot",
         _r_object_from_symbol(params_name),
@@ -1280,8 +1219,6 @@ def parse_out_results(result):
         # Some result sections carry plot names and forest-plot parameter paths.
         # Diagnostic analyses may return several plot parameter objects, so keep
         # this branch broad enough to preserve all named plot metadata.
-        print(text_n)
-        print("\n--------\n")
         if text_n == "images":
             image_path_d = R_parse_tools.recursioner(text)
         elif text_n == "display_images":
@@ -1676,7 +1613,6 @@ def make_weights_str(results):
     if "weights" not in results and "Weights" in results:
         results["weights"] = results["Weights"]
     if "weights" not in results:
-        print("Uh oh")
         raise Exception("make_weights_str() requires 'weights' in the results")
 
     digits = PERCENTAGE_DISPLAY_DIGITS

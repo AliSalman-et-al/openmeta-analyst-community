@@ -260,7 +260,6 @@ class Dataset:
 
     def remove_outcome(self, outcome_name):
         if outcome_name is None:
-            print("Tried to remove a None outcome")
             return
         self.outcome_names_to_follow_ups.pop(outcome_name)
         for study in self.studies:
@@ -296,13 +295,8 @@ class Dataset:
                 ma_unit = cur_outcome[follow_up_name]
                 ma_unit.add_group(group_name)
 
-        print("added group: %s. cur groups: %s" % (group_name, self.get_group_names()))
-
     def remove_group(self, group_name):
         self._remove_group_data(group_name)
-        print(
-            "removed group: %s. cur groups: %s" % (group_name, self.get_group_names())
-        )
 
     def add_follow_up(self, follow_up_name):
         """adds the follow-up to *all* outcomes"""
@@ -351,7 +345,6 @@ class Dataset:
     def get_group_names_for_outcome_fu(self, outcome_name, follow_up):
         group_names = []
         for study in self.studies:
-            print(study.name)
             if outcome_name in study.outcomes_to_follow_ups:
                 if follow_up in study.outcomes_to_follow_ups[outcome_name]:
                     cur_ma_unit = study.outcomes_to_follow_ups[outcome_name][follow_up]
@@ -842,13 +835,6 @@ class MetaAnalyticUnit:
         if upper is None:
             upper = self.effects_dict[effect][group_str]["upper"]
 
-        print("Using the following values to calculate se:")
-        print(
-            (
-                "  (est,lower,upper, mult) = (%s,%s,%s, %s)"
-                % (str(est), str(lower), str(upper), str(mult))
-            )
-        )
         try:
             se = (upper - est) / mult
         except:
@@ -926,13 +912,6 @@ class MetaAnalyticUnit:
         se = self.get_se(effect, group_str, mult)
         d_se = se
         # d_se = convert_to_display_scale(se) # this doesn't mean anything...i suppose its just to check to see if we have an se value
-
-        print(
-            (
-                "results of calculating display effect and ci: (est,low,high,se(calc scale): %s, %s, %s, %s"
-                % (d_est, d_lower, d_upper, se)
-            )
-        )
 
         self.set_display_effect(effect, group_str, d_est)
         self.set_display_lower(effect, group_str, d_lower)
@@ -1043,11 +1022,9 @@ class MetaAnalyticUnit:
 
     def get_se(self, effect, group_str, mult):
         if "SE" in self.effects_dict[effect][group_str]:
-            print(("SE found: %s" % str(self.effects_dict[effect][group_str]["SE"])))
             se = self.effects_dict[effect][group_str]["SE"]
             if se is None:
                 new_se = self.calculate_SE_if_possible(effect, group_str, mult=mult)
-                print(("new se is %s" % str(new_se)))
                 return new_se
             return se
         else:
@@ -1128,7 +1105,6 @@ class MetaAnalyticUnit:
                 if old_name in group_str:
                     str_changed = False
                     cur_group_names = group_str.split("-")
-                    cur_vals = self.effects_dict[effect][group_str]
                     updated_group_strs = []
                     for cur_group_name in cur_group_names:
                         if cur_group_name == old_name:

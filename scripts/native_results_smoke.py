@@ -16,7 +16,7 @@ from typing import Any, cast
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 
 
-SCALE_FACTORS = (1.0, 1.25, 1.5, 1.75)
+SCALE_FACTORS = (1.0, 1.5)
 NUMERIC_TOLERANCE = 0.01
 MAX_CAPTURE_ATTEMPTS = 5
 

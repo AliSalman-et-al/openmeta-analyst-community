@@ -239,7 +239,7 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
     assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
 
-def test_fast_workflow_uses_one_runner_command_per_target():
+def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():
     workflow = load_workflow(".github", "workflows", "fast-verification.yml")
     jobs = workflow["jobs"]
 
@@ -254,13 +254,6 @@ def test_fast_workflow_uses_one_runner_command_per_target():
         "packaging-contract-macos",
         "fast-verification-gate",
     } <= set(jobs)
-    assert jobs["source-fast-targets"]["needs"] == "change-classifier"
-    assert jobs["remaining-surface-verification"]["needs"] == "change-classifier"
-    assert jobs["full-r-stack"]["needs"] == "change-classifier"
-    assert "run-windows" in jobs["full-r-stack"]["if"]
-    assert jobs["full-r-stack"]["runs-on"] == "windows-latest"
-    assert jobs["full-r-stack"]["timeout-minutes"] == 60
-    assert "strategy" not in jobs["full-r-stack"]
     assert set(jobs["fast-verification-gate"]["needs"]) == {
         "change-classifier",
         "qt6-verification",
@@ -273,35 +266,6 @@ def test_fast_workflow_uses_one_runner_command_per_target():
     }
     assert set(workflow["on"]) == {"workflow_dispatch", "push", "pull_request"}
     assert workflow["on"]["push"]["branches"] == ["master"]
-    assert jobs["packaging-contract"]["needs"] == "change-classifier"
-    assert jobs["packaging-contract-macos"]["needs"] == "change-classifier"
-    assert "run-windows-package" in jobs["packaging-contract"]["if"]
-    assert "run-windows-package" in jobs["windows-package-qualification"]["if"]
-    policy = _load_package_input_policy()
-    for package_input in (
-        ".github/workflows/package-windows.yml",
-        ".github/workflows/macos-trusted-release-candidate.yml",
-        ".github/workflows/notarization-status.yml",
-        ".github/workflows/promote.yml",
-        "sample_projects/*",
-        "scripts/build_qt6.py",
-        "scripts/test-bounded-package-process.ps1",
-        "scripts/resolve_package_ci_metadata.py",
-        "scripts/validate_adaptive_layout_evidence.py",
-        "docs/verification/RCMetaR-r-dependencies.json",
-        "delivery/targets.json",
-        "tests/python/fast/test_qt6_cutover_finalization.py",
-        "tests/python/fast/test_qt6_build_slice.py",
-        "tests/python/fast/test_project_format.py",
-        "tests/python/fast/test_qt_text_boundaries.py",
-        "tests/python/gui/test_metaform_automation_launch.py",
-    ):
-        assert policy.requires_package_qualification([package_input])
-    assert (
-        workflow["env"]["RCMS_CRAN_REPO"]
-        == "https://packagemanager.posit.co/cran/2026-07-16"
-    )
-    assert jobs["qt6-verification"]["timeout-minutes"] == 45
     assert jobs["source-fast-targets"]["strategy"]["matrix"]["include"] == [
         {"target": "windows-x64", "runner": "windows-latest", "platform": "windows"},
         {"target": "macos-x64", "runner": "macos-15-intel", "platform": "macos"},
@@ -324,49 +288,6 @@ def test_fast_workflow_uses_one_runner_command_per_target():
         ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref.rsplit("@", 1)[-1])
         for ref in refs
     )
-    source_fast_steps = {
-        step["name"]: step
-        for step in jobs["source-fast-targets"]["steps"]
-        if "name" in step
-    }
-    source_fast = "\n".join(
-        str(step.get("run", "")) for step in source_fast_steps.values()
-    )
-    assert source_fast.count("verify.py fast") == 2
-    assert "verify-smoke" not in source_fast
-    assert "verify_rcmetar_r_default.py" not in source_fast
-    assert source_fast_steps["Run Fast Verification on Windows"]["run"] == (
-        "uv run --locked python scripts\\verify.py fast --require-r-evidence"
-    )
-    assert source_fast_steps["Run Fast Verification on macOS"]["run"] == (
-        "uv run --no-sync python scripts/verify.py fast --require-r-evidence"
-    )
-    full_r_steps = {
-        step["name"]: step for step in jobs["full-r-stack"]["steps"] if "name" in step
-    }
-    assert full_r_steps["Run Full R Stack Evidence"]["run"] == (
-        "uv run --locked python scripts\\verify.py r-stack"
-    )
-    assert full_r_steps["Install pinned R"]["with"]["r-version"] == "4.6.1"
-    assert full_r_steps["Cache Full R Stack library"]["with"]["path"] == (
-        "artifacts/r-library-cache"
-    )
-    assert "r_verification_support.py" in full_r_steps[
-        "Cache Full R Stack library"
-    ]["with"]["key"]
-    gate_step = next(
-        step
-        for step in jobs["fast-verification-gate"]["steps"]
-        if step.get("name") == "Check required lane results"
-    )
-    assert gate_step["env"]["CLASSIFIER_RESULT"] == (
-        "${{ needs.change-classifier.result }}"
-    )
-    assert gate_step["env"]["FULL_R_STACK_RESULT"] == (
-        "${{ needs.full-r-stack.result }}"
-    )
-    assert 'if [ "$CLASSIFIER_RESULT" != "success" ]' in gate_step["run"]
-    assert 'if [ "$FULL_R_STACK_RESULT" != "success" ]' in gate_step["run"]
 
 
 def test_package_policy_covers_direct_release_call_graph():
@@ -385,9 +306,7 @@ def test_package_policy_covers_direct_release_call_graph():
         "scripts/package-macos.sh",
         "scripts/package-windows.ps1",
     )
-    script_reference = re.compile(
-        r"scripts[/\\][A-Za-z0-9_.-]+\.(?:py|ps1|sh|R)"
-    )
+    script_reference = re.compile(r"scripts[/\\][A-Za-z0-9_.-]+\.(?:py|ps1|sh|R)")
     path_reference = re.compile(
         r"Path\([\"']scripts[\"']\)\s*/\s*[\"']([A-Za-z0-9_.-]+)[\"']"
     )
@@ -401,8 +320,7 @@ def test_package_policy_covers_direct_release_call_graph():
         visited.add(entrypoint)
         source = read_repo_text(*entrypoint.split("/"))
         references = {
-            match.replace("\\", "/")
-            for match in script_reference.findall(source)
+            match.replace("\\", "/") for match in script_reference.findall(source)
         }
         references.update(
             f"scripts/{match}" for match in path_reference.findall(source)
@@ -411,7 +329,8 @@ def test_package_policy_covers_direct_release_call_graph():
         pending.extend(
             reference
             for reference in references
-            if reference not in visited and ROOT.joinpath(*reference.split("/")).is_file()
+            if reference not in visited
+            and ROOT.joinpath(*reference.split("/")).is_file()
         )
     missing = sorted(
         path

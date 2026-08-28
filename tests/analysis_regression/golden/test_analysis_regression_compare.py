@@ -530,9 +530,7 @@ def test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper(tmp_
 def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path):
     root = _copy_frozen_contract(tmp_path)
     archive, reference = verify_golden_compatibility._load_frozen_reference(root)
-    descriptor_path = (
-        root / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
-    )
+    descriptor_path = root / "tests/analysis_regression/baseline/plot-descriptors.json"
     descriptor_path.write_text(
         descriptor_path.read_text(encoding="utf-8") + " ", encoding="utf-8"
     )
@@ -542,7 +540,7 @@ def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path)
         )
 
     shutil.copy2(
-        ROOT / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json",
+        ROOT / "tests/analysis_regression/baseline/plot-descriptors.json",
         descriptor_path,
     )
     contract = verify_golden_compatibility._load_plot_descriptor_contract(
@@ -684,7 +682,9 @@ def test_scoped_exception_accepts_only_named_detail_and_classification():
         ],
     )
 
-    accepted = [row for row in report["rows"] if row["classification"] == ACCEPTED_EXCEPTION]
+    accepted = [
+        row for row in report["rows"] if row["classification"] == ACCEPTED_EXCEPTION
+    ]
     assert [row["detail"] for row in accepted] == [
         "Unexpected text section New Section was produced."
     ]
@@ -1126,14 +1126,14 @@ def _current(status="success", failure=None):
 
 def _copy_frozen_contract(tmp_path):
     root = tmp_path / "repo"
-    relative_dir = Path("docs/verification/pre-qt6-baseline")
+    relative_dir = Path("tests/analysis_regression/baseline")
     target_dir = root / relative_dir
     target_dir.mkdir(parents=True)
     for filename in (
         "manifest.json",
         "observed-golden-baseline.zip",
-        "golden-plot-descriptors.json",
-        "golden-numeric-contract.json",
+        "plot-descriptors.json",
+        "numeric-contract.json",
     ):
         shutil.copy2(ROOT / relative_dir / filename, target_dir / filename)
     return root

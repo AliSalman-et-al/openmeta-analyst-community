@@ -534,7 +534,10 @@ def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
     assert job["strategy"]["max-parallel"] == 2
     assert job["runs-on"] == "${{ matrix.runner }}"
     steps = {step["name"]: step for step in job["steps"]}
-    assert steps["Upload immutable unsigned package"]["with"]["if-no-files-found"] == "error"
+    assert (
+        steps["Upload immutable unsigned package"]["with"]["if-no-files-found"]
+        == "error"
+    )
     evidence_upload = steps["Upload bring-up evidence and failure diagnostics"]
     assert evidence_upload["if"] == "${{ always() }}"
     assert evidence_upload["with"]["if-no-files-found"] == "warn"
@@ -548,24 +551,6 @@ def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
 
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert "aqtinstall==3.3.0" in metadata["dependency-groups"]["dev"]
-
-
-def test_native_macos_workflow_rebuilds_and_proves_locked_rpy2_api_bridge():
-    script = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
-    specification = (ROOT / "packaging/pyinstaller/rc-metastudio-macos.spec").read_text(
-        encoding="utf-8"
-    )
-
-    assert "RPY2_CFFI_MODE=API" in script
-    assert "--no-binary rpy2-rinterface" in script
-    assert '"$python_exe" - "$rpy2_api_bridge" "$machine"' in script
-    assert 'expected_architecture = sys.argv[2]' in script
-    assert '["lipo", "-archs", str(bridge)]' in script
-    assert "otool -L" in script
-    assert 'openrlib.cffi_mode.name != "API"' in script
-    assert 'robjects.r("1 + 1")' in script
-    assert '"_rinterface_cffi_api"' in specification
-    assert '"_rinterface_cffi_abi"' in specification
 
 
 def test_locked_rpy2_runtime_discovers_concrete_native_extensions():

@@ -25,7 +25,7 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.2.3"
+VERSION = "0.3.0"
 
 DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
 DEFAULT_DATASET_NAME = "untitled_dataset"
@@ -367,7 +367,6 @@ def tabulate(lists, sep=" | ", return_col_widths=False, align=[]):
         align = [
             "L",
         ] * len(lists)
-    print("Align is now %s: " % align)
 
     # covert lists in args to string lists
     string_lists = []

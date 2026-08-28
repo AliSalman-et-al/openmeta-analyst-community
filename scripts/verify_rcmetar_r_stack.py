@@ -18,9 +18,13 @@ from typing import Any
 
 def load_r_support() -> ModuleType:
     support_path = Path(__file__).resolve().parent / "r_verification_support.py"
-    spec = importlib.util.spec_from_file_location("rcms_r_verification_support", support_path)
+    spec = importlib.util.spec_from_file_location(
+        "rcms_r_verification_support", support_path
+    )
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"could not load shared R verification support: {support_path}")
+        raise RuntimeError(
+            f"could not load shared R verification support: {support_path}"
+        )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -37,10 +41,7 @@ R_VERIFICATION_SUPPORT = Path("scripts") / "r_verification_support.py"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
 R_STACK_TESTS = (Path("tests") / "r_stack",)
-BRIDGE_TESTS = (
-    *R_STACK_TESTS,
-    Path("tests") / "python" / "fast" / "test_rcmetar_r_manifest_validation.py",
-)
+BRIDGE_TESTS = R_STACK_TESTS
 REQUIRED_RPY2_IDENTITIES = {
     "rpy2": "3.6.7",
     "rpy2-rinterface": "3.6.6",
@@ -299,9 +300,7 @@ def verify_manifest_versions(
             "manifest dependency packages are not installed: " + ", ".join(missing)
         )
     manifest = json.loads(
-        (
-            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
-        ).read_text(encoding="utf-8")
+        (root / "config/r-dependencies.json").read_text(encoding="utf-8")
     )
     exact_versions = {
         dependency["name"]: dependency["installed_version"]

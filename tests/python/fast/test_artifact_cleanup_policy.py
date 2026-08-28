@@ -167,12 +167,4 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
     assert sorted(set(created)) == [str(scratch)]
     assert fp_outpath.parent == scratch
     assert bundle_fp_outpath.parent == scratch
-    assert not (ROOT / "r_tmp").resolve() in fp_outpath.parents
-
-
-def test_third_party_inventory_has_notice_creation_boundary():
-    inventory = (ROOT / "docs" / "release" / "third-party-inventory.md").read_text(
-        encoding="utf-8"
-    )
-    assert "THIRD_PARTY_NOTICES.md" in inventory
-    assert "Do not create an empty placeholder" in inventory
+    assert (ROOT / "r_tmp").resolve() not in fp_outpath.parents

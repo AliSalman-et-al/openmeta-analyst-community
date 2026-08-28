@@ -1,6 +1,5 @@
 # import pdb
 import string
-import math
 from functools import cmp_to_key
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
@@ -9,7 +8,6 @@ from PyQt6.QtWidgets import QDialog, QMessageBox
 from meta_globals import *
 import app_error_handler
 import adaptive_window
-import forms.ui_change_cov_type
 from forms.ui_change_cov_type import Ui_ChangeCovTypeForm
 from ma_dataset import Covariate
 import qt_layout
@@ -60,8 +58,6 @@ class CovModel(QAbstractTableModel):
     def __init__(self, dataset, covariate, filename=""):
         super(CovModel, self).__init__()
         self.dataset = dataset
-        studies = self.dataset.studies
-
         self.covariate = covariate
 
         # now we add a covariate with the new type
@@ -125,7 +121,6 @@ class CovModel(QAbstractTableModel):
             else:
                 mapping[val] = i
 
-        print(mapping)
         return mapping
 
     def _to_alphabet_str(self, x):
@@ -176,7 +171,6 @@ class CovModel(QAbstractTableModel):
         if not index.isValid() or not (0 <= index.row() < len(self.included_studies)):
             return None
 
-        orig_cov_val = self.orig_cov_list[index.row()]
         if role == Qt.ItemDataRole.DisplayRole:
             row, column = index.row(), index.column()
             if column == self.STUDY_COL:

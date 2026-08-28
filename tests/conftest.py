@@ -44,9 +44,9 @@ def _qapplication_for_qt_test_selections(request):
 
 @pytest.fixture(autouse=True)
 def _isolate_qsettings_for_qt_tests(request, tmp_path):
-    if not (
-        request.node.get_closest_marker("gui")
-        or request.node.get_closest_marker("qsettings")
+    relative = request.node.path.resolve().relative_to(_ROOT).as_posix()
+    if "/python/gui/" not in f"/{relative}" and not request.node.get_closest_marker(
+        "qsettings"
     ):
         return
 
@@ -61,26 +61,7 @@ def _isolate_qsettings_for_qt_tests(request, tmp_path):
 
 
 def pytest_collection_modifyitems(config, items):
-    config._needs_qapplication = False
-    for item in items:
-        relative = item.path.resolve().relative_to(_ROOT).as_posix()
-        lane = next(
-            (
-                marker
-                for marker, segment in (
-                    ("fast", "/python/fast/"),
-                    ("gui", "/python/gui/"),
-                    ("r_stack", "/r_stack/"),
-                    ("golden", "/analysis_regression/golden/"),
-                    ("packaging_contract", "/packaging/contract/"),
-                    ("packaged_smoke", "/packaged_smoke/"),
-                )
-                if segment in f"/{relative}"
-            ),
-            None,
-        )
-        if lane is not None and item.get_closest_marker(lane) is None:
-            item.add_marker(getattr(pytest.mark, lane))
     config._needs_qapplication = any(
-        item.get_closest_marker("gui") is not None for item in items
+        "/python/gui/" in f"/{item.path.resolve().relative_to(_ROOT).as_posix()}"
+        for item in items
     )

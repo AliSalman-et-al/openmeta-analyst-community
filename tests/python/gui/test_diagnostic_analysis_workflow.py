@@ -1,17 +1,4 @@
-"""Regression tests for issue #53.
-
-In the maintained PyQt5 build the diagnostic meta-analysis workflow dead-ended
-silently: clicking "next >" in the Diagnostic Metrics dialog did nothing and
-showed no error. Two distinct defects caused this:
-
-1. ``Diag_Metrics.ok`` built ``MA_Specs`` directly, *without* the backend-error
-   handling that the binary/continuous path uses. A backend failure raised out
-   of the Qt slot and was swallowed by the event loop (no feedback at all).
-
-2. ``MA_Specs.setup_diagnostic_ui`` called ``QApplication.translate`` with a
-   removed four-argument signature. PyQt5 rejects that call shape, so even with
-   a working backend the dialog construction raised before it could be shown.
-"""
+"""Diagnostic analysis workflow behavior."""
 
 import os
 import sys
@@ -55,22 +42,30 @@ def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monke
     monkeypatch.setattr(
         ma_specs.meta_py_r,
         "run_diagnostic_multi",
-        lambda methods, params: calls.append(("standard", methods, params))
-        or "standard",
+        lambda methods, params: (
+            calls.append(("standard", methods, params)) or "standard"
+        ),
     )
     monkeypatch.setattr(
         ma_specs.meta_py_r,
         "run_diagnostic_workflow",
-        lambda workflow, methods, params: calls.append((workflow, methods, params))
-        or workflow,
+        lambda workflow, methods, params: (
+            calls.append((workflow, methods, params)) or workflow
+        ),
     )
 
-    assert ma_specs._run_diagnostic_backend(
-        "standard", ["diagnostic.random"], [{"measure": "Sens"}]
-    ) == "standard"
-    assert ma_specs._run_diagnostic_backend(
-        "subgroup", ["diagnostic.random"], [{"measure": "Sens"}]
-    ) == "subgroup"
+    assert (
+        ma_specs._run_diagnostic_backend(
+            "standard", ["diagnostic.random"], [{"measure": "Sens"}]
+        )
+        == "standard"
+    )
+    assert (
+        ma_specs._run_diagnostic_backend(
+            "subgroup", ["diagnostic.random"], [{"measure": "Sens"}]
+        )
+        == "subgroup"
+    )
     assert calls == [
         ("standard", ["diagnostic.random"], [{"measure": "Sens"}]),
         ("subgroup", ["diagnostic.random"], [{"measure": "Sens"}]),
@@ -161,8 +156,7 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
             conf_level=window.model.get_global_conf_level(),
         )
 
-        # Construction succeeded (no swallowed exception) and the diagnostic
-        # window title was set via the PyQt5-compatible translate() call.
+        # The method dialog must open with the selected diagnostic metrics.
         assert form is not None
         assert str(form.windowTitle()) == (
             "Method & Parameters for Sensitivity and Specificity"

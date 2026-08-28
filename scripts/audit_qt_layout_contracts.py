@@ -26,65 +26,6 @@ LEGACY_HELPERS = (
     "_fit_wizard_page_to_contents",
 )
 
-# A canonical form is authoritative only when every runtime surface that owns it
-# explicitly registers the stated role. Wizard pages inherit the Workflow Window
-# contract from MainWizard and are therefore intentionally absent here.
-TOP_LEVEL_FORM_INVENTORY = {
-    "about_legal.ui": (("about_legal_dialog.py", "AboutLegalDialog", "TRANSACTIONAL"),),
-    "binary_data_form2.ui": (
-        ("binary_data_form.py", "BinaryDataForm2", "TRANSACTIONAL"),
-    ),
-    "change_cov_type_form.ui": (
-        ("change_cov_type_form.py", "ChangeCovTypeForm", "TRANSACTIONAL"),
-    ),
-    "change_group_name_dlg.ui": (
-        ("edit_group_name_form.py", "EditGroupName", "TRANSACTIONAL"),
-        ("edit_group_name_form.py", "EditCovariateName", "TRANSACTIONAL"),
-    ),
-    "choose_back_calc_result_form.ui": (
-        ("binary_data_form.py", "ChooseBackCalcResultForm", "TRANSACTIONAL"),
-    ),
-    "conf_level_dialog.ui": (
-        ("conf_level_dialog.py", "ChangeConfLevelDlg", "CONFIDENCE_LEVEL"),
-    ),
-    "continuous_back_calc_result_form.ui": (
-        ("continuous_data_form.py", "ChooseBackCalcResultForm", "TRANSACTIONAL"),
-    ),
-    "continuous_data_form.ui": (
-        ("continuous_data_form.py", "ContinuousDataForm", "TRANSACTIONAL"),
-    ),
-    "cov_reg_dlg2.ui": (("meta_reg_form.py", "MetaRegForm", "TRANSACTIONAL"),),
-    "cov_subgroup_dlg.ui": (
-        ("meta_subgroup_form.py", "MetaSubgroupForm", "TRANSACTIONAL"),
-    ),
-    "diagnostic_data_form.ui": (
-        ("diagnostic_data_form.py", "DiagnosticDataForm", "TRANSACTIONAL"),
-    ),
-    "diagnostic_metrics.ui": (("diag_metrics.py", "Diag_Metrics", "TRANSACTIONAL"),),
-    "edit_dialog2.ui": (("edit_dialog.py", "EditDialog", "EDIT_DATASET"),),
-    "edit_forest_plot.ui": (("results_window.py", "EditPlotDialog", "TRANSACTIONAL"),),
-    "ma_specs2.ui": (("ma_specs.py", "MA_Specs", "TRANSACTIONAL"),),
-    "meta.ui": (("meta_form.py", "MetaForm", "MAIN"),),
-    "network_view_window.ui": (("network_view.py", "ViewDialog", "NETWORK_VIEW"),),
-    "new_covariate_dlg.ui": (
-        ("add_new_dialogs.py", "AddNewCovariateForm", "TRANSACTIONAL"),
-    ),
-    "new_follow_up_dlg.ui": (
-        ("add_new_dialogs.py", "AddNewFollowUpForm", "TRANSACTIONAL"),
-    ),
-    "new_group_dlg.ui": (("add_new_dialogs.py", "AddNewGroupForm", "TRANSACTIONAL"),),
-    "new_outcome_dlg.ui": (
-        ("add_new_dialogs.py", "AddNewOutcomeForm", "TRANSACTIONAL"),
-    ),
-    "new_study_dlg.ui": (("add_new_dialogs.py", "AddNewStudyForm", "TRANSACTIONAL"),),
-    "results_window.ui": (("results_window.py", "ResultsWindow", "RESULTS"),),
-    "running.ui": (
-        ("ma_specs.py", "MetaProgress", "TRANSIENT"),
-        ("meta_form.py", "ImportProgress", "TRANSIENT"),
-        ("progress_bar.py", "MetaProgress", "TRANSIENT"),
-    ),
-}
-
 TOP_LEVEL_CLASSES = {"QDialog", "QMainWindow"}
 QT_CHROME_CLASSES = {"QMenuBar", "QStatusBar", "QToolBar"}
 SIZE_PROPERTIES = {
@@ -847,98 +788,7 @@ def _audit_sources(source_dir):
     return findings
 
 
-def _audit_inventory(forms_dir, source_dir):
-    findings = []
-    actual_top_levels = set()
-    for path in forms_dir.glob("*.ui"):
-        top = ET.parse(path).getroot().find("widget")
-        if top is not None and top.get("class") in TOP_LEVEL_CLASSES:
-            actual_top_levels.add(path.name)
-    expected = set(TOP_LEVEL_FORM_INVENTORY)
-    for missing in sorted(actual_top_levels - expected):
-        findings.append(
-            Finding(
-                forms_dir / missing,
-                "window-archetype",
-                "top-level form has no authoritative inventory entry",
-            )
-        )
-    for stale in sorted(expected - actual_top_levels):
-        findings.append(
-            Finding(
-                forms_dir / stale,
-                "window-archetype",
-                "inventory entry is not a canonical top-level form",
-            )
-        )
-    parsed_sources = {}
-    for form_name, registrations in TOP_LEVEL_FORM_INVENTORY.items():
-        for source_name, class_name, role in registrations:
-            source = source_dir / source_name
-            if source not in parsed_sources:
-                parsed_sources[source] = (
-                    ast.parse(source.read_text(encoding="utf-8"))
-                    if source.exists()
-                    else None
-                )
-            tree = parsed_sources[source]
-            target_class = next(
-                (
-                    node
-                    for node in (tree.body if tree is not None else ())
-                    if isinstance(node, ast.ClassDef) and node.name == class_name
-                ),
-                None,
-            )
-            exact_registration = (
-                any(
-                    _is_exact_window_registration(node, role)
-                    for node in ast.walk(target_class)
-                )
-                if target_class is not None
-                else False
-            )
-            if not exact_registration:
-                findings.append(
-                    Finding(
-                        source,
-                        "window-archetype",
-                        f"{class_name} for {form_name} does not explicitly register {role}",
-                    )
-                )
-    return findings
-
-
-def _is_exact_window_registration(node, expected_role):
-    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-        return False
-    if (
-        node.func.attr != "register_adaptive_window"
-        or not isinstance(node.func.value, ast.Name)
-        or node.func.value.id != "adaptive_window"
-        or not node.args
-        or not isinstance(node.args[0], ast.Name)
-        or node.args[0].id != "self"
-    ):
-        return False
-    role_node = (
-        node.args[1]
-        if len(node.args) >= 2
-        else next(
-            (keyword.value for keyword in node.keywords if keyword.arg == "role"), None
-        )
-    )
-    return (
-        isinstance(role_node, ast.Attribute)
-        and role_node.attr == expected_role
-        and isinstance(role_node.value, ast.Attribute)
-        and role_node.value.attr == "WindowRole"
-        and isinstance(role_node.value.value, ast.Name)
-        and role_node.value.value.id == "adaptive_window"
-    )
-
-
-def audit_repository(root, require_inventory=True):
+def audit_repository(root):
     root = Path(root)
     source_dir = root / "src" / "rc_metastudio"
     forms_dir = source_dir / "forms"
@@ -946,8 +796,6 @@ def audit_repository(root, require_inventory=True):
     for path in sorted(forms_dir.glob("*.ui")):
         findings.extend(_audit_form(path))
     findings.extend(_audit_sources(source_dir))
-    if require_inventory:
-        findings.extend(_audit_inventory(forms_dir, source_dir))
     return findings
 
 

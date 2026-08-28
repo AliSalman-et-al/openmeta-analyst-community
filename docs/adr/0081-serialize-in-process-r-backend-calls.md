@@ -1,3 +1,0 @@
-# Serialize In-Process R Backend Calls
-
-The maintained Modern CI Path keeps the in-process rpy2 backend from ADR 0052, but every Python-to-R backend entry is now guarded by one process-wide reentrant serializer. Application code must call serialized `meta_py_r` entrypoints such as `execute_r_string` rather than reaching through `meta_py_r.ro.r` directly. This prevents rapid GUI edits, automation, or worker callbacks from overlapping calls into the embedded R interpreter while preserving existing synchronous Analysis Behavior; debouncing remains a possible UI improvement, but it is not the safety boundary for rpy2 re-entry.

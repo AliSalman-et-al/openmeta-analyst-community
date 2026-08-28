@@ -170,7 +170,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def initialize_form(self):
         """Initialize all cells to empty items"""
-        print("Entering initialize_table_items")
 
         nrows = self.raw_data_table.rowCount()
         ncols = self.raw_data_table.columnCount()
@@ -194,9 +193,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     #            self.clear_Btn.setPalette(self.pushme_palette)
     #        else:
     #            self.clear_Btn.setPalette(self.orig_palette)
-
-    def print_effects_dict_from_ma_unit(self):
-        print(self.ma_unit.get_effects_dict())
 
     def enable_back_calculation_btn(self, engage=False):
         # For undo/redo
@@ -270,7 +266,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 for i in range(len(old_data))
             ]
             new_data_in_op1 = any(comparison0)
-            print(("Comparison0:", comparison0))
 
             if new_data_in_op1:
                 changed = True
@@ -279,7 +274,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                         new_item_available(old_data[i], new_data[1][i])
                         for i in range(len(old_data))
                     ]
-                    print(("Comparison1:", comparison1))
                     new_data_in_op2 = any(comparison1)
                     if not new_data_in_op2:
                         changed = False
@@ -301,14 +295,11 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             self._request_content_refit()
 
         bin_data = build_back_calc_args_dict()
-        print(("Binary data for back-calculation:", bin_data))
 
         imputed = meta_py_r.impute_bin_data(bin_data.copy())
-        print(("Imputed data: %s", imputed))
 
         # Leave if nothing was imputed
         if "FAIL" in imputed:
-            print("Fail to impute")
             self.back_calc_btn.setEnabled(False)
             return None
 
@@ -431,7 +422,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self, currentRow, currentColumn, previousRow, previousColumn
     ):
         self.current_item_data = self._get_int(currentRow, currentColumn)
-        print("Current Item Data:", self.current_item_data)
 
     def _setup_signals_and_slots(self):
         self.raw_data_table.cellChanged.connect(
@@ -583,7 +573,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         self.try_to_update_cur_outcome()
         self.set_current_effect()
 
-        self.enable_txt_box_input()
         self.enable_back_calculation_btn()
         self._update_effect_choice_accessibility()
 
@@ -617,7 +606,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                     display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
             except Exception:
                 return False, False
-        print(("Val_str: %s" % val_str))
         return True, display_scale_val
 
     def _get_txt_from_val_str(self, val_str):
@@ -661,7 +649,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 display_scale_val = None
         except ValueError:
             # Ignore incomplete numeric input while the user is still editing.
-            print("fail.")
             return None
 
         calc_scale_val = meta_py_r.binary_convert_scale(
@@ -689,7 +676,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         """Generates the 2x2 table with whatever parametric data was provided"""
         """Sets events and non-events from stored events and arm totals."""
 
-        print("_update_raw_data:")
         for row, group in enumerate(self.cur_groups):
             events, total = self.ma_unit.get_raw_data_for_group(group)
             no_events = None
@@ -716,12 +702,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             raw_data[0] = events
             raw_data[1] = total
 
-            print("%s events: %s, total: %s" % (row, events, total))
-        print(
-            "ok -- raw data is now: %s"
-            % calc_fncs.get_raw_data(self.ma_unit, self.cur_groups)
-        )
-
     def _cell_data_not_valid(self, celldata_string):
         # ignore blank entries
         if calc_fncs.cell_text_is_blank(celldata_string):
@@ -742,12 +722,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def restore_ma_unit(self, old_ma_unit):
         """Restores the ma_unit data and resets the form"""
         self.ma_unit.__dict__ = copy.deepcopy(old_ma_unit.__dict__)
-        print(
-            (
-                "Restored ma_unit data: %s"
-                % str(self.ma_unit.get_raw_data_for_groups(self.cur_groups))
-            )
-        )
 
         self.initialize_form()  # clear form first
         self._update_raw_data()
@@ -890,7 +864,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def _set_val(self, row, col, val):
         if is_NaN(val):  # get out quick
-            print("%s is not a number" % val)
             return
 
         try:
@@ -907,7 +880,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                     self.raw_data_table.item(row, col),
                     self._raw_count_cell_is_editable(row, col),
                 )
-                print(("    setting (%d,%d) to '%s'" % (row, col, str_val)))
 
                 #            # disable item
                 #            if str_val != "":
@@ -916,12 +888,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 #            item.setFlags(newflags)
 
         except:
-            print(
-                (
-                    "    Got to except in _set_val when trying to set (%d,%d)"
-                    % (row, col)
-                )
-            )
             raise
 
     def _update_data_table(self):
@@ -941,7 +907,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 computed_params["total"] = (
                     computed_params["r1sum"] + computed_params["r2sum"]
                 )
-            print("Computed Params", computed_params)
             if computed_params:
                 self._set_vals(computed_params)  # computed --> table widget
 
@@ -969,7 +934,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     def try_to_update_cur_outcome(self):
         e1, n1, e2, n2 = self.ma_unit.get_raw_data_for_groups(self.cur_groups)
-        print(("e1: %s, n1: %s, e2: %s, n2: %s" % (str(e1), str(n1), str(e2), str(n2))))
 
         two_arm_raw_data_ok = not any([self._isBlank(x) for x in [e1, n1, e2, n2]])
         one_arm_raw_data_ok = not any([self._isBlank(x) for x in [e1, n1]])
@@ -1059,12 +1023,6 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
         self.undoStack.push(command)
 
-    def enable_txt_box_input(self):
-        # meta_globals.enable_txt_box_input(self.effect_txt_box, self.low_txt_box,
-        #                                  self.high_txt_box)
-        # print("Enabled text box input")
-        pass
-
     def get_cur_group_str(self):
         # Inspired from get_cur_group_str of ma_data_table_model
 
@@ -1076,11 +1034,9 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
     ####### Undo framework ############
     def undo(self):
-        print("undoing....")
         self.undoStack.undo()
 
     def redo(self):
-        print("redoing....")
         self.undoStack.redo()
 
     #################################

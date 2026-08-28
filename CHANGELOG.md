@@ -4,6 +4,19 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
+## 0.3.0 - Unreleased
+
+### Changed
+
+- Reorganized verification into focused fast, native Qt, R, and packaging lanes so each behavior has one clear owner and local feedback arrives sooner.
+- Reused generated Qt build outputs and reduced redundant native scale matrices while retaining representative standard and fractional-scale coverage.
+- Replaced migration-era, source-shape, and taxonomy tests with tests of current behavior and failure boundaries.
+- Rewrote the maintained documentation around setup, project files, and releases.
+
+### Removed
+
+- Removed retired Qt migration tooling, duplicated verification manifests, stale architecture records, and other maintenance-only artifacts that no longer protected product behavior.
+
 ## 0.2.3 - 2026-07-22
 
 ### Changed

@@ -16,6 +16,16 @@ from rc_metastudio import qt6_build, qt6_resources
 
 ROOT = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = ROOT / "scripts" / "build_qt6.py"
+CHECK_QT_SCRIPT = ROOT / "scripts" / "check_qt_modules.py"
+
+
+def _qt_application_modules() -> list[str]:
+    spec = importlib.util.spec_from_file_location("check_qt_modules", CHECK_QT_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source_root = ROOT / "src/rc_metastudio"
+    return [path.stem for path in module.qt_modules(ROOT) if path.parent == source_root]
 
 
 def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -33,6 +43,15 @@ def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
 
 @pytest.fixture(scope="module")
 def verified_qt6_output(tmp_path_factory) -> Path:
+    configured_root = os.environ.get("RCMS_QT6_BUILD_ROOT")
+    if configured_root:
+        build_root = Path(configured_root)
+        required = (
+            build_root / "generated/rc_metastudio/forms/ui_about_legal.py",
+            build_root / "resources/icons.rcc",
+        )
+        if all(path.is_file() for path in required):
+            return build_root
     build_root = tmp_path_factory.mktemp("qt6-verified")
     _run_build("generate", "--build-root", str(build_root))
     return build_root
@@ -273,10 +292,11 @@ def test_official_archive_rejects_short_download_before_digest(tmp_path, monkeyp
     assert not destination.with_suffix(".download").exists()
 
 
-def test_canonical_form_generation_is_deterministic_and_importable(tmp_path):
-    first = tmp_path / "first"
+def test_canonical_form_generation_is_deterministic_and_importable(
+    tmp_path, verified_qt6_output
+):
+    first = verified_qt6_output
     second = tmp_path / "second"
-    _run_build("generate", "--build-root", str(first))
     _run_build("generate", "--build-root", str(second))
 
     relative_module = Path("generated/rc_metastudio/forms/ui_about_legal.py")
@@ -354,16 +374,7 @@ def test_generated_ui_bootstrap_imports_every_handwritten_qt_module(
     tmp_path, verified_qt6_output
 ):
     build_root = verified_qt6_output
-    inventory = json.loads(
-        (ROOT / "docs/verification/pre-qt6-baseline/qt-port-inventory.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    modules = [
-        Path(path).stem
-        for path in inventory["handwritten_qt_modules"]
-        if (ROOT / path).is_file()
-    ]
+    modules = _qt_application_modules()
     script = """
 import importlib
 import json
@@ -394,7 +405,6 @@ from rc_metastudio.__main__ import main
 startup_result = main()
 report_path.write_text(
     json.dumps({
-        "count": len(modules),
         "generated_root": str(layout.package_root),
         "startup_result": startup_result,
     }),
@@ -427,7 +437,6 @@ report_path.write_text(
         f"stderr:\n{completed.stderr}"
     )
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["count"] == 35
     assert report["startup_result"] == 0
     assert Path(report["generated_root"]) == (build_root / "generated/rc_metastudio")
 
@@ -487,11 +496,11 @@ def test_application_resource_loader_registers_only_the_binary_collection(
         registration.close()
 
 
-def test_minimal_qt6_window_reports_resources_and_exits_cleanly(tmp_path):
+def test_minimal_qt6_window_reports_resources_and_exits_cleanly(verified_qt6_output):
     completed = _run_build(
         "smoke",
         "--build-root",
-        str(tmp_path / "qt6"),
+        str(verified_qt6_output),
         "--exit-after-ms",
         "1",
     )
@@ -506,7 +515,9 @@ def test_minimal_qt6_window_reports_resources_and_exits_cleanly(tmp_path):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows native slice")
-def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(tmp_path):
+def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(
+    verified_qt6_output,
+):
     environment = os.environ.copy()
     environment.pop("QT_QPA_PLATFORM", None)
     completed = subprocess.run(
@@ -515,7 +526,7 @@ def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(tmp_path):
             str(BUILD_SCRIPT),
             "native-smoke",
             "--build-root",
-            str(tmp_path / "native"),
+            str(verified_qt6_output),
             "--exit-after-ms",
             "25",
         ],

@@ -684,7 +684,7 @@ binary.random <- function(binary.data, params) {
                         "Summary"=capture.output.and.collapse(summary.disp),
                         "plot_names"=plot.names,
                         "plot_params_paths"=plot.params.paths,
-                        "res"=pure.res, # the results directly from metafor in order to extract values of interests
+                        "res"=pure.res, # metafor results used to extract model values
                         "res.info"=binary.random.value.info(),
                         "Weights"=weights(res))
     }

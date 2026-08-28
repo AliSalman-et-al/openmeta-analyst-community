@@ -318,7 +318,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         # update the follow-ups list as appropriate
         if self.selected_outcome is not None:
             self.follow_ups_model.current_outcome = self.selected_outcome
-            print("\ncurrent outcome updated. is now: %s" % self.selected_outcome)
             self.follow_ups_model.refresh_follow_up_list()
             self.selected_follow_up = self.get_selected_follow_up()
             ## also update the groups and follow-up lists
@@ -362,11 +361,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
 
     def get_selected_follow_up(self):
         index = self.follow_up_list.currentIndex()
-        print("index is: %s" % index.row())
-        print(
-            "here is the current follow-up list: %s"
-            % self.follow_ups_model.follow_up_list
-        )
         return self.follow_ups_model.follow_up_list[index.row()]
 
     def get_selected_study(self):

@@ -129,7 +129,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     plot.data$effects.disp <- effects.disp
 
     # If metric is log scale, effect sizes and plot range are passed to forest.plot in
-    # calculation (log) scale, in order to set tick marks in log scale.
+    # calculation (log) scale so tick marks use the same scale.
     # Otherwise, effect sizes and plot range are passed in display (untransformed) scale.
 
     if (!metric.is.log.scale(params$measure)) {

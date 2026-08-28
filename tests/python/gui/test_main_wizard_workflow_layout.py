@@ -31,7 +31,6 @@ def _frame_tuple(window):
 
 
 def _assert_page_contract(wizard, expected_buttons):
-    import main_wizard
 
     page = wizard.currentPage()
     overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
@@ -488,7 +487,7 @@ finally:
     app.quit()
     app.processEvents()
 """
-    for scale_factor in ("1", "1.5", "2"):
+    for scale_factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment["QT_QPA_PLATFORM"] = "offscreen"
         environment["QT_SCALE_FACTOR"] = scale_factor

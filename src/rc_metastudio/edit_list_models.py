@@ -95,7 +95,6 @@ class TXGroupsModel(ResettableTableModel):
         self.group_list = self.dataset.get_group_names_for_outcome_fu(
             outcome, follow_up
         )
-        print("\ngroup names are: %s" % self.group_list)
         self.reset_model()
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
