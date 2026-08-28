@@ -3,32 +3,17 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from types import ModuleType
-from typing import Any
 
-
-def load_r_support() -> ModuleType:
-    support_path = Path(__file__).resolve().parent / "r_verification_support.py"
-    spec = importlib.util.spec_from_file_location(
-        "rcms_r_verification_support", support_path
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError(
-            f"could not load shared R verification support: {support_path}"
-        )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-r_support: Any = load_r_support()
+if __package__:
+    from . import r_verification_support as r_support
+else:
+    import r_verification_support as r_support
 
 
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
@@ -92,14 +77,6 @@ def require_success(result: subprocess.CompletedProcess[str], label: str) -> Non
         )
 
 
-def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path | None:
-    return r_support.resolve_rscript(name, env)
-
-
-def _candidate_rscript_names() -> list[str]:
-    return r_support.candidate_rscript_names()
-
-
 def installed_version_report(
     root: Path, python: str, rscript: Path, env: dict[str, str]
 ) -> dict:
@@ -128,13 +105,6 @@ def installed_version_report(
 def resolve_r_exe(root: Path, rscript: Path, env: dict[str, str]) -> Path:
     try:
         return r_support.resolve_r_exe(rscript, root, env)
-    except r_support.RVerificationSupportError as exc:
-        raise DefaultREvidenceError(str(exc)) from exc
-
-
-def r_version_key(root: Path, rscript: Path, env: dict[str, str]) -> str:
-    try:
-        return r_support.r_version_key(rscript, root, env)
     except r_support.RVerificationSupportError as exc:
         raise DefaultREvidenceError(str(exc)) from exc
 
@@ -178,12 +148,6 @@ def binary_dependency_policy(root: Path) -> dict:
         return r_support.load_binary_dependency_policy(root)
     except r_support.RVerificationSupportError as exc:
         raise DefaultREvidenceError(str(exc)) from exc
-
-
-def verification_base_env(
-    source: dict[str, str], *, platform_name: str = os.name
-) -> dict[str, str]:
-    return r_support.verification_base_env(source, platform_name=platform_name)
 
 
 def direct_dependency_policy(root: Path) -> tuple[list[str], dict[str, str]]:
@@ -288,7 +252,7 @@ def verify(args: argparse.Namespace) -> None:
     python = (
         str(Path(args.python).absolute()) if Path(args.python).exists() else args.python
     )
-    base_env = verification_base_env(dict(os.environ))
+    base_env = r_support.verification_base_env(dict(os.environ))
     policy = binary_dependency_policy(root)
     configured_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO")
     if configured_repo and configured_repo != policy["repository"]:
@@ -304,7 +268,7 @@ def verify(args: argparse.Namespace) -> None:
     )
     require_success(manifest_result, "manifest validation")
 
-    rscript = resolve_rscript(args.rscript)
+    rscript = r_support.resolve_rscript(args.rscript)
     if rscript is None:
         message = f"Rscript was not found: {args.rscript}; Default R Evidence limited to manifest validation"
         if args.require_r:

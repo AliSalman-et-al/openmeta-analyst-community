@@ -358,22 +358,19 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         if is_NaN(val):  # get out quick
             return
 
-        try:
-            str_val = "" if val in EMPTY_VALS else str(int(val))
-            with QSignalBlocker(self.two_by_two_table):
-                if self.two_by_two_table.item(row, col) == None:
-                    self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
-                else:
-                    required(
-                        self.two_by_two_table.item(row, col),
-                        f"diagnostic table cell ({row}, {col})",
-                    ).setText(str_val)
-                calc_fncs.set_table_item_editable(
+        str_val = "" if val in EMPTY_VALS else str(int(val))
+        with QSignalBlocker(self.two_by_two_table):
+            if self.two_by_two_table.item(row, col) == None:
+                self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
+            else:
+                required(
                     self.two_by_two_table.item(row, col),
-                    self._raw_count_cell_is_editable(row, col),
-                )
-        except:
-            pass
+                    f"diagnostic table cell ({row}, {col})",
+                ).setText(str_val)
+            calc_fncs.set_table_item_editable(
+                self.two_by_two_table.item(row, col),
+                self._raw_count_cell_is_editable(row, col),
+            )
 
     def _set_vals(self, computed_d):
         """Sets values in table widget"""
@@ -908,7 +905,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
                         d["%s%s" % (effect.lower(), Rsubkey)] = float(
                             [d_est, d_lower, d_upper][i]
                         )
-                    except:
+                    except (TypeError, ValueError):
                         pass
 
             x = self.getTotalSubjects()

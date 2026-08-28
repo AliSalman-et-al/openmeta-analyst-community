@@ -68,6 +68,24 @@ _DRIVER = textwrap.dedent(
 
     ro = meta_py_r.ro
 
+    class InvalidNetworkModel:
+        def __getattribute__(self, name):
+            raise AssertionError(
+                "invalid network data type must be rejected before model access"
+            )
+
+    sentinel = ro.r("structure('untouched')")
+    ro.globalenv["treatments"] = sentinel
+    try:
+        meta_py_r.ma_dataset_to_simple_network(
+            InvalidNetworkModel(), data_type="unsupported"
+        )
+    except ValueError as exc:
+        assert "unknown" in str(exc)
+    else:
+        raise AssertionError("invalid network data type was accepted")
+    assert ro.globalenv["treatments"] is sentinel
+
     # Fix 1: non-Latin-1 user text must remain valid text at the R boundary.
     assert not hasattr(meta_py_r, "_sanitize_for_R")
 

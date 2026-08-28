@@ -46,6 +46,15 @@ uv run pytest --strict-markers tests --collect-only -q
 For Qt source or GUI changes, generate the forms and run the relevant native lane:
 
 ```powershell
+.\scripts\verify-qt6.ps1
+```
+
+This is the canonical Qt verification command. It generates Qt6 modules first,
+then runs Ty across the whole `src/rc_metastudio` application with generated
+modules ahead of source forms on the search path, followed by the GUI and native
+smoke stages. CI can select an individual lane when needed:
+
+```powershell
 .\scripts\verify-qt6.ps1 -Section Core
 .\scripts\verify-qt6.ps1 -Section RemainingSurfaces
 ```

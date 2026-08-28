@@ -12,6 +12,14 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts import r_verification_support
+from scripts import verify as source_verifier
+from scripts import verify_rcmetar_r_default as default_verifier
+from scripts import verify_rcmetar_r_stack as stack_verifier
+
 VALIDATOR = REPO_ROOT / "scripts" / "validate_RCMetaR_r_manifests.py"
 DEPENDENCY_MANIFEST = Path("config/r-dependencies.json")
 DRIFT_MANIFEST = Path("config/r-statistical-drift.json")
@@ -25,20 +33,10 @@ LEGACY_EXPORT_PATTERN = re.compile(
 )
 
 
-def load_r_verification_support():
-    spec = importlib.util.spec_from_file_location(
-        "r_verification_support", REPO_ROOT / "scripts" / "r_verification_support.py"
-    )
-    support = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(support)
-    return support
-
-
 def test_shared_r_verification_support_resolves_home_and_normalizes_windows_locale(
     tmp_path,
 ):
-    support = load_r_verification_support()
+    support = r_verification_support
     r_home = tmp_path / "R"
     rscript = r_home / "bin" / support.candidate_rscript_names()[0]
     rscript.parent.mkdir(parents=True)
@@ -61,14 +59,6 @@ def test_shared_r_verification_support_resolves_home_and_normalizes_windows_loca
 
 
 def test_full_r_verifier_drops_unsupported_posix_locale_on_windows():
-    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_stack.py"
-    spec = importlib.util.spec_from_file_location(
-        "verify_rcmetar_r_stack", verifier_path
-    )
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
-
     source = {
         "LC_ALL": "C.UTF-8",
         "LC_CTYPE": "C.utf8",
@@ -76,20 +66,16 @@ def test_full_r_verifier_drops_unsupported_posix_locale_on_windows():
         "RCMS_SENTINEL": "preserved",
     }
 
-    assert verifier.verification_base_env(source, platform_name="nt") == {
+    assert r_verification_support.verification_base_env(source, platform_name="nt") == {
         "RCMS_SENTINEL": "preserved"
     }
-    assert verifier.verification_base_env(source, platform_name="posix") == source
+    assert r_verification_support.verification_base_env(source, platform_name="posix") == source
 
 
 def test_full_r_stack_orchestration_prepares_and_propagates_qt_environment(
     monkeypatch, tmp_path
 ):
-    verifier_path = REPO_ROOT / "scripts" / "verify.py"
-    spec = importlib.util.spec_from_file_location("verify", verifier_path)
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
+    verifier = source_verifier
 
     captured = {}
 
@@ -139,13 +125,11 @@ def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
         pass
 
     for script_name in ("verify_rcmetar_r_stack.py", "verify_rcmetar_r_default.py"):
-        spec = importlib.util.spec_from_file_location(
-            f"symlink_identity_{script_name.removesuffix('.py')}",
-            REPO_ROOT / "scripts" / script_name,
+        module = (
+            stack_verifier
+            if script_name == "verify_rcmetar_r_stack.py"
+            else default_verifier
         )
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
         captured = {}
 
         def stop_after_first_child(command, *, cwd, env):
@@ -401,15 +385,7 @@ def test_report_installed_versions_surfaces_rscript_failure(monkeypatch):
 def test_default_r_dependency_install_uses_script_file_and_archive_triples(
     monkeypatch, tmp_path
 ):
-    import importlib.util
-
-    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location(
-        "verify_rcmetar_r_default", verifier_path
-    )
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
+    verifier = default_verifier
 
     captured = {}
 
@@ -603,22 +579,12 @@ if (source_called) stop("digest mismatch attempted the HSROC source install")
 
 
 def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
-    import importlib.util
-
-    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location(
-        "verify_rcmetar_r_default", verifier_path
-    )
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
-
     r_home = tmp_path / "R"
-    rscript = r_home / "bin" / verifier._candidate_rscript_names()[0]
+    rscript = r_home / "bin" / r_verification_support.candidate_rscript_names()[0]
     rscript.parent.mkdir(parents=True)
     rscript.write_text("", encoding="utf-8")
 
-    resolved = verifier.resolve_rscript(
+    resolved = r_verification_support.resolve_rscript(
         "Rscript", env={"RCMS_R_HOME": str(r_home), "PATH": ""}
     )
 
@@ -626,24 +592,14 @@ def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
 
 
 def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_path):
-    import importlib.util
-
-    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location(
-        "verify_rcmetar_r_default", verifier_path
-    )
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
-
     r_home = tmp_path / "R"
-    rscript = r_home / "bin" / verifier._candidate_rscript_names()[0]
+    rscript = r_home / "bin" / r_verification_support.candidate_rscript_names()[0]
     rscript.parent.mkdir(parents=True)
     rscript.write_text("", encoding="utf-8")
     fake_r = (
         tmp_path
         / "bin"
-        / verifier._candidate_rscript_names()[0].replace("Rscript", "R")
+        / r_verification_support.candidate_rscript_names()[0].replace("Rscript", "R")
     )
     fake_r.parent.mkdir(parents=True)
     fake_r.write_text("", encoding="utf-8")
@@ -657,10 +613,10 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
         assert command == [str(fake_r), "RHOME"]
         return subprocess.CompletedProcess(command, 0, stdout=str(r_home), stderr="")
 
-    monkeypatch.setattr(verifier.r_support.shutil, "which", fake_which)
-    monkeypatch.setattr(verifier.r_support.subprocess, "run", fake_run)
+    monkeypatch.setattr(r_verification_support.shutil, "which", fake_which)
+    monkeypatch.setattr(r_verification_support.subprocess, "run", fake_run)
 
-    resolved = verifier.resolve_rscript("Rscript", env={"PATH": ""})
+    resolved = r_verification_support.resolve_rscript("Rscript", env={"PATH": ""})
 
     assert resolved == rscript.resolve()
 
@@ -668,15 +624,7 @@ def test_default_r_verifier_resolves_rscript_from_r_command(monkeypatch, tmp_pat
 def test_default_r_RCMetaR_install_preserves_dependency_libraries(
     monkeypatch, tmp_path
 ):
-    import importlib.util
-
-    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_default.py"
-    spec = importlib.util.spec_from_file_location(
-        "verify_rcmetar_r_default", verifier_path
-    )
-    verifier = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(verifier)
+    verifier = default_verifier
 
     dependency_library = tmp_path / "dependency-library"
     dependency_library.mkdir()

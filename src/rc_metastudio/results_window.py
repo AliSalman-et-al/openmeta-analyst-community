@@ -50,7 +50,7 @@ import os
 import sys
 import ui_results_window
 import app_error_handler
-import ui_edit_forest_plot
+from forms import ui_edit_forest_plot
 from rc_metastudio import meta_py_r
 from plot_defaults import FOREST_ARM_LABELS
 import plot_capabilities

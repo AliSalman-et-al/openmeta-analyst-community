@@ -36,6 +36,7 @@ def _create_diagnostic_dataset(window):
 
 
 def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monkeypatch):
+    import analysis_adapter
     import ma_specs
 
     calls = []
@@ -55,13 +56,13 @@ def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monke
     )
 
     assert (
-        ma_specs._run_diagnostic_backend(
+        analysis_adapter._run_diagnostic_backend(
             "standard", ["diagnostic.random"], [{"measure": "Sens"}]
         )
         == "standard"
     )
     assert (
-        ma_specs._run_diagnostic_backend(
+        analysis_adapter._run_diagnostic_backend(
             "subgroup", ["diagnostic.random"], [{"measure": "Sens"}]
         )
         == "subgroup"
@@ -528,12 +529,13 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_per_metric_diagnostic_merge_preserves_display_artifacts():
+def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
     import analysis_adapter
-    import ma_specs
 
-    def run_metric(request):
-        metric = request.metric
+    def run_backend(_workflow, _methods, parameter_values):
+        if len(_methods) > 1:
+            raise RuntimeError("combined execution is intentionally unavailable")
+        metric = parameter_values[0]["measure"]
         title = "%s Forest Plot" % metric
         return {
             "texts": {"%s Summary" % metric: "%s ok" % metric},
@@ -553,19 +555,24 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts():
             "image_order": [title],
         }
 
-    result = ma_specs._run_diagnostic_methods_per_metric(
-        tuple(
-            analysis_adapter.make_analysis_request(
-                data_type="diagnostic",
-                workflow="standard",
-                method="diagnostic.random",
-                metric=metric,
-                parameters={"measure": metric},
-            )
-            for metric in ("Sens", "Spec")
-        ),
-        run_metric,
+    monkeypatch.setattr(analysis_adapter, "_run_diagnostic_backend", run_backend)
+    monkeypatch.setattr(
+        analysis_adapter.meta_py_r,
+        "ma_dataset_to_simple_diagnostic_robj",
+        lambda *_args, **_kwargs: None,
     )
+    requests = tuple(
+        analysis_adapter.make_analysis_request(
+            data_type="diagnostic",
+            workflow="standard",
+            method="diagnostic.random",
+            metric=metric,
+            parameters={"measure": metric},
+        )
+        for metric in ("Sens", "Spec")
+    )
+    model = type("Model", (), {"included_studies_have_raw_data": lambda self: True})()
+    result = analysis_adapter.execute_analysis_requests(model, requests)
 
     assert result["display_images"] == {
         "Sens Forest Plot": "sens.display.svg",

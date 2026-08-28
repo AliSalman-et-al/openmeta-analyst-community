@@ -6,6 +6,7 @@ import math
 import os
 import re
 import sys
+from typing import Callable
 
 _current_module = sys.modules[__name__]
 for _module_name in ("rc_metastudio.meta_py_r", "meta_py_r"):
@@ -50,15 +51,56 @@ try:
 
     _rpy2_rchar_to_str = _rpy2_conversion._rchar_to_str
 
-    def _rchar_to_str_as_utf8(rchar, encoding):
+    def _rchar_to_str_as_utf8(rchar, encoding: str) -> str:
         try:
-            return _rpy2_conversion._utf8_rchar_to_str(rchar)
+            return str(_rpy2_conversion._utf8_rchar_to_str(rchar))
         except UnicodeDecodeError:
-            return _rpy2_rchar_to_str(rchar, encoding)
+            return str(_rpy2_rchar_to_str(rchar, encoding))
 
-    _rpy2_conversion._rchar_to_str = _rchar_to_str_as_utf8
+    # This private rpy2 hook is intentionally replaced at the integration
+    # boundary; its runtime signature is not expressible in rpy2's stubs.
+    setattr(_rpy2_conversion, "_rchar_to_str", _rchar_to_str_as_utf8)
 except Exception:
     pass
+
+
+_RFunction = Callable[..., object]
+
+
+def _r_function(function_name: str) -> _RFunction:
+    """Return a callable R function after checking rpy2's dynamic lookup."""
+
+    function = ro.r[function_name]
+    if not callable(function):
+        raise TypeError("R object %r is not callable" % function_name)
+    return function
+
+
+def _r_eval(expression: str) -> object:
+    """Evaluate an R expression after checking rpy2's dynamic evaluator."""
+
+    evaluator = ro.r
+    if not callable(evaluator):
+        raise TypeError("rpy2's R evaluator is not callable")
+    return evaluator(expression)
+
+
+def _call_dynamic(function: object, *args: object, **kwargs: object) -> object:
+    """Call a value returned by R after checking that it is callable."""
+
+    caller = getattr(function, "__call__", None)
+    if not callable(caller):
+        raise TypeError("R value is not callable")
+    return caller(*args, **kwargs)
+
+
+def _first_dynamic(value: object) -> object:
+    """Read the first element of an R vector after checking its shape."""
+
+    getitem = getattr(value, "__getitem__", None)
+    if not callable(getitem):
+        raise TypeError("R value is not indexable")
+    return getitem(0)
 
 
 def _r_is_null(r_object):
@@ -84,7 +126,7 @@ def _r_is_null(r_object):
 def execute_r_string(r_str):
     require_r_transaction()
     try:
-        return ro.r(r_str)
+        return _r_eval(r_str)
     except Exception as e:
         # reset working directory in r then raise the error, hope this will address issue #244
         reset_Rs_working_dir()
@@ -94,7 +136,7 @@ def execute_r_string(r_str):
 @serialized_r_call
 def execute_r_function(function_name, *args, **kwargs):
     require_r_transaction()
-    return ro.r[function_name](*args, **kwargs)
+    return _r_function(function_name)(*args, **kwargs)
 
 
 #################### R Library Loader ####################
@@ -179,7 +221,7 @@ def impute_diag_data(diag_data_dict):
         if val is None:
             diag_data_dict.pop(param)
 
-    dataf = ro.r["data.frame"](**diag_data_dict)
+    dataf = _r_function("data.frame")(**diag_data_dict)
     two_by_two = execute_r_function("rcmetar.impute.diagnostic", dataf)
 
     imputed_2x2 = R_parse_tools.rlist_to_pydict(two_by_two)
@@ -192,7 +234,7 @@ def impute_bin_data(bin_data_dict):
     bin_data_dict = normalize_confidence_level_params(bin_data_dict)
     remove_value(None, bin_data_dict)
 
-    dataf = ro.r["data.frame"](**bin_data_dict)
+    dataf = _r_function("data.frame")(**bin_data_dict)
     two_by_two = execute_r_function("rcmetar.impute.binary", dataf)
 
     res_as_dict = R_parse_tools.recursioner(two_by_two)
@@ -207,9 +249,9 @@ def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
     remove_value(None, group2_data)
     remove_value(None, effect_data)
 
-    dataf_grp1 = ro.r["data.frame"](**group1_data)
-    dataf_grp2 = ro.r["data.frame"](**group2_data)
-    dataf_effect = ro.r["data.frame"](**effect_data)
+    dataf_grp1 = _r_function("data.frame")(**group1_data)
+    dataf_grp2 = _r_function("data.frame")(**group2_data)
+    dataf_effect = _r_function("data.frame")(**effect_data)
 
     r_res = execute_r_function(
         "rcmetar.back.calculate.continuous",
@@ -350,7 +392,7 @@ def impute_cont_data(cont_data_dict, alpha):
     if len(list(cont_data_dict.items())) == 0:
         return {"succeeded": False}
 
-    dataf = ro.r["data.frame"](**cont_data_dict)
+    dataf = _r_function("data.frame")(**cont_data_dict)
     c_data = execute_r_function("rcmetar.impute.continuous.study", dataf, alpha=alpha)
 
     results = R_parse_tools.recursioner(c_data)
@@ -363,7 +405,7 @@ def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
     if len(list(cont_data_dict.items())) == 0:
         return {"succeeded": False}
 
-    dataf = ro.r["data.frame"](**cont_data_dict)
+    dataf = _r_function("data.frame")(**cont_data_dict)
     c_data = execute_r_function(
         "rcmetar.impute.continuous.prepost",
         dataf,
@@ -414,7 +456,7 @@ def get_params(method_name):
         order_vars = list(param_d["var_order"])
 
     pretty_names_and_descriptions = R_parse_tools.recursioner(
-        param_d.get("pretty.names", ro.r["list"]())
+        param_d.get("pretty.names", _r_function("list")())
     )
 
     return (
@@ -647,8 +689,7 @@ def ma_dataset_to_simple_network(
     in the getmc documentation for mtc.network"""
 
     network_path = network_path or _analysis_output_path("network.png")
-
-    if data_type not in [BINARY, CONTINUOUS]:
+    if data_type not in (BINARY, CONTINUOUS):
         raise ValueError("Given data type: '%s' is unknown." % str(data_type))
 
     if studies is None:
@@ -673,7 +714,7 @@ def ma_dataset_to_simple_network(
         "id": [x.replace(" ", "_") for x in descriptions],  # ids, ""
         "description": descriptions,
     }
-    ro.globalenv["treatments"] = ro.r["data.frame"](
+    ro.globalenv["treatments"] = _r_function("data.frame")(
         **{
             "id": _r_character_vector(treatments["id"]),
             "description": _r_character_vector(treatments["description"]),
@@ -683,7 +724,7 @@ def ma_dataset_to_simple_network(
     # Make 'data' data_frame in R
     if data_type == BINARY:
         data = {"study": [], "treatment": [], "responders": [], "sampleSize": []}
-    elif data_type == CONTINUOUS:
+    else:
         data = {
             "study": [],
             "treatment": [],
@@ -724,7 +765,7 @@ def ma_dataset_to_simple_network(
     else:
         data_frame_kwargs["mean"] = _r_numeric_vector(data["mean"])
         data_frame_kwargs["std.dev"] = _r_numeric_vector(data["std.dev"])
-    ro.globalenv["data"] = ro.r["data.frame"](**data_frame_kwargs)
+    ro.globalenv["data"] = _r_function("data.frame")(**data_frame_kwargs)
 
     ########## make the actual network ##########
     make_network_r_str = (
@@ -1131,7 +1172,7 @@ def update_plot_params(
 ):
     # first cast the params to an R data frame to make it
     # R-palatable
-    params_df = ro.r["data.frame"](**plot_params)
+    params_df = _r_function("data.frame")(**plot_params)
     ro.globalenv["tmp.params"] = params_df
     plot_params_symbol = _r_symbol(plot_params_name)
 
@@ -1324,10 +1365,10 @@ def _is_summary_display(r_object):
 
 @serialized_r_call
 def _capture_formatted_summary(r_object):
-    capture_summary = ro.r(
+    capture_summary = _r_eval(
         "function(x) paste(capture.output(print(x)), collapse='\\n')"
     )
-    return capture_summary(r_object)[0]
+    return _first_dynamic(_call_dynamic(capture_summary, r_object))
 
 
 def _format_table_summary(section_name, r_object, title=None, study_names=None):

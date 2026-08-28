@@ -866,29 +866,19 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         if is_NaN(val):  # get out quick
             return
 
-        try:
-            with QSignalBlocker(self.raw_data_table):
-                str_val = "" if val in EMPTY_VALS else str(int(val))
-                if self.raw_data_table.item(row, col) == None:
-                    self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
-                else:
-                    required(
-                        self.raw_data_table.item(row, col),
-                        f"binary table cell ({row}, {col})",
-                    ).setText(str_val)
-                calc_fncs.set_table_item_editable(
+        with QSignalBlocker(self.raw_data_table):
+            str_val = "" if val in EMPTY_VALS else str(int(val))
+            if self.raw_data_table.item(row, col) == None:
+                self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
+            else:
+                required(
                     self.raw_data_table.item(row, col),
-                    self._raw_count_cell_is_editable(row, col),
-                )
-
-                #            # disable item
-                #            if str_val != "":
-                #            item = self.raw_data_table.item(row, col)
-                #            newflags = item.flags() & ~Qt.ItemFlag.ItemIsEditable
-                #            item.setFlags(newflags)
-
-        except:
-            raise
+                    f"binary table cell ({row}, {col})",
+                ).setText(str_val)
+            calc_fncs.set_table_item_editable(
+                self.raw_data_table.item(row, col),
+                self._raw_count_cell_is_editable(row, col),
+            )
 
     def _update_data_table(self):
         """Fill in 2x2 table from other entries in the table"""

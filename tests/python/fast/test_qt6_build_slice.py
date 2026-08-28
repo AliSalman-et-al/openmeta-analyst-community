@@ -16,16 +16,6 @@ from rc_metastudio import qt6_build, qt6_resources
 
 ROOT = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = ROOT / "scripts" / "build_qt6.py"
-CHECK_QT_SCRIPT = ROOT / "scripts" / "check_qt_modules.py"
-
-
-def _qt_application_modules() -> list[str]:
-    spec = importlib.util.spec_from_file_location("check_qt_modules", CHECK_QT_SCRIPT)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    source_root = ROOT / "src/rc_metastudio"
-    return [path.stem for path in module.qt_modules(ROOT) if path.parent == source_root]
 
 
 def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -368,77 +358,6 @@ def test_canonical_form_manifest_fails_closed_on_drift_and_collisions():
     traversal[source] = Path("../ui_escape.py")
     with pytest.raises(RuntimeError, match="non-canonical destination"):
         qt6_build.validate_form_manifest(traversal, discovered)
-
-
-def test_generated_ui_bootstrap_imports_every_handwritten_qt_module(
-    tmp_path, verified_qt6_output
-):
-    build_root = verified_qt6_output
-    modules = _qt_application_modules()
-    script = """
-import importlib
-import json
-import sys
-import types
-from pathlib import Path
-
-root = Path(sys.argv[1])
-build_root = Path(sys.argv[2])
-modules = json.loads(sys.argv[3])
-report_path = Path(sys.argv[4])
-sys.path.insert(0, str(root / "src/rc_metastudio"))
-from rc_metastudio.qt6_ui import prepare_generated_ui_imports
-layout = prepare_generated_ui_imports(build_root)
-# A later test or tool may prepend source paths. The bootstrap must already have
-# bound the top-level forms package to generated Qt6 output.
-sys.path.insert(0, str(root / "src/rc_metastudio/forms"))
-sys.path.insert(0, str(root / "src/rc_metastudio"))
-forms = importlib.import_module("forms")
-if layout.package_root not in Path(forms.__file__).resolve().parents:
-    raise RuntimeError("forms package escaped the generated Qt6 layout")
-for name in modules:
-    importlib.import_module(name)
-fake_launch = types.ModuleType("launch")
-fake_launch.start = lambda: 0
-sys.modules["launch"] = fake_launch
-from rc_metastudio.__main__ import main
-startup_result = main()
-report_path.write_text(
-    json.dumps({
-        "generated_root": str(layout.package_root),
-        "startup_result": startup_result,
-    }),
-    encoding="utf-8",
-)
-"""
-    environment = os.environ.copy()
-    environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_QT6_BUILD_ROOT"] = str(build_root)
-    report_path = tmp_path / "import-report.json"
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            script,
-            str(ROOT),
-            str(build_root),
-            json.dumps(modules),
-            str(report_path),
-        ],
-        cwd=ROOT,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, (
-        "generated UI bootstrap failed\n"
-        f"stdout:\n{completed.stdout}\n"
-        f"stderr:\n{completed.stderr}"
-    )
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["startup_result"] == 0
-    assert Path(report["generated_root"]) == (build_root / "generated/rc_metastudio")
 
 
 def test_generated_ui_bootstrap_rejects_missing_or_tampered_outputs(

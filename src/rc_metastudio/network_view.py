@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QDialog, QGraphicsScene, QWidget
 
 import adaptive_window
 import app_error_handler
-import ui_network_view
+from forms import ui_network_view
 from rc_metastudio import meta_py_r
 import settings
 

@@ -624,6 +624,7 @@ from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 import app_error_handler
+import analysis_adapter
 import ma_specs
 
 class Model:
@@ -668,7 +669,7 @@ for locale, text in (
     observed.append(request.parameter_values()["conf.level"])
     confidence_input.setValue(11.0)
     data_calls.clear()
-    ma_specs._execute_analysis_requests(dialog.model, (request,))
+    analysis_adapter.execute_analysis_requests(dialog.model, (request,))
     execution_data_calls.extend(data_calls)
     dialog.close()
     app.processEvents()
@@ -748,7 +749,7 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
         mutable_parameters["conf.level"] = 1.0
         mutable_parameters["measure"] = "MUTATED"
 
-        ma_specs._execute_analysis_requests(_AnalysisModel(data_type), (request,))
+        analysis_adapter.execute_analysis_requests(_AnalysisModel(data_type), (request,))
 
         rendered = repr(calls)
         assert "90.5" in rendered
@@ -782,7 +783,7 @@ def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
         lambda *args, **kwargs: calls.append(("backend", args, kwargs)) or {},
     )
 
-    ma_specs._execute_meta_regression_request(
+    analysis_adapter.execute_meta_regression_request(
         model, ("study",), ("covariate",), request, True, 95.0
     )
 

@@ -873,7 +873,7 @@ def clear_r_tmp():
         try:
             if os.path.isfile(file_path):
                 os.unlink(file_path)  # same as remove
-        except Exception:
+        except OSError:
             pass
 
 

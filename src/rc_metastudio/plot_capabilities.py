@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validate plot capabilities and resolve their user-interface contracts."""
 
+from typing import TypedDict
+
+
+class _Regenerator(TypedDict):
+    function: str | None
+    plot_kinds: frozenset[str]
+
 REQUIRED_FIELDS = (
     "plot_kind",
     "editable",
@@ -27,7 +34,7 @@ PLOT_OPTION_GROUPS = {
     "other": frozenset(),
 }
 
-REGENERATORS = {
+REGENERATORS: dict[str, _Regenerator] = {
     "forest": {
         "function": "generate_forest_plot",
         "plot_kinds": frozenset(

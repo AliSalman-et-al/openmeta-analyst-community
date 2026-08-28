@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 from importlib import metadata
 import json
 import os
@@ -12,25 +11,11 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from types import ModuleType
-from typing import Any
 
-
-def load_r_support() -> ModuleType:
-    support_path = Path(__file__).resolve().parent / "r_verification_support.py"
-    spec = importlib.util.spec_from_file_location(
-        "rcms_r_verification_support", support_path
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError(
-            f"could not load shared R verification support: {support_path}"
-        )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-r_support: Any = load_r_support()
+if __package__:
+    from . import r_verification_support as r_support
+else:
+    import r_verification_support as r_support
 
 
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
@@ -128,10 +113,6 @@ def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path:
     return resolved
 
 
-def _candidate_rscript_names() -> list[str]:
-    return r_support.candidate_rscript_names()
-
-
 def resolve_r_exe(rscript: Path, root: Path, env: dict[str, str]) -> Path:
     try:
         return r_support.resolve_r_exe(rscript, root, env)
@@ -163,19 +144,6 @@ def isolated_r_env(
     env.setdefault("RPY2_CFFI_MODE", "API")
     env.setdefault("_R_CHECK_FORCE_SUGGESTS_", "false")
     return env
-
-
-def verification_base_env(
-    source: dict[str, str], *, platform_name: str = os.name
-) -> dict[str, str]:
-    return r_support.verification_base_env(source, platform_name=platform_name)
-
-
-def r_version_key(rscript: Path, root: Path, env: dict[str, str]) -> str:
-    try:
-        return r_support.r_version_key(rscript, root, env)
-    except r_support.RVerificationSupportError as exc:
-        raise VerificationError(str(exc)) from exc
 
 
 def dependency_cache_key(
@@ -329,7 +297,7 @@ def verify(args: argparse.Namespace) -> None:
         str(Path(args.python).absolute()) if Path(args.python).exists() else args.python
     )
     rscript = resolve_rscript(args.rscript)
-    base_env = verification_base_env(dict(os.environ))
+    base_env = r_support.verification_base_env(dict(os.environ))
     policy = binary_dependency_policy(root)
     configured_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO")
     if configured_repo and configured_repo != policy["repository"]:

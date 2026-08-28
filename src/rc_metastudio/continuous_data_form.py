@@ -763,20 +763,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         if is_NaN(val):  # get out quick
             return
 
-        try:
-            with QSignalBlocker(table):
-                str_val = "" if val in EMPTY_VALS else self.float_to_str(float(val))
-                if table.item(row, col) is None:
-                    table.setItem(row, col, QTableWidgetItem(str_val))
-                else:
-                    required(
-                        table.item(row, col), f"continuous table cell ({row}, {col})"
-                    ).setText(str_val)
-
-                ###self._disable_row_if_filled(table, row, col)
-        except:
-            pass
-            # raise
+        with QSignalBlocker(table):
+            str_val = "" if val in EMPTY_VALS else self.float_to_str(float(val))
+            if table.item(row, col) is None:
+                table.setItem(row, col, QTableWidgetItem(str_val))
+            else:
+                required(
+                    table.item(row, col), f"continuous table cell ({row}, {col})"
+                ).setText(str_val)
 
     def _disable_row_if_filled(self, table, row, col):
         # if str_val != "": #disable item

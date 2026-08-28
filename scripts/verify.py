@@ -6,15 +6,16 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
-import importlib.util
 import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from types import ModuleType
-from typing import cast
+
+if __package__:
+    from . import r_verification_support as r_support
+else:
+    import r_verification_support as r_support
 
 
 class VerificationError(RuntimeError):
@@ -46,27 +47,6 @@ SMOKE_TESTS = (
     "test_all_committed_samples_match_the_frozen_semantics_and_round_trip",
     "tests/python/fast/test_qt6_build_slice.py::"
     "test_binary_resource_registers_and_exposes_icon_and_svg",
-)
-
-
-def load_r_support() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "rcms_r_verification_support", SCRIPT_DIR / "r_verification_support.py"
-    )
-    if spec is None or spec.loader is None:
-        raise VerificationError("could not load shared R verification support")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-R_SUPPORT = load_r_support()
-resolve_rscript = cast(
-    Callable[[str], Path | None], getattr(R_SUPPORT, "resolve_rscript")
-)
-rscript_paths_for_r_home = cast(
-    Callable[[str | Path | None], list[Path]],
-    getattr(R_SUPPORT, "rscript_paths_for_r_home"),
 )
 
 
@@ -146,7 +126,7 @@ def run_pytest(nodes: list[str], *, env: dict[str, str], workers: int = 0) -> No
 def selected_rscript(args: argparse.Namespace) -> str:
     requested = args.rscript
     if args.r_runtime_root:
-        candidates = rscript_paths_for_r_home(args.r_runtime_root)
+        candidates = r_support.rscript_paths_for_r_home(args.r_runtime_root)
         for candidate in candidates:
             if candidate.exists():
                 return str(candidate.resolve())
@@ -155,7 +135,7 @@ def selected_rscript(args: argparse.Namespace) -> str:
         raise VerificationError(
             f"Rscript was not found in selected R runtime at '{args.r_runtime_root}'."
         )
-    resolved = resolve_rscript(requested or "Rscript")
+    resolved = r_support.resolve_rscript(requested or "Rscript")
     if resolved is not None:
         return str(resolved)
     if requested and requested != "Rscript":

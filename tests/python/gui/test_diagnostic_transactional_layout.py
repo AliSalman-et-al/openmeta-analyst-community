@@ -380,7 +380,8 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
 
     monkeypatch.setattr(diagnostic_data_form, "required", fail)
     table.blockSignals(True)
-    diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
+    with pytest.raises(RuntimeError, match="injected item update failure"):
+        diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
 
     assert table.signalsBlocked()
     table.deleteLater()

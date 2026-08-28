@@ -1302,7 +1302,9 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
 
-    def add_new(self, startup_outcome=None):
+    def add_new(
+        self, startup_outcome: main_wizard.DatasetInfo | None = None
+    ) -> None:
         redo_f, undo_f = None, None
         if self.cur_dimension == "outcome" and not startup_outcome:
             form = add_new_dialogs.AddNewOutcomeForm(
@@ -1335,12 +1337,7 @@ class MetaForm(QtWidgets.QMainWindow, ui_meta.Ui_MainWindow):
         ):  # For dealing with outcomes from the startup form
             new_outcome_name = qt_text.to_native_text(startup_outcome["name"])
             new_outcome_type = str(startup_outcome["data_type"])
-            try:
-                new_outcome_subtype = startup_outcome["sub_type"]
-            except:
-                pass
-                # pyqtRemoveInputHook()
-                # pdb.set_trace()
+            new_outcome_subtype = startup_outcome.get("sub_type")
             redo_f = lambda: self._add_new_outcome(
                 new_outcome_name, new_outcome_type, new_outcome_subtype
             )

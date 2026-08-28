@@ -82,14 +82,11 @@ try {
         return
     }
 
-    $qtModules = @(uv run python scripts/check_qt_modules.py --root .)
-    if ($LASTEXITCODE -ne 0 -or $qtModules.Count -eq 0) { throw "Handwritten Qt module discovery failed." }
     uv run ty check `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
         --extra-search-path "$BuildRoot/generated/rc_metastudio/forms" `
         --extra-search-path src/rc_metastudio `
-        --extra-search-path scripts `
-        $qtModules
+        src/rc_metastudio
     if ($LASTEXITCODE -ne 0) { throw "Qt6 strict type verification failed." }
 
     # Core owns every GUI module except the five deliberately isolated
