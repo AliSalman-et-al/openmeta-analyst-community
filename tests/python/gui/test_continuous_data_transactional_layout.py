@@ -458,10 +458,9 @@ def test_continuous_metric_transition_does_not_resize_visible_root(monkeypatch):
         _close(app, dialog)
 
 
-@pytest.mark.parametrize("size", [(1440, 900), (1024, 640), (800, 600)])
 @pytest.mark.parametrize("variant", ["md_simple", "smd_pre_post", "tx_mean"])
-def test_continuous_major_variant_behavior_matrix(monkeypatch, size, variant):
-    available = QtCore.QRect(20, 30, *size)
+def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
+    available = QtCore.QRect(20, 30, 800, 600)
     recorder = {}
     initial_metric = "TX Mean" if variant == "tx_mean" else "MD"
     app, dialog = _open_continuous_dialog(

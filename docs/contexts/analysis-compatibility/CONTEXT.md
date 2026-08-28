@@ -65,8 +65,8 @@ A local-only Default R Evidence mode that reports missing or mismatched R depend
 _Avoid_: Passing CI evidence, soft CI failure
 
 **Full R Stack Evidence**:
-The opt-in, scheduled, release, or packaging-gated verification that installs the R dependency bundle, builds and checks RCMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior.
-_Avoid_: Required PR R check, default R test
+The required, serialized Windows verification job that installs the R dependency bundle, builds and checks RCMetaR, validates installed package versions, runs R analysis smoke coverage, and exercises real rpy2 bridge behavior outside the fast source matrix.
+_Avoid_: Default R Evidence, per-platform Full R matrix
 
 **R Dependency Cache**:
 A cache of installed R package dependency inputs keyed by R runtime version, R dependency policy, package metadata, and repository policy, used to avoid repeated CRAN downloads without trusting assembled application outputs.

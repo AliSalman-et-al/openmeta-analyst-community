@@ -14,9 +14,9 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 
 - Issue: #5
 - Dataset: `sample_projects/amino.rcms`
-- Evidence: `tests/python/gui/test_gui_binary_slice.py`
-- Verified workflow: open the existing project, display binary study rows, run the random-effects action, and render a result summary plus forest plot path in the PyQt5 window.
-- Command: `uv run pytest -q tests`
+- Evidence: `tests/python/gui/test_metaform_data_workflows.py`
+- Verified workflow: open the existing project, display binary study rows, run the random-effects action, and render a result summary plus forest plot path in the PyQt6 window.
+- Command: `uv run pytest -q tests/python/gui/test_metaform_data_workflows.py`
 
 ## About/Legal and Static Project Links Workflow
 
@@ -94,6 +94,6 @@ Record one entry for every Release Cutover workflow that is verified through GUI
 
 - Issue: #41
 - Dataset: `sample_projects/BCG.rcms` and `sample_projects/amino.rcms`
-- Evidence: `tests/packaging/contract/test_windows_distributable_contract.py::test_windows_distributable_contract_is_declared` and `tests/packaging/contract/test_windows_distributable_contract.py::test_lane_named_local_scripts_replace_old_workflow_wrappers`
+- Evidence: `tests/packaging/contract/test_windows_distributable_contract.py::test_windows_distributable_contract_is_declared`
 - Verified workflow: package the Windows package artifact around the real `launch.py` entry point, include the sample project files needed for real `.rcms` launch checks, and run the local verification workflow through the targeted `MetaForm` automation suite before packaging.
 - Command: `uv run pytest tests\\packaging\\contract\\test_windows_distributable_contract.py`

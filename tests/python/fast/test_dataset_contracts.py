@@ -1,0 +1,94 @@
+import copy
+import os
+import sys
+
+import pytest
+
+
+sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
+
+import ma_dataset
+
+
+def _dataset(data_type=ma_dataset.DIAGNOSTIC):
+    dataset = ma_dataset.Dataset(
+        title="Contract dataset",
+        is_diag=data_type == ma_dataset.DIAGNOSTIC,
+        summary={"data_type": "diagnostic"},
+    )
+    dataset.notes = "dataset notes"
+    dataset.num_outcomes = 1
+    dataset.num_follow_ups = 1
+    dataset.num_treatments = 1
+    dataset.add_study(ma_dataset.Study(1, "Study 1", year=2026))
+    dataset.add_outcome(ma_dataset.Outcome("Outcome", data_type))
+    dataset.add_covariate(
+        ma_dataset.Covariate("Region", "factor"), {"Study 1": "north"}
+    )
+    unit = dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
+    groups = unit.get_group_names()
+    unit.tx_groups[groups[0]].raw_data[0] = 3
+    effect_group = groups[0] if data_type == ma_dataset.DIAGNOSTIC else "-".join(groups)
+    effect = "Sens" if data_type == ma_dataset.DIAGNOSTIC else "OR"
+    unit.effects_dict[effect][effect_group]["est"] = 0.75
+    return dataset
+
+
+@pytest.mark.fast
+def test_copy_preserves_and_isolates_the_complete_dataset_graph():
+    source = _dataset()
+    cloned = source.copy()
+
+    assert cloned is not source
+    assert cloned.title == source.title
+    assert cloned.is_diag is source.is_diag
+    assert cloned.summary == source.summary
+    assert cloned.notes == source.notes
+    assert cloned.num_outcomes == source.num_outcomes
+    assert cloned.num_follow_ups == source.num_follow_ups
+    assert cloned.num_treatments == source.num_treatments
+    assert cloned.covariates[0].name == "Region"
+    assert cloned.studies[0].name == "Study 1"
+
+    cloned.summary["data_type"] = "changed"
+    cloned.notes = "changed"
+    cloned.covariates[0].name = "Changed region"
+    cloned.studies[0].name = "Changed study"
+    cloned_unit = cloned.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
+    cloned_unit.tx_groups[cloned_unit.get_group_names()[0]].raw_data[0] = 99
+    cloned_unit.effects_dict["Sens"][cloned_unit.get_group_names()[0]]["est"] = 0.2
+
+    source_unit = source.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
+    assert source.summary["data_type"] == "diagnostic"
+    assert source.notes == "dataset notes"
+    assert source.covariates[0].name == "Region"
+    assert source.studies[0].name == "Study 1"
+    assert source_unit.tx_groups[source_unit.get_group_names()[0]].raw_data[0] == 3
+    assert source_unit.effects_dict["Sens"][source_unit.get_group_names()[0]]["est"] == 0.75
+
+
+@pytest.mark.fast
+def test_group_deletion_handles_empty_datasets_and_keeps_public_behaviors(capsys):
+    dataset = ma_dataset.Dataset()
+
+    dataset.delete_group("missing")
+    assert capsys.readouterr().out == ""
+
+    dataset.remove_group("missing")
+    assert capsys.readouterr().out == "removed group: missing. cur groups: []\n"
+
+
+@pytest.mark.fast
+def test_delete_group_and_remove_group_have_equivalent_mutations():
+    deleted = _dataset(ma_dataset.BINARY)
+    removed = copy.deepcopy(deleted)
+    group = deleted.get_group_names()[0]
+
+    deleted.delete_group(group)
+    removed.remove_group(group)
+
+    for left_study, right_study in zip(deleted.studies, removed.studies):
+        left_unit = left_study.outcomes_to_follow_ups["Outcome"]["first"]
+        right_unit = right_study.outcomes_to_follow_ups["Outcome"]["first"]
+        assert left_unit.get_group_names() == right_unit.get_group_names()
+        assert left_unit.get_effects_dict() == right_unit.get_effects_dict()

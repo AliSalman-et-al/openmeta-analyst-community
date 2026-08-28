@@ -1626,13 +1626,15 @@ def test_macho_discriminator_excludes_java_without_trusting_extensions(
 
     large_attribute = tmp_path / "large-attribute.class"
     large_attribute.write_bytes(minimal_java_class(attribute_body=b"x" * 1_000_000))
-    original_read = feasibility._read_java_bytes
+    from rc_metastudio import macos_macho
+
+    original_read = macos_macho._read_java_bytes
 
     def reject_unbounded_read(stream, size, label):
         assert size < 100_000, f"attribute body was materialized: {size}"
         return original_read(stream, size, label)
 
-    monkeypatch.setattr(feasibility, "_read_java_bytes", reject_unbounded_read)
+    monkeypatch.setattr(macos_macho, "_read_java_bytes", reject_unbounded_read)
     assert feasibility.is_valid_java_class(large_attribute)
     assert not feasibility.is_macho_candidate(large_attribute)
 
@@ -3023,9 +3025,7 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
 def test_direct_macos_inputs_remain_manual_and_do_not_block_windows_release_gate():
     policy = load_package_policy()
     direct_inputs = [
-        "scripts/validate_test_taxonomy.py",
         "scripts/verify_rcmetar_r_stack.py",
-        "docs/verification/test-taxonomy.json",
         "scripts/delivery.py",
         "scripts/inspect_macos_deployment.py",
         "scripts/qt6_macos_feasibility.py",

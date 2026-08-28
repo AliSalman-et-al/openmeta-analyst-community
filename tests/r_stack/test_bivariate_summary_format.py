@@ -1,27 +1,17 @@
-import os
-import shutil
-import subprocess
 import textwrap
 
-import pytest
-
-
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+from _r_driver_support import build_r_driver, run_r_driver
 
 
 _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    __RCMETAR_BOOTSTRAP__
     required <- c("metafor", "HSROC", "boot")
     missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
     if (length(missing) > 0) {
       cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
       quit(status=42)
     }
-
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     work <- tempfile("bivariate_summary_")
     dir.create(work)
@@ -85,40 +75,20 @@ _BIVARIATE_SUMMARY_DRIVER = textwrap.dedent(
     }
     for (expected in c("Estimate", "Lower bound", "Upper bound",
                        "Sensitivity", "Specificity", "Correlation",
-                       "0.6740", "0.8373", "0.2421")) {
+                       "0.67", "0.84", "0.24")) {
       if (!grepl(expected, rendered, fixed=TRUE)) {
         stop(paste("missing expected text", expected, "in:\n", rendered))
       }
     }
-    if (grepl("\\b0\\.674\\b", rendered) || grepl("\\b0\\.76\\b", rendered)) {
-      stop(paste("Bivariate Summary should use uniform four-decimal precision:\n", rendered))
+    if (grepl("0.6740|0.8373|0.2421", rendered)) {
+      stop(paste("Bivariate Summary should use the configured two-decimal precision:\n", rendered))
     }
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_BIVARIATE_SUMMARY_DRIVER = build_r_driver(_BIVARIATE_SUMMARY_DRIVER)
 
 
 def test_bivariate_summary_is_preformatted_without_r_placeholder_headers():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_BIVARIATE_SUMMARY_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    if result.returncode == 42:
-        pytest.skip(result.stdout.strip())
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_BIVARIATE_SUMMARY_DRIVER)

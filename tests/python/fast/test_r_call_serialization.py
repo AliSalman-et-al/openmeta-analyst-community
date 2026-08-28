@@ -35,16 +35,30 @@ def test_public_rpy2_paths_are_serialized_and_raw_gateways_enforce_transaction()
         assert "require_r_transaction" in calls
 
 
-def test_application_code_does_not_bypass_serialized_r_backend_entrypoints():
+def test_application_code_uses_only_serialized_r_backend_entrypoints():
     root = Path(__file__).resolve().parents[3]
+    allowed = {"meta_py_r.py", "meta_py_r_backend.py", "launch.py", "qt6_macos_feasibility.py"}
     offenders = []
 
     for path in (root / "src").rglob("*.py"):
-        if path.name in {"meta_py_r.py", "meta_py_r_backend.py", "launch.py"}:
+        if path.name in allowed:
             continue
-        text = path.read_text(encoding="utf-8")
-        if "meta_py_r.ro.r" in text:
-            offenders.append(str(path.relative_to(root)))
+        module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(module):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name) and node.func.id in {
+                "execute_r_string",
+                "execute_r_function",
+            }:
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "r"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "ro"
+            ):
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
 
     assert offenders == []
 

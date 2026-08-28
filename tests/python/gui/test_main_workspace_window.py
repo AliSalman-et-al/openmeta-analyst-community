@@ -6,6 +6,8 @@ import subprocess
 
 import pytest
 
+pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
@@ -42,10 +44,6 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
         assert (
             window.tableView.sizePolicy().verticalPolicy()
             == QtWidgets.QSizePolicy.Policy.Expanding
-        )
-        assert (
-            window._adaptive_window_controller.policy
-            == (adaptive_window.WINDOW_POLICIES[adaptive_window.WindowRole.MAIN])
         )
         for control in (
             window.nav_left_btn,

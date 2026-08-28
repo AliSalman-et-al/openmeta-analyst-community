@@ -60,7 +60,6 @@ def test_qt_port_inventory_classifies_required_surfaces_and_completion_rules():
     for entry_point in (
         "scripts/package-macos.sh",
         "scripts/resolve_package_ci_metadata.py",
-        "scripts/verify_package_release.py",
     ):
         assert entry_point in inventory["packaging_entry_points"]
     for category in (

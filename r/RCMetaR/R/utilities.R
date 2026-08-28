@@ -779,19 +779,19 @@ create.regression.display <- function(res, params, display.data) {
 
   if (!identical(as.character(res$method), "FE")) {
     heterogeneity <- rcmetar.regression.summary.array(list(
-      c("Residual heterogeneity (τ²)", rcmetar.regression.display.value(res$tau2, result.digits)),
-      c("SE of τ²", rcmetar.regression.display.value(res$se.tau2, se.digits)),
-      c("Residual heterogeneity (τ)", rcmetar.regression.display.value(sqrt(res$tau2), result.digits)),
-      c("Residual I²", rcmetar.regression.display.value(res$I2, 1L, percent=TRUE)),
-      c("Residual H²", rcmetar.regression.display.value(res$H2, result.digits)),
-      c("Heterogeneity explained (R²)", rcmetar.regression.display.value(res$R2, 1L, percent=TRUE))
+      c("Residual heterogeneity (\u03c4\u00b2)", rcmetar.regression.display.value(res$tau2, result.digits)),
+      c("SE of \u03c4\u00b2", rcmetar.regression.display.value(res$se.tau2, se.digits)),
+      c("Residual heterogeneity (\u03c4)", rcmetar.regression.display.value(sqrt(res$tau2), result.digits)),
+      c("Residual I\u00b2", rcmetar.regression.display.value(res$I2, 1L, percent=TRUE)),
+      c("Residual H\u00b2", rcmetar.regression.display.value(res$H2, result.digits)),
+      c("Heterogeneity explained (R\u00b2)", rcmetar.regression.display.value(res$R2, 1L, percent=TRUE))
     ))
     arrays <- c(arrays, list(heterogeneity))
     titles <- c(titles, "Residual heterogeneity")
   }
 
   moderator.df2 <- if (t.inference) residual.df else NULL
-  moderator.label <- if (t.inference) "Overall moderators (F)" else "Overall moderators (Qₘ)"
+  moderator.label <- if (t.inference) "Overall moderators (F)" else "Overall moderators (Q\u2098)"
   test.rows <- list(rcmetar.regression.test.row(
     moderator.label, res$QM, res$m, res$QMp, moderator.df2, params$digits))
   factor.tests <- rcmetar.regression.factor.tests(res, display.data, params)
@@ -804,14 +804,14 @@ create.regression.display <- function(res, params, display.data) {
       if (t.inference) residual.df else NULL, params$digits)
   }
   test.rows[[length(test.rows) + 1]] <- rcmetar.regression.test.row(
-    "Residual heterogeneity (Qₑ)", res$QE, residual.df, res$QEp,
+    "Residual heterogeneity (Q\u2091)", res$QE, residual.df, res$QEp,
     NULL, params$digits)
   tests <- rcmetar.regression.summary.array(test.rows, c("Test", "Statistic", "df", "p-value"))
   arrays <- c(arrays, list(tests))
   titles <- c(titles, "Model tests")
 
   notes <- if (!identical(as.character(res$method), "FE")) {
-    "Heterogeneity explained (R²) is the proportional reduction in estimated between-study heterogeneity relative to the corresponding model without moderators."
+    "Heterogeneity explained (R\u00b2) is the proportional reduction in estimated between-study heterogeneity relative to the corresponding model without moderators."
   } else {
     NULL
   }

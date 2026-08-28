@@ -48,9 +48,11 @@ rc_metastudio = [
 ]
 
 [tool.pytest.ini_options]
+addopts = "--strict-markers"
 markers = [
     "fast: default fast verification lane tests.",
     "gui: offscreen Qt or MetaForm GUI workflow tests.",
+    "qsettings: tests that require isolated per-test QSettings storage.",
     "r_stack: tests that require or simulate R Stack behavior.",
     "golden: golden baseline tooling and comparison tests.",
     "packaging_contract: packaging and workflow contract tests.",

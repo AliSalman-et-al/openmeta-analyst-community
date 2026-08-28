@@ -164,7 +164,7 @@ jobs:
         run: uv cache prune --ci
 
   source-fast-targets:
-    name: Source Smoke and Fast Verification (${{ matrix.target }})
+    name: Source Fast Verification (${{ matrix.target }})
     needs: change-classifier
     if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
     timeout-minutes: 90
@@ -207,7 +207,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: artifacts/r-default-library-cache
-          key: r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
+          key: r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'scripts/verify_rcmetar_r_default.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION') }}
 
       - name: Provision macOS native R build libraries
         if: ${{ matrix.platform == 'macos' }}
@@ -222,22 +222,6 @@ jobs:
           echo "CPPFLAGS=-I$libpng_prefix/include ${CPPFLAGS:-}" >> "$GITHUB_ENV"
           echo "LDFLAGS=-L$libpng_prefix/lib ${LDFLAGS:-}" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$libpng_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
-
-      - name: Provision Default R Evidence on Windows
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: |
-          uv sync --locked
-          $rscript = (Get-Command Rscript).Source
-          uv run python scripts\verify_rcmetar_r_default.py --rscript $rscript --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts\r-default-library-cache
-
-      - name: Provision Default R Evidence on macOS
-        if: ${{ matrix.platform == 'macos' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv sync --locked
-          uv run python scripts/verify_rcmetar_r_default.py --rscript "$(command -v Rscript)" --require-r --require-installed-packages --install-missing --r-library-cache-root artifacts/r-default-library-cache
 
       - name: Rebuild and prove macOS rpy2 API bridge against installed R
         if: ${{ matrix.platform == 'macos' }}
@@ -295,19 +279,58 @@ jobs:
             --github-env "$GITHUB_ENV" \
             --diagnostic "build/qt-sdk/${{ matrix.target }}-rcc.json"
 
-      - name: Run source smoke and Fast Verification on Windows
+      - name: Run Fast Verification on Windows
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
-        run: |
-          .\scripts\verify-smoke.ps1 -Sync -RequireREvidence
-          .\scripts\verify-fast.ps1 -StrictTaxonomy -RequireREvidence
+        run: uv run --locked python scripts\verify.py fast --require-r-evidence
 
-      - name: Run source smoke and Fast Verification on macOS
+      - name: Run Fast Verification on macOS
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
-        run: |
-          bash ./scripts/verify-smoke.sh --require-r-evidence
-          bash ./scripts/verify-fast.sh --strict-taxonomy --require-r-evidence
+        run: uv run --no-sync python scripts/verify.py fast --require-r-evidence
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci
+
+  full-r-stack:
+    name: Required Windows Full R Stack Evidence
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11.9
+
+      - name: Install pinned R
+        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          r-version: 4.6.1
+          use-public-rspm: true
+
+      - name: Cache Full R Stack library
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: artifacts/r-library-cache
+          key: r-full-stack-v1-windows-r-4.6.1-public-ppm-2026-07-16-${{ hashFiles('scripts/install-r-deps.R', 'scripts/r_binary_policy.R', 'scripts/r_dependency_policy.py', 'scripts/r_verification_support.py', 'docs/verification/RCMetaR-r-dependencies.json', 'r/RCMetaR/DESCRIPTION', 'scripts/verify_rcmetar_r_stack.py') }}
+
+      - name: Run Full R Stack Evidence
+        run: uv run --locked python scripts\verify.py r-stack
 
       - name: Prune uv cache
         if: ${{ always() }}
@@ -319,6 +342,83 @@ jobs:
     if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
     uses: ./.github/workflows/package-windows.yml
 
+  packaging-contract:
+    name: Packaging Contract Tests
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11.9
+
+      - name: Prepare generated Qt6 forms
+        run: |
+          uv sync --locked
+          $buildRoot = Join-Path $PWD "build\qt6-packaging-contract"
+          uv run python scripts\build_qt6.py generate --build-root $buildRoot
+          if ($LASTEXITCODE -ne 0) { throw "Qt6 form or resource generation failed." }
+          "RCMS_QT6_BUILD_ROOT=$((Resolve-Path $buildRoot).Path)" >> $env:GITHUB_ENV
+
+      - name: Run packaging contract tests
+        run: uv run pytest -q tests\packaging\contract
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci
+
+  packaging-contract-macos:
+    name: Focused Native macOS Packaging Contracts
+    needs: change-classifier
+    if: ${{ needs.change-classifier.outputs.run-windows-package == 'true' }}
+    runs-on: macos-15
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11.9
+
+      - name: Install locked project dependencies
+        run: uv sync --locked
+
+      - name: Run focused native macOS packaging contract nodes
+        run: |
+          uv run pytest -q \
+            tests/packaging/contract/test_macos_embedded_r_adapter_behavior.py::test_pyinstaller_preserves_miniature_cran_framework_toc \
+            tests/packaging/contract/test_macos_x64_distributable_contract.py::test_macos_r_relocator_enforces_private_root_before_mutation_and_is_idempotent \
+            tests/packaging/contract/test_macos_x64_distributable_contract.py::test_bounded_process_kills_stubborn_grandchild
+
+      - name: Prune uv cache
+        if: ${{ always() }}
+        run: uv cache prune --ci
+
   fast-verification-gate:
     name: Qt6 Integration Verification Gate
     needs:
@@ -326,7 +426,10 @@ jobs:
       - qt6-verification
       - remaining-surface-verification
       - source-fast-targets
+      - full-r-stack
       - windows-package-qualification
+      - packaging-contract
+      - packaging-contract-macos
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -335,15 +438,23 @@ jobs:
       - name: Check required lane results
         shell: bash
         env:
+          CLASSIFIER_RESULT: ${{ needs.change-classifier.result }}
           RUN_WINDOWS: ${{ needs.change-classifier.outputs.run-windows }}
           REASON: ${{ needs.change-classifier.outputs.reason }}
           QT6_RESULT: ${{ needs.qt6-verification.result }}
           REMAINING_SURFACE_RESULT: ${{ needs.remaining-surface-verification.result }}
           SOURCE_FAST_RESULT: ${{ needs.source-fast-targets.result }}
+          FULL_R_STACK_RESULT: ${{ needs.full-r-stack.result }}
           RUN_WINDOWS_PACKAGE: ${{ needs.change-classifier.outputs.run-windows-package }}
           WINDOWS_PACKAGE_RESULT: ${{ needs.windows-package-qualification.result }}
+          PACKAGING_CONTRACT_RESULT: ${{ needs.packaging-contract.result }}
+          PACKAGING_CONTRACT_MACOS_RESULT: ${{ needs.packaging-contract-macos.result }}
         run: |
           set -euo pipefail
+          if [ "$CLASSIFIER_RESULT" != "success" ]; then
+            echo "Qt6 verification change classifier result: $CLASSIFIER_RESULT" >&2
+            exit 1
+          fi
           echo "Qt6 integration verification classifier: $REASON"
           if [ "$RUN_WINDOWS" != "true" ]; then
             echo "No Qt6 verification inputs changed; Windows lane intentionally skipped."
@@ -357,12 +468,24 @@ jobs:
               exit 1
             fi
             if [ "$SOURCE_FAST_RESULT" != "success" ]; then
-              echo "Three-target source smoke and Fast Verification result: $SOURCE_FAST_RESULT" >&2
+              echo "Three-target Fast Verification result: $SOURCE_FAST_RESULT" >&2
+              exit 1
+            fi
+            if [ "$FULL_R_STACK_RESULT" != "success" ]; then
+              echo "Required Windows Full R Stack Evidence result: $FULL_R_STACK_RESULT" >&2
               exit 1
             fi
           fi
           if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$WINDOWS_PACKAGE_RESULT" != "success" ]; then
             echo "Required Windows x64 package qualification result: $WINDOWS_PACKAGE_RESULT" >&2
+            exit 1
+          fi
+          if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$PACKAGING_CONTRACT_RESULT" != "success" ]; then
+            echo "Windows packaging contract result: $PACKAGING_CONTRACT_RESULT" >&2
+            exit 1
+          fi
+          if [ "$RUN_WINDOWS_PACKAGE" = "true" ] && [ "$PACKAGING_CONTRACT_MACOS_RESULT" != "success" ]; then
+            echo "Focused native macOS packaging contract result: $PACKAGING_CONTRACT_MACOS_RESULT" >&2
             exit 1
           fi
           echo "Required classified Qt6 verification passed."

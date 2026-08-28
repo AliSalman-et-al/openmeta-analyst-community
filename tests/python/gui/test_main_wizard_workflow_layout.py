@@ -317,7 +317,8 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
         _show(wizard, qapp)
         page = wizard.currentPage()
 
-        for foreground, theme in (("#111111", "light"), ("#f5f5f5", "dark")):
+        rendered_icons = {}
+        for foreground in ("#111111", "#f5f5f5"):
             palette = qapp.palette()
             palette.setColor(
                 QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor(foreground)
@@ -325,8 +326,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
             qapp.setPalette(palette)
             qapp.processEvents()
 
-            for button in page._data_type_buttons():
-                assert page._data_type_icon_themes[button.objectName()] == theme
+            for button in page.findChildren(QtWidgets.QAbstractButton):
                 image = button.icon().pixmap(button.iconSize()).toImage()
                 colors = [
                     image.pixelColor(x, y)
@@ -334,7 +334,10 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                     for x in range(image.width())
                     if image.pixelColor(x, y).alpha() >= 128
                 ]
-                assert colors, (theme, button.objectName(), button.icon().isNull())
+                assert colors, (foreground, button.objectName(), button.icon().isNull())
+                rendered_icons.setdefault(foreground, {})[button.objectName()] = tuple(
+                    sorted(color.rgba() for color in colors)
+                )
 
             diagnostic = (
                 page.diagnostic_Button.icon()
@@ -348,6 +351,8 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                 if diagnostic.pixelColor(x, y).alpha() >= 128
             }
             assert len(diagnostic_colors) >= 3
+
+        assert rendered_icons["#111111"] != rendered_icons["#f5f5f5"]
     finally:
         qapp.setPalette(original_palette)
         wizard.close()
@@ -373,37 +378,30 @@ def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
         qapp.processEvents()
 
 
-def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkeypatch):
+def test_hidden_and_closed_wizards_do_not_react_to_other_wizard_focus(qapp):
     import main_wizard
 
-    calls = []
-    original = main_wizard.MainWizard._reveal_focused_control
-
-    def observe(self, previous, current):
-        calls.append(self)
-        return original(self, previous, current)
-
-    monkeypatch.setattr(main_wizard.MainWizard, "_reveal_focused_control", observe)
     first = main_wizard.MainWizard(path="new_dataset")
     second = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(first, qapp)
+        first_page = first.currentPage()
+        first_scroll = first_page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+        first_scroll.ensureWidgetVisible(first_page.diagnostic_Button)
+        qapp.processEvents()
+        first_scroll_value = first_scroll.verticalScrollBar().value()
         first.hide()
         qapp.processEvents()
-        assert first._focus_reveal_connected is False
 
         _show(second, qapp)
-        calls.clear()
         second.currentPage().onearm_mean_Button.setFocus()
         qapp.processEvents()
-        assert second in calls
-        assert first not in calls
+        assert first_scroll.verticalScrollBar().value() == first_scroll_value
 
         first.close()
-        calls.clear()
         second.currentPage().twoarm_means_Button.setFocus()
         qapp.processEvents()
-        assert first not in calls
+        assert second.currentPage().twoarm_means_Button.hasFocus()
     finally:
         first.close()
         second.close()

@@ -14,7 +14,9 @@ fail-closed checks:
   all-cell paint paths. The frozen deleted-node inventory contains only the 12
   tests whose underlying Qt5/pickle/generated-code surface was actually removed;
   every other collected node from the frozen 879-node historical baseline
-  remains represented. The final maintained strict taxonomy contains 893 nodes.
+  remains represented. The classification is historical evidence only; its
+  replacement references are checked at stable file paths rather than against
+  a live pytest node ledger.
 - `scripts/import_qt_modules.py` imports all 45 handwritten PyQt6-bearing
   modules in isolated warnings-as-errors processes after deterministic form and
   binary-resource generation. The same closed discovery output, including the

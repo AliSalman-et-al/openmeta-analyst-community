@@ -69,7 +69,7 @@ def test_exact_client_size_clears_sticky_maximized_state(qapp):
                 self.first_show = False
                 self.setWindowState(
                     self.windowState()
-                    | adaptive_layout_evidence.QtCore.Qt.WindowMaximized
+                    | adaptive_layout_evidence.QtCore.Qt.WindowState.WindowMaximized
                 )
 
         def showNormal(self):
@@ -83,7 +83,8 @@ def test_exact_client_size_clears_sticky_maximized_state(qapp):
 
     window = StickyMaximizedWindow()
     window.setWindowState(
-        window.windowState() | adaptive_layout_evidence.QtCore.Qt.WindowMaximized
+        window.windowState()
+        | adaptive_layout_evidence.QtCore.Qt.WindowState.WindowMaximized
     )
 
     try:

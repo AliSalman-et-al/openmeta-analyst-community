@@ -304,7 +304,7 @@ def _packaging_entry_points(root: Path, commit: str | None) -> list[str]:
     workflows = _source_tracked(root, commit, ".github/workflows/*.yml")
     packaging = _source_tracked(root, commit, "packaging/*", "packaging/**/*")
     script_pattern = re.compile(
-        r"(?:build-.+-package|package-.+|sign-.+|delivery|resolve_package_ci_metadata|verify_package_release)",
+        r"(?:build-.+-package|package-.+|sign-.+|delivery|resolve_package_ci_metadata)",
         re.IGNORECASE,
     )
     scripts = [

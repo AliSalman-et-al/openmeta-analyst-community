@@ -37,7 +37,7 @@ def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
     report = compare_golden_baseline(_baseline(), _current())
 
     assert report["passed"] is True
-    assert report["rows"][0]["classification"] == PASS
+    assert report["rows"][0]["classification"] == "pass"
     assert report["rows"][0]["id"] == "amino-binary-random"
 
 
@@ -48,10 +48,9 @@ def test_analysis_regression_comparison_classifies_numeric_drift_with_row_contex
     row = next(
         row
         for row in compare_golden_baseline(_baseline(), current)["rows"]
-        if row["classification"] == NUMERIC_DRIFT
+        if row["classification"] == "numeric_drift"
     )
 
-    assert row["classification"] == NUMERIC_DRIFT
     assert row["id"] == "amino-binary-random"
     assert "Summary.estimate" in row["detail"]
 
@@ -124,10 +123,9 @@ def test_analysis_regression_comparison_classifies_non_numeric_result_drift():
     row = next(
         row
         for row in compare_golden_baseline(_baseline(), current)["rows"]
-        if row["classification"] == TEXT_ARTIFACT_DRIFT
+        if row["classification"] == "text_artifact_drift"
     )
 
-    assert row["classification"] == TEXT_ARTIFACT_DRIFT
     assert row["id"] == "amino-binary-random"
 
 

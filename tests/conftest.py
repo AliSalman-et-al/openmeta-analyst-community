@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 from pathlib import Path
@@ -43,31 +42,12 @@ def _qapplication_for_qt_test_selections(request):
     return None
 
 
-def _taxonomy_entries():
-    taxonomy_path = _ROOT / "docs" / "verification" / "test-taxonomy.json"
-    try:
-        taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    return {
-        entry["nodeid"].replace("\\", "/"): entry
-        for entry in taxonomy.get("tests", [])
-        if isinstance(entry, dict) and "nodeid" in entry
-    }
-
-
-def _entry_requires_qt(entry):
-    return entry and (
-        "qt" in entry.get("external_dependencies", [])
-        or "gui_compatibility" in entry.get("evidence", [])
-    )
-
-
 @pytest.fixture(autouse=True)
 def _isolate_qsettings_for_qt_tests(request, tmp_path):
-    entries = _taxonomy_entries()
-    entry = entries.get(request.node.nodeid.replace("\\", "/"))
-    if not _entry_requires_qt(entry):
+    if not (
+        request.node.get_closest_marker("gui")
+        or request.node.get_closest_marker("qsettings")
+    ):
         return
 
     from PyQt6 import QtCore
@@ -81,17 +61,26 @@ def _isolate_qsettings_for_qt_tests(request, tmp_path):
 
 
 def pytest_collection_modifyitems(config, items):
-    entries = _taxonomy_entries()
     config._needs_qapplication = False
     for item in items:
-        entry = entries.get(item.nodeid.replace("\\", "/"))
-        if not entry:
-            continue
-        if _entry_requires_qt(entry):
-            config._needs_qapplication = True
-        marker_names = {entry.get("size"), entry.get("lane")}
-        marker_names.update(entry.get("evidence", []))
-        if entry.get("runtime_class") == "minutes":
-            marker_names.add("slow")
-        for marker_name in sorted(name for name in marker_names if name):
-            item.add_marker(marker_name)
+        relative = item.path.resolve().relative_to(_ROOT).as_posix()
+        lane = next(
+            (
+                marker
+                for marker, segment in (
+                    ("fast", "/python/fast/"),
+                    ("gui", "/python/gui/"),
+                    ("r_stack", "/r_stack/"),
+                    ("golden", "/analysis_regression/golden/"),
+                    ("packaging_contract", "/packaging/contract/"),
+                    ("packaged_smoke", "/packaged_smoke/"),
+                )
+                if segment in f"/{relative}"
+            ),
+            None,
+        )
+        if lane is not None and item.get_closest_marker(lane) is None:
+            item.add_marker(getattr(pytest.mark, lane))
+    config._needs_qapplication = any(
+        item.get_closest_marker("gui") is not None for item in items
+    )

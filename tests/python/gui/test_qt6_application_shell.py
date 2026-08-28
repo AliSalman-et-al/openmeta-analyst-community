@@ -14,6 +14,8 @@ import zipfile
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+
 
 ROOT = Path(__file__).resolve().parents[3]
 

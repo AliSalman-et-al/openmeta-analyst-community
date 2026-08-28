@@ -1,27 +1,17 @@
-import os
-import shutil
-import subprocess
 import textwrap
 
-import pytest
-
-
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+from _r_driver_support import build_r_driver, run_r_driver
 
 
 _DIAGNOSTIC_FEASIBILITY_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    __RCMETAR_BOOTSTRAP__
     required <- c("metafor", "HSROC")
     missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
     if (length(missing) > 0) {
       cat("SKIP missing R packages:", paste(missing, collapse=", "), "\n")
       quit(status=42)
     }
-
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
 
     entered.effects <- new(
       "DiagnosticData",
@@ -53,29 +43,9 @@ _DIAGNOSTIC_FEASIBILITY_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_DIAGNOSTIC_FEASIBILITY_DRIVER = build_r_driver(_DIAGNOSTIC_FEASIBILITY_DRIVER)
 
 
 def test_count_based_diagnostic_methods_require_counts():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_DIAGNOSTIC_FEASIBILITY_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    if result.returncode == 42:
-        pytest.skip(result.stdout.strip())
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_DIAGNOSTIC_FEASIBILITY_DRIVER)

@@ -15,7 +15,7 @@ The maintained Python 3 and Qt 5 path has replaced the retired release path afte
 
 ## Issue #34 release evidence
 
-- Local verification command: `scripts\verify-fast.ps1` runs the Fast Verification Lane; `scripts\package-windows.ps1` runs the explicit Windows Packaging Lane.
+- Local verification command: `uv run python scripts\verify.py fast --require-r-evidence` runs the Fast Verification Lane; `scripts\package-windows.ps1` runs the explicit Windows Packaging Lane.
 - Expected artifact: `RCMetaStudio-windows-x64.zip`.
 - Representative project-open samples: `sample_projects\BCG.rcms` and `sample_projects\amino.rcms`.
 - Help/legal target: About/Legal and static GitHub links replace the retired bundled help system.

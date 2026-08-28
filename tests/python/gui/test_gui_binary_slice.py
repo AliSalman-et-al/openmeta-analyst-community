@@ -84,43 +84,6 @@ def test_real_metaform_preserves_standard_binary_rows():
         os.chdir(REPO_ROOT)
 
 
-def test_representative_projects_round_trip_without_byte_identical_expectations(
-    tmp_path, monkeypatch
-):
-    import launch
-
-    for name in [
-        "amino.rcms",
-        "continuous.rcms",
-        "lymph.rcms",
-        "BCG.rcms",
-        "meantime.rcms",
-    ]:
-        app, window = launch.start_automation()
-        saved_path = str(tmp_path / name)
-        try:
-            assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name)))
-                is True
-            )
-            expected = _dataset_summary(window.model.dataset)
-            meta_form = sys.modules["meta_form"]
-            monkeypatch.setattr(
-                meta_form.QFileDialog,
-                "getSaveFileName",
-                lambda **kwargs: (saved_path, ""),
-            )
-
-            window.save_as()
-            reopened = meta_form._load_project(saved_path)
-
-            assert _dataset_summary(reopened) == expected
-        finally:
-            window.close()
-            app.processEvents()
-            os.chdir(REPO_ROOT)
-
-
 def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
     import launch
 

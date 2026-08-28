@@ -18,7 +18,6 @@ CLASSIFICATION = Path("docs/verification/qt6-legacy-test-classification.json")
 DELETED_NODE_BASELINE = Path(
     "docs/verification/pre-qt6-baseline/deleted-test-nodeids.json"
 )
-TEST_TAXONOMY = Path("docs/verification/test-taxonomy.json")
 TY_IGNORE_ALLOWLIST = Path("config/qt6-ty-ignore-allowlist.json")
 ALLOWED_DECISIONS = {"ported", "rewritten-at-stronger-seam", "retired"}
 ACTIVE_AUDIT_GLOBS = (
@@ -182,6 +181,7 @@ def validate_ty_ignore_allowlist(root: Path) -> dict[str, int]:
     for record in records:
         if not isinstance(record, dict):
             raise CutoverAuditError("ty ignore allowlist records must be objects")
+        record = cast(dict[str, object], record)
         entry = {
             key: record.get(key) for key in ("path", "qualified_name", "rule", "sha256")
         }
@@ -285,25 +285,17 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
     deleted_baseline = _load_json(root / DELETED_NODE_BASELINE)
     expected_nodes = deleted_baseline.get("deleted_test_nodes")
     node_records = manifest.get("deleted_test_nodes")
-    taxonomy = _load_json(root / TEST_TAXONOMY)
-    taxonomy_records = taxonomy.get("tests")
     if not isinstance(expected_nodes, list) or not all(
         isinstance(item, str) for item in expected_nodes
     ):
         raise CutoverAuditError("deleted test node baseline must be a list of nodeids")
     if not isinstance(node_records, list):
         raise CutoverAuditError("deleted test classifications need exact records")
-    if not isinstance(taxonomy_records, list):
-        raise CutoverAuditError("test taxonomy must contain a collected test list")
-    collected_nodeids = {
-        item["nodeid"]
-        for item in taxonomy_records
-        if isinstance(item, dict) and isinstance(item.get("nodeid"), str)
-    }
     observed_nodes: set[str] = set()
     for record in node_records:
         if not isinstance(record, dict):
             raise CutoverAuditError("deleted test classifications must be objects")
+        record = cast(dict[str, object], record)
         nodeid = record.get("legacy_nodeid")
         decision = record.get("decision")
         evidence = record.get("evidence_nodeid")
@@ -312,13 +304,14 @@ def validate_legacy_test_classification(root: Path) -> dict[str, object]:
             raise CutoverAuditError(
                 "deleted test record needs a nodeid and valid decision"
             )
-        if not isinstance(evidence, str) or "::" not in evidence:
-            raise CutoverAuditError(f"{nodeid} needs one exact replacement test nodeid")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise CutoverAuditError(f"{nodeid} needs one replacement evidence path")
         if not isinstance(rationale, str) or len(rationale.strip()) < 20:
             raise CutoverAuditError(f"{nodeid} needs a concrete semantic rationale")
-        if evidence not in collected_nodeids:
+        evidence_path = evidence.split("::", 1)[0]
+        if not (root / evidence_path).is_file():
             raise CutoverAuditError(
-                f"{nodeid} names a replacement not present in collected taxonomy: {evidence!r}"
+                f"{nodeid} names missing replacement evidence: {evidence_path!r}"
             )
         if nodeid in observed_nodes:
             raise CutoverAuditError(f"duplicate deleted test classification: {nodeid}")

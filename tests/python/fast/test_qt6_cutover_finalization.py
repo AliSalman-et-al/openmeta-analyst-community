@@ -304,6 +304,49 @@ def test_classification_rejects_missing_or_unnamed_replacement_evidence(tmp_path
         validate_legacy_test_classification(tmp_path)
 
 
+def test_classification_uses_replacement_file_paths_without_collecting_pytest_nodes(
+    tmp_path,
+):
+    baseline_root = tmp_path / "docs/verification/pre-qt6-baseline"
+    baseline_root.mkdir(parents=True)
+    (baseline_root / "qt-port-inventory.json").write_text(
+        json.dumps({"qt_bearing_tests": ["tests/old.py"]}), encoding="utf-8"
+    )
+    (baseline_root / "deleted-test-nodeids.json").write_text(
+        json.dumps({"deleted_test_nodes": ["tests/old.py::test_removed"]}),
+        encoding="utf-8",
+    )
+    replacement = tmp_path / "tests/replacement.py"
+    replacement.parent.mkdir()
+    replacement.write_text("def test_replacement(): pass\n", encoding="utf-8")
+    (tmp_path / "docs/verification/qt6-legacy-test-classification.json").write_text(
+        json.dumps(
+            {
+                "classifications": [
+                    {
+                        "legacy_test": "tests/old.py",
+                        "decision": "retired",
+                        "evidence": ["tests/replacement.py"],
+                    }
+                ],
+                "deleted_test_nodes": [
+                    {
+                        "legacy_nodeid": "tests/old.py::test_removed",
+                        "decision": "retired",
+                        "evidence_nodeid": "tests/replacement.py::not_collected",
+                        "rationale": "The maintained replacement file is the stable evidence boundary.",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_legacy_test_classification(tmp_path)
+
+    assert result["classified_deleted_nodes"] == 1
+
+
 def test_cutover_audit_rejects_runtime_pickle_and_generated_python(tmp_path):
     source = tmp_path / "src/rc_metastudio"
     forms = source / "forms"

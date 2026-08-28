@@ -9,9 +9,10 @@ execution remains unchanged; no worker thread or process owns the embedded R
 runtime. Every binary, continuous, diagnostic, and workflow backend call is
 made from the frozen request; execution helpers do not read the dialog again.
 
-The maintained Qt6 lane runs the configuration, failure, diagnostic, and Golden
-Analysis tests and then executes `scripts/native_analysis_smoke.py` with the
-native platform plugin and fatal Qt warnings. The smoke retains a visible
+The maintained Qt6 lane runs the GUI configuration, failure, and diagnostic
+analysis tests and then executes `scripts/native_analysis_smoke.py` with the
+native platform plugin and fatal Qt warnings. Golden Analysis tests belong to
+the fast source lane. The native smoke retains a visible
 configuration screenshot and JSON evidence under
 `build/qt6-verification/native-analysis`. The evidence proves a comma-decimal
 confidence level reaches the actual backend as `90.5`. It drives the production
@@ -25,10 +26,10 @@ progress surfaces.
 Real statistical behavior is qualified separately with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
+uv run python scripts\verify.py r-stack
 ```
 
-That gate is also invoked by `scripts/verify-qt6.ps1`; it requires the exact
+That gate requires the exact
 locked `rpy2`, `rpy2-rinterface`, and `rpy2-robjects` distribution identities
 through `importlib.metadata`, records them in both version maps in every Golden
 capture, validates the R and package identities, builds and checks RCMetaR,

@@ -3,9 +3,10 @@
 """Diagnostic outcome data entry dialog."""
 
 import copy
+from contextlib import ExitStack
 from functools import partial
 
-from PyQt6.QtCore import QEvent, QObject, QTimer, Qt
+from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
 from PyQt6.QtWidgets import (
     QDialog,
@@ -366,36 +367,34 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
         try:
             str_val = "" if val in EMPTY_VALS else str(int(val))
-            self.two_by_two_table.blockSignals(True)
-            if self.two_by_two_table.item(row, col) == None:
-                self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
-            else:
-                required(
+            with QSignalBlocker(self.two_by_two_table):
+                if self.two_by_two_table.item(row, col) == None:
+                    self.two_by_two_table.setItem(row, col, QTableWidgetItem(str_val))
+                else:
+                    required(
+                        self.two_by_two_table.item(row, col),
+                        f"diagnostic table cell ({row}, {col})",
+                    ).setText(str_val)
+                calc_fncs.set_table_item_editable(
                     self.two_by_two_table.item(row, col),
-                    f"diagnostic table cell ({row}, {col})",
-                ).setText(str_val)
-            calc_fncs.set_table_item_editable(
-                self.two_by_two_table.item(row, col),
-                self._raw_count_cell_is_editable(row, col),
-            )
-            self.two_by_two_table.blockSignals(False)
+                    self._raw_count_cell_is_editable(row, col),
+                )
         except:
             print(("Got to except in _set_val when trying to set (%d,%d)" % (row, col)))
 
     def _set_vals(self, computed_d):
         """Sets values in table widget"""
 
-        self.two_by_two_table.blockSignals(True)
-        self._set_val(0, 0, computed_d["c11"])
-        self._set_val(0, 1, computed_d["c12"])
-        self._set_val(1, 0, computed_d["c21"])
-        self._set_val(1, 1, computed_d["c22"])
-        self._set_val(0, 2, computed_d["r1sum"])
-        self._set_val(1, 2, computed_d["r2sum"])
-        self._set_val(2, 0, computed_d["c1sum"])
-        self._set_val(2, 1, computed_d["c2sum"])
-        self._set_val(2, 2, computed_d["total"])
-        self.two_by_two_table.blockSignals(False)
+        with QSignalBlocker(self.two_by_two_table):
+            self._set_val(0, 0, computed_d["c11"])
+            self._set_val(0, 1, computed_d["c12"])
+            self._set_val(1, 0, computed_d["c21"])
+            self._set_val(1, 1, computed_d["c22"])
+            self._set_val(0, 2, computed_d["r1sum"])
+            self._set_val(1, 2, computed_d["r2sum"])
+            self._set_val(2, 0, computed_d["c1sum"])
+            self._set_val(2, 1, computed_d["c2sum"])
+            self._set_val(2, 2, computed_d["total"])
 
     def _get_prevalence_str(self):
         return str(self.prevalence_txt_box.text())
@@ -493,9 +492,7 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
         for row in range(nrows):
             for col in range(ncols):
-                self.two_by_two_table.blockSignals(True)
                 self._set_val(row, col, old_table_data[row][col])
-                self.two_by_two_table.blockSignals(False)
         self._update_data_table()
         self._mark_table_consistent()
 
@@ -652,23 +649,23 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
             mult=self.mult,
         )
 
-        calc_fncs.block_signals(self.entry_widgets, True)
-        try:
-            if val_str == "est" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-            elif val_str == "lower" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-            elif val_str == "upper" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-            elif val_str == "prevalence" and not is_empty(new_text):
-                get_disp_scale_val_if_valid(
-                    opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
-                    opt_cmp_msg="Prevalence must be between 0 and 1.",
-                )
-        except:
-            calc_fncs.block_signals(self.entry_widgets, False)
-            return False, False
-        calc_fncs.block_signals(self.entry_widgets, False)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            try:
+                if val_str == "est" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
+                elif val_str == "lower" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
+                elif val_str == "upper" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
+                elif val_str == "prevalence" and not is_empty(new_text):
+                    get_disp_scale_val_if_valid(
+                        opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
+                        opt_cmp_msg="Prevalence must be between 0 and 1.",
+                    )
+            except:
+                return False, False
         return True, display_scale_val
 
     def _get_txt_from_val_str(self, val_str):
@@ -697,16 +694,17 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
         if no_errors is False:  # There are errors
             guidance = self._validation_guidance(val_str, new_text)
             self.restore_ma_unit_and_table(old_ma_unit, old_table, old_prevalence)
-            calc_fncs.block_signals(self.entry_widgets, True)
-            if val_str == "est":
-                self.effect_txt_box.setFocus()
-            elif val_str == "lower":
-                self.low_txt_box.setFocus()
-            elif val_str == "upper":
-                self.high_txt_box.setFocus()
-            elif val_str == "prevalence":
-                self.prevalence_txt_box.setFocus()
-            calc_fncs.block_signals(self.entry_widgets, False)
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                if val_str == "est":
+                    self.effect_txt_box.setFocus()
+                elif val_str == "lower":
+                    self.low_txt_box.setFocus()
+                elif val_str == "upper":
+                    self.high_txt_box.setFocus()
+                elif val_str == "prevalence":
+                    self.prevalence_txt_box.setFocus()
             self._mark_table_invalid(guidance)
             return
 
@@ -789,28 +787,26 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
     def _update_raw_data(self):
         """populates the 2x2 table with whatever parametric data was provided"""
-        self.two_by_two_table.blockSignals(True)
-        field_index = 0
-        for col in (0, 1):
-            for row in (0, 1):
-                val = self.ma_unit.get_raw_data_for_group(self.group_str)[field_index]
-                if val is not None:
-                    try:
-                        val = str(int(val))
-                    except:
-                        val = str(val)
-                    item = QTableWidgetItem(val)
-                    self.two_by_two_table.setItem(row, col, item)
-                field_index += 1
-        self.two_by_two_table.blockSignals(False)
+        with QSignalBlocker(self.two_by_two_table):
+            field_index = 0
+            for col in (0, 1):
+                for row in (0, 1):
+                    val = self.ma_unit.get_raw_data_for_group(self.group_str)[field_index]
+                    if val is not None:
+                        try:
+                            val = str(int(val))
+                        except:
+                            val = str(val)
+                        item = QTableWidgetItem(val)
+                        self.two_by_two_table.setItem(row, col, item)
+                    field_index += 1
 
     def _populate_effect_cmbo_box(self):
         # Back-calculation is currently supported for sensitivity/specificity.
         effects = BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS
-        self.effect_cbo_box.blockSignals(True)
-        self.effect_cbo_box.addItems(effects)
-        self.effect_cbo_box.setCurrentIndex(0)
-        self.effect_cbo_box.blockSignals(False)
+        with QSignalBlocker(self.effect_cbo_box):
+            self.effect_cbo_box.addItems(effects)
+            self.effect_cbo_box.setCurrentIndex(0)
 
     def set_current_effect(self):
         """Fill in effect text boxes with data from ma_unit"""
@@ -832,26 +828,25 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
     def _update_data_table(self):
         """Try to calculate rest of 2x2 table from existing cells"""
 
-        calc_fncs.block_signals(self.entry_widgets, True)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            params = self._get_table_vals()
+            computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
+            print("Computed Params", computed_params)
+            if computed_params:
+                self._set_vals(computed_params)  # computed --> table widget
 
-        params = self._get_table_vals()
-        computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
-        print("Computed Params", computed_params)
-        if computed_params:
-            self._set_vals(computed_params)  # computed --> table widget
-
-        # Compute prevalence if possible
-        if (not computed_params["c1sum"] in EMPTY_VALS) and (
-            not computed_params["total"] in EMPTY_VALS
-        ):
-            prevalence = float(computed_params["c1sum"]) / float(
-                computed_params["total"]
-            )
-            prev_str = str(prevalence)[:7]
-            self.prevalence_txt_box.setText("%s" % prev_str)
-            self.enable_txt_box_input()
-
-        calc_fncs.block_signals(self.entry_widgets, False)
+            # Compute prevalence if possible
+            if (not computed_params["c1sum"] in EMPTY_VALS) and (
+                not computed_params["total"] in EMPTY_VALS
+            ):
+                prevalence = float(computed_params["c1sum"]) / float(
+                    computed_params["total"]
+                )
+                prev_str = str(prevalence)[:7]
+                self.prevalence_txt_box.setText("%s" % prev_str)
+                self.enable_txt_box_input()
         self._grow_all_raw_data_columns_to_contents()
 
     def clear_column(self, col):
@@ -884,9 +879,8 @@ class DiagnosticDataForm(QDialog, Ui_DiagnosticDataForm):
 
         # clear line edits
         self.set_current_effect()
-        self.prevalence_txt_box.blockSignals(True)
-        self.prevalence_txt_box.setText("")
-        self.prevalence_txt_box.blockSignals(False)
+        with QSignalBlocker(self.prevalence_txt_box):
+            self.prevalence_txt_box.setText("")
 
         calc_fncs.set_table_cells_editable(
             self.two_by_two_table, DIAGNOSTIC_RAW_COUNT_CELLS

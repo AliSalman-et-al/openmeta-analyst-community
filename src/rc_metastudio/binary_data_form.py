@@ -3,9 +3,10 @@
 """Binary outcome data entry dialog."""
 
 import copy
+from contextlib import ExitStack
 from functools import partial
 
-from PyQt6.QtCore import QEvent, QObject, QTimer, Qt
+from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
 from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette, QUndoStack
 from PyQt6.QtWidgets import (
     QDialog,
@@ -337,21 +338,19 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             # rewrite either the table or its copied model until it accepts.
             for x in range(3):
                 self.clear_column(x)
-            self.raw_data_table.blockSignals(True)
-            group_1_events = int(round(imputed[choice]["a"]))
-            group_1_total = int(round(imputed[choice]["b"]))
-            group_2_events = int(round(imputed[choice]["c"]))
-            group_2_total = int(round(imputed[choice]["d"]))
-            self._set_val(0, 0, group_1_events)
-            self._set_val(0, 1, group_1_total - group_1_events)
-            self._set_val(1, 0, group_2_events)
-            self._set_val(1, 1, group_2_total - group_2_events)
-            self.raw_data_table.blockSignals(False)
+            with QSignalBlocker(self.raw_data_table):
+                group_1_events = int(round(imputed[choice]["a"]))
+                group_1_total = int(round(imputed[choice]["b"]))
+                group_2_events = int(round(imputed[choice]["c"]))
+                group_2_total = int(round(imputed[choice]["d"]))
+                self._set_val(0, 0, group_1_events)
+                self._set_val(0, 1, group_1_total - group_1_events)
+                self._set_val(1, 0, group_2_events)
+                self._set_val(1, 1, group_2_total - group_2_events)
 
             self._update_data_table()
             self._update_ma_unit()  # save in ma_unit
         except BaseException:
-            self.raw_data_table.blockSignals(False)
             self.restore_ma_unit_and_table(old_ma_unit, old_table)
             raise
         # self.set_clear_btn_color()
@@ -420,16 +419,13 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         return False
 
     def _refresh_raw_data_editability(self):
-        self.raw_data_table.blockSignals(True)
-        try:
+        with QSignalBlocker(self.raw_data_table):
             for row in range(self.raw_data_table.rowCount()):
                 for col in range(self.raw_data_table.columnCount()):
                     calc_fncs.set_table_item_editable(
                         self.raw_data_table.item(row, col),
                         self._raw_count_cell_is_editable(row, col),
                     )
-        finally:
-            self.raw_data_table.blockSignals(False)
 
     def on_raw_data_table_currentCellChanged(
         self, currentRow, currentColumn, previousRow, previousColumn
@@ -497,21 +493,20 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         q_effects = [effect for effect in metric_family if effect in available_effects]
         if self.cur_effect not in q_effects:
             q_effects.append(str(self.cur_effect))
-        self.effect_cbo_box.blockSignals(True)
-        self.effect_cbo_box.clear()
-        for effect in q_effects:
-            self.effect_cbo_box.addItem(
-                self._effect_display_label(effect), userData=effect
+        with QSignalBlocker(self.effect_cbo_box):
+            self.effect_cbo_box.clear()
+            for effect in q_effects:
+                self.effect_cbo_box.addItem(
+                    self._effect_display_label(effect), userData=effect
+                )
+            # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+            self.effect_cbo_box.setMinimumWidth(0)
+            # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
+            self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
+            self.effect_cbo_box.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
             )
-        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-        self.effect_cbo_box.setMinimumWidth(0)
-        # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-        self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
-        self.effect_cbo_box.blockSignals(False)
+            self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self._update_effect_choice_accessibility()
         self._request_content_refit()
 
@@ -574,9 +569,8 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
                 else:
                     # just reset the item
                     text = item.text()
-                    self.raw_data_table.blockSignals(True)
-                    popped_item = self.raw_data_table.takeItem(row, col)
-                    self.raw_data_table.blockSignals(False)
+                    with QSignalBlocker(self.raw_data_table):
+                        popped_item = self.raw_data_table.takeItem(row, col)
                     del popped_item
                     self._set_val(row, col, text)
 
@@ -611,18 +605,18 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             mult=self.mult,
         )
 
-        calc_fncs.block_signals(self.entry_widgets, True)
-        try:
-            if val_str == "est" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-            elif val_str == "lower" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-            elif val_str == "upper" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-        except Exception:
-            calc_fncs.block_signals(self.entry_widgets, False)
-            return False, False
-        calc_fncs.block_signals(self.entry_widgets, False)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            try:
+                if val_str == "est" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
+                elif val_str == "lower" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
+                elif val_str == "upper" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
+            except Exception:
+                return False, False
         print(("Val_str: %s" % val_str))
         return True, display_scale_val
 
@@ -648,14 +642,15 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         )
         if no_errors is False:  # There are errors
             self.restore_ma_unit_and_table(old_ma_unit, old_table)
-            calc_fncs.block_signals(self.entry_widgets, True)
-            if val_str == "est":
-                self.effect_txt_box.setFocus()
-            elif val_str == "lower":
-                self.low_txt_box.setFocus()
-            elif val_str == "upper":
-                self.high_txt_box.setFocus()
-            calc_fncs.block_signals(self.entry_widgets, False)
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                if val_str == "est":
+                    self.effect_txt_box.setFocus()
+                elif val_str == "lower":
+                    self.low_txt_box.setFocus()
+                elif val_str == "upper":
+                    self.high_txt_box.setFocus()
             return
 
         # If we got to this point it means everything is ok so far
@@ -770,9 +765,7 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
 
         for row in range(nrows):
             for col in range(ncols):
-                self.raw_data_table.blockSignals(True)
                 self._set_val(row, col, old_table[row][col])
-                self.raw_data_table.blockSignals(False)
         self._update_data_table()
         self._mark_table_consistent()
 
@@ -878,25 +871,22 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
         """Clears out column in table and ma_unit"""
 
         for row in range(3):
-            self.raw_data_table.blockSignals(True)
             self._set_val(row, col, None)
-            self.raw_data_table.blockSignals(False)
 
         self._update_ma_unit()
 
     def _set_vals(self, computed_d):
         """Sets values in table widget"""
-        self.raw_data_table.blockSignals(True)
-        self._set_val(0, 0, computed_d["c11"])
-        self._set_val(0, 1, computed_d["c12"])
-        self._set_val(1, 0, computed_d["c21"])
-        self._set_val(1, 1, computed_d["c22"])
-        self._set_val(0, 2, computed_d["r1sum"])
-        self._set_val(1, 2, computed_d["r2sum"])
-        self._set_val(2, 0, computed_d["c1sum"])
-        self._set_val(2, 1, computed_d["c2sum"])
-        self._set_val(2, 2, computed_d["total"])
-        self.raw_data_table.blockSignals(False)
+        with QSignalBlocker(self.raw_data_table):
+            self._set_val(0, 0, computed_d["c11"])
+            self._set_val(0, 1, computed_d["c12"])
+            self._set_val(1, 0, computed_d["c21"])
+            self._set_val(1, 1, computed_d["c22"])
+            self._set_val(0, 2, computed_d["r1sum"])
+            self._set_val(1, 2, computed_d["r2sum"])
+            self._set_val(2, 0, computed_d["c1sum"])
+            self._set_val(2, 1, computed_d["c2sum"])
+            self._set_val(2, 2, computed_d["total"])
 
     def _set_val(self, row, col, val):
         if is_NaN(val):  # get out quick
@@ -904,28 +894,27 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
             return
 
         try:
-            self.raw_data_table.blockSignals(True)
-            str_val = "" if val in EMPTY_VALS else str(int(val))
-            if self.raw_data_table.item(row, col) == None:
-                self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
-            else:
-                required(
+            with QSignalBlocker(self.raw_data_table):
+                str_val = "" if val in EMPTY_VALS else str(int(val))
+                if self.raw_data_table.item(row, col) == None:
+                    self.raw_data_table.setItem(row, col, QTableWidgetItem(str_val))
+                else:
+                    required(
+                        self.raw_data_table.item(row, col),
+                        f"binary table cell ({row}, {col})",
+                    ).setText(str_val)
+                calc_fncs.set_table_item_editable(
                     self.raw_data_table.item(row, col),
-                    f"binary table cell ({row}, {col})",
-                ).setText(str_val)
-            calc_fncs.set_table_item_editable(
-                self.raw_data_table.item(row, col),
-                self._raw_count_cell_is_editable(row, col),
-            )
-            print(("    setting (%d,%d) to '%s'" % (row, col, str_val)))
+                    self._raw_count_cell_is_editable(row, col),
+                )
+                print(("    setting (%d,%d) to '%s'" % (row, col, str_val)))
 
-            #            # disable item
-            #            if str_val != "":
-            #                item = self.raw_data_table.item(row, col)
-            #                newflags = item.flags() & ~Qt.ItemIsEditable
-            #                item.setFlags(newflags)
+                #            # disable item
+                #            if str_val != "":
+                #            item = self.raw_data_table.item(row, col)
+                #            newflags = item.flags() & ~Qt.ItemFlag.ItemIsEditable
+                #            item.setFlags(newflags)
 
-            self.raw_data_table.blockSignals(False)
         except:
             print(
                 (
@@ -938,26 +927,23 @@ class BinaryDataForm2(QDialog, forms.ui_binary_data_form.Ui_BinaryDataForm):
     def _update_data_table(self):
         """Fill in 2x2 table from other entries in the table"""
 
-        self.raw_data_table.blockSignals(True)
-
-        params = self._get_table_vals()
-        computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
-        for total_name in ("r1sum", "r2sum"):
-            if computed_params[total_name] in EMPTY_VALS:
-                computed_params[total_name] = params[total_name]
-        if (
-            computed_params["total"] in EMPTY_VALS
-            and computed_params["r1sum"] not in EMPTY_VALS
-            and computed_params["r2sum"] not in EMPTY_VALS
-        ):
-            computed_params["total"] = (
-                computed_params["r1sum"] + computed_params["r2sum"]
-            )
-        print("Computed Params", computed_params)
-        if computed_params:
-            self._set_vals(computed_params)  # computed --> table widget
-
-        self.raw_data_table.blockSignals(False)
+        with QSignalBlocker(self.raw_data_table):
+            params = self._get_table_vals()
+            computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
+            for total_name in ("r1sum", "r2sum"):
+                if computed_params[total_name] in EMPTY_VALS:
+                    computed_params[total_name] = params[total_name]
+            if (
+                computed_params["total"] in EMPTY_VALS
+                and computed_params["r1sum"] not in EMPTY_VALS
+                and computed_params["r2sum"] not in EMPTY_VALS
+            ):
+                computed_params["total"] = (
+                    computed_params["r1sum"] + computed_params["r2sum"]
+                )
+            print("Computed Params", computed_params)
+            if computed_params:
+                self._set_vals(computed_params)  # computed --> table widget
 
     def _is_empty(self, i, j):
         val = self.raw_data_table.item(i, j)

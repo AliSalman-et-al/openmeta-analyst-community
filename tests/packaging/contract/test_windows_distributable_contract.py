@@ -10,6 +10,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from _workflow import load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -21,6 +22,15 @@ def _load_source_provenance():
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_package_input_policy():
+    path = ROOT / "scripts" / "package_input_policy.py"
+    spec = importlib.util.spec_from_file_location("package_input_policy", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
@@ -89,74 +99,9 @@ def sh_contract(*parts):
     }
 
 
-def workflow_contract(*parts):
-    text = read_repo_text(*parts)
-    trigger_text = text[text.index("on:") : text.index("\npermissions:")]
-    jobs = set(re.findall(r"(?m)^  ([A-Za-z0-9_-]+):$", text))
-    steps_by_job = {}
-    needs_by_job = {}
-    current_job = None
-    for line in text.splitlines():
-        job_match = re.match(r"^  ([A-Za-z0-9_-]+):$", line)
-        if job_match:
-            current_job = job_match.group(1)
-            steps_by_job[current_job] = []
-            continue
-        needs_scalar_match = re.match(r"^    needs:\s+([A-Za-z0-9_-]+)$", line)
-        if needs_scalar_match and current_job:
-            needs_by_job[current_job] = {needs_scalar_match.group(1)}
-            continue
-        needs_list_match = re.match(r"^      - ([A-Za-z0-9_-]+)$", line)
-        if needs_list_match and current_job and current_job in needs_by_job:
-            needs_by_job[current_job].add(needs_list_match.group(1))
-            continue
-        if re.match(r"^    needs:\s*$", line) and current_job:
-            needs_by_job[current_job] = set()
-            continue
-        step_match = re.match(r"^\s{6}- name: (.+)$", line)
-        if step_match and current_job:
-            steps_by_job[current_job].append(step_match.group(1))
-    return {
-        "text": text,
-        "jobs": jobs,
-        "steps_by_job": steps_by_job,
-        "uses": re.findall(
-            r"uses:\s+([^@\s]+)@([0-9a-f]{40})(?:\s+#\s+([^\s]+))?", text
-        ),
-        "legacy_uses": re.findall(r"uses:\s+[^@\s]+@v\d+", text),
-        "runs": re.findall(r"run:\s+(.+)", text),
-        "paths": set(re.findall(r'^\s+- "([^"]+)"$', text, re.MULTILINE)),
-        "events": set(re.findall(r"(?m)^  ([a-z_]+):(?:$|\n)", trigger_text)),
-        "cache_keys": re.findall(r"key:\s+(.+)", text),
-        "cache_paths": set(re.findall(r"(?m)^\s+path:\s+(.+)$", text)),
-        "restore_keys": re.findall(r"restore-keys:", text),
-        "env": dict(re.findall(r"(?m)^  ([A-Z0-9_]+):\s+(.+)$", text)),
-        "needs": needs_by_job,
-    }
-
-
 def relative_order(text, *needles):
     positions = [text.index(needle) for needle in needles]
     return positions == sorted(positions)
-
-
-def pytest_path_tokens(text):
-    return set(
-        re.findall(
-            r"tests[/\\](?:python|analysis_regression|packaging|r_stack)(?:[/\\][A-Za-z_]+)?",
-            text,
-        )
-    )
-
-
-def pytest_option_tokens(text):
-    return set(
-        re.findall(r"(?<![A-Za-z0-9_-])(--dist|-n|loadfile|4)(?![A-Za-z0-9_-])", text)
-    )
-
-
-def project_dependencies():
-    return set(re.findall(r'"([^"]+)"', read_repo_text("pyproject.toml")))
 
 
 def test_windows_distributable_contract_is_declared():
@@ -206,11 +151,7 @@ def test_windows_distributable_contract_is_declared():
         in spec
     )
     assert (
-        ROOT
-        / "src"
-        / "rc_metastudio"
-        / "images"
-        / "rc-metastudio-app-icon-rounded.ico"
+        ROOT / "src" / "rc_metastudio" / "images" / "rc-metastudio-app-icon-rounded.ico"
     ).is_file()
     assert (ROOT / "packaging" / "pyinstaller" / "rc-metastudio.spec").exists()
     assert "sole authoritative" in script["text"]
@@ -247,7 +188,7 @@ def test_windows_build_never_reuses_an_installed_r_library_tree():
 
 def test_windows_archive_is_version_derived_and_requalified_after_extraction():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
-    workflow = workflow_contract(".github", "workflows", "package-windows.yml")
+    workflow = load_workflow(".github", "workflows", "package-windows.yml")
 
     assert '$artifactName = "RCMetaStudio-$projectVersion-windows-x64"' in script
     assert "$archiveRootName = $artifactName" in script
@@ -258,10 +199,12 @@ def test_windows_archive_is_version_derived_and_requalified_after_extraction():
         in script
     )
     assert "Invoke-PackagedAppSmokeTest -Root $extractedApp" in script
-    assert (
-        "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-windows-x64.zip"
-        in workflow["text"]
+    upload = next(
+        step
+        for step in workflow["jobs"]["package"]["steps"]
+        if step.get("name") == "Upload package and qualification evidence"
     )
+    assert "steps.package-metadata.outputs.version" in upload["with"]["name"]
 
 
 def test_packaged_smoke_launches_with_positional_project_argument():
@@ -296,60 +239,53 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
     assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
 
-def test_fast_workflow_runs_smoke_before_fast_verification():
-    workflow = workflow_contract(".github", "workflows", "fast-verification.yml")
+def test_fast_workflow_uses_one_runner_command_per_target():
+    workflow = load_workflow(".github", "workflows", "fast-verification.yml")
+    jobs = workflow["jobs"]
 
     assert {
         "change-classifier",
         "qt6-verification",
         "remaining-surface-verification",
         "source-fast-targets",
+        "full-r-stack",
         "windows-package-qualification",
+        "packaging-contract",
+        "packaging-contract-macos",
         "fast-verification-gate",
-    } <= workflow["jobs"]
-    assert workflow["needs"]["source-fast-targets"] == {"change-classifier"}
-    assert workflow["needs"]["remaining-surface-verification"] == {
-        "change-classifier"
-    }
-    assert workflow["needs"]["fast-verification-gate"] == {
+    } <= set(jobs)
+    assert jobs["source-fast-targets"]["needs"] == "change-classifier"
+    assert jobs["remaining-surface-verification"]["needs"] == "change-classifier"
+    assert jobs["full-r-stack"]["needs"] == "change-classifier"
+    assert "run-windows" in jobs["full-r-stack"]["if"]
+    assert jobs["full-r-stack"]["runs-on"] == "windows-latest"
+    assert jobs["full-r-stack"]["timeout-minutes"] == 60
+    assert "strategy" not in jobs["full-r-stack"]
+    assert set(jobs["fast-verification-gate"]["needs"]) == {
         "change-classifier",
         "qt6-verification",
         "remaining-surface-verification",
         "source-fast-targets",
+        "full-r-stack",
         "windows-package-qualification",
+        "packaging-contract",
+        "packaging-contract-macos",
     }
-    assert workflow["events"] == {"workflow_dispatch", "push", "pull_request"}
-    assert workflow["legacy_uses"] == []
-    assert all(
-        ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref)
-        for _, ref, _ in workflow["uses"]
-    )
-    assert "src/*" in workflow["text"]
-    assert "tests/*" in workflow["text"]
-    assert (
-        ".github/workflows/*|.python-version|pyproject.toml|uv.lock|config/*|"
-        "docs/verification/*|r/*|scripts/*|src/*|tests/*" in workflow["text"]
-    )
-    for critical_input in (
-        "config/qt6-ty-ignore-allowlist.json",
-        "scripts/import_qt_modules.py",
-        "src/rc_metastudio/qt6_cutover.py",
-    ):
-        top_level = critical_input.split("/", 1)[0]
-        assert f"{top_level}/*" in workflow["text"]
-    assert (
-        workflow["text"].count("needs.change-classifier.outputs.run-windows == 'true'")
-        == 3
-    )
-    assert (
-        "needs.change-classifier.outputs.run-windows-package == 'true'"
-        in workflow["text"]
-    )
+    assert set(workflow["on"]) == {"workflow_dispatch", "push", "pull_request"}
+    assert workflow["on"]["push"]["branches"] == ["master"]
+    assert jobs["packaging-contract"]["needs"] == "change-classifier"
+    assert jobs["packaging-contract-macos"]["needs"] == "change-classifier"
+    assert "run-windows-package" in jobs["packaging-contract"]["if"]
+    assert "run-windows-package" in jobs["windows-package-qualification"]["if"]
+    policy = _load_package_input_policy()
     for package_input in (
+        ".github/workflows/package-windows.yml",
+        ".github/workflows/macos-trusted-release-candidate.yml",
+        ".github/workflows/notarization-status.yml",
+        ".github/workflows/promote.yml",
         "sample_projects/*",
         "scripts/build_qt6.py",
         "scripts/test-bounded-package-process.ps1",
-        "scripts/verify_package_release.py",
         "scripts/resolve_package_ci_metadata.py",
         "scripts/validate_adaptive_layout_evidence.py",
         "docs/verification/RCMetaR-r-dependencies.json",
@@ -360,204 +296,171 @@ def test_fast_workflow_runs_smoke_before_fast_verification():
         "tests/python/fast/test_qt_text_boundaries.py",
         "tests/python/gui/test_metaform_automation_launch.py",
     ):
-        policy_path = ROOT / "scripts" / "package_input_policy.py"
-        policy_spec = importlib.util.spec_from_file_location(
-            "package_input_policy_for_contract", policy_path
-        )
-        assert policy_spec is not None and policy_spec.loader is not None
-        policy = importlib.util.module_from_spec(policy_spec)
-        policy_spec.loader.exec_module(policy)
         assert policy.requires_package_qualification([package_input])
-    assert "Required Windows x64 Package Qualification" in workflow["text"]
-    assert "Required Windows x64 package qualification result" in workflow["text"]
-    assert "Required macOS Intel x64 Package Qualification" not in workflow["text"]
-    assert "docs/verification/*" in workflow["text"]
-    assert ".\\scripts\\verify-smoke.ps1 -Sync" in workflow["text"]
-    assert ".\\scripts\\verify-fast.ps1 -StrictTaxonomy" in workflow["text"]
-    assert "bash ./scripts/verify-smoke.sh --require-r-evidence" in workflow["text"]
-    assert "bash ./scripts/verify-smoke.sh --sync" not in workflow["text"]
-    assert "bash ./scripts/verify-fast.sh --strict-taxonomy" in workflow["text"]
-    for target in ("windows-x64", "macos-x64", "macos-arm64"):
-        assert target in workflow["text"]
-    assert "Qt6 Verification Change Classifier" in workflow["text"]
-    assert "Qt6 Integration Verification Gate" in workflow["text"]
-    assert "pull-requests: read" in workflow["text"]
-    assert "gh api --paginate" in workflow["text"]
-    assert "branches:" in workflow["text"]
-    assert "- master" in workflow["text"]
-    assert 'if [ "$EVENT_NAME" = "push" ]; then' in workflow["text"]
-    assert (
-        "No Qt6 verification inputs changed; Windows lane intentionally skipped."
-        in workflow["text"]
-    )
-    assert "timeout-minutes: 45" in workflow["text"]
-    assert workflow["text"].count("fetch-depth: 0") == 2
-    assert "brew install libpng pkg-config" in workflow["text"]
-    assert 'libpng_prefix="$(brew --prefix libpng)"' in workflow["text"]
-    assert 'mkdir -p "$HOME/.R"' in workflow["text"]
-    assert '>> "$HOME/.R/Makevars"' in workflow["text"]
-    assert "CPPFLAGS += -I%s/include" in workflow["text"]
-    assert "LDFLAGS += -L%s/lib" in workflow["text"]
-    for variable in ("CPPFLAGS", "LDFLAGS", "PKG_CONFIG_PATH"):
-        assert f"{variable}=" in workflow["text"]
-    assert "qt-sdk-6.11.1-${{ matrix.target }}" in workflow["text"]
-    assert "uv run aqt install-qt mac desktop 6.11.1 clang_64" in workflow["text"]
-    assert "qt6_macos_feasibility.py resolve-rcc" in workflow["text"]
-    assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in workflow["text"]
-    assert '--github-env "$GITHUB_ENV"' in workflow["text"]
     assert (
         workflow["env"]["RCMS_CRAN_REPO"]
         == "https://packagemanager.posit.co/cran/2026-07-16"
     )
-    assert (
-        "r-default-evidence-v2-${{ matrix.target }}-r-4.6.1-public-ppm-2026-07-16"
-        in workflow["text"]
+    assert jobs["qt6-verification"]["timeout-minutes"] == 45
+    assert jobs["source-fast-targets"]["strategy"]["matrix"]["include"] == [
+        {"target": "windows-x64", "runner": "windows-latest", "platform": "windows"},
+        {"target": "macos-x64", "runner": "macos-15-intel", "platform": "macos"},
+        {"target": "macos-arm64", "runner": "macos-15", "platform": "macos"},
+    ]
+    refs = []
+
+    def collect(value):
+        if isinstance(value, dict):
+            if "uses" in value:
+                refs.append(value["uses"])
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    collect(workflow)
+    assert all(
+        ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref.rsplit("@", 1)[-1])
+        for ref in refs
     )
-    assert "use-public-rspm: true" in workflow["text"]
+    source_fast_steps = {
+        step["name"]: step
+        for step in jobs["source-fast-targets"]["steps"]
+        if "name" in step
+    }
+    source_fast = "\n".join(
+        str(step.get("run", "")) for step in source_fast_steps.values()
+    )
+    assert source_fast.count("verify.py fast") == 2
+    assert "verify-smoke" not in source_fast
+    assert "verify_rcmetar_r_default.py" not in source_fast
+    assert source_fast_steps["Run Fast Verification on Windows"]["run"] == (
+        "uv run --locked python scripts\\verify.py fast --require-r-evidence"
+    )
+    assert source_fast_steps["Run Fast Verification on macOS"]["run"] == (
+        "uv run --no-sync python scripts/verify.py fast --require-r-evidence"
+    )
+    full_r_steps = {
+        step["name"]: step for step in jobs["full-r-stack"]["steps"] if "name" in step
+    }
+    assert full_r_steps["Run Full R Stack Evidence"]["run"] == (
+        "uv run --locked python scripts\\verify.py r-stack"
+    )
+    assert full_r_steps["Install pinned R"]["with"]["r-version"] == "4.6.1"
+    assert full_r_steps["Cache Full R Stack library"]["with"]["path"] == (
+        "artifacts/r-library-cache"
+    )
+    assert "r_verification_support.py" in full_r_steps[
+        "Cache Full R Stack library"
+    ]["with"]["key"]
+    gate_step = next(
+        step
+        for step in jobs["fast-verification-gate"]["steps"]
+        if step.get("name") == "Check required lane results"
+    )
+    assert gate_step["env"]["CLASSIFIER_RESULT"] == (
+        "${{ needs.change-classifier.result }}"
+    )
+    assert gate_step["env"]["FULL_R_STACK_RESULT"] == (
+        "${{ needs.full-r-stack.result }}"
+    )
+    assert 'if [ "$CLASSIFIER_RESULT" != "success" ]' in gate_step["run"]
+    assert 'if [ "$FULL_R_STACK_RESULT" != "success" ]' in gate_step["run"]
+
+
+def test_package_policy_covers_direct_release_call_graph():
+    policy = _load_package_input_policy()
+    entrypoints = (
+        ".github/workflows/candidate.yml",
+        ".github/workflows/community-release-candidate.yml",
+        ".github/workflows/macos-trusted-release-candidate.yml",
+        ".github/workflows/notarization-status.yml",
+        ".github/workflows/package-target.yml",
+        ".github/workflows/package-verification.yml",
+        ".github/workflows/package-windows.yml",
+        ".github/workflows/promote.yml",
+        "scripts/build-macos-package.sh",
+        "scripts/build-windows-package.ps1",
+        "scripts/package-macos.sh",
+        "scripts/package-windows.ps1",
+    )
+    script_reference = re.compile(
+        r"scripts[/\\][A-Za-z0-9_.-]+\.(?:py|ps1|sh|R)"
+    )
+    path_reference = re.compile(
+        r"Path\([\"']scripts[\"']\)\s*/\s*[\"']([A-Za-z0-9_.-]+)[\"']"
+    )
+    direct_inputs = set()
+    pending = list(entrypoints)
+    visited = set()
+    while pending:
+        entrypoint = pending.pop()
+        if entrypoint in visited:
+            continue
+        visited.add(entrypoint)
+        source = read_repo_text(*entrypoint.split("/"))
+        references = {
+            match.replace("\\", "/")
+            for match in script_reference.findall(source)
+        }
+        references.update(
+            f"scripts/{match}" for match in path_reference.findall(source)
+        )
+        direct_inputs.update(references)
+        pending.extend(
+            reference
+            for reference in references
+            if reference not in visited and ROOT.joinpath(*reference.split("/")).is_file()
+        )
+    missing = sorted(
+        path
+        for path in direct_inputs
+        if not policy.requires_package_qualification([path])
+    )
+
+    assert not missing, f"unclassified direct package inputs: {missing}"
 
 
 def test_package_workflow_builds_path_aware_artifacts():
-    workflow = workflow_contract(".github", "workflows", "package-verification.yml")
-    target = workflow_contract(".github", "workflows", "package-target.yml")
+    workflow = load_workflow(".github", "workflows", "package-verification.yml")
+    target = load_workflow(".github", "workflows", "package-target.yml")
+    workflow_jobs = workflow["jobs"]
+    target_job = target["jobs"]["package"]
 
     assert {
         "windows-package",
         "macos-packages",
-    } <= workflow["jobs"]
+    } <= set(workflow_jobs)
     assert (
         target["env"]["RCMS_CRAN_REPO"]
         == "https://packagemanager.posit.co/cran/2026-07-16"
     )
-    assert workflow["events"] == {"workflow_dispatch"}
-    assert workflow["legacy_uses"] == []
-    pinned_uses = workflow["uses"] + target["uses"]
-    assert all(
-        ref.startswith("./") or re.fullmatch(r"[0-9a-f]{40}", ref)
-        for _, ref, _ in pinned_uses
-    )
-    assert workflow["paths"] == set()
-    assert re.search(
-        r"- name: Check out exact source\s+"
-        r"uses: actions/checkout@[0-9a-f]{40} # v6\s+"
-        r"with:\s+fetch-depth: 0",
-        target["text"],
-    )
-    assert target["text"].count("fetch-depth: 0") == 1
-    assert "artifacts/${{ matrix.artifact }}.zip" in target["text"]
-    assert "artifacts/${{ matrix.artifact }}-evidence.json" in target["text"]
-    assert "RCMetaStudio-macos-x64" in target["text"]
-    assert "RCMetaStudio-macos-arm64" in target["text"]
-    r_cache_keys = [
-        key for key in target["cache_keys"] if key.startswith("bundled-r-library-v4-")
+    assert set(workflow["on"]) == {"workflow_dispatch"}
+    assert [
+        {key: item[key] for key in ("target", "architecture", "runner")}
+        for item in target_job["strategy"]["matrix"]["include"]
+    ] == [
+        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
+        {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
     ]
-    qt_cache_keys = [key for key in target["cache_keys"] if key.startswith("qt-sdk-")]
-    assert r_cache_keys == []
-    assert "produce-r-integration-kit" not in target["text"]
-    assert all("RCMS_CRAN_REPO_KEY" in key for key in r_cache_keys)
-    assert workflow["restore_keys"] == []
-    assert qt_cache_keys == ["qt-sdk-6.11.1-${{ matrix.target }}"]
+    assert target_job["timeout-minutes"] == 90
+    checkout = next(
+        step
+        for step in target_job["steps"]
+        if step.get("name") == "Check out exact source"
+    )
+    assert checkout["with"]["fetch-depth"] == 0
+    package = next(
+        step
+        for step in target_job["steps"]
+        if step.get("name") == "Build and run the first-green packaged workflow"
+    )
+    assert "steps.package-metadata.outputs.version" in package["run"]
     assert not Path(".github/workflows/r-integration-kit-producer.yml").exists()
-    assert all(
-        "steps.package-metadata.outputs.r-version" in key for key in r_cache_keys
-    )
-    assert "r-integration-kit" not in target["text"]
-    assert "Resolve package metadata" in target["text"]
-    assert "scripts/resolve_package_ci_metadata.py" in target["text"]
-    assert "resolve_package_ci_metadata.py --version-only" in target["text"]
-    assert (
-        '--archive-root-name "RCMetaStudio-${{ steps.package-metadata.outputs.version }}-${{ matrix.target }}"'
-        in target["text"]
-    )
-    assert "if: ${{ inputs.build_windows }}" in workflow["text"]
-    assert "if: ${{ inputs.build_macos }}" in workflow["text"]
-    assert "publish_release:" not in workflow["text"]
-    assert "release_tag:" not in workflow["text"]
-    assert "gh release" not in workflow["text"]
-    assert "contents: write" not in workflow["text"]
-    assert "timeout-minutes: 90" in target["text"]
-    assert "macos_architecture: arm64" not in workflow["text"]
-
-
-def test_lane_named_local_scripts_replace_old_workflow_wrappers():
-    smoke = ps_contract("scripts", "verify-smoke.ps1")
-    fast = ps_contract("scripts", "verify-fast.ps1")
-    smoke_sh = sh_contract("scripts", "verify-smoke.sh")
-    fast_sh = sh_contract("scripts", "verify-fast.sh")
-    package = ps_contract("scripts", "package-windows.ps1")
-
-    assert {
-        "Sync",
-        "RecreateVenv",
-        "RequireREvidence",
-        "RRuntimeRoot",
-        "Rscript",
-    } <= smoke["params"]
-    assert {
-        "Sync",
-        "RecreateVenv",
-        "RequireREvidence",
-        "StrictTaxonomy",
-        "FastWorkers",
-        "RRuntimeRoot",
-        "Rscript",
-    } <= fast["params"]
-    assert {"--rscript", "--r-runtime-root"} <= smoke_sh["case_options"]
-    assert {"--rscript", "--r-runtime-root"} <= fast_sh["case_options"]
-    assert "RHOME" in smoke["text"]
-    assert "RHOME" in fast["text"]
-    assert "Current Version" in smoke["text"]
-    assert "Current Version" in fast["text"]
-    assert "ProgramFiles" not in smoke["text"]
-    assert "ProgramFiles" not in fast["text"]
-    assert {"RecreateVenv", "SkipSmoke"} <= package["params"]
-    assert "ArtifactName" not in package["params"]
-    assert "ArchiveRootName" not in package["params"]
-    assert "Resolve-RRuntimeRoot" not in package["functions"]
-    assert "Resolve-RscriptFromRuntime" not in package["functions"]
-    assert "--rscript" not in package["text"]
-    assert "Stage-AuthenticatedOfficialR" in package["functions"]
-    assert "RIntegrationKit" not in package["text"]
-    assert "ExpectedRIntegrationKitSha256" not in package["text"]
-    assert "R-4.6.1-win.exe" in package["text"]
-    assert "Get-AuthenticodeSignature" in package["text"]
-    assert "artifacts\\download-cache\\windows-x64" in package["text"]
-    assert "/CURRENTUSER" in package["text"]
-    assert "/VERYSILENT" in package["text"]
-    assert "/SUPPRESSMSGBOXES" in package["text"]
-    assert "/SP-" in package["text"]
-    assert "/NORESTART" in package["text"]
-    assert "('/DIR=\"{0}\"' -f $rStage)" in package["text"]
-    assert "('/LOG=\"{0}\"' -f $installerLog)" in package["text"]
-    assert "Save-CurrentUserRInstallerState" in package["functions"]
-    assert "Restore-CurrentUserRInstallerState" in package["functions"]
-    assert relative_order(
-        package["text"],
-        '"/CURRENTUSER"',
-        '"/VERYSILENT"',
-        '"/SP-"',
-        "$registrySnapshots = Save-CurrentUserRInstallerState -BackupRoot",
-        "Start-Process -FilePath $rInstaller -ArgumentList $installerArgs",
-        "Restore-CurrentUserRInstallerState -Snapshots $registrySnapshots",
-    )
-    assert "r-default-library-cache" in smoke["text"]
-    assert "r-default-library-cache" in fast["text"]
-    assert '"r-library-cache"' not in smoke["text"]
-    assert '"r-library-cache"' not in fast["text"]
-    assert {
-        "tests\\python\\fast",
-        "tests\\analysis_regression\\golden",
-        "tests\\packaging\\contract",
-    } <= pytest_path_tokens(fast["text"])
-    assert {"--dist", "loadfile", "-n", "4"} <= pytest_option_tokens(fast["text"])
-    assert "pytest-xdist==3.8.0" in project_dependencies()
-    assert relative_order(
-        fast["text"],
-        "validate_golden_baseline_manifests.py",
-        "validate_test_taxonomy.py",
-        "Running parallel fast verification pytest lanes",
-        "verify_rcmetar_r_default.py",
-    )
-    assert not (ROOT / "src" / "building").exists()
+    assert workflow_jobs["windows-package"]["if"] == "${{ inputs.build_windows }}"
+    assert workflow_jobs["macos-packages"]["if"] == "${{ inputs.build_macos }}"
+    assert workflow.get("permissions", {}).get("contents") != "write"
 
 
 def test_macos_distributable_contract_is_declared():
@@ -646,25 +549,6 @@ def test_local_macos_package_script_uses_shared_build_script():
         'build_args+=(--archive-root-name "$archive_root_name")',
         'bash "$repo_root/scripts/build-macos-package.sh"',
     )
-
-
-def test_shared_package_verifier_names_only_existing_qt6_test_paths():
-    import importlib.util
-
-    path = ROOT / "scripts" / "verify_package_release.py"
-    spec = importlib.util.spec_from_file_location("verify_package_release", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    assert module.PACKAGE_TEST_PATHS
-    assert all((ROOT / test_path).exists() for test_path in module.PACKAGE_TEST_PATHS)
-    assert all(
-        "pyqt5" not in test_path.lower() for test_path in module.PACKAGE_TEST_PATHS
-    )
-    source = path.read_text(encoding="utf-8")
-    assert '"scripts/build_qt6.py"' in source
-    assert 'os.environ["RCMS_QT6_BUILD_ROOT"]' in source
 
 
 def test_shared_r_dependency_installer_is_used_by_packagers():

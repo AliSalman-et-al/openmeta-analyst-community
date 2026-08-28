@@ -89,7 +89,6 @@ certificate, missing target, checksum mismatch, and post-release withdrawal.
 
 ```powershell
 uv run pytest tests/packaging/contract -q
-uv run python scripts/validate_test_taxonomy.py --strict
 actionlint .github/workflows/*.yml
 ```
 

@@ -14,8 +14,9 @@
 # import pdb
 import sys
 import copy
+from contextlib import ExitStack
 
-from PyQt6.QtCore import QEvent, QObject, QTimer, Qt
+from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
 from PyQt6.QtWidgets import (
     QDialog,
@@ -211,9 +212,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.effect_cbo_box.setView(effect_view)
         effect_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        required(effect_view.window(), "continuous metric popup").installEventFilter(
-            self
+        self._effect_popup = required(
+            effect_view.window(), "continuous metric popup"
         )
+        self._effect_popup.installEventFilter(self)
         correlation_width = (
             self.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
             + self.correlation_pre_post.textMargins().left()
@@ -243,10 +245,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     ) -> bool:
         if event is None:
             return super(ContinuousDataForm, self).eventFilter(watched, event)
-        popup = required(
-            self.effect_cbo_box.view(), "continuous metric popup view"
-        ).window()
-        if watched is popup and event.type() == QEvent.Type.Show:
+        if watched is self._effect_popup and event.type() == QEvent.Type.Show:
             QTimer.singleShot(0, self._bound_effect_popup_to_screen)
         if (
             isinstance(watched, QWidget)
@@ -457,14 +456,13 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         q_effects = [effect for effect in metric_family if effect in available_effects]
         if self.cur_effect not in q_effects:
             q_effects.append(str(self.cur_effect))
-        self.effect_cbo_box.blockSignals(True)
-        self.effect_cbo_box.clear()
-        for effect in q_effects:
-            self.effect_cbo_box.addItem(
-                self._effect_display_label(effect), userData=effect
-            )
-        self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
-        self.effect_cbo_box.blockSignals(False)
+        with QSignalBlocker(self.effect_cbo_box):
+            self.effect_cbo_box.clear()
+            for effect in q_effects:
+                self.effect_cbo_box.addItem(
+                    self._effect_display_label(effect), userData=effect
+                )
+            self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
         self._update_effect_choice_accessibility()
 
     def effect_changed(self):
@@ -505,23 +503,23 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             mult=self.mult,
         )
 
-        calc_fncs.block_signals(self.entry_widgets, True)
-        try:
-            if val_str == "est" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-            elif val_str == "lower" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-            elif val_str == "upper" and not is_empty(new_text):
-                display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-            elif val_str == "correlation_pre_post" and not is_empty(new_text):
-                get_disp_scale_val_if_valid(
-                    opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
-                    opt_cmp_msg="Correlation must be between -1 and +1",
-                )
-        except:
-            calc_fncs.block_signals(self.entry_widgets, False)
-            return False, False
-        calc_fncs.block_signals(self.entry_widgets, False)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            try:
+                if val_str == "est" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
+                elif val_str == "lower" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
+                elif val_str == "upper" and not is_empty(new_text):
+                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
+                elif val_str == "correlation_pre_post" and not is_empty(new_text):
+                    get_disp_scale_val_if_valid(
+                        opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
+                        opt_cmp_msg="Correlation must be between -1 and +1",
+                    )
+            except:
+                return False, False
         print(("Val_str: %s" % val_str))
         return True, display_scale_val
 
@@ -555,16 +553,17 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             self.restore_ma_unit_and_tables(
                 old_ma_unit, old_tables_data, old_correlation
             )
-            calc_fncs.block_signals(self.entry_widgets, True)
-            if val_str == "est":
-                self.effect_txt_box.setFocus()
-            elif val_str == "lower":
-                self.low_txt_box.setFocus()
-            elif val_str == "upper":
-                self.high_txt_box.setFocus()
-            elif val_str == "correlation_pre_post":
-                self.correlation_pre_post.setFocus()
-            calc_fncs.block_signals(self.entry_widgets, False)
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                if val_str == "est":
+                    self.effect_txt_box.setFocus()
+                elif val_str == "lower":
+                    self.low_txt_box.setFocus()
+                elif val_str == "upper":
+                    self.high_txt_box.setFocus()
+                elif val_str == "correlation_pre_post":
+                    self.correlation_pre_post.setFocus()
             return
 
         # If we got to this point it means everything is ok so far
@@ -656,16 +655,15 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
     def update_raw_data(self):
         """Updates table widget with data from ma_unit"""
 
-        self.simple_table.blockSignals(True)
-        for row_index, group_name in enumerate(self.cur_groups):
-            grp_raw_data = self.ma_unit.get_raw_data_for_group(group_name)
-            for col in range(len(grp_raw_data)):
-                self._set_val(row_index, col, grp_raw_data[col], self.simple_table)
-            # also insert the SEs, if we have them
-            se_col = 3
-            se = self.ma_unit.get_se(self.cur_effect, self.group_str, self.mult)
-            self._set_val(row_index, se_col, se, self.simple_table)
-        self.simple_table.blockSignals(False)
+        with QSignalBlocker(self.simple_table):
+            for row_index, group_name in enumerate(self.cur_groups):
+                grp_raw_data = self.ma_unit.get_raw_data_for_group(group_name)
+                for col in range(len(grp_raw_data)):
+                    self._set_val(row_index, col, grp_raw_data[col], self.simple_table)
+                # also insert the SEs, if we have them
+                se_col = 3
+                se = self.ma_unit.get_se(self.cur_effect, self.group_str, self.mult)
+                self._set_val(row_index, se_col, se, self.simple_table)
         self.impute_data()
 
     def _cell_data_not_valid(self, celldata_string, cell_header=None):
@@ -776,17 +774,16 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
             return
 
         try:
-            table.blockSignals(True)
-            str_val = "" if val in EMPTY_VALS else self.float_to_str(float(val))
-            if table.item(row, col) is None:
-                table.setItem(row, col, QTableWidgetItem(str_val))
-            else:
-                required(
-                    table.item(row, col), f"continuous table cell ({row}, {col})"
-                ).setText(str_val)
-            table.blockSignals(False)
+            with QSignalBlocker(table):
+                str_val = "" if val in EMPTY_VALS else self.float_to_str(float(val))
+                if table.item(row, col) is None:
+                    table.setItem(row, col, QTableWidgetItem(str_val))
+                else:
+                    required(
+                        table.item(row, col), f"continuous table cell ({row}, {col})"
+                    ).setText(str_val)
 
-            ###self._disable_row_if_filled(table, row, col)
+                ###self._disable_row_if_filled(table, row, col)
         except:
             print("Unexpected error:", sys.exc_info()[0])
             print(
@@ -799,23 +796,21 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
     def _disable_row_if_filled(self, table, row, col):
         # if str_val != "": #disable item
-        table.blockSignals(True)
-        N_col = table.columnCount()
+        with QSignalBlocker(table):
+            N_col = table.columnCount()
 
-        print(("Row is filled? %s" % str(self._table_row_filled(table, row))))
+            print(("Row is filled? %s" % str(self._table_row_filled(table, row))))
 
-        if self._table_row_filled(table, row):
-            print(("Disabling row... %d" % row))
-            for col in range(N_col):
-                self._disable_cell(table, row, col)
-        table.blockSignals(False)
+            if self._table_row_filled(table, row):
+                print(("Disabling row... %d" % row))
+                for col in range(N_col):
+                    self._disable_cell(table, row, col)
 
     def _disable_cell(self, table, row, col):
-        table.blockSignals(True)
-        item = table.item(row, col)
-        newflags = item.flags() & ~Qt.ItemFlag.ItemIsEditable
-        item.setFlags(newflags)
-        table.blockSignals(False)
+        with QSignalBlocker(table):
+            item = table.item(row, col)
+            newflags = item.flags() & ~Qt.ItemFlag.ItemIsEditable
+            item.setFlags(newflags)
 
     def _table_row_filled(self, table, row):
         N_col = table.columnCount()
@@ -870,9 +865,7 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
             for row in range(nrows):
                 for col in range(ncols):
-                    table.blockSignals(True)
                     self._set_val(row, col, old_table_data[row][col], table=table)
-                    table.blockSignals(False)
         self._fit_tables_to_contents()
 
     def restore_ma_unit_and_tables(self, old_ma_unit, old_tables_data, old_correlation):
@@ -1646,13 +1639,14 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
         self.metric_parameter = None
         self.enable_txt_box_input()  # }
 
-        calc_fncs.block_signals(self.entry_widgets, True)
-        # reset tables
-        for table in self.tables:
-            for row_index in range(len(self.cur_groups)):
-                for var_index in range(table.columnCount()):
-                    self._set_val(row_index, var_index, "", table=table)
-        calc_fncs.block_signals(self.entry_widgets, False)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            # reset tables
+            for table in self.tables:
+                for row_index in range(len(self.cur_groups)):
+                    for var_index in range(table.columnCount()):
+                        self._set_val(row_index, var_index, "", table=table)
 
         self._copy_raw_data_from_table_to_ma_unit()
 
@@ -1674,9 +1668,10 @@ class ContinuousDataForm(QDialog, forms.ui_continuous_data_form.Ui_ContinuousDat
 
         # clear line edits
         self.set_current_effect()
-        calc_fncs.block_signals(self.entry_widgets, True)
-        self.correlation_pre_post.setText("0.0")
-        calc_fncs.block_signals(self.entry_widgets, False)
+        with ExitStack() as signal_blockers:
+            for widget in self.entry_widgets:
+                signal_blockers.enter_context(QSignalBlocker(widget))
+            self.correlation_pre_post.setText("0.0")
 
         # For undo/redo
         self.enable_back_calculation_btn()

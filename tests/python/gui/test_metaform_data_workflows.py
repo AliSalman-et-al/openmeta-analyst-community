@@ -1306,6 +1306,7 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
     import launch
 
     app, window = launch.start_automation()
+    model = None
     try:
         _create_binary_dataset(window)
         model = window.model
@@ -1317,12 +1318,16 @@ def test_invalid_paste_reports_validation_error_when_model_signals_are_blocked(
         )
 
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
+        model.blockSignals(True)
         table.paste_contents(model.index(0, model.RAW_DATA[0]), [["not numeric"]])
 
         assert shown
         assert shown[-1][1:] == ("Warning", "Raw data needs to be numeric.")
         assert _cell_text(model, 0, model.RAW_DATA[0]) == ""
+        assert model.signalsBlocked()
     finally:
+        if model is not None:
+            model.blockSignals(False)
         _close_without_prompt(app, window)
 
 

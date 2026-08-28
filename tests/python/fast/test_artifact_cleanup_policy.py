@@ -170,13 +170,6 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
     assert not (ROOT / "r_tmp").resolve() in fp_outpath.parents
 
 
-def test_r_smoke_script_uses_tempdir_not_repository_r_tmp():
-    text = (ROOT / "scripts" / "analysis-smoke-test.R").read_text(encoding="utf-8")
-    assert 'dir.create("r_tmp"' not in text
-    assert '"fp_outpath" = "./r_tmp/forest.png"' not in text
-    assert "tempdir()" in text
-
-
 def test_third_party_inventory_has_notice_creation_boundary():
     inventory = (ROOT / "docs" / "release" / "third-party-inventory.md").read_text(
         encoding="utf-8"

@@ -28,11 +28,9 @@ exercises the fixes locally without disturbing the stub-backed tests.
 """
 
 import os
-import subprocess
-import sys
 import textwrap
 
-import pytest
+from _r_driver_support import run_python_driver
 
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -886,22 +884,7 @@ def test_inprocess_rpy2_backend_python3_porting_fixes():
     env = dict(os.environ)
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    result = subprocess.run(
-        [sys.executable, "-c", _DRIVER],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=env,
-    )
-    if result.returncode == 42:
-        pytest.skip("in-process rpy2 backend unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    result = run_python_driver(_DRIVER, env=env)
     combined_output = result.stdout + result.stderr
     assert "UnicodeDecodeError" not in combined_output
     assert "replacement element" not in combined_output
@@ -912,93 +895,25 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
-    result = subprocess.run(
-        [sys.executable, "-c", _RCHAR_UTF8_DRIVER],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=env,
-    )
-    if result.returncode == 42:
-        pytest.skip("in-process rpy2 backend unavailable: %s" % result.stdout.strip())
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_python_driver(_RCHAR_UTF8_DRIVER, env=env)
 
 
 def test_RCMetaR_summary_capture_uses_formatted_print_methods():
     env = dict(os.environ)
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    result = subprocess.run(
-        [sys.executable, "-c", _SUMMARY_PRINT_DRIVER],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=env,
-    )
-    if result.returncode == 42:
-        pytest.skip(
-            "RCMetaR summary print regression unavailable: %s" % result.stdout.strip()
-        )
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_python_driver(_SUMMARY_PRINT_DRIVER, env=env)
 
 
 def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
     env = dict(os.environ)
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    result = subprocess.run(
-        [sys.executable, "-c", _HSROC_SUMMARY_DRIVER],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=env,
-    )
-    if result.returncode == 42:
-        pytest.skip(
-            "HSROC summary formatting regression unavailable: %s"
-            % result.stdout.strip()
-        )
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_python_driver(_HSROC_SUMMARY_DRIVER, env=env)
 
 
 def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
     env = dict(os.environ)
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    result = subprocess.run(
-        [sys.executable, "-c", _ADVANCED_RCMetaR_DRIVER],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=env,
-    )
-    if result.returncode == 42:
-        pytest.skip(
-            "advanced RCMetaR workflow regression unavailable: %s"
-            % result.stdout.strip()
-        )
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_python_driver(_ADVANCED_RCMetaR_DRIVER, env=env)

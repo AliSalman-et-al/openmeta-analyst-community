@@ -5,7 +5,14 @@
 from typing import TYPE_CHECKING, Protocol, cast
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QEvent, QObject, QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtCore import (
+    QEvent,
+    QObject,
+    QRegularExpression,
+    QSignalBlocker,
+    Qt,
+    pyqtSignal,
+)
 from PyQt6.QtGui import QAction, QKeyEvent, QUndoCommand, QUndoStack
 from PyQt6.QtWidgets import (
     QApplication,
@@ -511,7 +518,7 @@ class MADataTable(QtWidgets.QTableView):
             return
 
         # Prevent row-header signals while the edit dialog mutates row state.
-        self.vert_header.blockSignals(True)
+        signal_blocker = QSignalBlocker(self.vert_header)
 
         try:
             # dispatch on the data type
@@ -590,7 +597,7 @@ class MADataTable(QtWidgets.QTableView):
                     ma_edit = CommandEditMAUnit(self, study_index, ma_unit, old_ma_unit)
                     self.undoStack.push(ma_edit)
         finally:
-            self.vert_header.blockSignals(False)
+            del signal_blocker
 
     def rowMoved(self, row, oldIndex, newIndex):
         pass
@@ -850,7 +857,7 @@ class MADataTable(QtWidgets.QTableView):
         original_unsaved = (
             self._main_gui().current_data_unsaved if self.main_gui is not None else None
         )
-        original_model.blockSignals(True)
+        signal_blocker = QSignalBlocker(original_model)
         failure = None
         try:
             for src_row in range(len(source_content)):
@@ -876,7 +883,7 @@ class MADataTable(QtWidgets.QTableView):
         except Exception as exc:
             failure = "Exception while pasting: %s" % exc
         finally:
-            original_model.blockSignals(False)
+            del signal_blocker
 
         if failure is not None:
             if self.main_gui is not None:
@@ -1125,12 +1132,13 @@ class CommandCellEdit(QUndoCommand):
             # to prevent memory access problems on the c
             # side of things, when the model emits
             # the data edited signal.
-            model.blockSignals(True)
-            edit_ok = self._apply_content(model, index, self.new_content)
-            self.added_study = self.ma_data_table_view.model().study_auto_added
-            self.ma_data_table_view.model().study_auto_added = None
-
-            model.blockSignals(False)
+            signal_blocker = QSignalBlocker(model)
+            try:
+                edit_ok = self._apply_content(model, index, self.new_content)
+                self.added_study = self.ma_data_table_view.model().study_auto_added
+                self.ma_data_table_view.model().study_auto_added = None
+            finally:
+                del signal_blocker
             if not edit_ok:
                 self.ma_data_table_view._report_model_data_error(
                     self.ma_data_table_view._model_data_error_message()
@@ -1158,12 +1166,10 @@ class CommandCellEdit(QUndoCommand):
 
         # as in the redo method, we block signals before
         # editing the model data
-        model.blockSignals(True)
-        edit_ok = self._apply_content(
-            model, index, self.original_content, allow_empty_names=True
-        )
-
-        model.blockSignals(False)
+        with QSignalBlocker(model):
+            edit_ok = self._apply_content(
+                model, index, self.original_content, allow_empty_names=True
+            )
         if not edit_ok:
             self.ma_data_table_view._report_model_data_error(
                 self.ma_data_table_view._model_data_error_message()

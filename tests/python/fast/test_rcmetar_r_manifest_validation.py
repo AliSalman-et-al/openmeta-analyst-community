@@ -19,11 +19,66 @@ RCMetaR_PACKAGE = REPO_ROOT / "r" / "RCMetaR"
 RCMetaR_R_DIR = RCMetaR_PACKAGE / "R"
 RCMetaR_DESCRIPTION = RCMetaR_PACKAGE / "DESCRIPTION"
 RCMetaR_NAMESPACE = RCMetaR_PACKAGE / "NAMESPACE"
-APP_SRC = REPO_ROOT / "src" / "rc_metastudio"
 
 LEGACY_EXPORT_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*function\s*\(", re.MULTILINE
 )
+
+
+def load_r_verification_support():
+    spec = importlib.util.spec_from_file_location(
+        "r_verification_support", REPO_ROOT / "scripts" / "r_verification_support.py"
+    )
+    support = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(support)
+    return support
+
+
+def test_shared_r_verification_support_resolves_home_and_normalizes_windows_locale(
+    tmp_path,
+):
+    support = load_r_verification_support()
+    r_home = tmp_path / "R"
+    rscript = r_home / "bin" / support.candidate_rscript_names()[0]
+    rscript.parent.mkdir(parents=True)
+    rscript.write_text("", encoding="utf-8")
+
+    assert support.resolve_rscript(
+        "Rscript", env={"RCMS_R_HOME": str(r_home), "PATH": ""}
+    ) == rscript.resolve()
+    source = {
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.utf8",
+        "LANG": "C.UTF-8",
+        "RCMS_SENTINEL": "preserved",
+    }
+    assert support.verification_base_env(source, platform_name="nt") == {
+        "RCMS_SENTINEL": "preserved"
+    }
+    assert support.verification_base_env(source, platform_name="posix") == source
+
+
+def test_full_r_verifier_drops_unsupported_posix_locale_on_windows():
+    verifier_path = REPO_ROOT / "scripts" / "verify_rcmetar_r_stack.py"
+    spec = importlib.util.spec_from_file_location(
+        "verify_rcmetar_r_stack", verifier_path
+    )
+    verifier = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(verifier)
+
+    source = {
+        "LC_ALL": "C.UTF-8",
+        "LC_CTYPE": "C.utf8",
+        "LANG": "C.UTF-8",
+        "RCMS_SENTINEL": "preserved",
+    }
+
+    assert verifier.verification_base_env(source, platform_name="nt") == {
+        "RCMS_SENTINEL": "preserved"
+    }
+    assert verifier.verification_base_env(source, platform_name="posix") == source
 
 
 def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
@@ -746,71 +801,3 @@ def test_RCMetaR_namespace_preserves_s4_classes_explicitly():
     actual_classes = namespace_entries("exportClasses")
 
     assert actual_classes == expected_classes
-
-
-def test_python_app_calls_r_through_meta_py_r_adapter():
-    offenders = []
-    for path in APP_SRC.glob("*.py"):
-        if path.name in {
-            "meta_py_r.py",
-            # The native macOS feasibility probe is deployment qualification,
-            # not an application analysis path. It must prove rpy2 directly in
-            # both source and the frozen probe before the app adapter is loaded.
-            "qt6_macos_feasibility.py",
-        }:
-            continue
-        text = path.read_text(encoding="utf-8")
-        if re.search(r"\b(?:execute_r_string|execute_r_function)\s*\(|\bro\.r\b", text):
-            offenders.append(path.relative_to(REPO_ROOT).as_posix())
-
-    assert offenders == []
-
-
-def test_meta_py_r_uses_core_constructors_instead_of_s4_slots():
-    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
-
-    assert "new('BinaryData'" not in text
-    assert "new('ContinuousData'" not in text
-    assert "new('DiagnosticData'" not in text
-    assert "new('CovariateValues'" not in text
-    assert "rcmetar.create.binary.data" in text
-    assert "rcmetar.create.continuous.data" in text
-    assert "rcmetar.create.diagnostic.data" in text
-    assert "rcmetar.create.covariate.values" in text
-
-
-def test_meta_py_r_does_not_interpolate_user_text_into_r_source():
-    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
-    risky_patterns = [
-        r"execute_r_string\([^\n]*(?:%|\.format|\+)",
-        r"ro\.r\([^\n]*(?:%|\.format|\+)",
-        r"textConnection",
-        r"read\.table",
-        r"load\('%s",
-        r"save\(.*'%s",
-        r"png\('%s",
-        r"method\.parameters\('%s",
-        r"method\.description\('%s",
-        r"available\.methods\(.*%s",
-    ]
-
-    offenders = [pattern for pattern in risky_patterns if re.search(pattern, text)]
-
-    assert offenders == []
-
-
-def test_meta_py_r_retired_obsolete_latin1_bridge_hacks():
-    text = (APP_SRC / "meta_py_r.py").read_text(encoding="utf-8")
-
-    obsolete_tokens = [
-        "_sanitize_for_R",
-        "_cchar_to_str_with_latin1_fallback",
-        '.decode("latin-1"',
-        '.decode("latin1"',
-        '.encode("latin-1"',
-        '.encode("latin1"',
-    ]
-
-    offenders = [token for token in obsolete_tokens if token in text]
-
-    assert offenders == []

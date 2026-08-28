@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 from PyQt6 import QtGui
 
+from _workflow import load_workflow
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -62,19 +64,28 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
 
 
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():
-    workflow = _text(".github", "workflows", "package-verification.yml")
-    target = _text(".github", "workflows", "package-target.yml")
-    windows = _text(".github", "workflows", "package-windows.yml")
+    workflow = load_workflow(".github/workflows/package-verification.yml")
+    target = load_workflow(".github/workflows/package-target.yml")
+    windows = load_workflow(".github/workflows/package-windows.yml")
 
-    assert "uses: ./.github/workflows/package-windows.yml" in workflow
-    assert "uses: ./.github/workflows/package-target.yml" in workflow
-    assert "target: macos-x64" in target
-    assert "target: macos-arm64" in target
-    assert "Upload adaptive-layout evidence" not in target
-    assert "evidence_path" not in target
-    assert "adaptive-layout-evidence" not in workflow
-    assert "adaptive-layout-evidence" not in windows
-    assert target.count("if-no-files-found: error") >= 1
+    assert (
+        workflow["jobs"]["windows-package"]["uses"]
+        == "./.github/workflows/package-windows.yml"
+    )
+    assert (
+        workflow["jobs"]["macos-packages"]["uses"]
+        == "./.github/workflows/package-target.yml"
+    )
+    targets = target["jobs"]["package"]["strategy"]["matrix"]["include"]
+    assert {item["target"] for item in targets} == {"macos-x64", "macos-arm64"}
+    steps = target["jobs"]["package"]["steps"] + windows["jobs"]["package"]["steps"]
+    assert not any(
+        "adaptive-layout-evidence" in str(step) or "evidence_path" in str(step)
+        for step in steps
+    )
+    assert any(
+        step.get("with", {}).get("if-no-files-found") == "error" for step in steps
+    )
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():

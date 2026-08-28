@@ -172,15 +172,15 @@ not a premature claim of byte-for-byte reproducible PyInstaller bundles.
 
 ## Test and evidence tiers
 
-One taxonomy should apply to both platforms. Platform lanes may add evidence;
-they may not omit an invariant tier.
+Lane ownership directories and explicit pytest markers apply to both platforms.
+Platform lanes may add evidence; they may not omit an invariant tier.
 
 ### Tier 0: static and policy checks (all pull requests)
 
 - formatting, syntax, generated-file consistency, license/header checks;
 - workflow/schema validation and full-SHA action pin audit;
 - dependency lock and R manifest validation;
-- test taxonomy, bundle allowlist, and release-manifest schema tests.
+- lane-selection, bundle-allowlist, and release-manifest schema tests.
 
 ### Tier 1: hermetic source tests (all pull requests)
 

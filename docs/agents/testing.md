@@ -11,28 +11,16 @@ Sync the locked verification environment from the repository root:
 uv sync --locked
 ```
 
-During the dependency-first Native Qt6 Port interval, run the Qt6 vertical-slice
-lane:
+Run the maintained Qt6 vertical-slice lane:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-qt6.ps1 -Sync
 ```
 
 It performs deterministic form and binary-resource generation, strict `ty`
-checking, focused offscreen and Versioned Project Format tests,
-taxonomy-manifest validation, the full native PyQt6 application-shell suite,
-the complete remaining-window accessibility and adaptive-layout matrix,
-the maintained analysis tests, the full isolated R build/check/analysis stack,
-the fail-closed real-R comparison against the frozen pre-Qt6 Golden archive,
+checking, lane-directory and marker validation, the maintained GUI evidence,
 and separate visible native `qwindows` smokes with `QT_QPA_PLATFORM` unset. The
-Golden verifier writes only below a marker-owned
-`build/qt6-verification/golden-compatibility-*` directory and authenticates the
-committed outer archive, its bounded ZIP structure, internal manifest, artifacts,
-the independently hashed 415-value numeric contract, descriptor contract, and
-exact rpy2 distribution identities before accepting a capture. Frozen numeric
-text is never parsed to create expectations at runtime; only current candidate
-output is parsed and compared under the committed absolute/relative tolerance
-policy. The analysis evidence contract is documented in
+analysis evidence contract is documented in
 [native-qt6-analysis.md](../verification/native-qt6-analysis.md).
 The shell smoke constructs the real `MetaForm`, exercises its menu surface,
 processes events, and verifies the owned window is deleted on close with Qt
@@ -40,12 +28,14 @@ warnings fatal inside the controlled process.
 
 The Smoke Verification Lane, Fast Verification Lane, GUI suite, Default R
 Evidence, and packaging-contract aggregate are native PyQt6 verification paths.
-Source smoke and Fast Verification run on Windows x64, macOS Intel x64, and
-macOS ARM64 for Qt-affecting changes:
+Fast Verification runs on Windows x64, macOS Intel x64, and macOS ARM64 for
+Qt-affecting changes. Packaging contracts no longer run inside
+each source-fast target; a package-relevant pull request runs them once in the
+required `packaging-contract` job:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
+uv run python scripts\verify.py smoke
+uv run python scripts\verify.py fast --require-r-evidence
 ```
 
 The hosted Windows Native Qt6 Vertical Slice has a 45-minute ceiling. Its native
@@ -60,8 +50,7 @@ compiler, companion DLL, version, and PE architecture are pinned and validated
 before every use. The PyQt6 runtime remains supplied solely by the locked
 PyQt6 wheels.
 
-These lane-specific commands become available again as their PyQt6 source and
-tests are integrated:
+The maintained lane-specific selections are:
 
 ```powershell
 uv run pytest tests -m gui
@@ -73,8 +62,21 @@ uv run pytest tests -m packaging_contract
 Run Full R Stack Evidence before R Stack changes:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-r-stack-full.ps1
+uv run python scripts\verify.py r-stack
 ```
+
+The Full R Stack verifier selects the complete `tests/r_stack` directory. It
+sets `RCMS_R_STACK_REQUIRED=1`, so missing R, rpy2, or required R packages fail
+the maintained lane instead of becoming opportunistic pytest skips. Direct
+local pytest selections may still skip when the workstation prerequisites are
+absent; those runs are not Full R Stack evidence. The Golden verifier writes
+only below a marker-owned `build/qt6-verification/golden-compatibility-*`
+directory and authenticates the committed outer archive, its bounded ZIP
+structure, internal manifest, artifacts, independently hashed 415-value numeric
+contract, descriptor contract, and exact rpy2 distribution identities before
+accepting a capture. Frozen numeric text is never parsed to create expectations
+at runtime; only current candidate output is parsed and compared under the
+committed absolute/relative tolerance policy.
 
 Smoke/Fast Default R Evidence uses `artifacts\r-default-library-cache`, and Full R Stack Evidence retains its separate `artifacts\r-library-cache`. Windows package construction does not reuse either installed library tree: it caches only immutable downloads, installs the pinned native package closure into its private staged R runtime, and then installs local `RCMetaR`. Native binary dependencies are pinned to the dated Public PPM snapshot `https://packagemanager.posit.co/cran/2026-07-16`; `RCMS_CRAN_REPO` may repeat that exact value, but mismatched overrides are rejected.
 
@@ -88,7 +90,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package-windows.ps1
 ```
 
 Pull requests that change a direct Windows assembly or qualification input must
-pass the required `Required Windows x64 Package Qualification` job. The
+pass both the structured `Packaging Contract Tests` job and the required
+`Required Windows x64 Package Qualification` job. The
 classifier includes the package workflows and specifications, Python/R locks,
 application source, bundled sample projects, R sources and dependency policy,
 delivery-target metadata, Qt generation and package-verification scripts, the
@@ -128,8 +131,8 @@ that same job; it never consumes an R Integration Kit:
 bash ./scripts/package-macos.sh --architecture x64
 ```
 
-Packaging-relevant pull requests now require the native macOS Intel x64
-qualification alongside Windows. The Intel job retains the distributable ZIP,
+Native macOS candidate and release workflows retain Intel x64 qualification.
+The Intel job retains the distributable ZIP,
 Mach-O deployment/dependency manifest, frozen runtime probe, packaged workflow
 and Cocoa-surface evidence, logs, archive-inspection record, and final evidence
 binding. Local cross-platform contracts are the fast feedback seam:
@@ -141,10 +144,12 @@ uv run pytest -q tests/packaging/contract/test_macos_x64_distributable_contract.
 Only a native `macos-15-intel` run can satisfy the final architecture, Cocoa,
 bundle-signature, and packaged-R evidence contract.
 
-The hosted pull-request path currently runs the Windows Qt6 vertical slice when
-source, tests, dependency files, or its verification inputs change. Broader
-source, R, and packaging gates return as the corresponding Qt6 tickets land.
-Native macOS Intel and Apple Silicon feasibility is delivered by Issue #329.
+The hosted pull-request path runs the Windows Qt6 vertical slice, the three
+target Source Fast Verification matrix, and the required Windows Full R Stack
+Evidence job when source, tests, dependency files, or verification inputs
+change. Package-relevant changes additionally run the Windows and focused native
+macOS packaging contract jobs plus Windows package qualification. Native macOS
+Intel and Apple Silicon feasibility is delivered by Issue #329.
 Its native workflow and retained evidence contract are documented in
 `docs/verification/native-macos-qt6-feasibility.md`. Local non-macOS validation
 can check the validator and workflow structure, but it cannot satisfy the two

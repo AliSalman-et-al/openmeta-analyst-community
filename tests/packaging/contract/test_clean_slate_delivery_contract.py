@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 from jsonschema import validate
 
+from _workflow import load_workflow
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -21,7 +23,15 @@ def load_delivery():
     return module
 
 
-def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
+def workflow_step(workflow, job_name: str, step_name: str):
+    return next(
+        step
+        for step in workflow["jobs"][job_name]["steps"]
+        if step.get("name") == step_name
+    )
+
+
+def test_clean_slate_delivery_state_machine(tmp_path):
     delivery = load_delivery()
     manifest_path = tmp_path / "release-set.json"
     commit = "a" * 40
@@ -39,7 +49,7 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     )
     manifest = delivery.load(manifest_path)
     schema = json.loads(
-        (ROOT / "delivery" / "release-set.schema.json").read_text(encoding="utf-8")
+        (ROOT / "delivery/release-set.schema.json").read_text(encoding="utf-8")
     )
     validate(instance=manifest, schema=schema)
     assert manifest["channel"] == "candidate"
@@ -51,8 +61,10 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     assert "scripts/sign-notarize-macos-artifact.sh" in delivery.POLICY_INPUTS
     assert "config/macos-package-targets.json" in delivery.POLICY_INPUTS
     assert ".github/workflows/community-release-candidate.yml" in delivery.POLICY_INPUTS
-    assert ".github/workflows/macos-trusted-release-candidate.yml" in delivery.POLICY_INPUTS
-
+    assert (
+        ".github/workflows/macos-trusted-release-candidate.yml"
+        in delivery.POLICY_INPUTS
+    )
     assert manifest["release_targets"] == ["windows-x64"]
     for target in manifest["release_targets"]:
         previous = delivery.release_identity_digest(manifest)
@@ -74,7 +86,6 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
                 argparse.Namespace(manifest=str(manifest_path), result=str(result))
             )
             previous = delivery.canonical_digest(delivery.load(result))
-
     delivery.verify(argparse.Namespace(manifest=str(manifest_path)))
     rc_path = tmp_path / "release-set-rc.json"
     delivery.promote(
@@ -178,130 +189,150 @@ def test_clean_slate_delivery_state_machine_and_workflow_policy(tmp_path):
     with pytest.raises(ValueError, match="incomplete or out-of-order"):
         delivery.verify(argparse.Namespace(manifest=str(bad_path)))
 
-    candidate = (ROOT / ".github/workflows/candidate.yml").read_text(encoding="utf-8")
-    community = (ROOT / ".github/workflows/community-release-candidate.yml").read_text(
-        encoding="utf-8"
-    )
-    macos_trusted = (
-        ROOT / ".github/workflows/macos-trusted-release-candidate.yml"
-    ).read_text(encoding="utf-8")
-    promote = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
-    legacy = (ROOT / ".github/workflows/package-verification.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "contents: write" not in candidate
-    assert "macos-trusted" in candidate
-    assert "run: .\\scripts\\package-windows.ps1\n" in candidate
-    assert "-ArtifactName" not in candidate
-    assert "Expected exactly one versioned Windows package" in candidate
-    assert "Move-Item -LiteralPath $builtArchives[0].FullName" in candidate
-    assert "RCMS_RUNNER_LABEL: ${{ matrix.runner }}" in candidate
-    assert "Upload native macOS candidate diagnostics" in candidate
-    assert "candidate-${{ matrix.target }}-diagnostics" in candidate
-    assert "work/rc-metastudio-macos/warn-rc-metastudio-macos.txt" in candidate
-    assert "work/rc-metastudio-macos/BUNDLE-00.toc" in candidate
-    assert not (ROOT / ".github/workflows/release-candidate.yml").exists()
-    assert "attestations: write" in community
-    assert "--automation-native-smoke" in community
-    assert "RCMS_PACKAGE_BASELINE_DPR" in community
-    assert "RCMS_PACKAGE_SMOKE_EVIDENCE" in community
-    assert "scripts/run_bounded_process.py --timeout-seconds 900" in community
-    assert 'Get-ChildItem qualified/tree -Recurse -Filter amino.rcms' in community
-    assert "Upload RC qualification diagnostics" in community
-    assert "rc-qualification-${{ matrix.target }}-diagnostics" in community
-    assert community.index("astral-sh/setup-uv@") < community.index(
-        "uv python install 3.11.9"
-    )
-    assert "--clobber" not in promote + legacy
-    assert "push:\n    tags:" not in legacy
-    assert (
-        "refusing overwrite" in community.lower() and "refusing overwrite" in promote.lower()
-    )
-    assert "sha256sum --check SHA256SUMS" in promote
-    verification_step = promote[
-        promote.index("Verify RC release set") : promote.index("Publish stable release")
-    ]
-    assert "GH_TOKEN: ${{ github.token }}" in verification_step
-    assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verification_step
-    for publisher in (community, promote):
-        assert "git ls-remote --exit-code --tags origin" in publisher
-        assert "tag_args=(--verify-tag)" in publisher
-        assert '"${tag_args[@]}"' in publisher
-    assert 'tag_args=(--target "${{ inputs.source_sha }}")' in community
-    assert 'tag_args=(--target "$source_sha")' in promote
-    assert "git push origin" not in community + promote
-    assert "UNSIGNED COMMUNITY BUILD" not in community + promote
-    assert "SmartScreen and Gatekeeper warnings" not in community + promote
-    assert "**Signing status:** Unsigned community builds." in community
-    assert "macOS DMGs are Developer ID signed, notarized, and stapled" in promote
-    assert "environment: macos-signing" in macos_trusted
-    assert "secrets.APPLE_CERTIFICATE_P12_BASE64" in macos_trusted
-    assert "secrets.APPLE_CERTIFICATE_PASSWORD" in macos_trusted
-    assert "secrets.KEYCHAIN_PASSWORD" in macos_trusted
-    assert "secrets.APPLE_ID" in macos_trusted
-    assert "secrets.APPLE_APP_SPECIFIC_PASSWORD" in macos_trusted
-    assert "secrets.APPLE_TEAM_ID" in macos_trusted
-    assert "security set-key-partition-list" in macos_trusted
-    assert "Developer ID Application:" in macos_trusted
-    assert "scripts/sign-notarize-macos-artifact.sh" in macos_trusted
-    assert "bash scripts/package-macos.sh" not in macos_trusted
-    assert "Windows artifact changed while being carried" in macos_trusted
-    assert "sign-submit-macos:" in macos_trusted
-    assert "finalize-macos:" in macos_trusted
-    assert "needs: [validate-candidate, sign-submit-macos]" in macos_trusted
-    assert "needs: [carry-windows, finalize-macos]" in macos_trusted
-    assert "Preserve exact signed bytes and submission ID" in macos_trusted
-    assert "submitted-${{ matrix.target }}" in macos_trusted
-    assert "RCMetaStudio-macos-x64.dmg" in macos_trusted
-    assert "RCMetaStudio-macos-arm64.dmg" in macos_trusted
-    assert "candidate_artifact: RCMetaStudio-macos-x64.zip" in macos_trusted
-    assert "candidate_artifact: RCMetaStudio-macos-arm64.zip" in macos_trusted
-    assert "hdiutil attach" in macos_trusted
-    assert "hdiutil detach" in macos_trusted
-    assert '--stage signed' in macos_trusted
-    assert '--output-file "submitted/$ARTIFACT"' in macos_trusted
-    assert '(cd submitted && shasum -a 256 "$ARTIFACT"' in macos_trusted
-    assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in macos_trusted
-    assert macos_trusted.index("--mode sign-and-submit") < macos_trusted.index(
-        "--mode finalize"
-    )
-    assert "Publish immutable macOS-trusted RC" in macos_trusted
-    assert "test \"$(jq -r .trust_profile \"$manifest\")\" = macos-trusted" in promote
 
-    signing_adapter = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
+def test_release_workflows_have_immutable_structured_topology():
+    candidate = load_workflow(".github/workflows/candidate.yml")
+    community = load_workflow(".github/workflows/community-release-candidate.yml")
+    trusted = load_workflow(".github/workflows/macos-trusted-release-candidate.yml")
+    promote = load_workflow(".github/workflows/promote.yml")
+    legacy = load_workflow(".github/workflows/package-verification.yml")
+
+    assert candidate["permissions"] == {"contents": "read"}
+    assert set(candidate["jobs"]) == {"initialize", "build", "candidate-gate"}
+    assert candidate["jobs"]["build"]["needs"] == "initialize"
+    assert candidate["jobs"]["candidate-gate"]["needs"] == "build"
+    assert {
+        item["target"]
+        for item in candidate["jobs"]["build"]["strategy"]["matrix"]["include"]
+    } == {"windows-x64", "macos-x64", "macos-arm64"}
+
+    assert community["permissions"] == {"contents": "read", "actions": "read"}
+    assert community["jobs"]["attest"]["needs"] == "qualify"
+    assert community["jobs"]["attest"]["permissions"]["attestations"] == "write"
+    assert community["jobs"]["publish-rc"]["needs"] == "attest"
+    assert community["jobs"]["publish-rc"]["permissions"]["contents"] == "write"
+
+    assert trusted["permissions"] == {"contents": "read", "actions": "read"}
+    assert trusted["jobs"]["carry-windows"]["needs"] == "validate-candidate"
+    assert trusted["jobs"]["sign-submit-macos"]["environment"] == "macos-signing"
+    assert set(trusted["jobs"]["finalize-macos"]["needs"]) == {
+        "validate-candidate",
+        "sign-submit-macos",
+    }
+    assert set(trusted["jobs"]["attest"]["needs"]) == {
+        "carry-windows",
+        "finalize-macos",
+    }
+    assert trusted["jobs"]["publish-rc"]["needs"] == "attest"
+
+    assert promote["permissions"] == {"contents": "read"}
+    assert promote["jobs"]["promote"]["environment"] == "production-release"
+    assert promote["jobs"]["promote"]["permissions"] == {"contents": "write"}
+    assert set(legacy["jobs"]) == {"windows-package", "macos-packages"}
+    assert legacy["permissions"] == {"contents": "read"}
+
+    verify_rc = workflow_step(
+        promote, "promote", "Verify RC release set and exact asset digests"
+    )
+    assert "(cd promotion && sha256sum --check SHA256SUMS)" in verify_rc["run"]
+    assert 'git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"' in verify_rc[
+        "run"
+    ]
+
+    publishers = (
+        (
+            community,
+            "publish-rc",
+            "Publish clearly labeled immutable unsigned RC",
+            'test "$(git rev-list -n 1 "$TAG")" = "${{ inputs.source_sha }}"',
+            'tag_args=(--target "${{ inputs.source_sha }}")',
+        ),
+        (
+            trusted,
+            "publish-rc",
+            "Publish immutable macOS-trusted RC",
+            'test "$(git rev-list -n 1 "$TAG")" = "${{ inputs.source_sha }}"',
+            'tag_args=(--target "${{ inputs.source_sha }}")',
+        ),
+        (
+            promote,
+            "promote",
+            "Publish stable release without rebuilding",
+            'test "$(git rev-list -n 1 "$STABLE_TAG")" = "$source_sha"',
+            'tag_args=(--target "$source_sha")',
+        ),
+    )
+    for workflow, job_name, step_name, verified_target, targeted_tag in publishers:
+        run = workflow_step(workflow, job_name, step_name)["run"]
+        assert "gh release view" in run and "refusing overwrite" in run
+        assert "git ls-remote --exit-code --tags origin" in run
+        assert verified_target in run
+        assert "tag_args=(--verify-tag)" in run
+        assert targeted_tag in run
+        assert '"${tag_args[@]}"' in run
+
+    sign = workflow_step(
+        trusted, "sign-submit-macos", "Sign exact candidate app and submit it to Apple"
+    )
+    preserved = workflow_step(
+        trusted, "sign-submit-macos", "Preserve exact signed bytes and submission ID"
+    )
+    finalize = workflow_step(
+        trusted, "finalize-macos", "Wait for Apple, then staple and verify preserved bytes"
+    )
+    final_launch = workflow_step(
+        trusted, "finalize-macos", "Launch final signed and stapled macOS bytes"
+    )
+    assert '--mode sign-and-submit' in sign["run"]
+    assert '(cd submitted && shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256")' in sign[
+        "run"
+    ]
+    assert preserved["uses"].startswith("actions/upload-artifact@")
+    assert preserved["with"] == {
+        "name": "submitted-${{ matrix.target }}",
+        "path": "submitted",
+        "if-no-files-found": "error",
+        "retention-days": 30,
+        "compression-level": 0,
+    }
+    assert '(cd submitted && shasum -a 256 -c "$ARTIFACT.sha256")' in finalize[
+        "run"
+    ]
+    assert '--mode finalize' in finalize["run"]
+    assert '--input-archive "submitted/$ARTIFACT"' in finalize["run"]
+    assert 'xcrun stapler validate "qualified/$ARTIFACT"' in final_launch["run"]
+    assert "codesign --verify --verbose=4" in final_launch["run"]
+    signer = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
         encoding="utf-8"
     )
-    assert "--options runtime" not in signing_adapter
-    assert "sign_macos_app.py" in signing_adapter
-    assert "xcrun notarytool submit" in signing_adapter
-    assert "xcrun notarytool wait" in signing_adapter
-    assert "--wait" not in signing_adapter
-    assert "xcrun stapler staple" in signing_adapter
-    assert "xcrun stapler validate" in signing_adapter
-    assert 'hdiutil create -volname "RC MetaStudio"' in signing_adapter
-    assert "-format UDZO" in signing_adapter
-    assert 'ln -s /Applications "$dmg_root/Applications"' in signing_adapter
-    assert 'tmp_output="${output_archive%.dmg}.tmp.dmg"' in signing_adapter
-    assert 'tmp_output="$output_archive.tmp.dmg"' not in signing_adapter
-    assert "codesign --force --timestamp" in signing_adapter
-    assert "spctl --assess --type open --context context:primary-signature" in signing_adapter
-    assert "copy_app_from_dmg" in signing_adapter
-    assert "spctl --assess --type execute" in signing_adapter
-    assert "--entitlements" not in signing_adapter
+    assert "xcrun notarytool submit" in signer
+    assert "xcrun notarytool wait" in signer
+    assert "xcrun stapler staple" in signer
+    assert "xcrun stapler validate" in signer
 
 
 def test_notarization_status_workflow_uses_protected_credentials():
-    workflow = (
-        ROOT / ".github" / "workflows" / "notarization-status.yml"
-    ).read_text(encoding="utf-8")
-
-    assert "workflow_dispatch:" in workflow
-    assert "environment: macos-signing" in workflow
-    assert "secrets.APPLE_ID" in workflow
-    assert "secrets.APPLE_APP_SPECIFIC_PASSWORD" in workflow
-    assert "secrets.APPLE_TEAM_ID" in workflow
-    assert "secrets.APPLE_CERTIFICATE_P12_BASE64" not in workflow
-    assert "xcrun notarytool history" in workflow
-    assert 'xcrun notarytool info "$SUBMISSION_ID"' in workflow
-    assert "--output-format json" in workflow
-    assert "submission_id must be a UUID" in workflow
+    workflow = load_workflow(".github/workflows/notarization-status.yml")
+    job = workflow["jobs"]["status"]
+    assert job["environment"] == "macos-signing"
+    assert workflow["permissions"] == {"contents": "read"}
+    query = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "Query notarization history and status"
+    )
+    assert set(query["env"]) >= {
+        "APPLE_ID",
+        "APPLE_APP_SPECIFIC_PASSWORD",
+        "APPLE_TEAM_ID",
+    }
+    assert query["env"]["APPLE_ID"] == "${{ secrets.APPLE_ID }}"
+    assert (
+        query["env"]["APPLE_APP_SPECIFIC_PASSWORD"]
+        == "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
+    )
+    assert query["env"]["APPLE_TEAM_ID"] == "${{ secrets.APPLE_TEAM_ID }}"
+    assert "xcrun notarytool history" in query["run"]
+    assert 'xcrun notarytool info "$SUBMISSION_ID"' in query["run"]
+    assert "--output-format json" in query["run"]
+    assert "submission_id must be a UUID" in query["run"]

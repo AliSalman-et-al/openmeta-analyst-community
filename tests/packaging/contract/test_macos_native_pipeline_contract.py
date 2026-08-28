@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
+from _workflow import load_workflow
 
 ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location(
@@ -48,28 +49,34 @@ def test_public_macos_command_accepts_both_architectures_from_the_manifest():
     wrapper = (ROOT / "scripts/package-macos.sh").read_text(encoding="utf-8")
 
     assert "resolve_macos_package_target.py" in wrapper
-    assert 'x64|arm64)' in wrapper
+    assert "x64|arm64)" in wrapper
     assert "Issue #342 packages macOS Intel only" not in wrapper
 
 
 def test_reusable_workflow_is_a_two_architecture_native_matrix():
-    workflow = (ROOT / ".github/workflows/package-target.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "target: macos-x64" in workflow
-    assert "target: macos-arm64" in workflow
-    assert "runner: macos-15-intel" in workflow
-    assert "runner: macos-15" in workflow
-    assert "scripts/package-macos.sh --architecture \"${{ matrix.architecture }}\"" in workflow
+    workflow = load_workflow(".github/workflows/package-target.yml")
+    matrix = workflow["jobs"]["package"]["strategy"]["matrix"]["include"]
+    assert [
+        {key: item[key] for key in ("target", "architecture", "runner")}
+        for item in matrix
+    ] == [
+        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
+        {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
+    ]
 
 
 def test_first_green_gate_uses_the_bcg_packaged_workflow():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 
     assert 'sample_path="$sample_root/BCG.rcms"' in build
-    assert '--automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"' in build
-    assert '--automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"' in build
+    assert (
+        '--automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
+        in build
+    )
+    assert (
+        '--automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
+        in build
+    )
     assert "--automation-native-smoke" in build
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
@@ -95,13 +102,13 @@ def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition
     )
     assert 'evidence.get("platform_plugin") != "cocoa"' in build
     assert 'not evidence.get("passed")' in build
-    assert 'handle.isExposed()' in launcher
-    assert 'geometry.width() <= 0 or geometry.height() <= 0' in launcher
+    assert "handle.isExposed()" in launcher
+    assert "geometry.width() <= 0 or geometry.height() <= 0" in launcher
     assert '"rows": model.rowCount() if model is not None else 0' in launcher
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
     assert trust.count("--automation-startup-wizard-smoke") == 1
-    assert 'qualified/diagnostics/startup-wizard.json' in trusted_workflow
+    assert "qualified/diagnostics/startup-wizard.json" in trusted_workflow
     assert 'evidence.get("platform_plugin") == "cocoa"' in trusted_workflow
 
 
@@ -121,7 +128,7 @@ def test_private_r_framework_is_completed_as_a_signable_code_bundle():
     collect = build.index('"packaging/pyinstaller/rc-metastudio-macos.spec"')
     assert complete < package < collect
     assert 'existing not in (None, "R")' in build
-    canonicalize = build.index('runtime_library.replace(main_executable)')
+    canonicalize = build.index("runtime_library.replace(main_executable)")
     staged_canonicalization = build.index('canonicalize_r_framework "$r_framework"')
     inject = build.index('copy_tree "$staged_r_framework" "$r_framework"')
     inspect = build.index('inspect_macos_deployment.py" native-graph')
@@ -131,7 +138,7 @@ def test_private_r_framework_is_completed_as_a_signable_code_bundle():
     assert 'RCMS_STAGED_R_FRAMEWORK="$r_framework"' in build
     assert 'macos_embedded_r_adapter.py" post-app' in build
     assert 'runtime_library.symlink_to(Path("../../R"))' in build
-    assert 'info_plist.is_file() or info_plist.is_symlink()' in build
+    assert "info_plist.is_file() or info_plist.is_symlink()" in build
     assert '("Headers", "Libraries", "PrivateHeaders")' in build
     assert 'root_members != {"R", "Resources", "Versions"}' in build
     assert '"@loader_path/Resources/lib/$dependency_name" "$framework_main"' in build
@@ -148,9 +155,9 @@ def test_rpy2_bridge_is_relocated_before_it_is_imported():
     api_proof = build.index("from rpy2 import robjects")
     assert locate < relocate < api_proof
     assert "import _rinterface_cffi_api as m" not in build
-    assert '@loader_path/*.dylib)' in build
+    assert "@loader_path/*.dylib)" in build
     assert 'source_relative="lib/${dependency#@loader_path/}"' in build
-    assert '@rpath/*.dylib)' in build
+    assert "@rpath/*.dylib)" in build
     assert 'source_relative="lib/${dependency#@rpath/}"' in build
     assert "grep -E '@rpath/|" in build
     assert build.count('relocate_rpy2_api_bridge "$rpy2_api_bridge"') == 2
@@ -164,9 +171,13 @@ def test_nested_r_extensions_rebase_broken_loader_relative_runtime_edges():
         encoding="utf-8"
     )
 
-    assert 'loader_target="$(dirname "$binary")/${dependency#@loader_path/}"' in relocator
+    assert (
+        'loader_target="$(dirname "$binary")/${dependency#@loader_path/}"' in relocator
+    )
     assert 'target="$resources/lib/${dependency##*/}"' in relocator
-    assert 'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
+    assert (
+        'install_name_tool -change "$dependency" "$replacement" "$binary"' in relocator
+    )
     assert 'canonical_id="@loader_path/$(basename "$binary")"' in relocator
     assert 'codesign --force --sign - "$binary"' in relocator
 
@@ -190,9 +201,10 @@ def test_arm64_framework_component_is_selected_by_its_real_package_identifier(
         encoding="utf-8",
     )
 
-    assert resolver.resolve_framework(
-        tmp_path, "4.6.1", "org.R-project.R.fw.pkg"
-    ) == framework.resolve()
+    assert (
+        resolver.resolve_framework(tmp_path, "4.6.1", "org.R-project.R.fw.pkg")
+        == framework.resolve()
+    )
 
 
 def test_arm64_launcher_adapter_rejects_intel_build_metadata():

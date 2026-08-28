@@ -25,13 +25,13 @@ The bundled private R package is RCMetaR. Packaged releases bundle the required 
 Run the smoke verification lane for the fastest local check:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-smoke.ps1
+uv run python scripts\verify.py smoke
 ```
 
 Run the fast verification lane for routine local evidence:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-fast.ps1
+uv run python scripts\verify.py fast --require-r-evidence
 ```
 
 Run area-specific checks when changing GUI, R Stack, golden analysis, or packaging behavior:

@@ -60,12 +60,7 @@ class Dataset:
         self.covariates = []
 
     def copy(self):
-        cloned = Dataset(self.title, self.summary)
-        cloned.studies = list(self.studies)
-        cloned.outcome_names_to_follow_ups = copy.deepcopy(
-            self.outcome_names_to_follow_ups
-        )
-        return cloned
+        return copy.deepcopy(self)
 
     def get_outcome_names(self):
         return sorted(self.outcome_names_to_follow_ups.keys())
@@ -106,7 +101,9 @@ class Dataset:
                     outcome.name = new_outcome_name
 
     def delete_group(self, group_name):
-        study = self.studies[0]
+        self._remove_group_data(group_name)
+
+    def _remove_group_data(self, group_name):
         for study in self.studies:
             for outcome_name in list(study.outcomes_to_follow_ups.keys()):
                 cur_outcome = study.outcomes_to_follow_ups[outcome_name]
@@ -302,11 +299,7 @@ class Dataset:
         print("added group: %s. cur groups: %s" % (group_name, self.get_group_names()))
 
     def remove_group(self, group_name):
-        for study in self.studies:
-            for outcome_name in list(study.outcomes_to_follow_ups.keys()):
-                cur_outcome = study.outcomes_to_follow_ups[outcome_name]
-                for ma_unit in list(cur_outcome.values()):
-                    ma_unit.remove_group(group_name)
+        self._remove_group_data(group_name)
         print(
             "removed group: %s. cur groups: %s" % (group_name, self.get_group_names())
         )

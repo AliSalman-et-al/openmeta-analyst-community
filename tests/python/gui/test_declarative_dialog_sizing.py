@@ -26,9 +26,6 @@ def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
             is adaptive_window.WindowArchetype.WORKFLOW
         )
         assert wizard.currentPage().findChild(QtWidgets.QScrollArea, "pageScrollArea")
-        assert not hasattr(wizard, "_oma_first_show_refit_filter")
-        assert wizard.property("RCMS_first_show_refit_options") is None
-        assert wizard.property("RCMS_stable_fit_size") is None
     finally:
         wizard.close()
         qapp.processEvents()

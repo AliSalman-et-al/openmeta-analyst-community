@@ -8,7 +8,7 @@
     {"path":"src/rc_metastudio/binary_data_form.py","qualified_name":"BinaryDataForm2.eventFilter","rule":"invalid-method-override","sha256":"0ad2f431043c43854c7274c0306c763a58c33ae3be29042a4d966bc266189d10"},
     {"path":"src/rc_metastudio/binary_data_form.py","qualified_name":"ChooseBackCalcResultForm.eventFilter","rule":"invalid-method-override","sha256":"3cd0abb40f3f7037a234c52a410a5dc72820a481289df78bf2583b05c1631551"},
     {"path":"src/rc_metastudio/continuous_data_form.py","qualified_name":"ChooseBackCalcResultForm.eventFilter","rule":"invalid-method-override","sha256":"4c20d85a3c3be214f94ce012cfedefd57312167f0d8051bff5c8d4c4c34fe822"},
-    {"path":"src/rc_metastudio/continuous_data_form.py","qualified_name":"ContinuousDataForm.eventFilter","rule":"invalid-method-override","sha256":"3a5e04955979c8d1ce459b5d6d36cb8aa6790fc549d78ee832094790ef785dae"},
+    {"path":"src/rc_metastudio/continuous_data_form.py","qualified_name":"ContinuousDataForm.eventFilter","rule":"invalid-method-override","sha256":"67c4e58d75b81600ebc1898ca9dfd6b6df9a11c9cd6c11daebb7ea9b04208f4c"},
     {"path":"src/rc_metastudio/diag_metrics.py","qualified_name":"Diag_Metrics.eventFilter","rule":"invalid-method-override","sha256":"b00a020b3ea65645e6f67a0e02233b319d160dc3d1436233ae2c432608de02df"},
     {"path":"src/rc_metastudio/diagnostic_data_form.py","qualified_name":"DiagnosticDataForm.eventFilter","rule":"invalid-method-override","sha256":"6bb1c6c918bd9e371aae09526e61de30707183dc60f47a1717904b7a7fe6ad7b"},
     {"path":"src/rc_metastudio/edit_dialog.py","qualified_name":"EditDialog.showEvent","rule":"invalid-method-override","sha256":"4d780ea4a16ec0eec864375459070806e1d03d8aafe4fb8871c903ebad57ee51"},

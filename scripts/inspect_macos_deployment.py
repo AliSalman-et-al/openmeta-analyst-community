@@ -17,9 +17,9 @@ from typing import Any, cast
 import unicodedata
 import zipfile
 
-from rc_metastudio.qt6_macos_feasibility import (
-    EvidenceError,
-    _archs,
+from rc_metastudio.macos_macho import (
+    MachOError,
+    architectures,
     is_macho_candidate,
 )
 from rc_metastudio.r_runtime import macos_r_framework_version
@@ -283,8 +283,8 @@ def validate_archive_root_name(value: str) -> str:
 
 def macho_architectures(path: Path) -> list[str]:
     try:
-        return _archs(path)
-    except EvidenceError as exc:
+        return architectures(path)
+    except MachOError as exc:
         raise MacOSDeploymentInspectionError(str(exc)) from exc
 
 

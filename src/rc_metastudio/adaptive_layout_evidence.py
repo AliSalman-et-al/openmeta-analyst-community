@@ -185,6 +185,14 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         remembered_geometry = _exercise_remembered_geometry(main_window, settings)
         splitter = _exercise_results_splitter(app, results)
         intrinsic_artifact = _intrinsic_artifact_record(results, plot_path)
+        table_record = {
+            "rows": model.rowCount(),
+            "columns": model.columnCount(),
+            "column_widths": [
+                main_window.tableView.columnWidth(index)
+                for index in range(model.columnCount())
+            ],
+        }
     finally:
         for _name, _archetype, window in reversed(surfaces[1:]):
             window.close()
@@ -210,14 +218,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         "device_pixel_ratio": round(screen.devicePixelRatio(), 2),
         "font": _font_record(font),
         "icon_available": not app.windowIcon().isNull(),
-        "table": {
-            "rows": model.rowCount(),
-            "columns": model.columnCount(),
-            "column_widths": [
-                main_window.tableView.columnWidth(index)
-                for index in range(model.columnCount())
-            ],
-        },
+        "table": table_record,
         "splitter": splitter,
         "intrinsic_artifact": intrinsic_artifact,
         "remembered_geometry": remembered_geometry,
@@ -380,7 +381,6 @@ def _capture_surface(
     paint_probe = window.grab()
     if paint_probe.isNull() or paint_probe.width() < 1 or paint_probe.height() < 1:
         raise RuntimeError("%s did not produce a painted client image." % name)
-    frame = window.frameGeometry()
     pixmap = _grab_painted_native_frame(app, screen, window)
     if pixmap.isNull() or pixmap.width() < 1 or pixmap.height() < 1:
         raise RuntimeError("QScreen.grabWindow could not capture %s." % name)
@@ -699,7 +699,7 @@ def _font_record(font):
         "family": font.family(),
         "point_size": font.pointSizeF(),
         "weight": font.weight(),
-        "style": int(font.style()),
+        "style": font.style().value,
     }
 
 

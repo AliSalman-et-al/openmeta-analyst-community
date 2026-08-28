@@ -1,12 +1,6 @@
-import os
-import shutil
-import subprocess
 import textwrap
 
-import pytest
-
-
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+from _r_driver_support import REPO_ROOT, run_r_driver
 
 
 _METRIC_LABEL_DRIVER = textwrap.dedent(
@@ -42,22 +36,4 @@ _METRIC_LABEL_DRIVER = textwrap.dedent(
 
 
 def test_pretty_metric_name_handles_tx_mean_separator_variants():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_METRIC_LABEL_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_METRIC_LABEL_DRIVER)

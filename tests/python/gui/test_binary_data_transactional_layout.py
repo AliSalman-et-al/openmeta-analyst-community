@@ -2,6 +2,7 @@ import copy
 import os
 from pathlib import Path
 
+import pytest
 from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
 
 import adaptive_window
@@ -201,6 +202,51 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         )
     finally:
         dialog.close()
+
+
+@pytest.mark.parametrize("initially_blocked", [False, True])
+def test_binary_set_val_restores_table_signal_state(initially_blocked):
+    import binary_data_form
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    table = QtWidgets.QTableWidget(1, 1)
+
+    class StubForm:
+        raw_data_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            return True
+
+    table.blockSignals(initially_blocked)
+    binary_data_form.BinaryDataForm2._set_val(StubForm(), 0, 0, 3)
+
+    assert table.signalsBlocked() is initially_blocked
+    table.deleteLater()
+    app.processEvents()
+
+
+def test_binary_set_val_restores_blocked_state_when_item_update_fails():
+    import binary_data_form
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    table = QtWidgets.QTableWidget(1, 1)
+    table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
+
+    class StubForm:
+        raw_data_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            raise RuntimeError("injected item update failure")
+
+    table.blockSignals(True)
+    with pytest.raises(RuntimeError, match="injected item update failure"):
+        binary_data_form.BinaryDataForm2._set_val(StubForm(), 0, 0, 3)
+
+    assert table.signalsBlocked()
+    table.deleteLater()
+    app.processEvents()
 
 
 def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch):

@@ -1533,6 +1533,14 @@ def _execute_analysis_requests(model, requests):
     raise ValueError("Unsupported analysis data family: %s" % data_type)
 
 
+def _run_diagnostic_backend(workflow, method_names, parameter_values):
+    if workflow == "standard":
+        return meta_py_r.run_diagnostic_multi(method_names, parameter_values)
+    return meta_py_r.run_diagnostic_workflow(
+        workflow, method_names, parameter_values
+    )
+
+
 def _run_binary_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
@@ -1819,11 +1827,7 @@ def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
         method_names = [request.method for request in requests]
         parameter_values = [request.parameter_values() for request in requests]
         workflow = requests[0].workflow
-        if workflow == "standard":
-            return meta_py_r.run_diagnostic_multi(method_names, parameter_values)
-        return meta_py_r.run_diagnostic_workflow(
-            workflow, method_names, parameter_values
-        )
+        return _run_diagnostic_backend(workflow, method_names, parameter_values)
     except Exception:
         return _run_diagnostic_with_shared_data_per_metric(requests)
 
@@ -1831,14 +1835,8 @@ def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
 def _run_diagnostic_with_shared_data_per_metric(requests):
     return _run_diagnostic_methods_per_metric(
         requests,
-        lambda request: (
-            meta_py_r.run_diagnostic_multi(
-                [request.method], [request.parameter_values()]
-            )
-            if request.workflow == "standard"
-            else meta_py_r.run_diagnostic_workflow(
-                request.workflow, [request.method], [request.parameter_values()]
-            )
+        lambda request: _run_diagnostic_backend(
+            request.workflow, [request.method], [request.parameter_values()]
         ),
     )
 
@@ -1846,11 +1844,7 @@ def _run_diagnostic_with_shared_data_per_metric(requests):
 def _run_diagnostic_with_metric_specific_data(model, requests):
     def run_metric(request):
         meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=request.metric)
-        if request.workflow == "standard":
-            return meta_py_r.run_diagnostic_multi(
-                [request.method], [request.parameter_values()]
-            )
-        return meta_py_r.run_diagnostic_workflow(
+        return _run_diagnostic_backend(
             request.workflow, [request.method], [request.parameter_values()]
         )
 

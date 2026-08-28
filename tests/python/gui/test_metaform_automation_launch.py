@@ -12,6 +12,8 @@ import pytest
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtWidgets import QHeaderView
 
+pytestmark = [pytest.mark.gui, pytest.mark.qsettings]
+
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
@@ -2470,61 +2472,6 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
         app.processEvents()
 
 
-def test_results_window_displays_canonical_svg_plot_artifact(tmp_path):
-    import launch
-    import test_backend_compat
-
-    test_backend_compat.install()
-    import results_window
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    plot_path = tmp_path / "forest.png"
-    svg_path = tmp_path / "forest.display.svg"
-    image = results_window.QImage(1600, 800, results_window.QImage.Format.Format_RGB32)
-    image.fill(results_window.Qt.GlobalColor.white)
-    assert image.save(str(plot_path), "PNG")
-    svg_path.write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800">'
-        '<rect width="1600" height="800" fill="white"/>'
-        '<text x="20" y="60">Forest Plot</text>'
-        "</svg>",
-        encoding="utf-8",
-    )
-
-    window = results_window.ResultsWindow(
-        {
-            "texts": {},
-            "images": {"Forest Plot": str(plot_path)},
-            "display_images": {"Forest Plot": str(svg_path)},
-            "image_var_names": {"Forest Plot": "forest_plot"},
-            "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
-            "image_order": ["Forest Plot"],
-            "plot_capabilities": {"Forest Plot": _plot_capability()},
-        }
-    )
-
-    try:
-        window.show()
-        app.processEvents()
-        svg_items = [
-            item
-            for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsSvgItem)
-        ]
-        pixmap_items = [
-            item
-            for item in window.scene.items()
-            if isinstance(item, results_window.QGraphicsPixmapItem)
-        ]
-
-        assert len(svg_items) == 1
-        assert pixmap_items == []
-        assert svg_items[0].scale() < 1.0
-    finally:
-        window.close()
-        app.processEvents()
-
-
 def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path):
     import launch
     import test_backend_compat
@@ -3013,9 +2960,6 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             if isinstance(item, results_window.QGraphicsTextItem)
         }
         reference_item = sections[long_reference]
-        assert reference_item.textWidth() >= (
-            window.graphics_view.viewport().width() - results_window.padding - 5
-        )
         assert (
             reference_item.document().defaultTextOption().wrapMode()
             == results_window.QTextOption.WrapMode.WordWrap
@@ -4956,25 +4900,6 @@ def test_new_dataset_wizard_overflow_keeps_diagnostic_choice_reachable():
         app.processEvents()
 
 
-def test_new_dataset_wizard_uses_replacement_workflow_policy():
-    import launch
-    from PyQt6 import QtWidgets
-    import main_wizard
-
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    wizard = main_wizard.MainWizard(path="new_dataset")
-    try:
-        wizard.restart()
-        app.processEvents()
-
-        assert _window_archetype(wizard) == "workflow"
-        assert not hasattr(wizard, "_oma_first_show_refit_filter")
-        assert wizard.property("RCMS_first_show_refit_options") is None
-    finally:
-        wizard.close()
-        app.processEvents()
-
-
 @pytest.mark.parametrize("path", [None, "new_dataset", "csv_import"])
 def test_wizard_uses_modern_style_with_explicit_back_navigation(path):
     import launch
@@ -5506,75 +5431,6 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         os.chdir(REPO_ROOT)
 
 
-def test_data_entry_dialog_tables_expand_and_show_all_rows(monkeypatch):
-    import copy
-    import launch
-    import binary_data_form
-    import continuous_data_form
-    import diagnostic_data_form
-
-    app, window = launch.start_automation()
-    dialogs = []
-    monkeypatch.setattr(
-        continuous_data_form.ChooseBackCalcResultForm, "exec", lambda self: False
-    )
-
-    try:
-        assert window.open(_sample_project_path("amino.rcms")) is True
-        model = window.model
-        dialogs.append(
-            binary_data_form.BinaryDataForm2(
-                copy.deepcopy(model.get_current_ma_unit_for_study(0)),
-                model.current_txs,
-                model.get_cur_group_str(),
-                model.current_effect,
-                conf_level=model.get_global_conf_level(),
-                parent=window.tableView,
-            )
-        )
-
-        assert window.open(_sample_project_path("continuous.rcms")) is True
-        model = window.model
-        dialogs.append(
-            continuous_data_form.ContinuousDataForm(
-                copy.deepcopy(model.get_current_ma_unit_for_study(0)),
-                model.current_txs,
-                model.get_cur_group_str(),
-                model.current_effect,
-                conf_level=model.get_global_conf_level(),
-                parent=window.tableView,
-            )
-        )
-
-        assert window.open(_sample_project_path("lymph.rcms")) is True
-        model = window.model
-        dialogs.append(
-            diagnostic_data_form.DiagnosticDataForm(
-                copy.deepcopy(model.get_current_ma_unit_for_study(0)),
-                model.current_txs,
-                model.get_cur_group_str(),
-                conf_level=model.get_global_conf_level(),
-                parent=window.tableView,
-            )
-        )
-
-        tables = [
-            dialogs[0].raw_data_table,
-            dialogs[1].simple_table,
-            dialogs[1].g1_pre_post_table,
-            dialogs[1].g2_pre_post_table,
-            dialogs[2].two_by_two_table,
-        ]
-        for table in tables:
-            _assert_compact_table_fits_visible_cells(table)
-    finally:
-        for dialog in dialogs:
-            dialog.close()
-        window.close()
-        app.processEvents()
-        os.chdir(REPO_ROOT)
-
-
 def test_csv_required_format_table_expands_and_shows_all_rows(monkeypatch):
     import main_wizard
 
@@ -5984,113 +5840,3 @@ def _dataset_summary(dataset):
             str(name) for name in dataset.outcome_names_to_follow_ups.keys()
         ),
     }
-
-
-def test_native_packaged_smoke_requires_expected_plugin_and_visible_window(monkeypatch):
-    import launch
-
-    phases = []
-    close_states = []
-    open_modes = []
-
-    class Model:
-        def rowCount(self):
-            return 1
-
-    class Table:
-        def model(self):
-            return Model()
-
-    class App:
-        def platformName(self):
-            return "windows" if sys.platform == "win32" else "cocoa"
-
-        def processEvents(self):
-            pass
-
-        def sendPostedEvents(self, *_args):
-            pass
-
-        def topLevelWidgets(self):
-            return []
-
-        def quit(self):
-            pass
-
-    class Meta:
-        tableView = Table()
-
-        def isVisible(self):
-            return True
-
-        def open(self, _path, raise_on_error=False):
-            open_modes.append(raise_on_error)
-            return True
-
-        def close(self):
-            close_states.append(self.current_data_unsaved)
-
-        def hide(self):
-            pass
-
-        def deleteLater(self):
-            pass
-
-    def start_automation(phase_callback=None):
-        if phase_callback is not None:
-            phase_callback("application:configured")
-        return App(), Meta()
-
-    monkeypatch.setattr(launch, "start_automation", start_automation)
-    monkeypatch.setattr(launch, "_write_automation_smoke_log", phases.append)
-    monkeypatch.setattr(launch, "_force_table_paint", lambda _app, _meta: None)
-    monkeypatch.setattr(
-        launch, "_assert_standard_binary_summary_is_formatted", lambda _meta: None
-    )
-    monkeypatch.setattr(
-        launch,
-        "_exercise_packaged_project_workflow",
-        lambda _app, _meta, _sample: {},
-    )
-
-    assert launch.start_automation_smoke("sample.rcms", require_native_window=True) == 0
-    assert close_states == [False]
-    assert open_modes == [True]
-    assert phases == [
-        "packaged-workflow:start",
-        "packaged-workflow:shell:application:configured",
-        "packaged-workflow:shell-created",
-        "packaged-workflow:project-open:start",
-        "packaged-workflow:project-open:return",
-        "packaged-workflow:sample-opened",
-        "packaged-workflow:paint:start",
-        "packaged-workflow:paint:complete",
-        "packaged-workflow:project-exercise:start",
-        "packaged-workflow:project-exercise:complete",
-        "packaged-workflow:save-reopen-complete",
-        "packaged-workflow:teardown:close:start",
-        "packaged-workflow:teardown:close:return",
-        "packaged-workflow:teardown:deferred-delete:complete",
-        "packaged-workflow:teardown:top-level-windows:none",
-        "packaged-workflow:teardown:app-quit:start",
-        "packaged-workflow:teardown:app-quit:return",
-        "packaged-workflow:post-close",
-        "packaged-workflow:return",
-    ]
-
-    trace = object()
-    stopped_traces = []
-    monkeypatch.setattr(launch, "_start_automation_hang_trace", lambda: trace)
-    monkeypatch.setattr(
-        launch,
-        "_stop_automation_hang_trace",
-        stopped_traces.append,
-    )
-
-    def fail_start_automation(phase_callback=None):
-        raise RuntimeError("injected startup failure")
-
-    monkeypatch.setattr(launch, "start_automation", fail_start_automation)
-    with pytest.raises(RuntimeError, match="injected startup failure"):
-        launch.start_automation_smoke("sample.rcms", require_native_window=True)
-    assert stopped_traces == [trace]

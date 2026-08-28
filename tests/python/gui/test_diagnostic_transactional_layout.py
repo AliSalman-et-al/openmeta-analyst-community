@@ -339,6 +339,54 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
         app.processEvents()
 
 
+@pytest.mark.parametrize("initially_blocked", [False, True])
+def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
+    import diagnostic_data_form
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    table = QtWidgets.QTableWidget(1, 1)
+
+    class StubForm:
+        two_by_two_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            return True
+
+    table.blockSignals(initially_blocked)
+    diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
+
+    assert table.signalsBlocked() is initially_blocked
+    table.deleteLater()
+    app.processEvents()
+
+
+def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkeypatch):
+    import diagnostic_data_form
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    table = QtWidgets.QTableWidget(1, 1)
+    table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
+
+    class StubForm:
+        two_by_two_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            return True
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("injected item update failure")
+
+    monkeypatch.setattr(diagnostic_data_form, "required", fail)
+    table.blockSignals(True)
+    diagnostic_data_form.DiagnosticDataForm._set_val(StubForm(), 0, 0, 3)
+
+    assert table.signalsBlocked()
+    table.deleteLater()
+    app.processEvents()
+
+
 def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
     import diagnostic_data_form
 

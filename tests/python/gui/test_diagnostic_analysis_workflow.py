@@ -48,6 +48,35 @@ def _create_diagnostic_dataset(window):
     )
 
 
+def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monkeypatch):
+    import ma_specs
+
+    calls = []
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "run_diagnostic_multi",
+        lambda methods, params: calls.append(("standard", methods, params))
+        or "standard",
+    )
+    monkeypatch.setattr(
+        ma_specs.meta_py_r,
+        "run_diagnostic_workflow",
+        lambda workflow, methods, params: calls.append((workflow, methods, params))
+        or workflow,
+    )
+
+    assert ma_specs._run_diagnostic_backend(
+        "standard", ["diagnostic.random"], [{"measure": "Sens"}]
+    ) == "standard"
+    assert ma_specs._run_diagnostic_backend(
+        "subgroup", ["diagnostic.random"], [{"measure": "Sens"}]
+    ) == "subgroup"
+    assert calls == [
+        ("standard", ["diagnostic.random"], [{"measure": "Sens"}]),
+        ("subgroup", ["diagnostic.random"], [{"measure": "Sens"}]),
+    ]
+
+
 def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
     import launch
 
