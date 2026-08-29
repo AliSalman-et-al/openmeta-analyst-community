@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from ._workflow import load_workflow
+from ._workflow import load_module_from_path, load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -20,7 +20,6 @@ def _load_source_provenance():
     spec = importlib.util.spec_from_file_location(
         "source_provenance", ROOT / "scripts" / "source_provenance.py"
     )
-    assert spec is not None and spec.loader is not None
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -544,8 +543,8 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
 
 
 def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
-    launch = read_repo_text("src", "rc_metastudio", "launch.py")
-    probe = launch.split("def start_package_runtime_probe", 1)[1].split(
+    automation = read_repo_text("src", "rc_metastudio", "automation.py")
+    probe = automation.split("def start_package_runtime_probe", 1)[1].split(
         "def _exercise_packaged_project_workflow", 1
     )[0]
     assert 'if sys.platform == "darwin":' in probe
@@ -661,7 +660,20 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     assert 'project_schema_root = app_source / "project_schemas" / "v1"' in spec
     assert 'project_schema_root.glob("*.schema.json")' in spec
     assert 'str(Path("rc_metastudio") / "project_schemas" / "v1")' in spec
-    assert '*(f"forms.{name}" for name in generated_form_modules)' in spec
+    assert "generated_ui_collection.py" in spec
+    assert "pyinstaller_module_entries(qt6_build_root)" in spec
+    assert "a.pure.extend(generated_ui_modules)" in spec
+    assert "def is_windows_system_runtime(entry):" in spec
+    assert 'name.startswith("api-ms-win-")' in spec
+    assert 'name.startswith("icudt")' in spec
+    assert '"icuuc.dll"' in spec
+    assert '"ucrtbase.dll"' in spec
+    assert (
+        "a.binaries = [entry for entry in a.binaries if not "
+        "is_windows_system_runtime(entry)]"
+    ) in spec
+    assert 'str(generated_package)' not in spec
+    assert 'str(generated_forms)' not in spec
     assert (
         'excludes=["PyQt5", "PySide2", "PySide6", "qtpy", "_rinterface_cffi_abi"]'
         in spec
@@ -675,6 +687,36 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "function Copy-DirectoryTree",
         'Copy-DirectoryTree -Source $Root -Destination (Join-Path $DestinationRoot "R")',
     )
+
+
+def test_generated_ui_collection_matches_the_canonical_package_manifest(tmp_path):
+    from rc_metastudio.qt6_build import CANONICAL_FORMS
+
+    build_root = tmp_path / "qt6"
+    generated_root = build_root / "generated"
+    for destination in CANONICAL_FORMS.values():
+        generated = generated_root / destination
+        generated.parent.mkdir(parents=True, exist_ok=True)
+        generated.write_text("GENERATED_UI = True\n", encoding="utf-8")
+
+    collection = load_module_from_path(
+        "generated_ui_collection",
+        ROOT / "packaging" / "pyinstaller" / "generated_ui_collection.py",
+    )
+    entries = collection.pyinstaller_module_entries(build_root)
+    expected_names = {
+        ".".join(destination.with_suffix("").parts)
+        for destination in CANONICAL_FORMS.values()
+    }
+
+    assert {name for name, _path, typecode in entries if typecode == "PYMODULE"} == (
+        expected_names
+    )
+    for name, path, typecode in entries:
+        assert name.startswith("rc_metastudio.")
+        assert not name.startswith("ui_")
+        assert typecode == "PYMODULE"
+        compile(Path(path).read_text(encoding="utf-8"), path, "exec")
 
 
 def _load_windows_deployment_inspector():
@@ -730,7 +772,7 @@ def test_frozen_windows_bootstrap_indexes_all_private_native_directories(tmp_pat
 def test_frozen_direct_runtime_probe_validates_private_r_without_a_kit(
     monkeypatch, tmp_path
 ):
-    from rc_metastudio import launch
+    from rc_metastudio import automation
 
     app = tmp_path / "RCMetaStudio"
     executable = app / "RCMetaStudio.exe"
@@ -744,8 +786,8 @@ def test_frozen_direct_runtime_probe_validates_private_r_without_a_kit(
     r_dll.parent.mkdir(parents=True)
     r_dll.write_bytes(b"R")
 
-    monkeypatch.setattr(launch.sys, "executable", str(executable))
-    shared_library, direct_spike = launch._verified_frozen_runtime_shared_library(
+    monkeypatch.setattr(automation.sys, "executable", str(executable))
+    shared_library, direct_spike = automation._verified_frozen_runtime_shared_library(
         {"R_HOME": str(r_home), "derivation": {}, "direct_spike": False},
         api_bridge.resolve(),
     )

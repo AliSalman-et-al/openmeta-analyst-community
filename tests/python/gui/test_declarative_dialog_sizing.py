@@ -13,8 +13,8 @@ prepare_generated_ui_imports()
 
 
 def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
-    import adaptive_window
-    import main_wizard
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -33,7 +33,7 @@ def test_application_wizard_uses_workflow_policy_without_legacy_refit(qapp):
 
 
 def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_path):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     for path in ("new_dataset", "csv_import"):
         wizard = main_wizard.MainWizard(path=path)
@@ -74,7 +74,7 @@ def test_application_wizard_modern_style_renders_sized_nonblank_pages(qapp, tmp_
 
 
 def test_parented_application_wizard_does_not_inherit_shell_width(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     parent = QtWidgets.QMainWindow()
     parent.resize(1600, 900)
@@ -101,7 +101,7 @@ def test_parented_application_wizard_does_not_inherit_shell_width(qapp):
 
 
 def test_application_wizard_pages_do_not_use_background_pixmaps(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard()
     try:

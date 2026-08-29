@@ -23,14 +23,14 @@ prepare_generated_ui_imports()
 
 @pytest.mark.parametrize("initially_blocked", [False, True])
 def test_continuous_set_val_restores_table_signal_state(initially_blocked):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
     )
     table = QtWidgets.QTableWidget(1, 1)
 
-    class StubForm:
+    class StubDialog:
         simple_table = table
 
         @staticmethod
@@ -38,8 +38,8 @@ def test_continuous_set_val_restores_table_signal_state(initially_blocked):
             return str(value)
 
     table.blockSignals(initially_blocked)
-    continuous_data_form.ContinuousDataForm._set_val(
-        cast(continuous_data_form.ContinuousDataForm, StubForm()), 0, 0, 3
+    continuous_data_dialog.ContinuousDataDialog._set_val(
+        cast(continuous_data_dialog.ContinuousDataDialog, StubDialog()), 0, 0, 3
     )
 
     assert table.signalsBlocked() is initially_blocked
@@ -48,7 +48,7 @@ def test_continuous_set_val_restores_table_signal_state(initially_blocked):
 
 
 def test_continuous_set_val_restores_blocked_state_when_item_update_fails(monkeypatch):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
@@ -56,7 +56,7 @@ def test_continuous_set_val_restores_blocked_state_when_item_update_fails(monkey
     table = QtWidgets.QTableWidget(1, 1)
     table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
 
-    class StubForm:
+    class StubDialog:
         simple_table = table
 
         @staticmethod
@@ -66,11 +66,11 @@ def test_continuous_set_val_restores_blocked_state_when_item_update_fails(monkey
     def fail(*_args, **_kwargs):
         raise RuntimeError("injected item update failure")
 
-    monkeypatch.setattr(continuous_data_form, "required", fail)
+    monkeypatch.setattr(continuous_data_dialog, "required", fail)
     table.blockSignals(True)
     with pytest.raises(RuntimeError, match="injected item update failure"):
-        continuous_data_form.ContinuousDataForm._set_val(
-            cast(continuous_data_form.ContinuousDataForm, StubForm()), 0, 0, 3
+        continuous_data_dialog.ContinuousDataDialog._set_val(
+            cast(continuous_data_dialog.ContinuousDataDialog, StubDialog()), 0, 0, 3
         )
 
     assert table.signalsBlocked()

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Small typing helpers for Qt test seams.
 
 Qt's generated stubs correctly model nullable lookups, while these tests

@@ -32,14 +32,11 @@ ACTION_CONTRACTS = {
     "add-outcome": "accept-cancel",
     "add-study": "accept-cancel",
     "import-progress": "none",
-    "analysis-progress": "none",
     "shared-progress": "none",
     "startup-splash": "none",
 }
 
-TRANSIENT_SURFACES = frozenset(
-    {"analysis-progress", "import-progress", "shared-progress", "startup-splash"}
-)
+TRANSIENT_SURFACES = frozenset({"import-progress", "shared-progress", "startup-splash"})
 SPECIAL_OVERFLOW = {
     "about-legal": "text-browser",
     "change-covariate-type": "bounded-table",
@@ -363,7 +360,6 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
     applicable = focus["applicable"]
     if applicable is False:
         if surface_id not in {
-            "analysis-progress",
             "import-progress",
             "shared-progress",
             "startup-splash",
@@ -496,19 +492,17 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
 def _surface_factories() -> dict[str, Any]:
     from PyQt6 import QtCore, QtGui
 
-    # Match the flat module identities used by the running application. Mixing
-    # package and flat imports creates duplicate Qt class objects and invalid
-    # runtime ``isinstance`` checks.
-    import about_legal_dialog
-    import add_new_dialogs
-    import change_cov_type_form
-    import conf_level_dialog
-    import edit_group_name_form
-    import launch
-    import ma_specs
-    import main_wizard
-    import meta_form
-    import progress_bar
+    from rc_metastudio import (
+        about_legal_dialog,
+        add_new_dialogs,
+        covariate_type_dialog,
+        confidence_level_dialog,
+        edit_name_dialogs,
+        launch,
+        main_wizard,
+        main_window,
+        progress_dialog,
+    )
 
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
@@ -516,28 +510,27 @@ def _surface_factories() -> dict[str, Any]:
         def __init__(self, _dataset: Any, _covariate: Any) -> None:
             super().__init__(2, 3)
 
-    setattr(change_cov_type_form, "CovModel", PreviewModel)
+    setattr(covariate_type_dialog, "CovariateTypeModel", PreviewModel)
     return {
         "about-legal": about_legal_dialog.AboutLegalDialog,
-        "change-covariate-type": lambda: change_cov_type_form.ChangeCovTypeForm(
+        "change-covariate-type": lambda: covariate_type_dialog.CovariateTypeDialog(
             object(), object()
         ),
-        "edit-group-name": lambda: edit_group_name_form.EditGroupName(
+        "edit-group-name": lambda: edit_name_dialogs.EditGroupNameDialog(
             "Treatment group"
         ),
-        "edit-covariate-name": lambda: edit_group_name_form.EditCovariateName(
+        "edit-covariate-name": lambda: edit_name_dialogs.EditCovariateNameDialog(
             "Baseline risk"
         ),
         "main-wizard": lambda: main_wizard.MainWizard(path="new_dataset"),
-        "confidence-level": conf_level_dialog.ChangeConfLevelDlg,
-        "add-covariate": add_new_dialogs.AddNewCovariateForm,
-        "add-follow-up": add_new_dialogs.AddNewFollowUpForm,
-        "add-group": add_new_dialogs.AddNewGroupForm,
-        "add-outcome": add_new_dialogs.AddNewOutcomeForm,
-        "add-study": add_new_dialogs.AddNewStudyForm,
-        "import-progress": meta_form.ImportProgress,
-        "analysis-progress": ma_specs.MetaProgress,
-        "shared-progress": progress_bar.MetaProgress,
+        "confidence-level": confidence_level_dialog.ConfidenceLevelDialog,
+        "add-covariate": add_new_dialogs.AddCovariateDialog,
+        "add-follow-up": add_new_dialogs.AddFollowUpDialog,
+        "add-group": add_new_dialogs.AddGroupDialog,
+        "add-outcome": add_new_dialogs.AddOutcomeDialog,
+        "add-study": add_new_dialogs.AddStudyDialog,
+        "import-progress": main_window.ImportProgressDialog,
+        "shared-progress": progress_dialog.AnalysisProgressDialog,
         "startup-splash": launch.create_startup_splash,
     }
 
@@ -901,13 +894,11 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
 
     prepare_generated_ui_imports()
     QtCore.qInstallMessageHandler(_qt_message_handler)
-    sys.path.append(str(ROOT / "src/rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend, qt6_resources
+    from rc_metastudio import r_backend, qt6_resources
 
-    meta_py_r_backend.install_stub_meta_py_r()
+    r_backend.install_stub_r_bridge()
     qt6_resources.ensure_application_resources()
-    import adaptive_window
-    import app_error_handler
+    from rc_metastudio import adaptive_window, app_error_handler
 
     app = app_error_handler.get_or_create_application([])
     # Evidence failures must terminate the gate, never block behind the app's

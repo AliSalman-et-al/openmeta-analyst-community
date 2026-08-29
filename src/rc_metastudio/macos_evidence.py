@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Pure validation and inventory helpers for native macOS evidence.
 
 This module owns the evidence contract and filesystem hashing. The feasibility

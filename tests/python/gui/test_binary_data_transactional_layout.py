@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from rc_metastudio import automation
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -22,40 +23,39 @@ AVAILABLE = QtCore.QRect(20, 30, 1024, 640)
 
 
 def _open_binary_dialog(monkeypatch):
-    import binary_data_form
-    import launch
+    from rc_metastudio import binary_data_dialog
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     monkeypatch.setattr(
-        binary_data_form.adaptive_window,
+        binary_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(AVAILABLE),
     )
     monkeypatch.setattr(
-        binary_data_form.meta_py_r, "get_mult_from_r", lambda _level: 1.96
+        binary_data_dialog.r_bridge, "get_mult_from_r", lambda _level: 1.96
     )
     monkeypatch.setattr(
-        binary_data_form.meta_py_r,
+        binary_data_dialog.r_bridge,
         "binary_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        binary_data_form.meta_py_r, "impute_bin_data", lambda _data: {"FAIL": True}
+        binary_data_dialog.r_bridge, "impute_bin_data", lambda _data: {"FAIL": True}
     )
     monkeypatch.setattr(
-        binary_data_form.meta_py_r,
+        binary_data_dialog.r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {},
     )
     monkeypatch.setattr(
-        binary_data_form.meta_py_r,
+        binary_data_dialog.r_bridge,
         "effect_triplet",
         lambda *_args, **_kwargs: (None, None, None),
     )
     assert window.open(str(REPO_ROOT / "sample_projects" / "amino.rcms")) is True
     model = window.model
-    dialog = binary_data_form.BinaryDataForm2(
-        copy.deepcopy(model.get_current_ma_unit_for_study(0)),
+    dialog = binary_data_dialog.BinaryDataDialog(
+        copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
         model.current_txs,
         model.get_cur_group_str(),
         model.current_effect,
@@ -173,13 +173,13 @@ def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypat
 
 
 def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monkeypatch):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
     )
     monkeypatch.setattr(
-        binary_data_form.adaptive_window,
+        binary_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(20, 30, 800, 600),
     )
@@ -187,7 +187,7 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
         "op1": {"a": 1, "b": 10, "c": 2, "d": 12},
         "op2": {"a": 3, "b": 14, "c": 4, "d": 16},
     }
-    dialog = binary_data_form.ChooseBackCalcResultForm(data)
+    dialog = binary_data_dialog.BinaryBackCalculationDialog(data)
     try:
         dialog.info_label.setText("Long back-calculation guidance " * 40)
         dialog._layout_controller.request_content_refit()
@@ -217,12 +217,12 @@ def test_binary_back_calculation_choices_are_scrollable_and_screen_bounded(monke
 
 @pytest.mark.parametrize("initially_blocked", [False, True])
 def test_binary_set_val_restores_table_signal_state(initially_blocked):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     table = QtWidgets.QTableWidget(1, 1)
 
-    class StubForm:
+    class StubDialog:
         raw_data_table = table
 
         @staticmethod
@@ -230,8 +230,8 @@ def test_binary_set_val_restores_table_signal_state(initially_blocked):
             return True
 
     table.blockSignals(initially_blocked)
-    binary_data_form.BinaryDataForm2._set_val(
-        cast(binary_data_form.BinaryDataForm2, StubForm()), 0, 0, 3
+    binary_data_dialog.BinaryDataDialog._set_val(
+        cast(binary_data_dialog.BinaryDataDialog, StubDialog()), 0, 0, 3
     )
 
     assert table.signalsBlocked() is initially_blocked
@@ -240,7 +240,7 @@ def test_binary_set_val_restores_table_signal_state(initially_blocked):
 
 
 def test_binary_set_val_restores_blocked_state_when_item_update_fails():
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
@@ -248,7 +248,7 @@ def test_binary_set_val_restores_blocked_state_when_item_update_fails():
     table = QtWidgets.QTableWidget(1, 1)
     table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
 
-    class StubForm:
+    class StubDialog:
         raw_data_table = table
 
         @staticmethod
@@ -257,8 +257,8 @@ def test_binary_set_val_restores_blocked_state_when_item_update_fails():
 
     table.blockSignals(True)
     with pytest.raises(RuntimeError, match="injected item update failure"):
-        binary_data_form.BinaryDataForm2._set_val(
-            cast(binary_data_form.BinaryDataForm2, StubForm()), 0, 0, 3
+        binary_data_dialog.BinaryDataDialog._set_val(
+            cast(binary_data_dialog.BinaryDataDialog, StubDialog()), 0, 0, 3
         )
 
     assert table.signalsBlocked()
@@ -267,7 +267,7 @@ def test_binary_set_val_restores_blocked_state_when_item_update_fails():
 
 
 def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     observed = []
@@ -286,7 +286,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             }
         }
 
-    monkeypatch.setattr(binary_data_form.meta_py_r, "impute_bin_data", back_calculate)
+    monkeypatch.setattr(binary_data_dialog.r_bridge, "impute_bin_data", back_calculate)
     try:
         dialog.clear_form()
         for row in (0, 1):
@@ -306,13 +306,13 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
         assert observed[-1]["N_A"] == 100
         assert observed[-1]["N_B"] == 100
         assert dialog.back_calc_btn.isEnabled()
-        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
             None,
             100,
             None,
             100,
         ]
-        dialog.restore_ma_unit(copy.deepcopy(dialog.ma_unit))
+        dialog.restore_analysis_unit(copy.deepcopy(dialog.analysis_unit))
         for row in (0, 1):
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.text() == "100"
@@ -322,7 +322,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
         mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
-        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
             10,
             100,
             5,
@@ -347,7 +347,7 @@ def _binary_table_snapshot(dialog):
 def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
     monkeypatch,
 ):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     imputed = {
@@ -355,7 +355,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed
+        binary_data_dialog.r_bridge, "impute_bin_data", lambda _d: imputed
     )
 
     def cancel_choice(chooser):
@@ -373,14 +373,14 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         return chooser.result()
 
     monkeypatch.setattr(
-        binary_data_form.ChooseBackCalcResultForm, "exec", cancel_choice
+        binary_data_dialog.BinaryBackCalculationDialog, "exec", cancel_choice
     )
     try:
         dialog.clear_form()
         dialog.undoStack.clear()
         dialog.enable_back_calculation_btn()
         table_before = _binary_table_snapshot(dialog)
-        model_before = copy.deepcopy(dialog.ma_unit)
+        model_before = copy.deepcopy(dialog.analysis_unit)
         dirty_before = window.current_data_unsaved
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.back_calc_btn.isEnabled()
@@ -389,10 +389,12 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         app.processEvents()
 
         assert _binary_table_snapshot(dialog) == table_before
-        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == (
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == (
             model_before.get_raw_data_for_groups(dialog.cur_groups)
         )
-        assert dialog.ma_unit.get_effects_dict() == model_before.get_effects_dict()
+        assert (
+            dialog.analysis_unit.get_effects_dict() == model_before.get_effects_dict()
+        )
         assert dialog.undoStack.count() == 0
         assert window.current_data_unsaved is dirty_before
         assert dialog.result() == 0
@@ -402,7 +404,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
 
 
 def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypatch):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     imputed = {
@@ -410,7 +412,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_form.meta_py_r, "impute_bin_data", lambda _d: imputed
+        binary_data_dialog.r_bridge, "impute_bin_data", lambda _d: imputed
     )
 
     def accept_second_choice(chooser):
@@ -427,7 +429,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         return chooser.result()
 
     monkeypatch.setattr(
-        binary_data_form.ChooseBackCalcResultForm, "exec", accept_second_choice
+        binary_data_dialog.BinaryBackCalculationDialog, "exec", accept_second_choice
     )
     try:
         dialog.clear_form()
@@ -437,7 +439,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         app.processEvents()
 
         assert _binary_table_snapshot(dialog)[:6] == ["4", "10", "14", "5", "11", "16"]
-        assert dialog.ma_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
             4,
             14,
             5,
@@ -476,12 +478,12 @@ def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(
 def test_binary_table_long_count_overflows_inside_table_and_remains_accessible(
     monkeypatch,
 ):
-    import app_error_handler
-    import binary_data_form
+    from rc_metastudio import app_error_handler
+    from rc_metastudio import binary_data_dialog
 
     warnings = []
     monkeypatch.setattr(
-        binary_data_form.QMessageBox,
+        binary_data_dialog.QMessageBox,
         "warning",
         lambda *args: warnings.append(args),
     )
@@ -517,12 +519,12 @@ def test_binary_table_long_count_overflows_inside_table_and_remains_accessible(
 
 
 def test_binary_validation_message_wraps_and_is_revealed(monkeypatch):
-    import binary_data_form
+    from rc_metastudio import binary_data_dialog
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     warnings = []
     monkeypatch.setattr(
-        binary_data_form.QMessageBox,
+        binary_data_dialog.QMessageBox,
         "warning",
         lambda *args: warnings.append(args),
     )

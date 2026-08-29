@@ -37,20 +37,22 @@ UPSTREAM_X64_LDFLAGS = (
     "-F/Library/Frameworks/R.framework/.. -framework R "
     "-L/opt/R/x86_64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
 )
+
+
 def private_config(architecture: str) -> str:
     if architecture not in {"x86_64", "arm64"}:
         raise RuntimeError(f"unsupported R build architecture: {architecture}")
     exact_guard = (
-        f'''expected='{UPSTREAM_X64_LDFLAGS}'
+        f"""expected='{UPSTREAM_X64_LDFLAGS}'
       if [ "$upstream" != "$expected" ]; then
         echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2
         exit 1
-      fi'''
+      fi"""
         if architecture == "x86_64"
-        else '''case "$upstream" in
+        else """case "$upstream" in
         *"/opt/R/arm64/lib"*"-framework R"*) ;;
         *) echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2; exit 1 ;;
-      esac'''
+      esac"""
     )
     return f"""#!/bin/sh
 set -eu

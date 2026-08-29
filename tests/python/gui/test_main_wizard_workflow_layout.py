@@ -15,7 +15,7 @@ os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verificat
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-import adaptive_window
+from rc_metastudio import adaptive_window
 from test_types import key_click, mouse_click, required
 
 
@@ -76,7 +76,7 @@ def _assert_multiline_data_type_labels_fit(page) -> None:
 
 
 def test_main_wizard_is_a_stable_workflow_window(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -128,7 +128,7 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
 
 
 def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -183,8 +183,8 @@ def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
 def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
     qapp, monkeypatch, available_size, path
 ):
-    import adaptive_window
-    import main_wizard
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import main_wizard
 
     available = QtCore.QRect(0, 0, *available_size)
     monkeypatch.setattr(
@@ -283,7 +283,7 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
 
 
 def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -328,7 +328,7 @@ def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
 
 
 def test_return_activates_visible_default_wizard_action(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -361,8 +361,8 @@ def test_return_activates_visible_default_wizard_action(qapp):
 
 
 def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
-    import main_wizard
-    import qt6_resources
+    from rc_metastudio import main_wizard
+    from rc_metastudio import qt6_resources
 
     qt6_resources.ensure_application_resources()
     original_palette = qapp.palette()
@@ -414,7 +414,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
 
 
 def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -433,7 +433,7 @@ def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
 
 
 def test_hidden_and_closed_wizards_do_not_react_to_other_wizard_focus(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     first = main_wizard.MainWizard(path="new_dataset")
     second = main_wizard.MainWizard(path="new_dataset")
@@ -472,7 +472,7 @@ def test_hidden_and_closed_wizards_do_not_react_to_other_wizard_focus(qapp):
 
 
 def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="csv_import")
     try:
@@ -528,9 +528,9 @@ import json
 from PyQt6 import QtCore, QtWidgets
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
-import app_error_handler
-import adaptive_window
-import main_wizard
+from rc_metastudio import app_error_handler
+from rc_metastudio import adaptive_window
+from rc_metastudio import main_wizard
 
 app = app_error_handler.get_or_create_application([])
 wizard = main_wizard.MainWizard(path="new_dataset")
@@ -566,9 +566,8 @@ finally:
         environment["PYTHONPATH"] = os.pathsep.join(
             [
                 str(root / "src"),
-                str(root / "src" / "rc_metastudio"),
                 str(
-                    root / "build" / "qt6-verification" / "generated" / "rc_metastudio"
+                    root / "build" / "qt6-verification" / "generated"
                 ),
             ]
         )

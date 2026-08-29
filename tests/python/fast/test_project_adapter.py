@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import copy
-import os
-import sys
 
 import pytest
 
-from rc_metastudio.project_format import JsonObject, JsonValue
+from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
-import project_adapter
+from rc_metastudio import project_adapter
 
 
 def _multi_arm_project(family: str) -> JsonObject:
@@ -102,3 +99,31 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
         "Tx 2",
         "Tx 3",
     ]
+
+
+def test_document_to_runtime_project_reconstructs_state_and_selection() -> None:
+    project = _multi_arm_project("binary")
+    state: JsonObject = {
+        "schema_version": 1,
+        "active_outcome": "Outcome",
+        "active_follow_up": "first",
+        "active_groups": ["Tx 1", "Tx 2"],
+        "active_effect": "OR",
+        "confidence_level": 95.0,
+    }
+
+    runtime_project = project_adapter.document_to_runtime_project(
+        ProjectDocument(format_version=1, project=project, state=state)
+    )
+
+    assert isinstance(runtime_project, project_adapter.RuntimeProject)
+    assert runtime_project.dataset.get_outcome_names() == ["Outcome"]
+    assert runtime_project.model_state == {
+        "current_outcome": "Outcome",
+        "current_time_point": 0,
+        "current_txs": ["Tx 1", "Tx 2"],
+        "current_effect": "OR",
+        "study_auto_added": False,
+        "conf_level": 95.0,
+    }
+    assert runtime_project.restored_selection is True

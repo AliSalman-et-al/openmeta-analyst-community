@@ -29,14 +29,11 @@ CALC_NUM_DIGITS = 4
 
 VERSION = "0.3.0"
 
-DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
+NETWORK_ANALYSIS_DISABLED = True
 DEFAULT_DATASET_NAME = "untitled_dataset"
 
-## For now we're going to hardcode which metrics are available.
-# In the future, we may want to pull these out dynamically from
-# the R side. But then meta-analytic methods would have either to
-# only operate over the effects and variances or else themselves
-# know how to compute arbitrary metrics.
+# Supported metrics are part of the application contract. R methods operate on
+# these known effects and variances.
 
 # Binary metrics
 BINARY_TWO_ARM_METRICS = ["OR", "RD", "RR", "AS", "YUQ", "YUY"]
@@ -96,9 +93,7 @@ ALL_METRIC_NAMES.update(DIAGNOSTIC_METRIC_NAMES)
 # enumeration of data types and dictionaries mapping both ways
 BINARY, CONTINUOUS, DIAGNOSTIC, OTHER = range(4)
 
-# we need two types for covariates; factor and continuous. we'll use the
-# above definition (enumerated as part of a general data type) for continuous
-# and just define factor here.
+# Continuous shares the general data-type enumeration; factor is covariate-only.
 FACTOR = 4
 
 # making life easier
@@ -127,7 +122,6 @@ EMPTY_VALS = ("", None)  # these indicate an empty row/cell
 BASE_PATH = str(os.path.abspath(os.getcwd()))
 
 # def get_BASE_PATH():
-#    BASE_PATH = str(os.path.abspath(os.getcwd())) # where temporary R output should go
 
 
 # this is a useful function sometimes.
@@ -144,15 +138,14 @@ def none_to_str(value: _Value) -> _Value: ...
 
 def none_to_str(value: object | None) -> object | str:
     """Return an empty display value for ``None`` without changing other values."""
-
     return "" if value is None else value
 
 
 # for diagnostic data -- this dictionary maps
 # the mteric names as they appear in the UI/ure
 # used here to the names used in the model.
-# see get_diag_metrics_to_run.
-DIAG_METRIC_NAMES_D = {
+# see get_diagnostic_metrics_dialog_to_run.
+DIAGNOSTIC_METRIC_NAMES = {
     "sens": ["Sens"],
     "spec": ["Spec"],
     "dor": ["DOR"],
@@ -176,7 +169,6 @@ def equal_close_enough(x, y):
     return abs(x - y) < threshold
 
 
-### CONFIDENCE LEVEL STUFF #####
 DEFAULT_CONF_LEVEL = 95.0  # (normal 95% CI)
 CONFIDENCE_LEVEL_MIN = 0.0
 CONFIDENCE_LEVEL_MAX = 100.0
@@ -297,14 +289,8 @@ def normalize_confidence_level_params(params):
     return normalized
 
 
-"""
-some useful static methods
-"""
-
-
 def seems_sane(xticks: str) -> bool:
     """Return whether a comma-separated tick list contains only finite numbers."""
-
     raw_ticks = xticks.split(",")
     if len(raw_ticks) < 2:
         return False
@@ -350,18 +336,14 @@ def is_an_int(value: object) -> bool:
             return False
 
 
-def is_NaN(value: object) -> bool:
-    # there's no built-in for checking if a number is a NaN in
-    # Python < 2.6. checking if a number is equal to itself
-    # does the trick, though purportedly does not always work.
+def is_nan(value: object) -> bool:
+    """Return whether ``value`` has IEEE NaN comparison behavior."""
+
     return value != value
 
 
-class CommandGenericDo(QUndoCommand):
-    """
-    This is a generic undo/redo command that takes two unevaluated lambdas --
-    thunks, if you will -- one for doing and one for undoing.
-    """
+class CallbackCommand(QUndoCommand):
+    """Execute paired redo and undo callbacks."""
 
     def __init__(
         self,
@@ -369,7 +351,7 @@ class CommandGenericDo(QUndoCommand):
         undo_f: Callable[[], None],
         description: str = "",
     ) -> None:
-        super(CommandGenericDo, self).__init__(description)
+        super().__init__(description)
         self.redo_f = redo_f
         self.undo_f = undo_f
 
@@ -405,7 +387,6 @@ def tabulate(
     align: Sequence[str] | None = None,
 ) -> str | tuple[str, list[int]]:
     """Render equally sized columns as a plain-text table."""
-
     column_alignments = list(align) if align is not None else []
     if len(column_alignments) != len(lists):
         column_alignments = ["L"] * len(lists)

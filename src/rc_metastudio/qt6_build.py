@@ -32,35 +32,35 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/about_legal.ui"): Path(
         "rc_metastudio/forms/ui_about_legal.py"
     ),
-    Path("src/rc_metastudio/forms/binary_data_form2.ui"): Path(
-        "rc_metastudio/forms/ui_binary_data_form.py"
+    Path("src/rc_metastudio/forms/binary_data_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_binary_data_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/change_cov_type_form.ui"): Path(
-        "rc_metastudio/forms/ui_change_cov_type.py"
+    Path("src/rc_metastudio/forms/covariate_type_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_covariate_type_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/change_group_name_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_edit_group_name.py"
+    Path("src/rc_metastudio/forms/edit_name_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_edit_name_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/choose_back_calc_result_form.ui"): Path(
-        "rc_metastudio/forms/ui_choose_back_calc_result_form.py"
+    Path("src/rc_metastudio/forms/binary_back_calculation_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_binary_back_calculation_dialog.py"
     ),
     Path("src/rc_metastudio/forms/choose_metric_page.ui"): Path(
         "rc_metastudio/forms/ui_choose_metric_page.py"
     ),
-    Path("src/rc_metastudio/forms/conf_level_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_conf_level_dialog.py"
+    Path("src/rc_metastudio/forms/confidence_level_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_confidence_level_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/continuous_back_calc_result_form.ui"): Path(
-        "rc_metastudio/forms/ui_continuous_back_calc_result_form.py"
+    Path("src/rc_metastudio/forms/continuous_back_calculation_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_continuous_back_calculation_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/continuous_data_form.ui"): Path(
-        "rc_metastudio/forms/ui_continuous_data_form.py"
+    Path("src/rc_metastudio/forms/continuous_data_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_continuous_data_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/cov_reg_dlg2.ui"): Path(
-        "rc_metastudio/forms/ui_meta_reg.py"
+    Path("src/rc_metastudio/forms/meta_regression_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_meta_regression_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/cov_subgroup_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_cov_subgroup_dlg.py"
+    Path("src/rc_metastudio/forms/subgroup_analysis_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_subgroup_analysis_dialog.py"
     ),
     Path("src/rc_metastudio/forms/csv_import_page.ui"): Path(
         "rc_metastudio/forms/ui_csv_import_page.py"
@@ -68,39 +68,41 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/data_type_page.ui"): Path(
         "rc_metastudio/forms/ui_data_type_page.py"
     ),
-    Path("src/rc_metastudio/forms/diagnostic_data_form.ui"): Path(
-        "rc_metastudio/forms/ui_diagnostic_data_form.py"
+    Path("src/rc_metastudio/forms/diagnostic_data_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_diagnostic_data_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/diagnostic_metrics.ui"): Path(
-        "rc_metastudio/forms/ui_diagnostic_metrics.py"
+    Path("src/rc_metastudio/forms/diagnostic_metrics_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_diagnostic_metrics_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/edit_dialog2.ui"): Path(
+    Path("src/rc_metastudio/forms/edit_dialog.ui"): Path(
         "rc_metastudio/forms/ui_edit_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/edit_forest_plot.ui"): Path(
-        "rc_metastudio/forms/ui_edit_forest_plot.py"
+    Path("src/rc_metastudio/forms/edit_plot_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_edit_plot_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/ma_specs2.ui"): Path(
-        "rc_metastudio/forms/ui_ma_specs.py"
+    Path("src/rc_metastudio/forms/analysis_setup_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_analysis_setup_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/meta.ui"): Path("rc_metastudio/ui_meta.py"),
-    Path("src/rc_metastudio/forms/network_view_window.ui"): Path(
-        "rc_metastudio/forms/ui_network_view.py"
+    Path("src/rc_metastudio/forms/main_window.ui"): Path(
+        "rc_metastudio/ui_main_window.py"
     ),
-    Path("src/rc_metastudio/forms/new_covariate_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_new_covariate.py"
+    Path("src/rc_metastudio/forms/network_view_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_network_view_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/new_follow_up_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_new_follow_up.py"
+    Path("src/rc_metastudio/forms/new_covariate_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_new_covariate_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/new_group_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_new_group.py"
+    Path("src/rc_metastudio/forms/new_follow_up_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_new_follow_up_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/new_outcome_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_new_outcome.py"
+    Path("src/rc_metastudio/forms/new_group_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_new_group_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/new_study_dlg.ui"): Path(
-        "rc_metastudio/forms/ui_new_study.py"
+    Path("src/rc_metastudio/forms/new_outcome_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_new_outcome_dialog.py"
+    ),
+    Path("src/rc_metastudio/forms/new_study_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_new_study_dialog.py"
     ),
     Path("src/rc_metastudio/forms/outcome_name_page.ui"): Path(
         "rc_metastudio/forms/ui_outcome_name_page.py"
@@ -108,8 +110,8 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/results_window.ui"): Path(
         "rc_metastudio/ui_results_window.py"
     ),
-    Path("src/rc_metastudio/forms/running.ui"): Path(
-        "rc_metastudio/forms/ui_running.py"
+    Path("src/rc_metastudio/forms/progress_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_progress_dialog.py"
     ),
     Path("src/rc_metastudio/forms/welcome_page.ui"): Path(
         "rc_metastudio/forms/ui_welcome_page.py"
@@ -154,7 +156,6 @@ def validate_form_manifest(
     manifest: Mapping[Path, Path], discovered: set[Path]
 ) -> None:
     """Reject canonical-form drift and unsafe or colliding build destinations."""
-
     declared = set(manifest)
     if declared != discovered:
         missing = sorted(path.as_posix() for path in discovered - declared)
@@ -256,7 +257,6 @@ def validate_rcc(
     expected_version: str = QT_RCC_VERSION,
 ) -> None:
     """Fail closed unless *rcc* is the pinned official Windows x64 compiler."""
-
     actual_digest = _sha256(rcc)
     if actual_digest != expected_digest:
         raise RuntimeError(
@@ -288,7 +288,6 @@ def download_pinned_archive(
     expected_digest: str,
 ) -> None:
     """Download an immutable archive while enforcing length before its digest."""
-
     temporary = destination.with_suffix(".download")
     temporary.unlink(missing_ok=True)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -399,6 +398,10 @@ def _render_form(build_root: Path, source: Path, destination: Path) -> Path:
         if "QtCore.QMetaObject.connectSlotsByName(" not in line
         and not line.strip().endswith("import icons_rc")
     )
+    generated = generated.replace(
+        "from adaptive_controls import",
+        "from rc_metastudio.adaptive_controls import",
+    )
     module.write_text(generated, encoding="utf-8", newline="\n")
     temporary.unlink()
     _write_package_marker(build_root / "generated/rc_metastudio/__init__.py")
@@ -425,12 +428,20 @@ def _compile_resource(build_root: Path) -> Path:
 
 def generate(build_root: Path) -> tuple[Path, Path]:
     """Generate every canonical form and the shared binary resource."""
-
     discovered = {
         path.relative_to(ROOT)
         for path in (ROOT / "src/rc_metastudio/forms").glob("*.ui")
     }
     validate_form_manifest(CANONICAL_FORMS, discovered)
+    generated_root = build_root / "generated"
+    expected_modules = {
+        generated_root / destination for destination in CANONICAL_FORMS.values()
+    }
+    package_root = generated_root / "rc_metastudio"
+    if package_root.is_dir():
+        for module in package_root.rglob("ui_*.py"):
+            if module not in expected_modules:
+                module.unlink()
     modules = {
         source: _render_form(build_root, source, destination)
         for source, destination in CANONICAL_FORMS.items()
@@ -465,7 +476,6 @@ def smoke(
     expected_qpa: str | None = None,
 ) -> dict[str, str | bool]:
     """Launch a visible native Qt6 form and return user-observable evidence."""
-
     module_path, resource_path = _smoke_inputs(build_root)
     if not QtCore.QResource.registerResource(str(resource_path)):
         raise RuntimeError(f"Qt refused to register binary resource {resource_path}")

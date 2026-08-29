@@ -5,7 +5,7 @@
 from collections.abc import Mapping
 from typing import TypedDict
 
-from analysis_results import (
+from rc_metastudio.analysis_results import (
     PlotCapability,
     PlotComposition,
     PlotKind,

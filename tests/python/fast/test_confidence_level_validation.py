@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath("src"))
 
-from meta_globals import (
+from rc_metastudio.meta_globals import (
     normalize_confidence_level_params,
     seems_sane,
     validate_analysis_count,

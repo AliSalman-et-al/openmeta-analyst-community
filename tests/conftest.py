@@ -10,11 +10,12 @@ os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _ROOT = Path(__file__).resolve().parents[1]
-_APP_PACKAGE = _ROOT / "src" / "rc_metastudio"
-for _path in (_APP_PACKAGE, _APP_PACKAGE / "forms"):
-    _path_text = str(_path)
-    if _path_text not in sys.path:
-        sys.path.insert(0, _path_text)
+if str(_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "src"))
+
+from rc_metastudio import r_backend
+
+r_backend.install_stub_r_bridge()
 
 _QAPPLICATION = None
 

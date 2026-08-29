@@ -156,11 +156,7 @@ def configure_bundled_r_environment(app_root=None):
     manifest = None
     derivation = None
     direct_spike_marker = Path(root).parent / "Resources" / "direct-r-spike.marker"
-    direct_spike = (
-        frozen
-        and sys.platform == "darwin"
-        and direct_spike_marker.is_file()
-    )
+    direct_spike = frozen and sys.platform == "darwin" and direct_spike_marker.is_file()
     if frozen:
         if threading.current_thread() is not threading.main_thread():
             raise RuntimeError(

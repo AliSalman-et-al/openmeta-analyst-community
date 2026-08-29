@@ -8,7 +8,7 @@ The release pipeline builds Windows x64, Intel macOS, and Apple silicon macOS ar
 2. Complete the matching `CHANGELOG.md` section.
 3. Run the fast, full R, Qt, and packaging checks affected by the release.
 4. Merge the release commit to protected `master` and record its full commit SHA.
-5. Confirm the `Fast Verification` workflow succeeds for that SHA.
+5. Confirm the `Qt6 Integration Verification` workflow succeeds for that SHA.
 
 ## Build a candidate
 

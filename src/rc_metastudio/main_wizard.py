@@ -1,13 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import forms.ui_choose_metric_page
-import forms.ui_csv_import_page
-import forms.ui_data_type_page
-import forms.ui_outcome_name_page
-import forms.ui_welcome_page
+from typing import TYPE_CHECKING, TypedDict
 
-from typing import TypedDict
+if TYPE_CHECKING:
+    import ui_choose_metric_page as _ui_choose_metric_page
+    import ui_csv_import_page as _ui_csv_import_page
+    import ui_data_type_page as _ui_data_type_page
+    import ui_outcome_name_page as _ui_outcome_name_page
+    import ui_welcome_page as _ui_welcome_page
+else:
+    from rc_metastudio.forms import ui_choose_metric_page as _ui_choose_metric_page
+    from rc_metastudio.forms import ui_csv_import_page as _ui_csv_import_page
+    from rc_metastudio.forms import ui_data_type_page as _ui_data_type_page
+    from rc_metastudio.forms import ui_outcome_name_page as _ui_outcome_name_page
+    from rc_metastudio.forms import ui_welcome_page as _ui_welcome_page
 
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer
 from PyQt6.QtGui import (
@@ -32,14 +39,14 @@ from PyQt6.QtWidgets import (
     QWizard,
     QWizardPage,
 )
-import meta_globals
-import app_error_handler
-import adaptive_window
-import qt_layout
-import qt_text
-import csv_import
-from ma_data_table_model import DatasetModel
-from settings import get_default_open_directory
+from rc_metastudio import meta_globals
+from rc_metastudio import app_error_handler
+from rc_metastudio import adaptive_window
+from rc_metastudio import qt_layout
+from rc_metastudio import qt_text
+from rc_metastudio import csv_import
+from rc_metastudio.dataset_table_model import DatasetTableModel
+from rc_metastudio.settings import get_default_open_directory
 
 
 class DatasetInfo(TypedDict, total=False):
@@ -61,7 +68,7 @@ class MainWizardPage(QWizardPage):
         return wizard
 
 
-class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
+class WelcomePage(MainWizardPage, _ui_welcome_page.Ui_WizardPage):
     def __init__(self, parent=None, recent_datasets=None):
         super(WelcomePage, self).__init__(parent)
         self.setupUi(self)
@@ -85,7 +92,6 @@ class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
         return False
 
     def nextId(self):
-        # print("wizard path is: %s" % str(self.wizard().get_wizard_path()))
         if self.wizard().get_wizard_path() == "open":
             return -1
         else:
@@ -111,7 +117,6 @@ class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
 
     def _setup_open_recent_btn(self):
         if len(self.recent_datasets) > 0:
-            ###
             # then add a drop-down to the 'open recent'
             # button with the recent datasets.
             qm = QMenu()
@@ -177,10 +182,7 @@ class WelcomePage(MainWizardPage, forms.ui_welcome_page.Ui_WizardPage):
         self.wizard().next()
 
 
-################################################################################
-
-
-class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
+class DataTypePage(MainWizardPage, _ui_data_type_page.Ui_DataTypePage):
     _ICON_NAMES = {
         "onearm_proportion_Button": "one-arm-proportion.svg",
         "onearm_mean_Button": "one-arm-mean.svg",
@@ -291,7 +293,6 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         button.setIcon(QIcon(f":/icons/dataset-types/{theme}/{icon_name}"))
 
     def _button_selected(self, button):
-        # print("button clicked %s" % str(button))
 
         if button == self.onearm_proportion_Button:
             self.summary["arms"] = "one"
@@ -345,7 +346,6 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
         self.completeChanged.emit()
 
     def isComplete(self):
-        # print(self.buttonGroup.checkedButton())
 
         if self.buttonGroup.checkedButton():
             return True
@@ -362,8 +362,7 @@ class DataTypePage(MainWizardPage, forms.ui_data_type_page.Ui_DataTypePage):
             return Page_ChooseMetric
 
 
-###############################################################################
-class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage):
+class ChooseMetricPage(MainWizardPage, _ui_choose_metric_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(ChooseMetricPage, self).__init__(parent)
         self.setupUi(self)
@@ -409,14 +408,11 @@ class ChooseMetricPage(MainWizardPage, forms.ui_choose_metric_page.Ui_WizardPage
         return Page_OutcomeName
 
 
-###############################################################################
-
-
 def _qt_item_text(value):
     return qt_text.to_native_text(value)
 
 
-class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
+class CsvImportPage(MainWizardPage, _ui_csv_import_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(CsvImportPage, self).__init__(parent)
         self.setupUi(self)
@@ -438,10 +434,8 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         )
 
     def initializePage(self):
-        ######################################################
         self.file_path = None
         self._reset_data()
-        ######################################################
 
         self.required_header_labels = self._get_required_header_labels()
         self.required_fmt_table.setRowCount(2)
@@ -508,11 +502,11 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             self._import_result = csv_import.parse_csv(
                 file_path,
                 expected_headers=self.required_header_labels,
-                has_headers=self._hasHeaders(),
-                from_excel=self._isFromExcel(),
+                has_headers=self._has_headers(),
+                from_excel=self._is_from_excel(),
                 delimiter=self._get_delimter(),
                 quotechar=self._get_quotechar(),
-                year_column=DatasetModel.YEAR - 1,
+                year_column=DatasetTableModel.YEAR - 1,
             )
             payload = self._import_result.to_payload()
             self.headers = payload["headers"]
@@ -563,27 +557,25 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
             return False
 
     def _get_required_header_labels(self):
+        """Provides column header labels based on chosen datatype and subtype
+        ** Must be updated if header_data() is dataset_table_model is changed
         """
-        Provides column header labels based on chosen datatype and subtype
-        ** Must be updated if header_data() is ma_data_table_model is changed
-        """
-
         dataset_info = self.wizard().require_dataset_info()
         data_type = dataset_info["data_type"]
         data_subtype = dataset_info["sub_type"]
         effect = dataset_info["effect"]
-        raw_cols, outcome_cols = DatasetModel.get_column_indices(
+        raw_cols, outcome_cols = DatasetTableModel.get_column_indices(
             data_type, data_subtype
         )
 
         header_labels = []
 
-        model_cols = [DatasetModel.NAME, DatasetModel.YEAR]
+        model_cols = [DatasetTableModel.NAME, DatasetTableModel.YEAR]
         model_cols.extend(raw_cols)
         model_cols.extend(outcome_cols)
 
         for col in model_cols:
-            col_name = DatasetModel.helper_basic_horizontal_headerData(
+            col_name = DatasetTableModel._basic_horizontal_header_data(
                 section=col,
                 data_type=meta_globals.STR_TO_TYPE_DICT[data_type],
                 sub_type=data_subtype,
@@ -598,16 +590,16 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
 
     def csv_data(self):
         """Imported data is a list of rows. A row is a list of
-        cell contents (as strings)"""
-
+        cell contents (as strings)
+        """
         if not self.imported_data_ok or self._import_result is None:
             return None
         return self._import_result.to_payload()
 
-    def _isFromExcel(self):
+    def _is_from_excel(self):
         return self.from_excel_chkbx.isChecked()
 
-    def _hasHeaders(self):
+    def _has_headers(self):
         return self.has_headers_chkbx.isChecked()
 
     def _get_delimter(self):
@@ -617,8 +609,7 @@ class CsvImportPage(MainWizardPage, forms.ui_csv_import_page.Ui_WizardPage):
         return str(self.quotechar_le.text())
 
 
-################################################################################
-class OutcomeNamePage(MainWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
+class OutcomeNamePage(MainWizardPage, _ui_outcome_name_page.Ui_WizardPage):
     def __init__(self, parent=None):
         super(OutcomeNamePage, self).__init__(parent)
         self.setupUi(self)
@@ -635,7 +626,6 @@ class OutcomeNamePage(MainWizardPage, forms.ui_outcome_name_page.Ui_WizardPage):
             return -1
 
 
-################################################################################
 Page_Welcome, Page_DataType, Page_ChooseMetric, Page_OutcomeName, Page_CsvImport = list(
     range(5)
 )

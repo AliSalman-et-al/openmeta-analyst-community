@@ -56,7 +56,9 @@ def filter_pyinstaller_r_binaries(
     staged_root = staged_framework.resolve(strict=True)
     staged_library = staged_root / "Resources/lib"
     staged_library_names = {
-        path.name for path in staged_library.iterdir() if path.is_file() or path.is_symlink()
+        path.name
+        for path in staged_library.iterdir()
+        if path.is_file() or path.is_symlink()
     }
     retained = []
     excluded = []
@@ -550,9 +552,7 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
     validate_relocated_inventory(framework, native)
     lib_r_paths = list(app.rglob("libR.dylib"))
     version = current_version(framework)
-    expected_lib_r_link = (
-        framework / f"Versions/{version}/Resources/lib/libR.dylib"
-    )
+    expected_lib_r_link = framework / f"Versions/{version}/Resources/lib/libR.dylib"
     expected_lib_r = (framework / f"Versions/{version}/R").resolve(strict=True)
     if (
         len(lib_r_paths) != 1
@@ -575,14 +575,10 @@ def post_app_gate(app: Path, architecture: str, output: Path) -> None:
         raise AdapterError("final API bridge is outside Contents/Frameworks")
     if architectures(bridge) != [architecture]:
         raise AdapterError("final API bridge has the wrong architecture")
-    r_edge = [
-        value for value in dependencies(bridge) if value.endswith("libR.dylib")
-    ]
+    r_edge = [value for value in dependencies(bridge) if value.endswith("libR.dylib")]
     if len(r_edge) != 1 or not r_edge[0].startswith("@loader_path/"):
         raise AdapterError("final API bridge does not resolve uniquely to private libR")
-    if (
-        bridge.parent / r_edge[0][len("@loader_path/") :]
-    ).resolve() != expected_lib_r:
+    if (bridge.parent / r_edge[0][len("@loader_path/") :]).resolve() != expected_lib_r:
         raise AdapterError("final API bridge resolves outside the private R.framework")
     output.write_text(
         json.dumps(

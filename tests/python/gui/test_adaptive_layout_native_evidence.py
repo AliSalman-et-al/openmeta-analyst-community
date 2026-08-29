@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import pytest
+from rc_metastudio import automation
 
 from test_types import required
 
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
-    import adaptive_layout_evidence
+    from rc_metastudio import adaptive_layout_evidence
 
     with pytest.raises(RuntimeError, match="native Qt platform"):
         adaptive_layout_evidence.validate_native_platform("offscreen", "win32", "AMD64")
@@ -36,7 +37,7 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
 
 
 def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
-    import adaptive_layout_evidence
+    from rc_metastudio import adaptive_layout_evidence
 
     window = adaptive_layout_evidence.QtWidgets.QMainWindow()
     window.show()
@@ -60,7 +61,7 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
 
 
 def test_exact_client_size_clears_sticky_maximized_state(qapp):
-    import adaptive_layout_evidence
+    from rc_metastudio import adaptive_layout_evidence
 
     class StickyMaximizedWindow(adaptive_layout_evidence.QtWidgets.QMainWindow):
         first_show = True
@@ -103,7 +104,7 @@ def test_exact_client_size_clears_sticky_maximized_state(qapp):
 def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
     qapp, monkeypatch
 ):
-    import adaptive_layout_evidence
+    from rc_metastudio import adaptive_layout_evidence
 
     blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
     blank.fill(adaptive_layout_evidence.QtGui.QColor("white"))
@@ -132,8 +133,7 @@ def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
 def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     qapp, monkeypatch, tmp_path
 ):
-    import adaptive_layout_evidence
-    import launch
+    from rc_metastudio import adaptive_layout_evidence
 
     sample = ROOT / "sample_projects" / "amino.rcms"
     output = tmp_path / "native-evidence"
@@ -177,7 +177,7 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     monkeypatch.setattr(adaptive_layout_evidence, "_grab_native_frame", grab_test_frame)
 
     try:
-        app, main = launch.start_automation()
+        app, main = automation.start_automation()
         manifest = adaptive_layout_evidence.run_native_adaptive_layout_evidence(
             app, main, sample, output
         )

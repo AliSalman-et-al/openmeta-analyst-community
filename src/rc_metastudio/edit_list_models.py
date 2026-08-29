@@ -2,14 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Proxy models between dataset objects and editing dialogs."""
 
-# import pdb
-
 # core libraries
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
-import name_validation
-import qt_text
-from ma_dataset import Dataset
+from rc_metastudio import name_validation
+from rc_metastudio import qt_text
+from rc_metastudio.analysis_dataset import Dataset
 
 
 def _require_dataset(dataset: Dataset | None) -> Dataset:
@@ -77,9 +75,8 @@ class ResettableTableModel(QAbstractTableModel):
 
 
 class TXGroupsModel(ResettableTableModel):
-    """
-    This module mediates between the classes comprising a dataset
-    (i.e., study & ma_unit objects) and the view. In particular, we
+    """This module mediates between the classes comprising a dataset
+    (i.e., study & analysis_unit objects) and the view. In particular, we
     subclass the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -145,8 +142,7 @@ class TXGroupsModel(ResettableTableModel):
 
 
 class OutcomesModel(ResettableTableModel):
-    """
-    A simple table model for editing/deleting/adding outcomes.
+    """A simple table model for editing/deleting/adding outcomes.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -199,8 +195,7 @@ class OutcomesModel(ResettableTableModel):
             return self.reject_edit(str(exc))
 
         self.dataset.change_outcome_name(old_outcome_name, new_outcome_name)
-        # issue #130: if we change an outcome name, set the current outcome
-        # to said outcome
+        # Keep the current selection aligned with the renamed outcome.
         self.current_outcome = new_outcome_name
         self.outcome_list[row] = new_outcome_name
         return self.commit_edit(index)
@@ -214,8 +209,7 @@ class OutcomesModel(ResettableTableModel):
 
 
 class FollowUpsModel(ResettableTableModel):
-    """
-    A simple table model for editing/deleting/adding follow-ups.
+    """A simple table model for editing/deleting/adding follow-ups.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -223,8 +217,7 @@ class FollowUpsModel(ResettableTableModel):
     def __init__(self, filename="", dataset=None, outcome=None):
         super(FollowUpsModel, self).__init__()
         self.dataset = _require_dataset(dataset)
-        ## we maintain a current outcome string variable because
-        # the follow-ups are outcome specific
+        # Follow-ups belong to the selected outcome.
         self.current_outcome = outcome
         self.follow_up_list = self._follow_up_names_for_current_outcome()
 
@@ -289,9 +282,7 @@ class FollowUpsModel(ResettableTableModel):
 
 
 class StudiesModel(ResettableTableModel):
-    """
-    Table model implementation for studies list.
-    """
+    """Table model implementation for studies list."""
 
     def __init__(self, filename="", dataset=None):
         super(StudiesModel, self).__init__()
@@ -344,9 +335,7 @@ class StudiesModel(ResettableTableModel):
 
 
 class CovariatesModel(ResettableTableModel):
-    """
-    Table model implementation for covariates.
-    """
+    """Table model implementation for covariates."""
 
     def __init__(self, filename="", dataset=None):
         super(CovariatesModel, self).__init__()

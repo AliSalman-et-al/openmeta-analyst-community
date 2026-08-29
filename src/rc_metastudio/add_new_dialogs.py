@@ -1,42 +1,46 @@
+from typing import TYPE_CHECKING
+
 from PyQt6.QtWidgets import QDialog
 
-# from meta_globals import *
-from meta_globals import DIAGNOSTIC
-import forms.ui_new_group
-import forms.ui_new_follow_up
-import forms.ui_new_outcome
-import forms.ui_new_covariate
-import forms.ui_new_study
-import adaptive_controls
-import adaptive_window
+from rc_metastudio.meta_globals import DIAGNOSTIC
+from rc_metastudio import adaptive_controls
+from rc_metastudio import adaptive_window
 
-# import pdb
+if TYPE_CHECKING:
+    import ui_new_covariate_dialog as _ui_new_covariate_dialog
+    import ui_new_follow_up_dialog as _ui_new_follow_up_dialog
+    import ui_new_group_dialog as _ui_new_group_dialog
+    import ui_new_outcome_dialog as _ui_new_outcome_dialog
+    import ui_new_study_dialog as _ui_new_study_dialog
+else:
+    from rc_metastudio.forms import ui_new_covariate_dialog as _ui_new_covariate_dialog
+    from rc_metastudio.forms import ui_new_follow_up_dialog as _ui_new_follow_up_dialog
+    from rc_metastudio.forms import ui_new_group_dialog as _ui_new_group_dialog
+    from rc_metastudio.forms import ui_new_outcome_dialog as _ui_new_outcome_dialog
+    from rc_metastudio.forms import ui_new_study_dialog as _ui_new_study_dialog
 
 
-class AddNewGroupForm(QDialog, forms.ui_new_group.Ui_new_group_dialog):
+class AddGroupDialog(QDialog, _ui_new_group_dialog.Ui_new_group_dialog):
     def __init__(self, parent=None):
-        super(AddNewGroupForm, self).__init__(parent)
+        super().__init__(parent)
         self.setupUi(self)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
 
 
-class AddNewFollowUpForm(QDialog, forms.ui_new_follow_up.Ui_new_follow_up_dialog):
+class AddFollowUpDialog(QDialog, _ui_new_follow_up_dialog.Ui_new_follow_up_dialog):
     def __init__(self, parent=None):
-        super(AddNewFollowUpForm, self).__init__(parent)
+        super().__init__(parent)
         self.setupUi(self)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
 
 
-class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
+class AddOutcomeDialog(QDialog, _ui_new_outcome_dialog.Ui_new_outcome_dialog):
     def __init__(self, parent=None, is_diag=False):
-        super(AddNewOutcomeForm, self).__init__(parent)
-        ###
-        # we need to know if the outcome should be diagnostic
-        # or not.
+        super().__init__(parent)
         self.is_diag = is_diag
 
         self.setupUi(self)
@@ -47,7 +51,6 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
         )
 
     def _populate_combo_box(self):
-        # diagnostic datasets can have only diagnostic outcomes
         if self.is_diag:
             self.datatype_cbo_box.addItem("Diagnostic", DIAGNOSTIC)
         else:
@@ -55,18 +58,20 @@ class AddNewOutcomeForm(QDialog, forms.ui_new_outcome.Ui_Dialog):
                 self.datatype_cbo_box.addItem(name, type_id)
 
 
-class AddNewStudyForm(QDialog, forms.ui_new_study.Ui_new_study_dialog):
+class AddStudyDialog(QDialog, _ui_new_study_dialog.Ui_new_study_dialog):
     def __init__(self, parent=None):
-        super(AddNewStudyForm, self).__init__(parent)
+        super().__init__(parent)
         self.setupUi(self)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
 
 
-class AddNewCovariateForm(QDialog, forms.ui_new_covariate.Ui_new_covariate_dialog):
+class AddCovariateDialog(
+    QDialog, _ui_new_covariate_dialog.Ui_new_covariate_dialog
+):
     def __init__(self, parent=None):
-        super(AddNewCovariateForm, self).__init__(parent)
+        super().__init__(parent)
         self.setupUi(self)
         self._populate_combo_box()
         adaptive_controls.configure_choice_control(self.datatype_cbo_box)

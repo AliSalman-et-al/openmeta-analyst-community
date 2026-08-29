@@ -1,33 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import copy
-import os
-import sys
 
 
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
-import ma_dataset
+from rc_metastudio import analysis_dataset
 
 
-def _dataset(data_type=ma_dataset.DIAGNOSTIC):
-    dataset = ma_dataset.Dataset(
+def _dataset(data_type=analysis_dataset.DIAGNOSTIC):
+    dataset = analysis_dataset.Dataset(
         title="Contract dataset",
-        is_diag=data_type == ma_dataset.DIAGNOSTIC,
+        is_diag=data_type == analysis_dataset.DIAGNOSTIC,
         summary={"data_type": "diagnostic"},
     )
     dataset.notes = "dataset notes"
     dataset.num_outcomes = 1
     dataset.num_follow_ups = 1
     dataset.num_treatments = 1
-    dataset.add_study(ma_dataset.Study(1, "Study 1", year=2026))
-    dataset.add_outcome(ma_dataset.Outcome("Outcome", data_type))
+    dataset.add_study(analysis_dataset.Study(1, "Study 1", year=2026))
+    dataset.add_outcome(analysis_dataset.Outcome("Outcome", data_type))
     dataset.add_covariate(
-        ma_dataset.Covariate("Region", "factor"), {"Study 1": "north"}
+        analysis_dataset.Covariate("Region", "factor"), {"Study 1": "north"}
     )
     unit = dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
     groups = unit.get_group_names()
     unit.tx_groups[groups[0]].raw_data[0] = 3
-    effect_group = groups[0] if data_type == ma_dataset.DIAGNOSTIC else "-".join(groups)
-    effect = "Sens" if data_type == ma_dataset.DIAGNOSTIC else "OR"
+    effect_group = (
+        groups[0] if data_type == analysis_dataset.DIAGNOSTIC else "-".join(groups)
+    )
+    effect = "Sens" if data_type == analysis_dataset.DIAGNOSTIC else "OR"
     unit.effects_dict[effect][effect_group]["est"] = 0.75
     return dataset
 
@@ -68,7 +70,7 @@ def test_copy_preserves_and_isolates_the_complete_dataset_graph():
 
 
 def test_group_deletion_is_a_no_op_for_empty_datasets():
-    dataset = ma_dataset.Dataset()
+    dataset = analysis_dataset.Dataset()
 
     dataset.delete_group("missing")
     dataset.remove_group("missing")
@@ -78,7 +80,7 @@ def test_group_deletion_is_a_no_op_for_empty_datasets():
 
 
 def test_delete_group_and_remove_group_have_equivalent_mutations():
-    deleted = _dataset(ma_dataset.BINARY)
+    deleted = _dataset(analysis_dataset.BINARY)
     removed = copy.deepcopy(deleted)
     group = deleted.get_group_names()[0]
 
@@ -93,7 +95,7 @@ def test_delete_group_and_remove_group_have_equivalent_mutations():
 
 
 def test_rename_group_preserves_effects_when_the_name_contains_a_hyphen():
-    dataset = _dataset(ma_dataset.BINARY)
+    dataset = _dataset(analysis_dataset.BINARY)
     unit = dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"]
     original_groups = unit.get_group_names()
     dataset.change_group_name(original_groups[0], "Usual-care")

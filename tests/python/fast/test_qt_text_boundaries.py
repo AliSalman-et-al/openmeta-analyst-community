@@ -4,19 +4,18 @@ from pathlib import Path
 
 
 sys.path.insert(0, os.path.abspath("src"))
-sys.path.insert(0, os.path.abspath(os.path.join("src", "forms")))
 
-import test_backend_compat
+from rc_metastudio import r_backend
 
-test_backend_compat.install()
+r_backend.install_r_backend()
 
-import change_cov_type_form
-import edit_list_models
-import ma_data_table_view
-import ma_specs
-import main_wizard
-import meta_form
-import qt_text
+from rc_metastudio import covariate_type_dialog
+from rc_metastudio import edit_list_models
+from rc_metastudio import dataset_table_view
+from rc_metastudio import analysis_setup_dialog
+from rc_metastudio import main_wizard
+from rc_metastudio import main_window
+from rc_metastudio import qt_text
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,13 +25,15 @@ def test_none_is_blank_at_text_boundaries():
     assert qt_text.to_native_text(None) == ""
     assert qt_text.is_blank(None)
     assert edit_list_models._to_native_text(None) == ""
-    assert change_cov_type_form._to_native_text(None) == ""
-    assert ma_data_table_view._to_text(None) == ""
-    assert meta_form._qt_item_text(None) == ""
-    assert meta_form._qt_text(None) == ""
-    assert meta_form._qt_dialog_path(None) == ""
+    assert covariate_type_dialog._to_native_text(None) == ""
+    assert dataset_table_view._to_text(None) == ""
+    assert main_window._qt_item_text(None) == ""
+    assert main_window._qt_text(None) == ""
+    assert main_window._qt_dialog_path(None) == ""
     assert main_wizard._qt_item_text(None) == ""
-    specs = ma_specs.MA_Specs.__new__(ma_specs.MA_Specs)
+    specs = analysis_setup_dialog.AnalysisSetupDialog.__new__(
+        analysis_setup_dialog.AnalysisSetupDialog
+    )
     assert specs._enum_item_value(None) == ""
 
 

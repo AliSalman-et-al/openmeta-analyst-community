@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Shared static contracts for analysis results crossing the R boundary."""
 
 from __future__ import annotations
@@ -66,7 +68,6 @@ def empty_analysis_result() -> AnalysisResult:
 
 def parse_analysis_result(value: object) -> AnalysisResult:
     """Validate untrusted backend output before application code consumes it."""
-
     if not isinstance(value, Mapping):
         raise ValueError("analysis result must be a mapping")
     source: dict[str, object] = {}
@@ -94,7 +95,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
 
     # Local import avoids a module cycle: plot_capabilities owns descriptor
     # policy and imports the shared result types defined above.
-    import plot_capabilities
+    from rc_metastudio import plot_capabilities
 
     capabilities = plot_capabilities.validate_result(raw)
     extra_display_images = sorted(set(raw["display_images"]) - set(raw["images"]))

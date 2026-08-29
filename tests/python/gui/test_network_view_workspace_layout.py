@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
@@ -52,7 +50,7 @@ class _FakeScreen(QtCore.QObject):
 
 
 def _clear_settings():
-    import meta_globals
+    from rc_metastudio import meta_globals
 
     QtCore.QCoreApplication.setOrganizationName(meta_globals.ORGANIZATION_NAME)
     QtCore.QCoreApplication.setApplicationName(meta_globals.APPLICATION_NAME)
@@ -62,18 +60,18 @@ def _clear_settings():
 
 
 def _network_dialog(qapp, tmp_path, monkeypatch, parent=None):
-    import network_view
+    from rc_metastudio import network_view_dialog
 
     image_path = tmp_path / "network.png"
     image = QtGui.QImage(640, 320, QtGui.QImage.Format.Format_ARGB32)
     image.fill(QtGui.QColor("white"))
     assert image.save(str(image_path))
     monkeypatch.setattr(
-        network_view.meta_py_r,
-        "ma_dataset_to_simple_network",
+        network_view_dialog.r_bridge,
+        "dataset_to_simple_network",
         lambda **_kwargs: str(image_path),
     )
-    return network_view.ViewDialog(_NetworkModel(), parent=parent)
+    return network_view_dialog.NetworkViewDialog(_NetworkModel(), parent=parent)
 
 
 def _dispose(qapp, *widgets):
@@ -88,10 +86,10 @@ def _dispose(qapp, *widgets):
 
 
 @pytest.mark.parametrize("screen_size", [(800, 600), (1024, 640), (1600, 1000)])
-def test_network_view_first_use_tracks_owning_screen(
+def test_network_view_dialog_first_use_tracks_owning_screen(
     qapp, tmp_path, monkeypatch, screen_size
 ):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     _clear_settings()
     available = QtCore.QRect(0, 0, *screen_size)
@@ -116,10 +114,10 @@ def test_network_view_first_use_tracks_owning_screen(
         _dispose(qapp, dialog)
 
 
-def test_network_viewport_owns_surplus_space_and_preserves_image_ratio(
+def test_network_view_dialogport_owns_surplus_space_and_preserves_image_ratio(
     qapp, tmp_path, monkeypatch
 ):
-    import network_view
+    from rc_metastudio import network_view_dialog
 
     _clear_settings()
     dialog = _network_dialog(qapp, tmp_path, monkeypatch)
@@ -127,7 +125,7 @@ def test_network_viewport_owns_surplus_space_and_preserves_image_ratio(
         dialog.resize(620, 420)
         dialog.show()
         qapp.processEvents()
-        initial_viewport = dialog.network_viewer.viewport().size()
+        initial_viewport = dialog.network_view_dialoger.viewport().size()
         initial_controls_height = dialog.frame.height()
 
         source = QtGui.QPixmap(1200, 600)
@@ -135,35 +133,41 @@ def test_network_viewport_owns_surplus_space_and_preserves_image_ratio(
         source.setDevicePixelRatio(2.0)
         dialog.set_network_pixmap(source)
         qapp.processEvents()
-        initial_scale = dialog.network_viewer.transform().m11()
+        initial_scale = dialog.network_view_dialoger.transform().m11()
         monkeypatch.setattr(
-            network_view.meta_py_r,
-            "ma_dataset_to_simple_network",
+            network_view_dialog.r_bridge,
+            "dataset_to_simple_network",
             lambda **_kwargs: pytest.fail("resize regenerated the graph"),
         )
 
         dialog.resize(920, 680)
         qapp.processEvents()
 
-        assert dialog.network_viewer.viewport().width() > initial_viewport.width()
-        assert dialog.network_viewer.viewport().height() > initial_viewport.height()
+        assert (
+            dialog.network_view_dialoger.viewport().width() > initial_viewport.width()
+        )
+        assert (
+            dialog.network_view_dialoger.viewport().height() > initial_viewport.height()
+        )
         assert dialog.frame.height() == initial_controls_height
-        assert dialog.network_viewer.sizePolicy().horizontalPolicy() == (
+        assert dialog.network_view_dialoger.sizePolicy().horizontalPolicy() == (
             QtWidgets.QSizePolicy.Policy.Expanding
         )
-        assert dialog.network_viewer.sizePolicy().verticalPolicy() == (
+        assert dialog.network_view_dialoger.sizePolicy().verticalPolicy() == (
             QtWidgets.QSizePolicy.Policy.Expanding
         )
-        item = dialog.network_viewer.scene().items()[0]
+        item = dialog.network_view_dialoger.scene().items()[0]
         assert item.pixmap().devicePixelRatioF() == pytest.approx(2.0)
-        transform = dialog.network_viewer.transform()
+        transform = dialog.network_view_dialoger.transform()
         assert transform.m11() == pytest.approx(transform.m22())
         assert transform.m11() > initial_scale
         displayed = item.sceneBoundingRect()
         assert displayed.width() / displayed.height() == pytest.approx(2.0)
         viewport_rect = transform.mapRect(item.boundingRect())
-        assert viewport_rect.width() <= dialog.network_viewer.viewport().width()
-        assert viewport_rect.height() <= dialog.network_viewer.viewport().height()
+        assert viewport_rect.width() <= dialog.network_view_dialoger.viewport().width()
+        assert (
+            viewport_rect.height() <= dialog.network_view_dialoger.viewport().height()
+        )
     finally:
         _dispose(qapp, dialog)
 
@@ -208,7 +212,7 @@ def test_network_selectors_keep_content_and_refresh_only_the_graph(
 def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
     qapp, tmp_path, monkeypatch
 ):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     _clear_settings()
     available = QtCore.QRect(0, 0, 800, 600)
@@ -227,7 +231,7 @@ def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
         qapp.processEvents()
         assert dialog.frame.width() <= dialog.contentsRect().width()
         assert dialog.frame.height() == dialog.frame.sizeHint().height()
-        assert dialog.network_viewer.viewport().height() > 0
+        assert dialog.network_view_dialoger.viewport().height() > 0
         for combo in (dialog.outcome_cbo_box, dialog.follow_up_cbo_box):
             assert combo.width() >= dialog.frame.contentsRect().width() * 0.65
             assert combo.toolTip() == combo.currentText()
@@ -240,7 +244,9 @@ def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
         _dispose(qapp, dialog)
 
 
-def test_network_view_restores_independent_placement(qapp, tmp_path, monkeypatch):
+def test_network_view_dialog_restores_independent_placement(
+    qapp, tmp_path, monkeypatch
+):
     _clear_settings()
     available = QtCore.QRect(qapp.primaryScreen().availableGeometry())
     first = _network_dialog(qapp, tmp_path, monkeypatch)
@@ -268,7 +274,7 @@ def test_network_view_restores_independent_placement(qapp, tmp_path, monkeypatch
 
 @pytest.mark.parametrize("owner_kind", ["parent", "active_workspace"])
 def test_network_workspace_policy_uses_injected_owning_screen(qapp, owner_kind):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(1000, 100, 1000, 700)
     screen = _FakeScreen(available)
@@ -306,7 +312,7 @@ def test_network_workspace_policy_uses_injected_owning_screen(qapp, owner_kind):
 
 
 def test_network_workspace_screen_transition_preserves_valid_and_clamps_invalid(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(0, 0, 900, 700)
     screen = _FakeScreen(available)
@@ -340,7 +346,9 @@ def test_network_workspace_screen_transition_preserves_valid_and_clamps_invalid(
         _dispose(qapp, window)
 
 
-def test_network_viewport_refit_is_local_and_coalesced(qapp, tmp_path, monkeypatch):
+def test_network_view_dialogport_refit_is_local_and_coalesced(
+    qapp, tmp_path, monkeypatch
+):
     _clear_settings()
     dialog = _network_dialog(qapp, tmp_path, monkeypatch)
     try:
@@ -356,7 +364,7 @@ def test_network_viewport_refit_is_local_and_coalesced(qapp, tmp_path, monkeypat
         _dispose(qapp, dialog)
 
 
-def test_repeated_network_view_close_releases_owned_qt_objects(
+def test_repeated_network_view_dialog_close_releases_owned_qt_objects(
     qapp, tmp_path, monkeypatch
 ):
     _clear_settings()
@@ -366,7 +374,7 @@ def test_repeated_network_view_close_releases_owned_qt_objects(
         for _index in range(3):
             dialog = _network_dialog(qapp, tmp_path, monkeypatch, parent=parent)
             dialog_destroyed = QtTest.QSignalSpy(dialog.destroyed)
-            scene = dialog.network_viewer.scene()
+            scene = dialog.network_view_dialoger.scene()
             scene_destroyed = QtTest.QSignalSpy(scene.destroyed)
             dialog.show()
             qapp.processEvents()

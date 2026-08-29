@@ -13,6 +13,7 @@ from typing import cast
 import zipfile
 
 import pytest
+from rc_metastudio import automation
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 pytestmark = pytest.mark.qsettings
@@ -56,9 +57,8 @@ def _configure_qsettings_identity(qapp: QtWidgets.QApplication) -> None:
 
 
 def test_maintained_entry_point_reuses_one_native_application_and_closes_shell(qapp):
-    import launch
 
-    app, first = launch.start_automation()
+    app, first = automation.start_automation()
     try:
         assert app is qapp
         assert type(app).__module__.startswith("PyQt6")
@@ -70,7 +70,7 @@ def test_maintained_entry_point_reuses_one_native_application_and_closes_shell(q
     finally:
         _close_shell(app, first)
 
-    app_again, second = launch.start_automation()
+    app_again, second = automation.start_automation()
     try:
         assert app_again is app
         assert second is not first
@@ -139,9 +139,8 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
 
 
 def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
-    import launch
-    import about_legal_dialog
-    import meta_form
+    from rc_metastudio import about_legal_dialog
+    from rc_metastudio import main_window
 
     about_calls: list[QtWidgets.QWidget] = []
     open_calls: list[dict[str, object]] = []
@@ -152,12 +151,12 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
         lambda dialog: about_calls.append(dialog.parentWidget()) or 0,
     )
     monkeypatch.setattr(
-        meta_form.QFileDialog,
+        main_window.QFileDialog,
         "getOpenFileName",
         lambda **kwargs: open_calls.append(kwargs) or ("", ""),
     )
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     try:
         connected_actions = (
             window.action_save,
@@ -234,9 +233,8 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
 
 
 def test_close_cancel_and_failed_save_keep_owned_shell_alive(qapp, monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     window.current_data_unsaved = True
     monkeypatch.setattr(
         window,
@@ -268,7 +266,7 @@ def test_close_cancel_and_failed_save_keep_owned_shell_alive(qapp, monkeypatch):
 
 
 def test_qt6_settings_migration_preserves_domain_values_and_recent_projects(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -308,7 +306,7 @@ def test_qt6_settings_migration_preserves_domain_values_and_recent_projects(qapp
 
 
 def test_workspace_settings_store_only_portable_typed_values(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -330,7 +328,7 @@ def test_workspace_settings_store_only_portable_typed_values(qapp):
 
 
 def test_invalid_portable_setting_resets_only_its_own_field(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -351,7 +349,7 @@ def test_invalid_portable_setting_resets_only_its_own_field(qapp):
 
 
 def test_schema_versions_use_strict_raw_integer_validation(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -370,7 +368,7 @@ def test_schema_versions_use_strict_raw_integer_validation(qapp):
 
 
 def test_geometry_codec_rejects_overflow_and_repairs_only_geometry(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -397,7 +395,7 @@ def test_geometry_codec_rejects_overflow_and_repairs_only_geometry(qapp):
 
 
 def test_workspace_boolean_and_splitter_codecs_repair_only_invalid_fields(qapp):
-    import settings
+    from rc_metastudio import settings
 
     _configure_qsettings_identity(qapp)
     store = QtCore.QSettings()
@@ -446,10 +444,9 @@ def test_workspace_boolean_and_splitter_codecs_repair_only_invalid_fields(qapp):
 
 
 def test_adaptive_shell_state_is_typed_without_dynamic_qt_properties(qapp):
-    import adaptive_window
-    import launch
+    from rc_metastudio import adaptive_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     try:
         state = adaptive_window.adaptive_window_state(window)
         assert state.role is adaptive_window.WindowRole.MAIN
@@ -466,11 +463,10 @@ def test_adaptive_shell_state_is_typed_without_dynamic_qt_properties(qapp):
 def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
     qapp, tmp_path, monkeypatch
 ):
-    import launch
-    import project_adapter
-    import project_format
+    from rc_metastudio import project_adapter
+    from rc_metastudio import project_format
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
@@ -527,11 +523,10 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
 
 
 def test_packaged_sample_evidence_covers_the_authoritative_manifest(qapp):
-    import launch
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     try:
-        evidence = launch._exercise_all_packaged_samples(
+        evidence = automation._exercise_all_packaged_samples(
             window, ROOT / "sample_projects" / "BCG.rcms"
         )
         manifest = json.loads(
@@ -551,8 +546,7 @@ def test_packaged_sample_evidence_covers_the_authoritative_manifest(qapp):
 def test_structured_project_restores_nondefault_active_selection_without_normalizing_it(
     qapp, tmp_path, monkeypatch
 ):
-    import launch
-    import project_format
+    from rc_metastudio import project_format
 
     source = project_format.load_project(ROOT / "sample_projects" / "amino.rcms")
     project = _json_map(copy.deepcopy(source.project))
@@ -582,7 +576,7 @@ def test_structured_project_restores_nondefault_active_selection_without_normali
         selected, cast(project_format.JsonObject, project), state
     )
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     monkeypatch.setattr(QtWidgets.QMessageBox, "critical", lambda *_args: None)
     try:
         assert window.open(str(selected)) is True
@@ -605,10 +599,9 @@ def test_structured_project_restores_nondefault_active_selection_without_normali
 def test_wizard_created_projects_save_as_latest_structured_containers(
     qapp, tmp_path, monkeypatch, wizard_path
 ):
-    import launch
-    import project_format
+    from rc_metastudio import project_format
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
         "critical",
@@ -657,12 +650,11 @@ def test_wizard_created_projects_save_as_latest_structured_containers(
 def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards(
     qapp, monkeypatch
 ):
-    import launch
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     target = str(ROOT / "sample_projects" / "amino.rcms")
     for source_path in ("new_dataset", "csv_import"):
-        app, window = launch.start_automation()
+        app, window = automation.start_automation()
         try:
             result = {
                 "path": source_path,
@@ -728,15 +720,14 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
 def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
     qapp, tmp_path, monkeypatch
 ):
-    import launch
-    import project_adapter
-    import project_format
-    import settings
+    from rc_metastudio import project_adapter
+    from rc_metastudio import project_format
+    from rc_metastudio import settings
 
-    app, window = launch.start_automation()
-    meta_form = sys.modules["meta_form"]
-    assert "project_pickle" not in meta_form.__dict__
-    assert "_load_project_pickle" not in meta_form.__dict__
+    app, window = automation.start_automation()
+    main_window = sys.modules["rc_metastudio.main_window"]
+    assert "project_pickle" not in main_window.__dict__
+    assert "_load_project_pickle" not in main_window.__dict__
     critical_messages = []
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -753,7 +744,7 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
         malformed = tmp_path / "malformed.rcms"
         malformed.write_bytes(b"not a project")
         pickle_file = tmp_path / "pickle.rcms"
-        pickle_file.write_bytes(b"\x80\x02cma_dataset\nDataset\n.")
+        pickle_file.write_bytes(b"\x80\x02canalysis_dataset\nDataset\n.")
 
         def rewritten_project(name, mutate):
             destination = tmp_path / name
@@ -848,11 +839,10 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
 def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
     qapp, tmp_path, monkeypatch
 ):
-    import launch
-    import meta_form
-    import settings
+    from rc_metastudio import main_window
+    from rc_metastudio import settings
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     warnings = []
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -875,7 +865,7 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
                 )
                 if fault == "add":
                     context.setattr(
-                        meta_form,
+                        main_window,
                         "add_file_to_recent_files",
                         lambda _path: (_ for _ in ()).throw(
                             OSError("add recent failed")
@@ -905,7 +895,7 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
             with monkeypatch.context() as context:
                 if fault == "add":
                     context.setattr(
-                        meta_form,
+                        main_window,
                         "add_file_to_recent_files",
                         lambda _path: (_ for _ in ()).throw(
                             OSError("add recent failed")
@@ -937,11 +927,10 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
 def test_post_replace_durability_failure_commits_save_and_authorizes_next_actions(
     qapp, tmp_path, monkeypatch
 ):
-    import launch
-    import main_wizard
-    import project_format
+    from rc_metastudio import main_wizard
+    from rc_metastudio import project_format
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     warnings = []
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -1025,10 +1014,9 @@ def test_post_replace_durability_failure_commits_save_and_authorizes_next_action
 def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
     qapp, monkeypatch
 ):
-    import launch
-    import ma_data_table_model
+    from rc_metastudio import dataset_table_model
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     errors = []
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -1052,8 +1040,8 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
 
         def constructor_failure(context):
             context.setattr(
-                ma_data_table_model,
-                "DatasetModel",
+                dataset_table_model,
+                "DatasetTableModel",
                 lambda *_args, **_kwargs: (_ for _ in ()).throw(
                     RuntimeError("candidate construction failed")
                 ),
@@ -1125,7 +1113,6 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
 def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directions(
     qapp, monkeypatch
 ):
-    import launch
 
     def metric_menu_signature(window):
         return (
@@ -1147,7 +1134,7 @@ def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directi
             ),
         )
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     errors = []
     monkeypatch.setattr(
         QtWidgets.QMessageBox,

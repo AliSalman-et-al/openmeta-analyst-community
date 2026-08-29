@@ -22,7 +22,7 @@ made analyses dead-end:
    ASCII ``t`` while preserving ``²``, so the heterogeneity label ``τ²``
    reached Python and the results window as ``t²``.
 
-Because importing the real ``meta_py_r`` initialises embedded R, this runs in a
+Because importing the real ``r_bridge`` initialises embedded R, this runs in a
 subprocess and skips when the in-process backend (R/rpy2) is unavailable, so it
 exercises the fixes locally without disturbing the stub-backed tests.
 """
@@ -46,27 +46,53 @@ _DRIVER = textwrap.dedent(
         os.path.join(__REPO_ROOT__, "build", "qt6-verification"),
     )
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
-    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src", "rc_metastudio"))
     sys.path.insert(0, os.path.join(__REPO_ROOT__, "tests", "python", "fast"))
 
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
     prepare_generated_ui_imports()
 
-    import test_backend_compat
-    test_backend_compat.install()
+    from rc_metastudio import r_backend
+    r_backend.install_r_backend()
     try:
-        import meta_py_r
+        from rc_metastudio import r_bridge
+        from rc_metastudio.meta_globals import FACTOR
         try:
-            meta_py_r.RlibLoader().load_RCMetaR()
+            r_bridge.RLibraryLoader().load_rcmetar()
         except Exception:
             source_package = os.path.join(__REPO_ROOT__, "r", "RCMetaR")
-            meta_py_r.ro.r("devtools::load_all")(source_package, quiet=True)
+            r_bridge.ro.r("devtools::load_all")(source_package, quiet=True)
     except Exception as exc:
         # R / rpy2 / RCMetaR not available in this environment.
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
         sys.exit(42)
 
-    ro = meta_py_r.ro
+    ro = r_bridge.ro
+
+    from rc_metastudio.r_call_serialization import r_transaction
+
+    with r_transaction():
+        ro.globalenv["workflow_data"] = ro.r("list()")
+    original_execute_r_function = r_bridge.execute_r_function
+
+    def raise_workflow_r_error(name, *args, **kwargs):
+        if name == "rcmetar.run.diagnostic.analyses":
+            raise r_bridge.RRuntimeError("workflow execution failed")
+        return original_execute_r_function(name, *args, **kwargs)
+
+    r_bridge.execute_r_function = raise_workflow_r_error
+    try:
+        r_bridge.run_diagnostic_workflow(
+            "subgroup",
+            ["diagnostic.random"],
+            [{"measure": "Sens"}],
+            diag_data_name="workflow_data",
+        )
+    except r_bridge.DiagnosticExecutionError as exc:
+        assert "workflow execution failed" in str(exc)
+    else:
+        raise AssertionError("diagnostic workflow R failure was not translated")
+    finally:
+        r_bridge.execute_r_function = original_execute_r_function
 
     class InvalidNetworkModel:
         def __getattribute__(self, name):
@@ -77,21 +103,21 @@ _DRIVER = textwrap.dedent(
     sentinel = ro.r("structure('untouched')")
     ro.globalenv["treatments"] = sentinel
     try:
-        meta_py_r.ma_dataset_to_simple_network(
+        r_bridge.dataset_to_simple_network(
             InvalidNetworkModel(), data_type="unsupported"
         )
     except ValueError as exc:
         assert "unknown" in str(exc)
     else:
         raise AssertionError("invalid network data type was accepted")
-    assert ro.globalenv["treatments"] is sentinel
+    assert bool(ro.r("identical")(ro.globalenv["treatments"], sentinel)[0])
 
     # Fix 1: non-Latin-1 user text must remain valid text at the R boundary.
-    assert not hasattr(meta_py_r, "_sanitize_for_R")
+    assert not hasattr(r_bridge, "_sanitize_for_R")
 
     # Fix 2: NULL detection works against rpy2's NULLType.
-    assert meta_py_r._r_is_null(ro.r("list()").names) is True
-    assert meta_py_r._r_is_null(ro.r("c(a=1)").names) is False
+    assert r_bridge._r_is_null(ro.r("list()").names) is True
+    assert r_bridge._r_is_null(ro.r("c(a=1)").names) is False
 
     # Fix 4: R character scalars must reach Python as UTF-8 instead of first
     # passing through cp1252/native translation, which maps τ² to t².
@@ -106,7 +132,7 @@ _DRIVER = textwrap.dedent(
 
     # End-to-end through the core porting fixes: get_params parses a real method's
     # partly NULL-named parameter structure.
-    params, defaults, var_order, pretty = meta_py_r.get_params("binary.random")
+    params, defaults, var_order, pretty = r_bridge.get_params("binary.random")
     assert isinstance(defaults, dict)
     assert "conf.level" in defaults or "rm.method" in defaults
 
@@ -141,8 +167,8 @@ _DRIVER = textwrap.dedent(
                 FakeStudy(2, "Plain study", None),
             ]
             covariates = [
-                FakeCovariate('Group "label" \\\\ café τ', meta_py_r.FACTOR),
-                FakeCovariate("Dose", meta_py_r.CONTINUOUS),
+                FakeCovariate('Group "label" \\\\ café τ', FACTOR),
+                FakeCovariate("Dose", r_bridge.CONTINUOUS),
             ]
             self.dataset = FakeDataset(
                 covariates,
@@ -161,7 +187,7 @@ _DRIVER = textwrap.dedent(
         def get_studies(self, only_if_included=True):
             return self._studies
 
-        def get_cur_ests_and_SEs(self, **kwargs):
+        def get_current_estimates_and_standard_errors(self, **kwargs):
             return [-0.5596157879, -0.8295982833], [0.6172133998, 0.7152562329]
 
         def included_studies_have_raw_data(self):
@@ -191,8 +217,8 @@ _DRIVER = textwrap.dedent(
             'alpha "quoted" \\\\ café τ'
         ]
 
-    quoted_values_str, quoted_values = meta_py_r.cov_to_str(
-        FakeCovariate("region", meta_py_r.FACTOR),
+    quoted_values_str, quoted_values = r_bridge.cov_to_str(
+        FakeCovariate("region", FACTOR),
         [1, 2],
         FakeDataset(
             [],
@@ -210,7 +236,7 @@ _DRIVER = textwrap.dedent(
     assert list(ro.r(quoted_values_str)) == ["control τ", "O'Brien \\\\ north"]
 
     binary_model = FakeModel("binary", [[6, 27, 9, 27], [3, 59, 7, 64]])
-    meta_py_r.ma_dataset_to_simple_binary_robj(binary_model, var_name="issue146_binary")
+    r_bridge.dataset_to_simple_binary_r_object(binary_model, var_name="issue146_binary")
     assert_text_survived("issue146_binary")
 
     continuous_model = FakeModel(
@@ -218,7 +244,7 @@ _DRIVER = textwrap.dedent(
         [[27, 5.1, 1.2, 27, 6.2, 1.5], [59, 3.4, 0.9, 64, 4.1, 1.1]],
         effect="MD",
     )
-    meta_py_r.ma_dataset_to_simple_continuous_robj(
+    r_bridge.dataset_to_simple_continuous_r_object(
         continuous_model,
         var_name="issue146_continuous",
     )
@@ -231,7 +257,7 @@ _DRIVER = textwrap.dedent(
     analysis_dir = tempfile.mkdtemp(prefix="rcmetastudio-display-contract-")
     forest_path = os.path.join(analysis_dir, "forest.png")
     forest_display_path = os.path.join(analysis_dir, "forest.display.svg")
-    continuous_result = meta_py_r.run_continuous_ma(
+    continuous_result = r_bridge.run_continuous_ma(
         "continuous.random",
         {
             "conf.level": 95.0,
@@ -263,7 +289,7 @@ _DRIVER = textwrap.dedent(
     assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
 
     from PyQt6 import QtWidgets
-    import results_window
+    from rc_metastudio import results_window
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     result_window = results_window.ResultsWindow(continuous_result)
@@ -310,11 +336,132 @@ _DRIVER = textwrap.dedent(
     app.processEvents()
 
     diagnostic_model = FakeModel("diagnostic", [[6, 21, 9, 18], [3, 56, 7, 57]])
-    meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+    original_execute_r_function = r_bridge.execute_r_function
+
+    def raise_conversion_r_error(name, *args, **kwargs):
+        if name == "rcmetar.create.diagnostic.data":
+            raise r_bridge.RRuntimeError("diagnostic conversion failed")
+        return original_execute_r_function(name, *args, **kwargs)
+
+    r_bridge.execute_r_function = raise_conversion_r_error
+    try:
+        r_bridge.dataset_to_simple_diagnostic_r_object(
+            diagnostic_model,
+            var_name="failed_diagnostic",
+        )
+    except r_bridge.DiagnosticExecutionError as exc:
+        assert "diagnostic conversion failed" in str(exc)
+    else:
+        raise AssertionError("diagnostic conversion R failure was not translated")
+    finally:
+        r_bridge.execute_r_function = original_execute_r_function
+
+    r_bridge.dataset_to_simple_diagnostic_r_object(
         diagnostic_model,
         var_name="issue146_diagnostic",
     )
     assert_text_survived("issue146_diagnostic")
+
+    from rc_metastudio import analysis_adapter
+
+    class FilteredDiagnosticDataset:
+        def __init__(self, covariate):
+            self.covariate = covariate
+
+        def get_values_for_cov(self, covariate, ids_for_keys=False):
+            assert ids_for_keys is True
+            assert covariate == self.covariate.name
+            return {1: 1.0, 2: 2.0, 3: 3.0}
+
+    class FilteredDiagnosticModel:
+        def __init__(self):
+            self.current_effect = "Sens"
+            self._studies = [
+                FakeStudy(1, "Included 1", 1990),
+                FakeStudy(2, "Included 2", 1991),
+                FakeStudy(3, "Included 3", 1992),
+                FakeStudy(4, "Missing moderator", 1993),
+            ]
+            self.covariate = FakeCovariate("Moderator", r_bridge.CONTINUOUS)
+            self.dataset = FilteredDiagnosticDataset(self.covariate)
+
+        def get_studies(self, only_if_included=True):
+            assert only_if_included is True
+            return self._studies
+
+        def get_current_estimates_and_standard_errors(
+            self, only_if_included=True, only_these_studies=None, effect=None
+        ):
+            assert only_if_included is True
+            values = {
+                1: (0.1, 0.05),
+                2: (0.2, 0.05),
+                3: (0.3, 0.05),
+                4: (None, None),
+            }
+            studies = self._studies
+            if only_these_studies is not None:
+                studies = [
+                    study for study in studies if study.id in only_these_studies
+                ]
+            return tuple(zip(*(values[study.id] for study in studies)))
+
+        def included_studies_have_raw_data(self):
+            return False
+
+        def get_cur_raw_data(self, only_if_included=True, only_these_studies=None):
+            assert only_if_included is True
+            values = {
+                1: [10, 5, 4, 10],
+                2: [11, 6, 5, 11],
+                3: [12, 7, 6, 12],
+                4: [None, None, None, None],
+            }
+            studies = self._studies
+            if only_these_studies is not None:
+                studies = [
+                    study for study in studies if study.id in only_these_studies
+                ]
+            return [values[study.id] for study in studies]
+
+        def included_studies_have_point_estimates(self, effect=None):
+            return False
+
+    filtered_model = FilteredDiagnosticModel()
+    selected = analysis_adapter.select_studies_for_covariates(
+        filtered_model, (filtered_model.covariate,)
+    )
+    assert len(selected.studies) == 3
+    assert selected.has_missing_values is True
+
+    diagnostic_meta_request = analysis_adapter.make_analysis_request(
+        data_type="diagnostic",
+        workflow="meta-regression",
+        method="meta_regression",
+        metric="Sens",
+        parameters={"conf.level": 95.0, "measure": "Sens"},
+    )
+    diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
+        filtered_model,
+        selected.studies,
+        (filtered_model.covariate,),
+        diagnostic_meta_request,
+        False,
+        95.0,
+    )
+    assert "Summary" in diagnostic_meta_result["texts"]
+    for expression in (
+        "tmp_obj@y",
+        "tmp_obj@SE",
+        "tmp_obj@study.names",
+        "tmp_obj@years",
+        "tmp_obj@TP",
+        "tmp_obj@FN",
+        "tmp_obj@FP",
+        "tmp_obj@TN",
+        "tmp_obj@covariates[[1]]@cov.vals",
+    ):
+        assert len(ro.r(expression)) == 3
 
     invalid_conf_level_checks = ro.r('''
       c(
@@ -326,7 +473,7 @@ _DRIVER = textwrap.dedent(
     ''')
     assert all(bool(value) for value in invalid_conf_level_checks)
 
-    import golden_analysis
+    from rc_metastudio import golden_analysis
 
     subgroup_bundle = [
         bundle for bundle in golden_analysis.curated_golden_bundles()
@@ -355,13 +502,12 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
-    sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
     sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
-    import test_backend_compat
-    test_backend_compat.install()
+    from rc_metastudio import r_backend
+    r_backend.install_r_backend()
     try:
-        import meta_py_r
+        from rc_metastudio import r_bridge
     except Exception as exc:
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
         sys.exit(42)
@@ -375,7 +521,7 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     )
     assert conversion._rchar_to_str(rchar, "cp1252") == tau_squared
 
-    r_result = meta_py_r.ro.r(
+    r_result = r_bridge.ro.r(
         '''
         tau_squared <- paste0(intToUtf8(0x03c4), intToUtf8(0x00b2))
         i_squared <- paste0("I", intToUtf8(0x00b2))
@@ -387,7 +533,7 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
         ))
         '''
     )
-    text = meta_py_r.parse_out_results(r_result)["texts"]["Summary"]
+    text = r_bridge.parse_out_results(r_result)["texts"]["Summary"]
     assert tau_squared in text, text
     assert "t²" not in text, text
 
@@ -440,19 +586,18 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         )
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
-        sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
         sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
-        import test_backend_compat
-        test_backend_compat.install()
+        from rc_metastudio import r_backend
+        r_backend.install_r_backend()
         try:
-            import meta_py_r
-            meta_py_r.RlibLoader().load_RCMetaR()
+            from rc_metastudio import r_bridge
+            r_bridge.RLibraryLoader().load_rcmetar()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
 
-        ro = meta_py_r.ro
+        ro = r_bridge.ro
         summary_expr = textwrap.dedent(
             '''
             summary <- structure(
@@ -554,7 +699,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             '''
         )
         meta_reg_result = ro.r(meta_regression_expr)
-        parsed_meta_regression = meta_py_r.parse_out_results(meta_reg_result)
+        parsed_meta_regression = r_bridge.parse_out_results(meta_reg_result)
         regression_summary = parsed_meta_regression["texts"]["Summary"]
         assert "Overall moderators (Qₘ)" in regression_summary, regression_summary
         assert "Residual heterogeneity (Qₑ)" in regression_summary, regression_summary
@@ -575,7 +720,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             '''
         )
-        named_weights = meta_py_r.parse_out_results(named_weights_result)["texts"]["Weights"]
+        named_weights = r_bridge.parse_out_results(named_weights_result)["texts"]["Weights"]
         assert named_weights.splitlines()[0].strip() == "Study names  Weights", named_weights
         assert "Alpha Study" in named_weights, named_weights
         assert "Beta Study" in named_weights, named_weights
@@ -598,18 +743,17 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
     os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
-    sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
     sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
-    import test_backend_compat
-    test_backend_compat.install()
+    from rc_metastudio import r_backend
+    r_backend.install_r_backend()
     try:
-        import meta_py_r
+        from rc_metastudio import r_bridge
     except Exception as exc:
         sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
         sys.exit(42)
 
-    ro = meta_py_r.ro
+    ro = r_bridge.ro
     r_result = ro.r(
         '''
         list(
@@ -635,7 +779,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
         '''
     )
 
-    parsed = meta_py_r.parse_out_results(r_result)
+    parsed = r_bridge.parse_out_results(r_result)
     texts = parsed["texts"]
     assert "Summary" not in texts, texts
     assert "Between-study parameters" in texts, texts
@@ -667,7 +811,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
         )
         '''
     )
-    parsed_artifact = meta_py_r.parse_out_results(artifact_result)
+    parsed_artifact = r_bridge.parse_out_results(artifact_result)
     assert parsed_artifact["images"] == {"Forest Plot": "forest.png"}
     assert parsed_artifact["display_images"] == {
         "Forest Plot": "managed/forest.display.svg"
@@ -702,7 +846,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
         )
         '''
     )
-    parsed_direct = meta_py_r.parse_out_results(direct_summary)
+    parsed_direct = r_bridge.parse_out_results(direct_summary)
     direct_text = "\\n".join(parsed_direct["texts"].values())
     for raw_header in (
         "HPD.low",
@@ -748,7 +892,7 @@ _HSROC_SUMMARY_DRIVER = textwrap.dedent(
         )
         '''
     )
-    parsed_context = meta_py_r.parse_out_results(context_summary)
+    parsed_context = r_bridge.parse_out_results(context_summary)
     assert "Diagnostic Random-Effects" in parsed_context["texts"], parsed_context
     context_text = parsed_context["texts"]["Diagnostic Random-Effects"]
     assert "Lecart Lenfant" in context_text, parsed_context
@@ -802,19 +946,18 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
-        sys.path.insert(0, os.path.join(repo_root, "src", "rc_metastudio"))
         sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
 
-        import test_backend_compat
-        test_backend_compat.install()
+        from rc_metastudio import r_backend
+        r_backend.install_r_backend()
         try:
-            import meta_py_r
-            meta_py_r.RlibLoader().load_RCMetaR()
+            from rc_metastudio import r_bridge
+            r_bridge.RLibraryLoader().load_rcmetar()
         except Exception as exc:
             sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
             sys.exit(42)
 
-        ro = meta_py_r.ro
+        ro = r_bridge.ro
         ro.r(
             '''
             set.seed(113)

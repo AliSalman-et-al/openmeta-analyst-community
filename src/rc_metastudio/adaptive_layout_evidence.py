@@ -15,7 +15,8 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
+from rc_metastudio.analysis_results import parse_analysis_result
 
 
 EVIDENCE_SCHEMA_VERSION = 2
@@ -87,38 +88,40 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
             "Adaptive-layout evidence project opened without table rows."
         )
 
-    import about_legal_dialog
-    import main_wizard
-    import progress_bar
-    import results_window
-    import settings
+    from rc_metastudio import about_legal_dialog
+    from rc_metastudio import main_wizard
+    from rc_metastudio import progress_dialog
+    from rc_metastudio import results_window
+    from rc_metastudio import settings
 
     plot_path = _create_intrinsic_ratio_artifact(output)
     results = results_window.ResultsWindow(
-        {
-            "texts": {
-                "Summary": (
-                    "Native adaptive-layout package evidence\n\n"
-                    "Required Content remains readable while the Results navigation "
-                    "and content panes are resized independently."
-                )
-            },
-            "images": {"Aspect-Ratio Plot": str(plot_path)},
-            "plot_capabilities": {
-                "Aspect-Ratio Plot": {
-                    "plot_kind": "other",
-                    "editable": False,
-                    "styleable": False,
-                    "regenerator": "none",
-                    "composition": "single",
-                }
-            },
-        },
+        parse_analysis_result(
+            {
+                "texts": {
+                    "Summary": (
+                        "Native adaptive-layout package evidence\n\n"
+                        "Required Content remains readable while the Results navigation "
+                        "and content panes are resized independently."
+                    )
+                },
+                "images": {"Aspect-Ratio Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Aspect-Ratio Plot": {
+                        "plot_kind": "other",
+                        "editable": False,
+                        "styleable": False,
+                        "regenerator": "none",
+                        "composition": "single",
+                    }
+                },
+            }
+        ),
         parent=main_window,
     )
     workflow = main_wizard.MainWizard(path="new_dataset", parent=main_window)
     transactional = about_legal_dialog.AboutLegalDialog(parent=main_window)
-    transient = progress_bar.MetaProgress(parent=main_window)
+    transient = progress_dialog.AnalysisProgressDialog(parent=main_window)
     transient.setWindowTitle("Adaptive layout verification")
     transient.progress_bar.setRange(0, 100)
     transient.progress_bar.setValue(45)

@@ -113,10 +113,12 @@ def test_gitattributes_normalizes_text_and_keeps_rcms_fixtures_binary():
 def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("RCMS_ANALYSIS_SCRATCH_DIR", str(tmp_path / "scratch"))
 
-    import golden_analysis
-    import headless_analysis
+    from rc_metastudio import golden_analysis
+    from rc_metastudio import headless_analysis
+    from rc_metastudio import analysis_adapter
 
     created = []
+    captured_params = []
     monkeypatch.setattr(
         headless_analysis.settings,
         "make_r_tmp",
@@ -141,14 +143,19 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         )(),
     )
     monkeypatch.setattr(
-        headless_analysis.meta_py_r,
-        "ma_dataset_to_simple_binary_robj",
+        analysis_adapter.r_bridge,
+        "dataset_to_simple_binary_r_object",
         lambda _model, **_kwargs: None,
     )
+
+    def fake_run_binary_ma(_method, params):
+        captured_params.append(params)
+        return {"texts": {}, "images": {}}
+
     monkeypatch.setattr(
-        headless_analysis.meta_py_r,
+        analysis_adapter.r_bridge,
         "run_binary_ma",
-        lambda _method, params: params,
+        fake_run_binary_ma,
     )
 
     bundle = golden_analysis.curated_golden_bundles(root_dir=ROOT)[0]
@@ -158,10 +165,11 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         parameters=bundle["parameters"],
         metric="OR",
     )
-    result = headless_analysis.run_headless_analysis(case)
+    headless_analysis.run_headless_analysis(case)
 
     scratch = (tmp_path / "scratch").resolve()
-    fp_outpath = Path(result["fp_outpath"]).resolve()
+    assert captured_params
+    fp_outpath = Path(captured_params[0]["fp_outpath"]).resolve()
     bundle_fp_outpath = Path(bundle["parameters"]["fp_outpath"]).resolve()
     assert created
     assert sorted(set(created)) == [str(scratch)]

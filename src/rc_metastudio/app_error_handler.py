@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox
 
-import settings
+from rc_metastudio import settings
 
 
 UNEXPECTED_ERROR_TITLE = "Unexpected error"

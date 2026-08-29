@@ -12,6 +12,11 @@ from collections.abc import Mapping, Sequence
 from typing import TypeAlias, TypeVar
 import xml.etree.ElementTree as ET
 
+if __package__:
+    from scripts import qt_window_ownership
+else:
+    import qt_window_ownership
+
 
 LEGACY_HELPERS = (
     "center_dialog_over_parent",
@@ -28,7 +33,6 @@ LEGACY_HELPERS = (
     "_fit_wizard_page_to_contents",
 )
 
-TOP_LEVEL_CLASSES = {"QDialog", "QMainWindow"}
 QT_CHROME_CLASSES = {"QMenuBar", "QStatusBar", "QToolBar"}
 SIZE_PROPERTIES = {
     "minimumSize",
@@ -68,8 +72,8 @@ SOURCE_EXCEPTION_RULES = {
     "bounded-native-popup": {
         "paths": {
             "adaptive_controls.py",
-            "binary_data_form.py",
-            "continuous_data_form.py",
+            "binary_data_dialog.py",
+            "continuous_data_dialog.py",
         },
         "methods": {
             "move",
@@ -83,9 +87,9 @@ SOURCE_EXCEPTION_RULES = {
     },
     "compact-table-overflow": {
         "paths": {
-            "binary_data_form.py",
-            "continuous_data_form.py",
-            "diagnostic_data_form.py",
+            "binary_data_dialog.py",
+            "continuous_data_dialog.py",
+            "diagnostic_data_dialog.py",
             "qt_layout.py",
         },
         "methods": {
@@ -97,24 +101,24 @@ SOURCE_EXCEPTION_RULES = {
     "content-overflow-control": {
         "paths": {
             "adaptive_controls.py",
-            "binary_data_form.py",
-            "continuous_data_form.py",
-            "diagnostic_data_form.py",
-            "ma_specs.py",
-            "meta_form.py",
+            "binary_data_dialog.py",
+            "continuous_data_dialog.py",
+            "diagnostic_data_dialog.py",
+            "analysis_setup_dialog.py",
+            "main_window.py",
             "results_window.py",
         },
         "methods": {"setMaximumWidth", "setMinimumWidth"},
     },
     "intrinsic-ratio": {
-        "paths": {"network_view.py", "results_window.py"},
+        "paths": {"network_view_dialog.py", "results_window.py"},
         "methods": {"fitInView", "setSceneRect"},
     },
     "numeric-domain-control": {
         "paths": {
             "calculator_routines.py",
-            "continuous_data_form.py",
-            "diagnostic_data_form.py",
+            "continuous_data_dialog.py",
+            "diagnostic_data_dialog.py",
         },
         "methods": {"setMaximumWidth", "setMinimumWidth"},
     },
@@ -136,7 +140,7 @@ SOURCE_EXCEPTION_RULES = {
         },
     },
     "verification-layout-fixture": {
-        "paths": {"adaptive_layout_evidence.py", "launch.py"},
+        "paths": {"adaptive_layout_evidence.py", "automation.py"},
         "methods": {"adjustSize", "move", "resize"},
     },
 }
@@ -353,7 +357,7 @@ def _is_generated_source(path: Path, source_dir: Path) -> bool:
     return (
         relative
         in {
-            "ui_meta.py",
+            "ui_main_window.py",
             "ui_results_window.py",
             "forms/icons_rc.py",
         }
@@ -439,7 +443,6 @@ def _source_scope_index(
     tree: ast.AST,
 ) -> tuple[_NodeScopes, _NodeConditions, _ScopeParents, _Assignments]:
     """Index simple assignments without leaking constants across lexical scopes."""
-
     node_scopes: _NodeScopes = {}
     node_conditions: _NodeConditions = {}
     scope_parents: _ScopeParents = {tree: None}
@@ -864,6 +867,12 @@ def audit_repository(root: Path) -> list[Finding]:
     for path in sorted(forms_dir.glob("*.ui")):
         findings.extend(_audit_form(path))
     findings.extend(_audit_sources(source_dir))
+    findings.extend(
+        Finding(finding.path, "window-archetype", finding.detail)
+        for finding in qt_window_ownership.audit_top_level_form_ownership(
+            forms_dir, source_dir
+        )
+    )
     return findings
 
 

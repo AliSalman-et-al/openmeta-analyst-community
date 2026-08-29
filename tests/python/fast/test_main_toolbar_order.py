@@ -3,7 +3,7 @@ from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[3]
-META_UI = ROOT / "src" / "rc_metastudio" / "forms" / "meta.ui"
+MAIN_WINDOW_UI = ROOT / "src" / "rc_metastudio" / "forms" / "main_window.ui"
 
 
 def _action_names(element: ElementTree.Element) -> list[str]:
@@ -11,7 +11,7 @@ def _action_names(element: ElementTree.Element) -> list[str]:
 
 
 def test_toolbar_analysis_actions_follow_analysis_menu_order():
-    root = ElementTree.parse(META_UI).getroot()
+    root = ElementTree.parse(MAIN_WINDOW_UI).getroot()
     analysis_menu = root.find(".//widget[@name='menuAnalysis']")
     toolbar = root.find(".//widget[@name='toolBar']")
     assert analysis_menu is not None
@@ -31,13 +31,16 @@ def test_toolbar_analysis_actions_follow_analysis_menu_order():
 
     toolbar_actions = _action_names(toolbar)
     first_analysis_action = toolbar_actions.index(analysis_actions[0])
-    assert toolbar_actions[
-        first_analysis_action : first_analysis_action + len(analysis_actions)
-    ] == analysis_actions
+    assert (
+        toolbar_actions[
+            first_analysis_action : first_analysis_action + len(analysis_actions)
+        ]
+        == analysis_actions
+    )
 
 
 def test_toolbar_omits_menu_and_shortcut_actions_after_analysis_group():
-    root = ElementTree.parse(META_UI).getroot()
+    root = ElementTree.parse(MAIN_WINDOW_UI).getroot()
     toolbar = root.find(".//widget[@name='toolBar']")
     assert toolbar is not None
 

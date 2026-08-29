@@ -153,9 +153,7 @@ def test_profile_removes_exact_surfaces_and_records_evidence(monkeypatch, tmp_pa
     assert len(data["excluded_surfaces"]) == 4
 
 
-def test_two_phase_profile_round_trips_through_its_schema_owner(
-    monkeypatch, tmp_path
-):
+def test_two_phase_profile_round_trips_through_its_schema_owner(monkeypatch, tmp_path):
     profile = load_profile()
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)

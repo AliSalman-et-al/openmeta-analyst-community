@@ -135,7 +135,6 @@ def _dependency_versions() -> tuple[dict[str, str], float]:
 
 def discover_rpy2_native_extensions() -> list[Path]:
     """Return concrete native files owned by locked ``rpy2-rinterface``."""
-
     import rpy2.rinterface_lib as rinterface_lib
 
     distribution = metadata.distribution("rpy2-rinterface")
@@ -157,7 +156,6 @@ def discover_rpy2_native_extensions() -> list[Path]:
 
 def discover_macos_rcc(sdk_root: Path) -> Path:
     """Resolve one recognized Qt macOS SDK ``rcc`` layout, fail closed otherwise."""
-
     root = sdk_root.resolve()
     relative_candidates = (
         Path("libexec/rcc"),
@@ -230,7 +228,6 @@ def validate_macos_rcc(
 
 def append_github_env(github_env: Path, name: str, value: str) -> None:
     """Append one safe, exact UTF-8 GitHub environment-file assignment."""
-
     if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", name):
         raise RuntimeError(f"invalid GitHub environment variable name: {name!r}")
     if "\r" in value or "\n" in value:
@@ -249,7 +246,6 @@ def resolve_macos_rcc(
     host_machine: Callable[[], str] = platform.machine,
 ) -> dict[str, object]:
     """Validate, record, and export the exact official SDK ``rcc`` executable."""
-
     rcc = discover_macos_rcc(sdk_root)
     architectures = validate_macos_rcc(
         rcc, command_runner=command_runner, host_machine=host_machine

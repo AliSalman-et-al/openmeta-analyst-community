@@ -10,8 +10,6 @@ pytestmark = pytest.mark.qsettings
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
-sys.path.insert(0, os.path.abspath("src/rc_metastudio/forms"))
 
 from PyQt6 import QtCore, QtWidgets
 
@@ -26,10 +24,10 @@ ensure_application_resources()
 
 
 def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigation(qapp):
-    import adaptive_window
-    import meta_form
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import main_window
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         state = adaptive_window.adaptive_window_state(window)
         assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
@@ -63,9 +61,9 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
 
 
 def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
-    import meta_form
+    from rc_metastudio import main_window
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     window.showNormal()
     window.resize(920, 640)
     window.move(40, 30)
@@ -98,10 +96,10 @@ def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
 
 
 def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
-    import meta_form
-    import qt_layout
+    from rc_metastudio import main_window
+    from rc_metastudio import qt_layout
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         inherited_family = qapp.font().family()
         for widget in (
@@ -167,10 +165,10 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
 
 
 def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
-    import meta_form
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio import main_window
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         command = window._make_add_covariate_command("Age", "continuous")
         window.tableView.undoStack.push(command)
@@ -196,10 +194,10 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
 
 
 def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
-    import meta_form
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio import main_window
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         covariate = window.model.add_covariate("Age", "continuous")
         window.tableView.synchronize_column_widths()
@@ -238,8 +236,8 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
 
 
 def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_path):
-    import adaptive_window
-    import settings
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -278,8 +276,8 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
 def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors():
     script = r"""
 import json
-from rc_metastudio import launch
-app, window = launch.start_automation()
+from rc_metastudio import automation
+app, window = automation.start_automation()
 try:
     window.showNormal()
     window.resize(1000, 700)
@@ -317,7 +315,6 @@ finally:
         environment["PYTHONPATH"] = os.pathsep.join(
             (
                 str(ROOT / "src"),
-                str(ROOT / "src" / "rc_metastudio"),
                 environment.get("PYTHONPATH", ""),
             )
         )

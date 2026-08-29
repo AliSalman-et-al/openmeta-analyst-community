@@ -28,7 +28,7 @@ PACKAGE_INPUT_PATTERNS = (
     "tests/python/fast/test_qt6_build_slice.py",
     "tests/python/fast/test_project_format.py",
     "tests/python/fast/test_qt_text_boundaries.py",
-    "tests/python/gui/test_metaform_automation_launch.py",
+    "tests/python/gui/test_main_window_automation_launch.py",
     "scripts/build-windows-package.ps1",
     "scripts/test-bounded-package-process.ps1",
     "scripts/package-windows.ps1",

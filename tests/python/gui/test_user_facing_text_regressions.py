@@ -1,7 +1,6 @@
 from pathlib import Path
 import importlib
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from PyQt6 import QtCore, QtWidgets
 
@@ -10,6 +9,11 @@ from test_types import required
 
 prepare_generated_ui_imports()
 
+if TYPE_CHECKING:
+    from ui_main_window import Ui_MainWindow
+else:
+    from rc_metastudio.ui_main_window import Ui_MainWindow
+
 
 ROOT = Path(__file__).resolve().parents[3]
 HELP_HTML = sorted(
@@ -17,33 +21,33 @@ HELP_HTML = sorted(
 )
 
 GENERATED_UI_MODULE_NAMES = [
-    "forms.ui_about_legal",
-    "forms.ui_binary_data_form",
-    "forms.ui_change_cov_type",
-    "forms.ui_choose_back_calc_result_form",
-    "forms.ui_continuous_back_calc_result_form",
-    "forms.ui_choose_metric_page",
-    "forms.ui_cov_subgroup_dlg",
-    "forms.ui_csv_import_page",
-    "forms.ui_data_type_page",
-    "forms.ui_diagnostic_data_form",
-    "forms.ui_diagnostic_metrics",
-    "forms.ui_edit_dialog",
-    "forms.ui_edit_forest_plot",
-    "forms.ui_edit_group_name",
-    "forms.ui_ma_specs",
-    "forms.ui_meta_reg",
-    "forms.ui_network_view",
-    "forms.ui_new_covariate",
-    "forms.ui_new_follow_up",
-    "forms.ui_new_group",
-    "forms.ui_new_outcome",
-    "forms.ui_new_study",
-    "forms.ui_outcome_name_page",
-    "forms.ui_running",
-    "forms.ui_welcome_page",
-    "ui_meta",
-    "ui_results_window",
+    "rc_metastudio.forms.ui_about_legal",
+    "rc_metastudio.forms.ui_binary_data_dialog",
+    "rc_metastudio.forms.ui_covariate_type_dialog",
+    "rc_metastudio.forms.ui_binary_back_calculation_dialog",
+    "rc_metastudio.forms.ui_continuous_back_calculation_dialog",
+    "rc_metastudio.forms.ui_choose_metric_page",
+    "rc_metastudio.forms.ui_subgroup_analysis_dialog",
+    "rc_metastudio.forms.ui_csv_import_page",
+    "rc_metastudio.forms.ui_data_type_page",
+    "rc_metastudio.forms.ui_diagnostic_data_dialog",
+    "rc_metastudio.forms.ui_diagnostic_metrics_dialog",
+    "rc_metastudio.forms.ui_edit_dialog",
+    "rc_metastudio.forms.ui_edit_plot_dialog",
+    "rc_metastudio.forms.ui_edit_name_dialog",
+    "rc_metastudio.forms.ui_analysis_setup_dialog",
+    "rc_metastudio.forms.ui_meta_regression_dialog",
+    "rc_metastudio.forms.ui_network_view_dialog",
+    "rc_metastudio.forms.ui_new_covariate_dialog",
+    "rc_metastudio.forms.ui_new_follow_up_dialog",
+    "rc_metastudio.forms.ui_new_group_dialog",
+    "rc_metastudio.forms.ui_new_outcome_dialog",
+    "rc_metastudio.forms.ui_new_study_dialog",
+    "rc_metastudio.forms.ui_outcome_name_page",
+    "rc_metastudio.forms.ui_progress_dialog",
+    "rc_metastudio.forms.ui_welcome_page",
+    "rc_metastudio.ui_main_window",
+    "rc_metastudio.ui_results_window",
 ]
 
 
@@ -54,7 +58,7 @@ def _read(relative_path):
     ) and source_path.name.startswith("ui_"):
         source_path = Path("build/qt6/generated/rc_metastudio/forms") / source_path.name
     elif source_path in {
-        Path("src/rc_metastudio/ui_meta.py"),
+        Path("src/rc_metastudio/ui_main_window.py"),
         Path("src/rc_metastudio/ui_results_window.py"),
     }:
         source_path = Path("build/qt6/generated/rc_metastudio") / source_path.name
@@ -66,10 +70,6 @@ def _combined_text(paths):
 
 
 def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
-    sys.path.insert(0, str(ROOT / "src"))
-    sys.path.insert(0, str(ROOT / "src" / "forms"))
-    from ui_meta import Ui_MainWindow
-
     app = cast(
         QtWidgets.QApplication,
         required(
@@ -92,9 +92,7 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
 
 
 def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
-    sys.path.insert(0, str(ROOT / "src"))
-    sys.path.insert(0, str(ROOT / "src" / "forms"))
-    from meta_form import MetaForm
+    from rc_metastudio.main_window import MainWindow
 
     app = cast(
         QtWidgets.QApplication,
@@ -103,7 +101,7 @@ def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
             "application",
         ),
     )
-    window = MetaForm()
+    window = MainWindow()
 
     try:
         assert window.createPopupMenu() is None
@@ -117,8 +115,6 @@ def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
 
 
 def test_generated_dialogs_do_not_depend_on_fixed_position_content():
-    sys.path.insert(0, str(ROOT / "src"))
-    sys.path.insert(0, str(ROOT / "src" / "forms"))
     unmanaged_dialogs = []
 
     for module_name in GENERATED_UI_MODULE_NAMES:
@@ -158,8 +154,7 @@ def _root_for_ui_class(ui_class):
 
 
 def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy():
-    sys.path.insert(0, str(ROOT / "src"))
-    import conf_level_dialog
+    from rc_metastudio import confidence_level_dialog
 
     app = cast(
         QtWidgets.QApplication,
@@ -168,7 +163,7 @@ def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy(
             "application",
         ),
     )
-    dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
+    dialog = confidence_level_dialog.ConfidenceLevelDialog(95.0)
     dialog.show()
     app.processEvents()
 
@@ -177,7 +172,7 @@ def test_change_confidence_level_dialog_does_not_use_legacy_fixed_layout_policy(
             required(dialog.layout(), "dialog layout").sizeConstraint()
             == QtWidgets.QLayout.SizeConstraint.SetMinimumSize
         )
-        import adaptive_window
+        from rc_metastudio import adaptive_window
 
         assert (
             adaptive_window.adaptive_window_state(dialog).policy.archetype.value

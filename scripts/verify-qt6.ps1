@@ -82,6 +82,8 @@ try {
         return
     }
 
+    # Ty resolves generated modules from their flat build search paths while
+    # runtime imports remain package-qualified through rc_metastudio.forms.
     uv run ty check `
         --extra-search-path "$BuildRoot/generated/rc_metastudio" `
         --extra-search-path "$BuildRoot/generated/rc_metastudio/forms" `
@@ -89,10 +91,7 @@ try {
         --extra-search-path src/rc_metastudio `
         --extra-search-path src `
         --extra-search-path scripts `
-        --extra-search-path tests/python `
         --extra-search-path tests/python/gui `
-        --extra-search-path tests/r_stack `
-        --extra-search-path tests/packaging/contract `
         src/rc_metastudio scripts tests r/RCMetaR/inst/qa
     if ($LASTEXITCODE -ne 0) { throw "Repository-wide strict type verification failed." }
 
@@ -137,7 +136,7 @@ try {
         Invoke-NativeSmokeCommand -Label "Native R-load teardown smoke" -Command @(
             "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "r-load"
         )
-        Invoke-NativeSmokeCommand -Label "Native MetaForm teardown smoke" -Command @(
+        Invoke-NativeSmokeCommand -Label "Native MainWindow teardown smoke" -Command @(
             "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "meta-form"
         )
     }

@@ -6,13 +6,16 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 from typing import Any, Callable
 
 from PyQt6 import QtCore, QtWidgets, sip
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+
+
+def _phase(name: str) -> None:
+    print(f"RCMS_NATIVE_ANALYSIS_PHASE {name}", flush=True)
 
 
 def _sha256(path: Path) -> str:
@@ -62,15 +65,32 @@ def main() -> int:
     os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
-    sys.path.append(str(repo_root / "src" / "rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
 
-    meta_py_r_backend.install_stub_meta_py_r()
-    from rc_metastudio import app_error_handler, ma_specs
+    r_backend.install_stub_r_bridge()
+    _phase("backend-installed")
+    from rc_metastudio import app_error_handler, analysis_setup_dialog, progress_dialog
 
-    backend = ma_specs.meta_py_r
+    progress_class = progress_dialog.AnalysisProgressDialog
+    created_progress_dialogs = []
+
+    def create_progress_dialog(*args: object, **kwargs: object) -> object:
+        progress = progress_class(*args, **kwargs)
+        created_progress_dialogs.append(progress)
+        return progress
+
+    setattr(
+        analysis_setup_dialog.progress_dialog,
+        "AnalysisProgressDialog",
+        create_progress_dialog,
+    )
+
+    backend = analysis_setup_dialog.r_bridge
+
     _install_backend_stub(
-        backend, "ma_dataset_to_simple_binary_robj", lambda *_args, **_kwargs: None
+        backend,
+        "dataset_to_simple_binary_r_object",
+        lambda *_args, **_kwargs: None,
     )
     _install_backend_stub(
         backend,
@@ -120,7 +140,7 @@ def main() -> int:
         return {"texts": {"Summary": "ok"}, "images": {}}
 
     _install_backend_stub(backend, "run_binary_ma", run_backend)
-    _install_backend_stub(backend, "reset_Rs_working_dir", lambda: None)
+    _install_backend_stub(backend, "reset_r_working_directory", lambda: None)
 
     def deferred_delete() -> None:
         QtCore.QCoreApplication.sendPostedEvents(
@@ -129,12 +149,15 @@ def main() -> int:
         app.processEvents()
 
     def make_configuration() -> Any:
-        dialog = ma_specs.MA_Specs(Model(), parent=owner, conf_level=95.0)
+        dialog = analysis_setup_dialog.AnalysisSetupDialog(
+            Model(), parent=owner, conf_level=95.0
+        )
         dialog.show()
         app.processEvents()
         return dialog
 
     configuration = make_configuration()
+    _phase("success-configuration-created")
     confidence_input = configuration.parameter_grp_box.findChild(
         QtWidgets.QDoubleSpinBox
     )
@@ -154,11 +177,35 @@ def main() -> int:
     pixmap = screen.grabWindow(configuration.winId())
     if pixmap.isNull() or not pixmap.save(str(image), "PNG"):
         raise RuntimeError("failed to capture native analysis configuration")
-    configuration.run_ma()
-    progress = configuration.findChild(ma_specs.MetaProgress)
-    if progress is None:
-        raise RuntimeError("real analysis run did not create MetaProgress")
+
+    _phase("success-run-entry")
+    original_critical = analysis_setup_dialog.QMessageBox.critical
+
+    def fail_on_unexpected_critical(
+        _parent: object, title: str, message: str, *_args: object, **_kwargs: object
+    ) -> None:
+        raise RuntimeError(f"unexpected {title} dialog: {message}")
+
+    setattr(
+        analysis_setup_dialog.QMessageBox,
+        "critical",
+        fail_on_unexpected_critical,
+    )
+    try:
+        configuration.run_ma()
+    finally:
+        setattr(
+            analysis_setup_dialog.QMessageBox,
+            "critical",
+            original_critical,
+        )
+    _phase("success-run-return")
+    if not created_progress_dialogs:
+        raise RuntimeError("real analysis run did not create AnalysisProgressDialog")
+    progress = created_progress_dialogs[-1]
+    _phase("success-progress-found")
     deferred_delete()
+    _phase("success-deferred-delete-return")
     scenarios = {
         "success": {
             "deleted": {
@@ -170,19 +217,27 @@ def main() -> int:
     }
 
     failing = make_configuration()
+    _phase("failure-configuration-created")
+    progress_count = len(created_progress_dialogs)
     backend.run_binary_ma = lambda *_args, **_kwargs: (_ for _ in ()).throw(
         RuntimeError("native backend failure")
     )
-    original_critical = ma_specs.QMessageBox.critical
-    setattr(ma_specs.QMessageBox, "critical", lambda *_args, **_kwargs: None)
+    original_critical = analysis_setup_dialog.QMessageBox.critical
+    setattr(
+        analysis_setup_dialog.QMessageBox, "critical", lambda *_args, **_kwargs: None
+    )
     try:
+        _phase("failure-run-entry")
         failing.run_ma()
+        _phase("failure-run-return")
     finally:
-        setattr(ma_specs.QMessageBox, "critical", original_critical)
-    failing_progress = failing.findChild(ma_specs.MetaProgress)
-    if failing_progress is None:
-        raise RuntimeError("failed analysis did not create MetaProgress")
+        setattr(analysis_setup_dialog.QMessageBox, "critical", original_critical)
+    if len(created_progress_dialogs) != progress_count + 1:
+        raise RuntimeError("failed analysis did not create AnalysisProgressDialog")
+    failing_progress = created_progress_dialogs[-1]
+    _phase("failure-progress-found")
     deferred_delete()
+    _phase("failure-deferred-delete-return")
     scenarios["backend_failure"] = {
         "deleted": {
             "configuration": sip.isdeleted(failing),
@@ -192,16 +247,20 @@ def main() -> int:
     }
 
     cancelled = make_configuration()
+    _phase("cancel-configuration-created")
     cancelled.reject()
     deferred_delete()
+    _phase("cancel-deferred-delete-return")
     scenarios["cancel"] = {
         "deleted": {"configuration": sip.isdeleted(cancelled)},
         "top_level_delta": len(app.topLevelWidgets()) - baseline,
     }
 
     closed = make_configuration()
+    _phase("close-configuration-created")
     closed.close()
     deferred_delete()
+    _phase("close-deferred-delete-return")
     scenarios["close"] = {
         "deleted": {"configuration": sip.isdeleted(closed)},
         "top_level_delta": len(app.topLevelWidgets()) - baseline,
@@ -225,6 +284,7 @@ def main() -> int:
         json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     validate_evidence(evidence_path)
+    _phase("evidence-validated")
     print(evidence_path.read_text(encoding="utf-8"))
     return 0
 

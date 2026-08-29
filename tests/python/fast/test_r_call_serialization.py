@@ -13,8 +13,8 @@ from rc_metastudio import r_call_serialization
 def test_application_code_uses_only_serialized_r_backend_entrypoints():
     root = Path(__file__).resolve().parents[3]
     allowed = {
-        "meta_py_r.py",
-        "meta_py_r_backend.py",
+        "r_bridge.py",
+        "r_backend.py",
         "launch.py",
         "qt6_macos_feasibility.py",
     }

@@ -8,30 +8,30 @@ import builtins
 
 sys.path.insert(0, os.path.abspath("src"))
 
-import test_backend_compat
+from rc_metastudio import r_backend
 
-test_backend_compat.install()
+r_backend.install_r_backend()
 
-import ma_data_table_model
-import ma_dataset
-import meta_globals
-from rc_metastudio import meta_py_r
+from rc_metastudio import dataset_table_model
+from rc_metastudio import analysis_dataset
+from rc_metastudio import meta_globals
+from rc_metastudio import r_bridge
 
 
 def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
     script = textwrap.dedent(
         """
         import json
-        import test_backend_compat
+        from rc_metastudio import r_backend
 
-        test_backend_compat.install()
+        r_backend.install_r_backend()
 
-        import ma_dataset
-        import meta_globals
+        from rc_metastudio import analysis_dataset
+        from rc_metastudio import meta_globals
 
-        dataset = ma_dataset.Dataset()
-        outcome = ma_dataset.Outcome("Mortality", meta_globals.BINARY)
-        study = ma_dataset.Study(1, "Alpha")
+        dataset = analysis_dataset.Dataset()
+        outcome = analysis_dataset.Outcome("Mortality", meta_globals.BINARY)
+        study = analysis_dataset.Study(1, "Alpha")
         study.add_outcome(outcome, group_names=["tx A", "tx B", "tx C", "tx D"])
         study.add_follow_up_to_outcome(
             outcome,
@@ -64,7 +64,7 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
         env = os.environ.copy()
         env["RCMS_STUB_BACKEND"] = "1"
         env["PYTHONHASHSEED"] = seed
-        env["PYTHONPATH"] = os.path.abspath(os.path.join("src", "rc_metastudio"))
+        env["PYTHONPATH"] = os.path.abspath("src")
         result = subprocess.run(
             [sys.executable, "-c", script],
             check=True,
@@ -77,18 +77,18 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
 
 
 def _sortable_dataset_model():
-    dataset = ma_dataset.Dataset()
+    dataset = analysis_dataset.Dataset()
     studies = [
-        ma_dataset.Study(1, name="Gamma", year=1988),
-        ma_dataset.Study(2, name="Alpha", year=1977),
-        ma_dataset.Study(3, name="Beta", year=1989),
+        analysis_dataset.Study(1, name="Gamma", year=1988),
+        analysis_dataset.Study(2, name="Alpha", year=1977),
+        analysis_dataset.Study(3, name="Beta", year=1989),
     ]
     for study in studies:
         dataset.add_study(study)
 
-    dataset.add_outcome(ma_dataset.Outcome("Mortality", meta_globals.BINARY))
+    dataset.add_outcome(analysis_dataset.Outcome("Mortality", meta_globals.BINARY))
     dataset.add_covariate(
-        ma_dataset.Covariate("Dose", "continuous"),
+        analysis_dataset.Covariate("Dose", "continuous"),
         cov_values={"Gamma": 30, "Alpha": 10, "Beta": 20},
     )
 
@@ -96,12 +96,12 @@ def _sortable_dataset_model():
     effects_by_name = {"Gamma": 0.3, "Alpha": 0.1, "Beta": 0.2}
     group_str = "-".join(meta_globals.DEFAULT_GROUP_NAMES)
     for study in dataset.studies:
-        ma_unit = study.get_ma_unit("Mortality", "first")
-        ma_unit.set_raw_data_for_groups(
+        analysis_unit = study.get_analysis_unit("Mortality", "first")
+        analysis_unit.set_raw_data_for_groups(
             meta_globals.DEFAULT_GROUP_NAMES,
             [[raw_events_by_name[study.name], 10], [5, 10]],
         )
-        ma_unit.set_effect_and_ci(
+        analysis_unit.set_effect_and_ci(
             "OR",
             group_str,
             effects_by_name[study.name],
@@ -110,7 +110,9 @@ def _sortable_dataset_model():
             mult=1.96,
         )
 
-    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
+    model = dataset_table_model.DatasetTableModel(
+        dataset=dataset, add_blank_study=False
+    )
     model.current_outcome = "Mortality"
     model.current_effect = "OR"
     model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
@@ -125,7 +127,7 @@ def _study_names(model):
 def test_dataset_model_sort_studies_uses_python3_key_sort(monkeypatch):
     model = _sortable_dataset_model()
     monkeypatch.setattr(
-        meta_py_r, "binary_convert_scale", lambda value, *args, **kwargs: value
+        r_bridge, "binary_convert_scale", lambda value, *args, **kwargs: value
     )
     monkeypatch.delattr(builtins, "cmp", raising=False)
 

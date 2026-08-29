@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -19,7 +19,7 @@ from test_types import key_click, key_clicks, mouse_click, required
 prepare_generated_ui_imports()
 
 
-class FakeContinuousMAUnit:
+class FakeContinuousAnalysisUnit:
     def __init__(self, raw_data=None, effects=None):
         self.raw_data = raw_data or {
             "Group 1": [10, 94, 2],
@@ -64,17 +64,17 @@ def _open_continuous_dialog(
     available,
     metric="MD",
     recorder=None,
-    ma_unit=None,
+    analysis_unit=None,
     back_calc_result=None,
     choose_metric=False,
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     recorder = recorder if recorder is not None else {}
     recorder.setdefault("metric_choice_exec", [])
     monkeypatch.setattr(
-        continuous_data_form.adaptive_window,
+        continuous_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
@@ -97,7 +97,7 @@ def _open_continuous_dialog(
             return dialog.result()
 
         monkeypatch.setattr(
-            continuous_data_form.ChooseBackCalcResultForm,
+            continuous_data_dialog.ContinuousBackCalculationDialog,
             "exec",
             choose_second_option,
         )
@@ -108,15 +108,15 @@ def _open_continuous_dialog(
             return False
 
         monkeypatch.setattr(
-            continuous_data_form.ChooseBackCalcResultForm,
+            continuous_data_dialog.ContinuousBackCalculationDialog,
             "exec",
             reject_metric_choice,
         )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r, "get_mult_from_r", lambda _conf: 1.96
+        continuous_data_dialog.r_bridge, "get_mult_from_r", lambda _conf: 1.96
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "continuous_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
@@ -133,22 +133,22 @@ def _open_continuous_dialog(
         return {"succeeded": False, "comment": "stub"}
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "impute_cont_data",
         impute,
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "impute_pre_post_cont_data",
         impute_pre_post,
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (2.5, 1.5, 3.5)},
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "effect_triplet",
         lambda effect, _scale, metric=None: effect["calc_scale"],
     )
@@ -158,10 +158,10 @@ def _open_continuous_dialog(
         return back_calc_result or {"FAIL": True}
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r, "back_calc_cont_data", back_calc
+        continuous_data_dialog.r_bridge, "back_calc_cont_data", back_calc
     )
-    dialog = continuous_data_form.ContinuousDataForm(
-        ma_unit or FakeContinuousMAUnit(),
+    dialog = continuous_data_dialog.ContinuousDataDialog(
+        analysis_unit or FakeContinuousAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         metric,
@@ -200,9 +200,9 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
 def test_continuous_back_calculation_enablement_probes_metric_assumptions(
     monkeypatch, metric, working_parameter, expected_parameters
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={
             "Group 1": [100, 10, 10],
             "Group 2": [100, 6, None],
@@ -213,7 +213,7 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         metric=metric,
-        ma_unit=unit,
+        analysis_unit=unit,
     )
     observed_parameters = []
 
@@ -234,7 +234,7 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
         }
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "back_calc_cont_data",
         assumption_dependent_solver,
     )
@@ -252,10 +252,10 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
 def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
     monkeypatch,
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     recorder = {}
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -271,7 +271,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
     )
 
@@ -291,7 +291,9 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         return chooser.result()
 
     monkeypatch.setattr(
-        continuous_data_form.ChooseBackCalcResultForm, "exec", cancel_with_button
+        continuous_data_dialog.ContinuousBackCalculationDialog,
+        "exec",
+        cancel_with_button,
     )
     try:
         table_before = [
@@ -372,12 +374,12 @@ def test_failed_pre_post_imputation_restores_value_from_owning_table(
 def test_continuous_sample_size_is_rejected_before_model_or_r(monkeypatch, invalid_n):
     recorder = {}
     warnings = []
-    unit = FakeContinuousMAUnit()
+    unit = FakeContinuousAnalysisUnit()
     app, dialog = _open_continuous_dialog(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
     )
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -573,14 +575,16 @@ def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypat
 
 @pytest.mark.parametrize("size", [(1024, 640), (800, 600)])
 def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     long_label = (
         "Standardized Mean Difference with small-sample bias correction and "
         "complete confidence interval reporting across every treatment arm, "
         "follow-up, subgroup, estimator, and sensitivity-analysis scenario"
     )
-    monkeypatch.setitem(continuous_data_form.CONTINUOUS_METRIC_NAMES, "SMD", long_label)
+    monkeypatch.setitem(
+        continuous_data_dialog.CONTINUOUS_METRIC_NAMES, "SMD", long_label
+    )
     available = QtCore.QRect(20, 30, *size)
     app, dialog = _open_continuous_dialog(monkeypatch, available)
     try:
@@ -624,7 +628,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
 ):
     available = QtCore.QRect(20, 30, *size)
     recorder = {}
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -640,7 +644,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         monkeypatch,
         available,
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -685,7 +689,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
 def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
     monkeypatch, fault_boundary
 ):
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -702,7 +706,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -754,7 +758,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         elif fault_boundary == "copy":
             monkeypatch.setattr(
                 dialog,
-                "_copy_raw_data_from_table_to_ma_unit",
+                "_copy_raw_data_from_table_to_analysis_unit",
                 lambda: (_ for _ in ()).throw(RuntimeError("copy fault")),
             )
         elif fault_boundary == "snapshot":
@@ -822,7 +826,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
 def test_continuous_back_calculation_undo_publication_has_one_commit_point(
     monkeypatch, failure_timing
 ):
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -839,7 +843,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -960,16 +964,16 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
 def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable(
     monkeypatch, size
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     available = QtCore.QRect(20, 30, *size)
     monkeypatch.setattr(
-        continuous_data_form.adaptive_window,
+        continuous_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    dialog = continuous_data_form.ChooseBackCalcResultForm(
+    dialog = continuous_data_dialog.ContinuousBackCalculationDialog(
         "Required back-calculation guidance " * 40,
         "Use equal population standard deviations",
         "Use unequal population standard deviations",

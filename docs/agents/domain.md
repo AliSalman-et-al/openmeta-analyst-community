@@ -1,38 +1,13 @@
-# Domain Docs
+# Domain documentation
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+Read domain documentation before changing a modeled concept or proposing a new term.
 
-## Before exploring, read these
+1. Read `CONTEXT-MAP.md` when it exists.
+2. Follow its links to the relevant `CONTEXT.md` files.
+3. Read system decisions in `docs/adr/` and context decisions in nearby `docs/adr/` directories.
 
-- **`CONTEXT-MAP.md`** at the repo root. It points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`** for system-wide decisions.
-- **Context-scoped `docs/adr/` directories** near relevant context docs for local decisions.
+Missing files do not block work. Continue with the vocabulary established in the code, user interface, schemas, and tests.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The producer skill (`/grill-with-docs`) creates them lazily when terms or decisions actually get resolved.
+Use glossary terms exactly in code, tests, issues, and design notes. If a needed concept has no established name, resolve the terminology before spreading a new synonym.
 
-## File structure
-
-This repo uses a multi-context layout:
-
-```text
-/
-|-- CONTEXT-MAP.md
-|-- docs/adr/
-`-- src/
-    |-- context-a/
-    |   |-- CONTEXT.md
-    |   `-- docs/adr/
-    `-- context-b/
-        |-- CONTEXT.md
-        `-- docs/adr/
-```
-
-## Use the glossary's vocabulary
-
-When your output names a domain concept in an issue title, refactor proposal, hypothesis, or test name, use the term as defined in the relevant `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
-
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use, or there's a real gap to resolve with `/grill-with-docs`.
-
-## Flag ADR conflicts
-
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding.
+Call out any proposed change that conflicts with an accepted architecture decision record.

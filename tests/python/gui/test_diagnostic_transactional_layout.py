@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -27,7 +27,7 @@ class FakeDiagnosticGroup:
         self.raw_data = raw_data
 
 
-class FakeDiagnosticMAUnit:
+class FakeDiagnosticAnalysisUnit:
     def __init__(self, raw_data=None, effects=None):
         self.raw_data = list(raw_data or [12, 3, 4, 21])
         self.effects = dict(effects or {})
@@ -76,43 +76,43 @@ class FakeDiagnosticModel:
 def _open_data_dialog(
     monkeypatch, raw_data=None, effects=None, imputed=None, available=AVAILABLE
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
     )
     monkeypatch.setattr(
-        diagnostic_data_form.adaptive_window,
+        diagnostic_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda _conf: 1.96
+        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda _conf: 1.96
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "diagnostic_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "impute_diag_data",
         lambda _data: imputed or {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         },
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "effect_triplet",
         lambda effect, scale, metric=None: effect[scale],
     )
-    dialog = diagnostic_data_form.DiagnosticDataForm(
-        FakeDiagnosticMAUnit(raw_data=raw_data, effects=effects),
+    dialog = diagnostic_data_dialog.DiagnosticDataDialog(
+        FakeDiagnosticAnalysisUnit(raw_data=raw_data, effects=effects),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         conf_level=95.0,
@@ -121,17 +121,17 @@ def _open_data_dialog(
 
 
 def _open_metrics_dialog(monkeypatch, model):
-    import diag_metrics
+    from rc_metastudio import diagnostic_metrics_dialog
 
     app = required(
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
     )
     monkeypatch.setattr(
-        diag_metrics.adaptive_window,
+        diagnostic_metrics_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(AVAILABLE),
     )
-    dialog = diag_metrics.Diag_Metrics(model)
+    dialog = diagnostic_metrics_dialog.DiagnosticMetricsDialog(model)
     return app, dialog
 
 
@@ -195,13 +195,13 @@ def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
 def test_count_entry_preserves_diagnostic_behavior_without_root_growth(
     monkeypatch, size
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     available = QtCore.QRect(20, 30, *size)
     app, dialog = _open_data_dialog(monkeypatch, available=available)
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.QMessageBox,
+        diagnostic_data_dialog.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )
@@ -215,10 +215,10 @@ def test_count_entry_preserves_diagnostic_behavior_without_root_growth(
         app.processEvents()
 
         assert warnings == []
-        assert dialog.ma_unit.raw_data == [15.0, 3.0, 4.0, 21.0]
+        assert dialog.analysis_unit.raw_data == [15.0, 3.0, 4.0, 21.0]
         assert dialog.two_by_two_table.item(0, 2).text() == "19"
         assert dialog.two_by_two_table.item(2, 2).text() == "43"
-        assert dialog.ma_unit.effects["Sens"] == (0.8, 0.7, 0.9)
+        assert dialog.analysis_unit.effects["Sens"] == (0.8, 0.7, 0.9)
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
         assert dialog.frameGeometry().width() <= int(available.width() * 0.9) + 2
@@ -285,7 +285,7 @@ def test_back_calculation_updates_counts_without_root_growth(monkeypatch):
         dialog.back_calc_Btn.click()
         app.processEvents()
 
-        assert dialog.ma_unit.raw_data == [12.0, 3.0, 4.0, 21.0]
+        assert dialog.analysis_unit.raw_data == [12.0, 3.0, 4.0, 21.0]
         assert [
             dialog.two_by_two_table.item(row, column).text()
             for row in range(2)
@@ -353,7 +353,7 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
 
 @pytest.mark.parametrize("initially_blocked", [False, True])
 def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     app = cast(
         QtWidgets.QApplication,
@@ -364,7 +364,7 @@ def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
     )
     table = QtWidgets.QTableWidget(1, 1)
 
-    class StubForm:
+    class StubDialog:
         two_by_two_table = table
 
         @staticmethod
@@ -372,8 +372,8 @@ def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
             return True
 
     table.blockSignals(initially_blocked)
-    diagnostic_data_form.DiagnosticDataForm._set_val(
-        cast(diagnostic_data_form.DiagnosticDataForm, StubForm()), 0, 0, 3
+    diagnostic_data_dialog.DiagnosticDataDialog._set_val(
+        cast(diagnostic_data_dialog.DiagnosticDataDialog, StubDialog()), 0, 0, 3
     )
 
     assert table.signalsBlocked() is initially_blocked
@@ -382,7 +382,7 @@ def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
 
 
 def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkeypatch):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     app = cast(
         QtWidgets.QApplication,
@@ -394,7 +394,7 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
     table = QtWidgets.QTableWidget(1, 1)
     table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
 
-    class StubForm:
+    class StubDialog:
         two_by_two_table = table
 
         @staticmethod
@@ -404,11 +404,11 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
     def fail(*_args, **_kwargs):
         raise RuntimeError("injected item update failure")
 
-    monkeypatch.setattr(diagnostic_data_form, "required", fail)
+    monkeypatch.setattr(diagnostic_data_dialog, "required", fail)
     table.blockSignals(True)
     with pytest.raises(RuntimeError, match="injected item update failure"):
-        diagnostic_data_form.DiagnosticDataForm._set_val(
-            cast(diagnostic_data_form.DiagnosticDataForm, StubForm()), 0, 0, 3
+        diagnostic_data_dialog.DiagnosticDataDialog._set_val(
+            cast(diagnostic_data_dialog.DiagnosticDataDialog, StubDialog()), 0, 0, 3
         )
 
     assert table.signalsBlocked()
@@ -417,7 +417,7 @@ def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkey
 
 
 def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     app = cast(
         QtWidgets.QApplication,
@@ -433,7 +433,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
     app, dialog = _open_data_dialog(monkeypatch)
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.QMessageBox,
+        diagnostic_data_dialog.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )
@@ -451,7 +451,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         assert dialog.inconsistencyLabel.isVisible()
         assert dialog.inconsistencyLabel.wordWrap()
         assert "whole number" in dialog.inconsistencyLabel.text()
-        assert dialog.ma_unit.raw_data == [12, 3, 4, 21]
+        assert dialog.analysis_unit.raw_data == [12, 3, 4, 21]
         assert dialog.two_by_two_table.item(0, 0).text() == "12"
         mapped = dialog.inconsistencyLabel.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
@@ -486,7 +486,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
 def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
     monkeypatch, field_name, invalid_value, guidance, restored
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     app = cast(
         QtWidgets.QApplication,
@@ -506,7 +506,7 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
     )
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.calc_fncs.QMessageBox,
+        diagnostic_data_dialog.calc_fncs.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )

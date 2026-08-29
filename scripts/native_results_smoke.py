@@ -438,11 +438,11 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    sys.path.append(str(repo_root / "src" / "rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
 
-    meta_py_r_backend.install_stub_meta_py_r()
-    from rc_metastudio import app_error_handler, network_view, results_window
+    r_backend.install_stub_r_bridge()
+    from rc_metastudio import app_error_handler, network_view_dialog, results_window
+    from rc_metastudio.analysis_results import parse_analysis_result
 
     evidence_root.mkdir(parents=True, exist_ok=True)
     slug = _scale_slug(scale)
@@ -473,17 +473,19 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         "styleable": True,
     }
     results = results_window.ResultsWindow(
-        {
-            "texts": {
-                "Summary": "Random-effects model\nEstimate  Lower bound  Upper bound",
-                "References": "Maintained native Qt6 Results evidence.",
-            },
-            "images": {"Forest Plot": str(svg)},
-            "display_images": {"Forest Plot": str(svg)},
-            "image_params_paths": {"Forest Plot": str(evidence_root / "forest")},
-            "image_order": ["Forest Plot"],
-            "plot_capabilities": {"Forest Plot": capability},
-        }
+        parse_analysis_result(
+            {
+                "texts": {
+                    "Summary": "Random-effects model\nEstimate  Lower bound  Upper bound",
+                    "References": "Maintained native Qt6 Results evidence.",
+                },
+                "images": {"Forest Plot": str(svg)},
+                "display_images": {"Forest Plot": str(svg)},
+                "image_params_paths": {"Forest Plot": str(evidence_root / "forest")},
+                "image_order": ["Forest Plot"],
+                "plot_capabilities": {"Forest Plot": capability},
+            }
+        )
     )
     network_image = evidence_root / ("network-source-%s.png" % slug)
     source = QtGui.QImage(640, 320, QtGui.QImage.Format.Format_ARGB32)
@@ -509,11 +511,11 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             return "binary"
 
     setattr(
-        network_view.meta_py_r,
-        "ma_dataset_to_simple_network",
+        network_view_dialog.r_bridge,
+        "dataset_to_simple_network",
         lambda **_kwargs: str(network_image),
     )
-    network = network_view.ViewDialog(Model())
+    network = network_view_dialog.NetworkViewDialog(Model())
     results_image = evidence_root / ("results-%s.png" % slug)
     network_capture = evidence_root / ("network-%s.png" % slug)
     try:

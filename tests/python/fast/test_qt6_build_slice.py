@@ -327,6 +327,11 @@ def test_canonical_form_generation_is_deterministic_and_importable(
         assert "connectSlotsByName" not in rendered
         assert "icons_rc" not in rendered
 
+    stale_module = second / "generated/rc_metastudio/forms/ui_retired_form.py"
+    stale_module.write_text("retired = True\n", encoding="utf-8")
+    _run_build("generate", "--build-root", str(second))
+    assert not stale_module.exists()
+
 
 def test_canonical_form_manifest_fails_closed_on_drift_and_collisions():
     discovered = set(

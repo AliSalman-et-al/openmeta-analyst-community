@@ -59,7 +59,7 @@ def _dialog_with_content(text="Content"):
 def test_application_bootstrap_enables_qt_high_dpi_before_construction():
     script = """
 from PyQt6 import QtWidgets
-import app_error_handler
+from rc_metastudio import app_error_handler
 
 assert QtWidgets.QApplication.instance() is None
 app = app_error_handler.get_or_create_application([])
@@ -68,8 +68,8 @@ assert app is QtWidgets.QApplication.instance()
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(
         [
-            str(ROOT / "src" / "rc_metastudio"),
-            str(ROOT / "build" / "qt6-verification" / "generated" / "rc_metastudio"),
+            str(ROOT / "src"),
+            str(ROOT / "build" / "qt6-verification" / "generated"),
         ]
     )
     env["QT_QPA_PLATFORM"] = "offscreen"
@@ -88,7 +88,7 @@ assert app is QtWidgets.QApplication.instance()
 
 
 def test_geometry_helpers_bound_the_outer_frame_in_logical_space():
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(100, 50, 800, 600)
     geometry = adaptive_window.centered_bounded_geometry(
@@ -106,10 +106,13 @@ def test_geometry_helpers_bound_the_outer_frame_in_logical_space():
 
 
 def test_workspace_roles_apply_maximized_or_eighty_percent_first_use(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(100, 50, 1000, 800)
-    provider = lambda _window: QtCore.QRect(available)
+
+    def provider(_window):
+        return QtCore.QRect(available)
+
     main = QtWidgets.QMainWindow()
     results = QtWidgets.QMainWindow()
     edit_dataset = _dialog_with_content()
@@ -143,7 +146,7 @@ def test_workspace_roles_apply_maximized_or_eighty_percent_first_use(qapp):
 
 
 def test_unparented_workspace_uses_active_screen_before_maximizing(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     active_screen = FakeScreen(QtCore.QRect(1600, 100, 1200, 900))
     main = QtWidgets.QMainWindow()
@@ -170,7 +173,7 @@ def test_unparented_workspace_uses_active_screen_before_maximizing(qapp):
 
 
 def test_maximized_workspace_does_not_reapply_window_state_during_show(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     window = QtWidgets.QMainWindow()
     controller = adaptive_window.register_adaptive_window(
@@ -196,7 +199,7 @@ def test_maximized_workspace_does_not_reapply_window_state_during_show(qapp):
 
 
 def test_content_refit_requests_are_local_and_coalesced(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     dialog = _dialog_with_content()
     controller = adaptive_window.register_adaptive_window(
@@ -216,7 +219,7 @@ def test_content_refit_requests_are_local_and_coalesced(qapp):
 
 
 def test_visible_transactional_content_refit_preserves_placement(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     dialog = _dialog_with_content("Short")
     controller = adaptive_window.register_adaptive_window(
@@ -241,7 +244,7 @@ def test_visible_transactional_content_refit_preserves_placement(qapp):
 
 
 def test_visible_user_owned_windows_do_not_reclaim_geometry(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(0, 0, 1400, 1000)
     for role in (
@@ -270,7 +273,7 @@ def test_visible_user_owned_windows_do_not_reclaim_geometry(qapp):
 
 
 def test_runtime_clamp_preserves_user_geometry_without_recentering(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(0, 0, 800, 600)
     dialog = _dialog_with_content()
@@ -306,7 +309,7 @@ def test_runtime_clamp_preserves_user_geometry_without_recentering(qapp):
 
 
 def test_screen_metric_changes_clamp_and_reconnect_to_new_screen(qapp):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     initial = QtCore.QRect(0, 0, 1200, 900)
     first_screen = FakeScreen(initial)
@@ -347,13 +350,13 @@ def test_screen_metric_changes_clamp_and_reconnect_to_new_screen(qapp):
 
 
 def test_confidence_level_is_a_compact_transactional_dialog(qapp):
-    import adaptive_window
-    import conf_level_dialog
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import confidence_level_dialog
 
     parent = QtWidgets.QWidget()
     parent.setGeometry(120, 80, 700, 480)
     parent.show()
-    dialog = conf_level_dialog.ChangeConfLevelDlg(95.0, parent)
+    dialog = confidence_level_dialog.ConfidenceLevelDialog(95.0, parent)
     dialog.show()
     qapp.processEvents()
 
@@ -381,9 +384,9 @@ def test_confidence_level_is_a_compact_transactional_dialog(qapp):
 
 
 def test_confidence_level_handles_representative_long_text_and_enlarged_font(qapp):
-    import conf_level_dialog
+    from rc_metastudio import confidence_level_dialog
 
-    dialog = conf_level_dialog.ChangeConfLevelDlg(95.0)
+    dialog = confidence_level_dialog.ConfidenceLevelDialog(95.0)
     font = QtGui.QFont(qapp.font())
     font.setPointSize(max(18, font.pointSize() + 8))
     dialog.setFont(font)

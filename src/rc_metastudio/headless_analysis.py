@@ -1,12 +1,12 @@
 import os
 
-import ma_data_table_model
-import ma_dataset
-import meta_globals
-from rc_metastudio import meta_py_r
-import project_adapter
-import project_format
-import settings
+from rc_metastudio import dataset_table_model
+from rc_metastudio import analysis_dataset
+from rc_metastudio import meta_globals
+from rc_metastudio import analysis_adapter
+from rc_metastudio import project_adapter
+from rc_metastudio import project_format
+from rc_metastudio import settings
 
 
 class HeadlessAnalysisCase:
@@ -32,83 +32,107 @@ class HeadlessAnalysisCase:
 def load_dataset_model(dataset_path):
     dataset_path = os.path.abspath(dataset_path)
     document = project_format.load_project(dataset_path)
-    dataset = project_adapter.project_to_dataset(document.project)
-    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
-    state = project_adapter.state_to_model_state(dataset, document.state)
-    model.set_state(state)
+    runtime_project = project_adapter.document_to_runtime_project(document)
+    model = dataset_table_model.DatasetTableModel(
+        dataset=runtime_project.dataset, add_blank_study=False
+    )
+    model.set_state(runtime_project.model_state)
     return model
 
 
 def _add_case_covariates(model, covariates):
     for covariate in covariates:
         model.dataset.add_covariate(
-            ma_dataset.Covariate(covariate["name"], covariate["type"]),
+            analysis_dataset.Covariate(covariate["name"], covariate["type"]),
             covariate["values"],
         )
+
+
+def _analysis_metric(case_metric, parameters, fallback=None):
+    for metric in (case_metric, parameters.get("measure"), fallback):
+        if isinstance(metric, str) and metric.strip():
+            return metric
+    raise ValueError("metric must be a non-empty string")
 
 
 def run_headless_analysis(case):
     model = load_dataset_model(case.dataset_path)
     _add_case_covariates(model, case.covariates)
     selected_covariates = [
-        ma_dataset.Covariate(covariate["name"], covariate["type"])
+        analysis_dataset.Covariate(covariate["name"], covariate["type"])
         for covariate in case.covariates
     ]
-    covariate_kwargs = (
-        {"covs_to_include": selected_covariates} if selected_covariates else {}
-    )
     settings.make_r_tmp()
-    if case.metric is not None:
-        model.set_current_metric(case.metric)
-    data_type = case.data_type or model.get_current_outcome_type(get_str=False)
+    data_type = (
+        case.data_type
+        if case.data_type is not None
+        else model.get_current_outcome_type(get_str=False)
+    )
+    family = {
+        meta_globals.BINARY: "binary",
+        meta_globals.CONTINUOUS: "continuous",
+        meta_globals.DIAGNOSTIC: "diagnostic",
+    }.get(data_type)
+    if family is None:
+        raise ValueError(
+            "Headless harness only covers binary, continuous, and diagnostic analyses."
+        )
 
-    if data_type == meta_globals.BINARY:
-        meta_py_r.ma_dataset_to_simple_binary_robj(model, **covariate_kwargs)
-        if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_workflow_analysis(
-                case.analysis_type,
-                case.method,
-                case.parameters,
+    if family == "diagnostic":
+        if case.metric is not None:
+            model.set_current_metric(case.metric)
+        methods = case.method if isinstance(case.method, list) else [case.method]
+        parameter_values = (
+            case.parameters if isinstance(case.parameters, list) else [case.parameters]
+        )
+        if len(methods) != len(parameter_values):
+            raise ValueError(
+                "Diagnostic methods and parameter sets must have equal lengths."
             )
-        if case.analysis_type == "meta_regression":
-            return meta_py_r.run_meta_regression(
-                model.dataset,
-                [],
-                selected_covariates,
-                case.metric,
-                conf_level=case.parameters.get("conf.level"),
-                params=case.parameters,
+        requests = []
+        for method, params in zip(methods, parameter_values):
+            metric = _analysis_metric(case.metric, params)
+            effective_parameters = dict(params)
+            effective_parameters["measure"] = metric
+            requests.append(
+                analysis_adapter.make_analysis_request(
+                    data_type=family,
+                    workflow="standard",
+                    method=method,
+                    metric=metric,
+                    parameters=effective_parameters,
+                )
             )
-        if case.analysis_type == "subgroup":
-            return meta_py_r.run_workflow_analysis(
-                "subgroup", case.method, case.parameters
-            )
-        return meta_py_r.run_binary_ma(case.method, case.parameters)
-    if data_type == meta_globals.CONTINUOUS:
-        meta_py_r.ma_dataset_to_simple_continuous_robj(model, **covariate_kwargs)
-        if case.analysis_type in ["cumulative", "leave-one-out"]:
-            return meta_py_r.run_workflow_analysis(
-                case.analysis_type,
-                case.method,
-                case.parameters,
-            )
-        if case.analysis_type == "meta_regression":
-            return meta_py_r.run_meta_regression(
-                model.dataset,
-                [],
-                selected_covariates,
-                case.metric,
-                conf_level=case.parameters.get("conf.level"),
-                params=case.parameters,
-            )
-        if case.analysis_type == "subgroup":
-            return meta_py_r.run_workflow_analysis(
-                "subgroup", case.method, case.parameters
-            )
-        return meta_py_r.run_continuous_ma(case.method, case.parameters)
-    if data_type == meta_globals.DIAGNOSTIC:
-        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
-        return meta_py_r.run_diagnostic_multi(case.method, case.parameters)
-    raise ValueError(
-        "Headless harness only covers binary, continuous, and diagnostic analyses."
+        return analysis_adapter.execute_analysis_requests(model, tuple(requests))
+
+    workflow = case.analysis_type or "standard"
+    if workflow == "meta_regression":
+        workflow = "meta-regression"
+    effective_metric = _analysis_metric(
+        case.metric, case.parameters, getattr(model, "current_effect", None)
+    )
+    effective_parameters = dict(case.parameters)
+    effective_parameters["measure"] = effective_metric
+    model.set_current_metric(effective_metric)
+    request = analysis_adapter.make_analysis_request(
+        data_type=family,
+        workflow=workflow,
+        method=case.method or "meta_regression",
+        metric=effective_metric,
+        parameters=effective_parameters,
+    )
+    if workflow == "meta-regression":
+        study_selection = analysis_adapter.select_studies_for_covariates(
+            model, tuple(selected_covariates)
+        )
+        return analysis_adapter.execute_meta_regression_request(
+            model,
+            study_selection.studies,
+            tuple(selected_covariates),
+            request,
+            False,
+            effective_parameters.get("conf.level"),
+        )
+    return analysis_adapter.execute_analysis_requests(
+        model, (request,), selected_covariates=tuple(selected_covariates)
     )

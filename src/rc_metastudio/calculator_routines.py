@@ -3,16 +3,18 @@
 """Shared calculator helpers for data-entry dialogs."""
 
 import sys
+from collections.abc import Callable
 from functools import partial
+from typing import Protocol, TypeAlias
 from weakref import WeakKeyDictionary
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QUndoCommand
+from PyQt6.QtGui import QUndoCommand, QUndoStack
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
-from meta_globals import CALC_NUM_DIGITS, EMPTY_VALS, ERROR_COLOR, OK_COLOR
-from rc_metastudio import meta_py_r
-import qt_text
-from runtime_types import required
+from rc_metastudio.meta_globals import CALC_NUM_DIGITS, EMPTY_VALS, ERROR_COLOR, OK_COLOR
+from rc_metastudio import r_bridge
+from rc_metastudio import qt_text
+from rc_metastudio.runtime_types import required
 
 
 _EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
@@ -46,19 +48,19 @@ def between_bounds(est=None, low=None, high=None):
             return None
 
     good_result = my_lt(low, est)
-    okay = True if not (good_result is None) else False
+    okay = True if good_result is not None else False
     if okay and not good_result:
         msg = "The lower CI must be less than the point estimate!"
         return False, msg
 
     good_result = my_lt(est, high)
-    okay = True if not (good_result is None) else False
+    okay = True if good_result is not None else False
     if okay and not good_result:
         msg = "The higher CI must be greater than the point estimate!"
         return False, msg
 
     good_result = my_lt(low, high)
-    okay = True if not (good_result is None) else False
+    okay = True if good_result is not None else False
     if okay and not good_result:
         msg = "The lower CI must be less than the higher CI!"
         return False, msg
@@ -68,7 +70,6 @@ def between_bounds(est=None, low=None, high=None):
 
 def compute_2x2_table_from_inner_counts(params):
     """Derive 2x2 margins from the four independent inner count cells."""
-
     c11 = params["c11"]
     c12 = params["c12"]
     c21 = params["c21"]
@@ -124,14 +125,13 @@ def set_table_cells_editable(table, editable_cells):
 
 
 # Consistency checking code for 2x2 tables (binary and diagnostic)
-########################### CONSISTENCY CHECKING CODE ##########################
 class ConsistencyChecker:
     def __init__(self, fn_consistent=None, fn_inconsistent=None, table_2x2=None):
-        functions_passed = (not fn_consistent is None) and (not fn_inconsistent is None)
+        functions_passed = (fn_consistent is not None) and (fn_inconsistent is not None)
         assert functions_passed, (
             "Not enough functions passed to check_for_consistencies"
         )
-        assert not table_2x2 is None, "No table argument passed."
+        assert table_2x2 is not None, "No table argument passed."
 
         self.inconsistent = False
         self.inconsistent_action = required(fn_inconsistent, "inconsistency callback")
@@ -204,7 +204,7 @@ class ConsistencyChecker:
         for row in range(3):
             for col in range(3):
                 value = self._get_int(row, col)
-                if not value in EMPTY_VALS:
+                if value not in EMPTY_VALS:
                     if value < 0:
                         # Color item
                         self.table.blockSignals(True)
@@ -240,24 +240,20 @@ class ConsistencyChecker:
         self.table.blockSignals(False)
 
     def _row_is_populated(self, row):
-        return not True in [self._is_empty_cell(row, col) for col in range(3)]
+        return True not in [self._is_empty_cell(row, col) for col in range(3)]
 
     def _col_is_populated(self, col):
-        return not True in [self._is_empty_cell(row, col) for row in range(3)]
+        return True not in [self._is_empty_cell(row, col) for row in range(3)]
 
     def _is_empty_cell(self, i, j):
         val = self.table.item(i, j)
         return val is None or val.text() == ""
 
 
-########################### END CONSISTENCY CHECKER ############################
-
-
-####### SHARED BINARY, CONTINUOUS, DIAGNOSTIC DATA FORM UTILITY FUNCTIONS ######
 def enable_txt_box_input(*args):
     """Enables text boxes if they are empty, disables them otherwise
-    Input is textbox(es)"""
-
+    Input is textbox(es)
+    """
     for text_box in args:
         text_box.blockSignals(True)
 
@@ -272,7 +268,6 @@ def fit_effect_ci_line_edits_to_contents(
     line_edits, digits=CALC_NUM_DIGITS, semantic_samples=None
 ):
     """Size calculator values from a semantic contract when one is supplied."""
-
     if semantic_samples is None:
         semantic_samples = ()
     for line_edit in line_edits:
@@ -370,34 +365,42 @@ def diagnostic_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
 
 
 def helper_set_current_effect(
-    ma_unit, txt_boxes, current_effect, group_str, data_type, mult=None
+    analysis_unit, txt_boxes, current_effect, group_str, data_type, mult=None
 ):
-    """Fills in text boxes on calculator forms with data from ma unit.
+    """Populate calculator fields from a meta-analysis unit.
     I noticed all 3 set_current_effect functions in the 3 calculators are
-    nearly identical so it makes sense to share the similiar parts"""
-
+    nearly identical so it makes sense to share the similiar parts
+    """
     if mult is None:
         raise ValueError("mult must be specified")
 
     if data_type == "binary":
-        conv_to_disp_scale = lambda x: meta_py_r.binary_convert_scale(
-            x, current_effect, convert_to="display.scale"
-        )
+
+        def conv_to_disp_scale(x):
+            return r_bridge.binary_convert_scale(
+                x, current_effect, convert_to="display.scale"
+            )
     elif data_type == "continuous":
-        conv_to_disp_scale = lambda x: meta_py_r.continuous_convert_scale(
-            x, current_effect, convert_to="display.scale"
-        )
+
+        def conv_to_disp_scale(x):
+            return r_bridge.continuous_convert_scale(
+                x, current_effect, convert_to="display.scale"
+            )
     elif data_type == "diagnostic":
-        conv_to_disp_scale = lambda x: meta_py_r.diagnostic_convert_scale(
-            x, current_effect, convert_to="display.scale"
-        )
+
+        def conv_to_disp_scale(x):
+            return r_bridge.diagnostic_convert_scale(
+                x, current_effect, convert_to="display.scale"
+            )
     else:
         raise Exception("data_type unrecognized")
     effect_tbox, lower_tbox, upper_tbox = [
         txt_boxes[box_name] for box_name in ("effect", "lower", "upper")
     ]
 
-    (est, lower, upper) = ma_unit.get_effect_and_ci(current_effect, group_str, mult)
+    (est, lower, upper) = analysis_unit.get_effect_and_ci(
+        current_effect, group_str, mult
+    )
     (d_est, d_lower, d_upper) = [conv_to_disp_scale(x) for x in (est, lower, upper)]
     for val, txt_box in zip(
         (d_est, d_lower, d_upper), [effect_tbox, lower_tbox, upper_tbox]
@@ -438,37 +441,89 @@ def save_table_data(table):
     return table_backup
 
 
-class CommandFieldChanged(QUndoCommand):
+class CalculatorCommandOwner(Protocol):
+    def enable_back_calculation_btn(self, engage: bool = False) -> None: ...
+
+
+EditState: TypeAlias = tuple[object, ...]
+StateRestorer: TypeAlias = Callable[..., None]
+
+
+class FieldEditCommand(QUndoCommand):
+    """Undo one already-applied calculator edit and its complete UI state."""
+
     def __init__(
         self,
-        restore_new_f=None,
-        restore_old_f=None,
-        parent=None,
-        description="",
-        refresh_on_initial_redo=True,
-    ):
-        super(CommandFieldChanged, self).__init__(description)
+        *,
+        owner: CalculatorCommandOwner,
+        restore_state: StateRestorer,
+        old_state: EditState,
+        new_state: EditState,
+        description: str = "",
+        refresh_on_initial_redo: bool = True,
+    ) -> None:
+        super().__init__(description)
 
-        self.parent = parent
+        self.owner = owner
         self.just_created = True
-        self.restore_new_f = restore_new_f
-        self.restore_old_f = restore_old_f
+        self.restore_state = restore_state
+        self.old_state = old_state
+        self.new_state = new_state
         self.refresh_on_initial_redo = refresh_on_initial_redo
 
-    def redo(self):
+    def redo(self) -> None:
         if self.just_created:
             self.just_created = False
             if self.refresh_on_initial_redo:
-                required(
-                    self.parent, "calculator command owner"
-                ).enable_back_calculation_btn()
+                self.owner.enable_back_calculation_btn()
         else:
-            required(self.restore_new_f, "calculator redo callback")()
-            # self.parent.enable_back_calculation_btn() ##
+            self.restore_state(*self.new_state)
 
-    def undo(self):
-        required(self.restore_old_f, "calculator undo callback")()
-        # self.parent.enable_back_calculation_btn() ##
+    def undo(self) -> None:
+        self.restore_state(*self.old_state)
+
+
+def push_field_edit(
+    undo_stack: QUndoStack,
+    *,
+    owner: CalculatorCommandOwner,
+    restore_state: StateRestorer,
+    old_state: EditState,
+    new_state: EditState,
+    description: str = "",
+    refresh_on_initial_redo: bool = True,
+) -> None:
+    """Publish an already-applied calculator edit as one undoable state change."""
+    undo_stack.push(
+        make_field_edit_command(
+            owner=owner,
+            restore_state=restore_state,
+            old_state=old_state,
+            new_state=new_state,
+            description=description,
+            refresh_on_initial_redo=refresh_on_initial_redo,
+        )
+    )
+
+
+def make_field_edit_command(
+    *,
+    owner: CalculatorCommandOwner,
+    restore_state: StateRestorer,
+    old_state: EditState,
+    new_state: EditState,
+    description: str = "",
+    refresh_on_initial_redo: bool = True,
+) -> FieldEditCommand:
+    """Build a calculator edit command for a caller with atomic publication rules."""
+    return FieldEditCommand(
+        owner=owner,
+        restore_state=restore_state,
+        old_state=old_state,
+        new_state=new_state,
+        description=description,
+        refresh_on_initial_redo=refresh_on_initial_redo,
+    )
 
 
 def block_signals(widgets, state):
@@ -477,10 +532,10 @@ def block_signals(widgets, state):
 
 
 # Only used in binary and continuous?
-def get_raw_data(ma_unit, groups):
+def get_raw_data(analysis_unit, groups):
     raw_data_dict = {}
     for group in groups:
-        raw_data = ma_unit.get_raw_data_for_group(group)
+        raw_data = analysis_unit.get_raw_data_for_group(group)
         raw_data_dict[group] = raw_data
     return raw_data_dict
 
@@ -517,7 +572,7 @@ def _txt_boxes_disabled(text_boxes):
 # Function for testing validity and range conditions in form txt boxes
 def evaluate(
     new_text,
-    ma_unit,
+    analysis_unit,
     curr_effect,
     group_str,
     conv_to_disp_scale,
@@ -529,17 +584,16 @@ def evaluate(
 ):
     """opt_cmp_fn i.e. 'Optional Compare Function' should return True when the
     desired condition is met and False otherwise. It is a function of new_text:
-    opt_cmp_fn(new_text)"""
-
+    opt_cmp_fn(new_text)
+    """
     if mult is None:
         raise ValueError("mult must be specified")
 
-    est, lower, upper = ma_unit.get_effect_and_ci(
+    est, lower, upper = analysis_unit.get_effect_and_ci(
         curr_effect, group_str, mult
     )  # calc scale
     d_est, d_lower, d_upper = [conv_to_disp_scale(x) for x in (est, lower, upper)]
     is_between_bounds = partial(between_bounds, est=d_est, low=d_lower, high=d_upper)
-    ###### ERROR CHECKING CODE#####
     # Make sure entered value is numeric and between the appropriate bounds
     try:
         parsed_value = numeric_value(new_text)

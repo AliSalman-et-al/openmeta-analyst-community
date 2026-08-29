@@ -73,7 +73,6 @@ class ProjectDocument:
 
 def reconstruct_analysis_dataset(document: ProjectDocument) -> AnalysisDataset:
     """Return the Qt-independent Analysis Adapter input for a loaded project."""
-
     try:
         return _reconstruct_analysis_dataset(document.project, document.state)
     except (ProjectSemanticError, RecursionError) as exc:
@@ -328,7 +327,6 @@ def migrate_to_latest(
     state: Mapping[str, JsonValue],
 ) -> tuple[JsonObject, JsonObject]:
     """Apply the explicit pure migration chain for a structured format version."""
-
     if version > CURRENT_FORMAT_VERSION or version < 1:
         raise ProjectFormatError(f"unsupported project format version: {version}")
     try:
@@ -353,7 +351,6 @@ def load_project(
     limits: ProjectArchiveLimits | None = None,
 ) -> ProjectDocument:
     """Read, authenticate, validate, and migrate an `.rcms` container."""
-
     selected_limits = limits or ProjectArchiveLimits()
     members = _read_members(Path(path), selected_limits)
     manifest = _decode_json("manifest.json", members["manifest.json"])
@@ -472,7 +469,6 @@ def save_project(
     limits: ProjectArchiveLimits | None = None,
 ) -> None:
     """Validate and atomically replace an `.rcms` project on its filesystem."""
-
     selected_limits = limits or ProjectArchiveLimits()
     try:
         project_value = cast(JsonObject, copy.deepcopy(dict(project)))

@@ -15,6 +15,28 @@ def test_repository_satisfies_canonical_qt_layout_contract():
     assert audit_qt_layout_contracts.audit_repository(ROOT) == []
 
 
+def test_audit_rejects_unregistered_top_level_form(tmp_path):
+    form = tmp_path / "src" / "rc_metastudio" / "forms" / "unregistered.ui"
+    form.parent.mkdir(parents=True)
+    form.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0"><class>Unregistered</class>
+<widget class="QDialog" name="Unregistered"><layout class="QVBoxLayout" name="layout"/></widget>
+<resources/><connections/></ui>
+""",
+        encoding="utf-8",
+    )
+
+    findings = audit_qt_layout_contracts.audit_repository(tmp_path)
+
+    assert any(
+        finding.path == form
+        and finding.rule == "window-archetype"
+        and "no authoritative inventory entry" in finding.detail
+        for finding in findings
+    )
+
+
 def test_audit_rejects_unmanaged_content_geometry_and_legacy_helpers(tmp_path):
     forms = tmp_path / "src" / "rc_metastudio" / "forms"
     forms.mkdir(parents=True)
@@ -168,7 +190,7 @@ qualified = domain.QFont('Consolas', 12)
     assert sum("stylesheet font" in detail for detail in font_details) >= 8
 
 
-def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path):
+def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path, monkeypatch):
     forms = tmp_path / "src" / "rc_metastudio" / "forms"
     forms.mkdir(parents=True)
     (forms / "allowed.ui").write_text(
@@ -191,7 +213,7 @@ def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path):
 """,
         encoding="utf-8",
     )
-    source = tmp_path / "src" / "rc_metastudio" / "network_view.py"
+    source = tmp_path / "src" / "rc_metastudio" / "network_view_dialog.py"
     source.write_text(
         """from PyQt6.QtGui import QFont, QFontDatabase
 
@@ -227,5 +249,10 @@ def sequential_overwrite(widget):
 swatch.setFixedSize(style_metric)
 """,
         encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        audit_qt_layout_contracts.qt_window_ownership,
+        "TOP_LEVEL_FORM_INVENTORY",
+        {"allowed.ui": (("network_view_dialog.py", "Allowed", "MAIN"),)},
     )
     assert audit_qt_layout_contracts.audit_repository(tmp_path) == []

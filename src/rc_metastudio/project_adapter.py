@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Protocol
 
-import ma_dataset
-import two_way_dict
-from project_format import JsonObject, JsonValue
+from rc_metastudio import analysis_dataset
+from rc_metastudio import two_way_dict
+from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
 _FAMILY_NAMES = {0: "binary", 1: "continuous", 2: "diagnostic"}
@@ -18,6 +19,15 @@ _FAMILY_NAMES = {0: "binary", 1: "continuous", 2: "diagnostic"}
 
 class ProjectAdapterError(ValueError):
     """The application model cannot be represented as a structured project."""
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeProject:
+    """Reconstructed application state from a validated project document."""
+
+    dataset: analysis_dataset.Dataset
+    model_state: JsonObject
+    restored_selection: bool
 
 
 class ProjectStateModel(Protocol):
@@ -73,9 +83,8 @@ def _entered_effects(
     return result
 
 
-def dataset_to_project(dataset: ma_dataset.Dataset) -> JsonObject:
+def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
     """Return latest-version project data for an application dataset."""
-
     outcomes: list[JsonValue] = []
     families = set()
     for name in dataset.get_outcome_names():
@@ -166,7 +175,6 @@ def dataset_to_project(dataset: ma_dataset.Dataset) -> JsonObject:
 
 def model_to_state(model: ProjectStateModel) -> JsonObject:
     """Capture only durable, project-scoped working state."""
-
     return {
         "schema_version": 1,
         "active_outcome": model.current_outcome,
@@ -225,11 +233,10 @@ def _number(value: JsonValue, location: str) -> float:
     return float(value)
 
 
-def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
+def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
     """Rebuild an application dataset from validated project data."""
-
     source = _object(project["dataset"], "dataset")
-    dataset = ma_dataset.Dataset(
+    dataset = analysis_dataset.Dataset(
         title=_text(source["title"], "dataset title"),
         is_diag=_boolean(source["is_diagnostic"], "diagnostic flag"),
         summary=copy.deepcopy(source["summary"]),
@@ -239,7 +246,7 @@ def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
         _object(item, "outcome") for item in _array(source["outcomes"], "outcomes")
     ]
     outcomes = {
-        _text(item["name"], "outcome name"): ma_dataset.Outcome(
+        _text(item["name"], "outcome name"): analysis_dataset.Outcome(
             _text(item["name"], "outcome name"),
             _integer(item["data_type"], "outcome data type"),
             sub_type=_optional_text(item["sub_type"], "outcome subtype"),
@@ -261,7 +268,7 @@ def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
         for item in _array(source["covariates"], "covariates")
     ]
     dataset.covariates = [
-        ma_dataset.Covariate(
+        analysis_dataset.Covariate(
             _text(item["name"], "covariate name"),
             "continuous"
             if _integer(item["data_type"], "covariate data type") == 1
@@ -275,7 +282,7 @@ def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
 
     for study_value in _array(source["studies"], "studies"):
         item = _object(study_value, "study")
-        study = ma_dataset.Study(
+        study = analysis_dataset.Study(
             _integer(item["id"], "study id"),
             _text(item["name"], "study name"),
             _optional_integer(item["year"], "study year"),
@@ -305,7 +312,7 @@ def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
                 copy.deepcopy(_array(group["raw_data"], "group raw data"))
                 for group in group_items
             ]
-            unit = ma_dataset.MetaAnalyticUnit(
+            unit = analysis_dataset.MetaAnalysisUnit(
                 outcome, raw_data=raw_data, group_names=group_names
             )
             for group_data in group_items:
@@ -329,9 +336,10 @@ def project_to_dataset(project: JsonObject) -> ma_dataset.Dataset:
     return dataset
 
 
-def state_to_model_state(dataset: ma_dataset.Dataset, state: JsonObject) -> JsonObject:
+def state_to_model_state(
+    dataset: analysis_dataset.Dataset, state: JsonObject
+) -> JsonObject:
     """Translate portable durable state to the table model's typed state keys."""
-
     outcome = _optional_text(state["active_outcome"], "active outcome")
     follow_up = _optional_text(state["active_follow_up"], "active follow-up")
     groups = [
@@ -368,3 +376,14 @@ def state_to_model_state(dataset: ma_dataset.Dataset, state: JsonObject) -> Json
         "study_auto_added": False,
         "conf_level": _number(state["confidence_level"], "confidence level"),
     }
+
+
+def document_to_runtime_project(document: ProjectDocument) -> RuntimeProject:
+    """Reconstruct the application dataset and durable state from a document."""
+    dataset = project_to_dataset(document.project)
+    model_state = state_to_model_state(dataset, document.state)
+    return RuntimeProject(
+        dataset=dataset,
+        model_state=model_state,
+        restored_selection=document.state["active_outcome"] is not None,
+    )

@@ -7,7 +7,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from two_way_dict import TwoWayDict
+from rc_metastudio.two_way_dict import TwoWayDict
 
 
 def test_two_way_dict_uses_python3_dict_views_and_reverse_lookup():

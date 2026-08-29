@@ -73,3 +73,9 @@ exclude = ["build", "src/rc_metastudio/forms/ui_*.py"]
 
 [tool.ty.rules]
 all = "error"
+
+[tool.ruff.lint.per-file-ignores]
+"src/rc_metastudio/analysis_dataset.py" = ["E402"]
+"src/rc_metastudio/launch.py" = ["E402"]
+"src/rc_metastudio/r_bridge.py" = ["E402"]
+"tests/**/*.py" = ["E402"]

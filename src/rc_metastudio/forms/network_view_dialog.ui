@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NetworkViewDialog</class>
+ <widget class="QDialog" name="NetworkViewDialog">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>0</width><height>0</height></rect></property>
+  <property name="windowTitle"><string>Network</string></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGraphicsView" name="network_view_dialoger">
+     <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>1</verstretch></sizepolicy></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="verticalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <property name="alignment"><set>Qt::AlignCenter</set></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame">
+     <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+     <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
+     <property name="frameShadow"><enum>QFrame::Raised</enum></property>
+     <layout class="QFormLayout" name="formLayout">
+      <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+      <item row="0" column="0"><widget class="QLabel" name="label_3"><property name="text"><string>Outcome:</string></property><property name="buddy"><cstring>outcome_cbo_box</cstring></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="outcome_cbo_box">
+        <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+        <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToContents</enum></property>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel" name="label_4"><property name="text"><string>Follow-up:</string></property><property name="buddy"><cstring>follow_up_cbo_box</cstring></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="follow_up_cbo_box">
+        <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+        <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToContents</enum></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops><tabstop>network_view_dialoger</tabstop><tabstop>outcome_cbo_box</tabstop><tabstop>follow_up_cbo_box</tabstop></tabstops>
+ <resources/>
+ <connections/>
+</ui>

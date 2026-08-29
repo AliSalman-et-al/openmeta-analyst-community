@@ -1,4 +1,4 @@
-import qt_text
+from rc_metastudio import qt_text
 
 
 ENTITY_LABELS = {

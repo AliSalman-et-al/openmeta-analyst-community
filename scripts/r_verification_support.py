@@ -38,10 +38,7 @@ def rscript_paths_for_r_home(
     ]
 
 
-def r_home_from_r_command(
-    env: dict[str, str], *, platform_name: str = os.name
-) -> Path | None:
-    del platform_name  # Kept for a uniform, testable runtime-probing interface.
+def r_home_from_r_command(env: dict[str, str]) -> Path | None:
     r_command = shutil.which("R", path=env.get("PATH"))
     if not r_command:
         return None

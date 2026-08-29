@@ -7,22 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "config" / "forest_plot_defaults.json"
-TARGETS = {
-    ROOT / "src" / "rc_metastudio" / "plot_defaults.py": (
-        '"""Generated user-facing forest-plot defaults. Do not edit directly."""\n\n'
-        "FOREST_ARM_LABELS = ({intervention!r}, {control!r})\n\n"
-        "\n"
-        "def apply_default_forest_arm_labels(surface):\n"
-        "    surface.col3_str_edit.setText(FOREST_ARM_LABELS[0])\n"
-        "    surface.col4_str_edit.setText(FOREST_ARM_LABELS[1])\n"
-    ),
-    ROOT / "r" / "RCMetaR" / "R" / "forest_defaults.R": (
-        "# Generated from config/forest_plot_defaults.json. Do not edit directly.\n"
-        "rcmetar.default.arm.labels <- function() {{\n"
-        '    c("{intervention}", "{control}")\n'
-        "}}\n"
-    ),
-}
+PYTHON_TARGET = ROOT / "src" / "rc_metastudio" / "plot_defaults.py"
+R_TARGET = ROOT / "r" / "RCMetaR" / "R" / "forest_defaults.R"
 
 
 def rendered_targets() -> dict[Path, str]:
@@ -31,9 +17,21 @@ def rendered_targets() -> dict[Path, str]:
         isinstance(value, str) and value for value in values
     ):
         raise ValueError("arm_labels must contain two non-empty strings")
-    substitutions = {"intervention": values[0], "control": values[1]}
+    intervention, control = (json.dumps(value, ensure_ascii=False) for value in values)
     return {
-        path: template.format(**substitutions) for path, template in TARGETS.items()
+        PYTHON_TARGET: (
+            '"""Generated user-facing forest-plot defaults. Do not edit directly."""\n\n'
+            f"FOREST_ARM_LABELS = ({intervention}, {control})\n\n\n"
+            "def apply_default_forest_arm_labels(surface):\n"
+            "    surface.col3_str_edit.setText(FOREST_ARM_LABELS[0])\n"
+            "    surface.col4_str_edit.setText(FOREST_ARM_LABELS[1])\n"
+        ),
+        R_TARGET: (
+            "# Generated from config/forest_plot_defaults.json. Do not edit directly.\n"
+            "rcmetar.default.arm.labels <- function() {\n"
+            f"    c({intervention}, {control})\n"
+            "}\n"
+        ),
     }
 
 

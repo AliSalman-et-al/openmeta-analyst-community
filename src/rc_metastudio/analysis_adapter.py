@@ -6,10 +6,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
-from rc_metastudio import meta_py_r
-from analysis_results import AnalysisResult, parse_analysis_result
+from rc_metastudio import r_bridge
+from rc_metastudio import analysis_dataset
+from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
+from rc_metastudio.analysis_errors import DiagnosticExecutionError
 
 
 AnalysisValue: TypeAlias = bool | int | float | str | None
@@ -32,6 +34,39 @@ _FAMILY_METRICS: Mapping[AnalysisFamily, frozenset[str]] = {
 }
 
 
+class CovariateDataset(Protocol):
+    """Dataset operation required by covariate-qualified study selection."""
+
+    def get_values_for_cov(
+        self, covariate: str, ids_for_keys: bool = False
+    ) -> Mapping[int, object]: ...
+
+
+class CovariateSelectionModel(Protocol):
+    """Model operations required by covariate-qualified study selection."""
+
+    dataset: CovariateDataset
+
+    def get_studies(
+        self, only_if_included: bool = True
+    ) -> list[analysis_dataset.Study]: ...
+
+
+class MetaRegressionModel(Protocol):
+    """Model operation required by meta-regression conversion."""
+
+    dataset: analysis_dataset.Dataset
+
+
+@runtime_checkable
+class DiagnosticExecutionModel(Protocol):
+    """Model queries required before diagnostic execution."""
+
+    def included_studies_have_raw_data(self) -> bool: ...
+
+    def included_studies_have_point_estimates(self, effect: str) -> bool: ...
+
+
 @dataclass(frozen=True)
 class AnalysisParameter:
     """One normalized value passed to the R analysis boundary."""
@@ -47,11 +82,46 @@ class AnalysisRequest:
     data_type: AnalysisFamily
     workflow: AnalysisWorkflow
     method: str
-    metric: str | None
+    metric: str
     parameters: tuple[AnalysisParameter, ...]
+
+    def __post_init__(self) -> None:
+        _required_text("metric", self.metric)
 
     def parameter_values(self) -> dict[str, AnalysisValue]:
         return {parameter.name: parameter.value for parameter in self.parameters}
+
+
+@dataclass(frozen=True)
+class StudySelectionResult:
+    """Included studies that have values for every selected covariate."""
+
+    studies: tuple[analysis_dataset.Study, ...]
+    has_missing_values: bool
+
+
+def select_studies_for_covariates(
+    model: CovariateSelectionModel,
+    selected_covariates: Sequence[analysis_dataset.Covariate],
+) -> StudySelectionResult:
+    """Select included studies with complete values for selected covariates."""
+    covariate_values = {
+        covariate.name: model.dataset.get_values_for_cov(
+            covariate.name, ids_for_keys=True
+        )
+        for covariate in selected_covariates
+    }
+    studies = []
+    has_missing_values = False
+    for study in model.get_studies(only_if_included=True):
+        if all(
+            study.id in covariate_values[covariate.name]
+            for covariate in selected_covariates
+        ):
+            studies.append(study)
+        else:
+            has_missing_values = True
+    return StudySelectionResult(tuple(studies), has_missing_values)
 
 
 def make_analysis_request(
@@ -59,11 +129,10 @@ def make_analysis_request(
     data_type: str,
     workflow: str | None,
     method: str,
-    metric: str | None,
+    metric: str,
     parameters: Mapping[str, object],
 ) -> AnalysisRequest:
     """Validate and freeze values selected by a user-facing configuration."""
-
     normalized_data_type = _analysis_family(data_type)
     normalized_method = _required_text("analysis method", method)
     normalized_workflow = _analysis_workflow(workflow or "standard")
@@ -126,7 +195,11 @@ def _native_value(value: object) -> AnalysisValue:
     )
 
 
-def execute_analysis_requests(model: object, requests: Sequence[AnalysisRequest]):
+def execute_analysis_requests(
+    model: object,
+    requests: Sequence[AnalysisRequest],
+    selected_covariates: Sequence[analysis_dataset.Covariate] = (),
+) -> AnalysisResult:
     """Execute a frozen set of analysis requests through the R backend."""
     if not requests:
         raise ValueError("No analysis requests were configured.")
@@ -137,34 +210,53 @@ def execute_analysis_requests(model: object, requests: Sequence[AnalysisRequest]
     if data_type == "binary":
         if len(requests) != 1:
             raise ValueError("Binary execution requires exactly one request.")
-        meta_py_r.ma_dataset_to_simple_binary_robj(model)
-        return _run_binary_request(requests[0])
+        conversion_kwargs = _conversion_kwargs(selected_covariates)
+        r_bridge.dataset_to_simple_binary_r_object(model, **conversion_kwargs)
+        return parse_analysis_result(_run_binary_request(requests[0]))
     if data_type == "continuous":
         if len(requests) != 1:
             raise ValueError("Continuous execution requires exactly one request.")
-        meta_py_r.ma_dataset_to_simple_continuous_robj(model)
-        return _run_continuous_request(requests[0])
+        conversion_kwargs = _conversion_kwargs(selected_covariates)
+        r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
+        return parse_analysis_result(_run_continuous_request(requests[0]))
     if data_type == "diagnostic":
+        if not isinstance(model, DiagnosticExecutionModel):
+            raise TypeError(
+                "Diagnostic execution requires the diagnostic model queries."
+            )
         return _run_diagnostic_analysis_isolating_metric_failures(model, requests)
     raise ValueError("Unsupported analysis data family: %s" % data_type)
 
 
+def _conversion_kwargs(
+    selected_covariates: Sequence[analysis_dataset.Covariate],
+) -> dict[str, object]:
+    if not selected_covariates:
+        return {}
+    return {"covs_to_include": selected_covariates}
+
+
 def execute_meta_regression_request(
-    model, studies, selected_covariates, request, fixed_effects, default_conf_level
-):
+    model: MetaRegressionModel,
+    studies: Sequence[analysis_dataset.Study],
+    selected_covariates: Sequence[analysis_dataset.Covariate],
+    request: AnalysisRequest,
+    fixed_effects: bool,
+    default_conf_level: object,
+) -> AnalysisResult:
     """Convert the dataset and execute one frozen meta-regression request."""
     conversion_kwargs = {
         "covs_to_include": selected_covariates,
         "studies": studies,
     }
     if request.data_type == "diagnostic":
-        meta_py_r.ma_dataset_to_simple_diagnostic_robj(
+        r_bridge.dataset_to_simple_diagnostic_r_object(
             model, metric=request.metric, **conversion_kwargs
         )
     elif request.data_type == "continuous":
-        meta_py_r.ma_dataset_to_simple_continuous_robj(model, **conversion_kwargs)
+        r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
     elif request.data_type == "binary":
-        meta_py_r.ma_dataset_to_simple_binary_robj(
+        r_bridge.dataset_to_simple_binary_r_object(
             model, include_raw_data=False, **conversion_kwargs
         )
     else:
@@ -172,35 +264,37 @@ def execute_meta_regression_request(
             "Unsupported meta-regression data family: %s" % request.data_type
         )
     parameters = request.parameter_values()
-    return meta_py_r.run_meta_regression(
-        model.dataset,
-        list(studies),
-        list(selected_covariates),
-        request.metric,
-        fixed_effects=fixed_effects,
-        conf_level=parameters.get("conf.level", default_conf_level),
-        params=parameters,
+    return parse_analysis_result(
+        r_bridge.run_meta_regression(
+            model.dataset,
+            list(studies),
+            list(selected_covariates),
+            request.metric,
+            fixed_effects=fixed_effects,
+            conf_level=parameters.get("conf.level", default_conf_level),
+            params=parameters,
+        )
     )
 
 
 def _run_diagnostic_backend(workflow, method_names, parameter_values):
     if workflow == "standard":
-        return meta_py_r.run_diagnostic_multi(method_names, parameter_values)
-    return meta_py_r.run_diagnostic_workflow(workflow, method_names, parameter_values)
+        return r_bridge.run_diagnostic_multi(method_names, parameter_values)
+    return r_bridge.run_diagnostic_workflow(workflow, method_names, parameter_values)
 
 
 def _run_binary_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
-        return meta_py_r.run_binary_ma(request.method, parameters)
-    return meta_py_r.run_workflow_analysis(request.workflow, request.method, parameters)
+        return r_bridge.run_binary_ma(request.method, parameters)
+    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
 
 
 def _run_continuous_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
-        return meta_py_r.run_continuous_ma(request.method, parameters)
-    return meta_py_r.run_workflow_analysis(request.workflow, request.method, parameters)
+        return r_bridge.run_continuous_ma(request.method, parameters)
+    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
 
 
 def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
@@ -227,13 +321,15 @@ def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
     if _diagnostic_direct_effects_need_metric_specific_data(model, requests):
         return _run_diagnostic_with_metric_specific_data(model, requests)
 
-    meta_py_r.ma_dataset_to_simple_diagnostic_robj(model)
+    r_bridge.dataset_to_simple_diagnostic_r_object(model)
     try:
         method_names = [request.method for request in requests]
         parameter_values = [request.parameter_values() for request in requests]
         workflow = requests[0].workflow
-        return _run_diagnostic_backend(workflow, method_names, parameter_values)
-    except Exception:
+        return parse_analysis_result(
+            _run_diagnostic_backend(workflow, method_names, parameter_values)
+        )
+    except DiagnosticExecutionError:
         return _run_diagnostic_with_shared_data_per_metric(requests)
 
 
@@ -248,7 +344,7 @@ def _run_diagnostic_with_shared_data_per_metric(requests):
 
 def _run_diagnostic_with_metric_specific_data(model, requests):
     def run_metric(request):
-        meta_py_r.ma_dataset_to_simple_diagnostic_robj(model, metric=request.metric)
+        r_bridge.dataset_to_simple_diagnostic_r_object(model, metric=request.metric)
         return _run_diagnostic_backend(
             request.workflow, [request.method], [request.parameter_values()]
         )
@@ -263,7 +359,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
         metric = request.metric
         try:
             metric_result = parse_analysis_result(run_metric(request))
-        except Exception as e:
+        except DiagnosticExecutionError as e:
             failures.append((metric, e))
             merged_result["texts"]["%s Error" % metric] = str(e)
         else:

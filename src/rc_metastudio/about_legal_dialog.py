@@ -2,12 +2,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Screen-bounded About/Legal Transactional Dialog."""
 
+from typing import TYPE_CHECKING
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox
 
-import adaptive_window
-import meta_globals
-import forms.ui_about_legal
+from rc_metastudio import adaptive_window
+from rc_metastudio import meta_globals
+
+if TYPE_CHECKING:
+    import ui_about_legal as _ui_about_legal
+else:
+    from rc_metastudio.forms import ui_about_legal as _ui_about_legal
 
 
 ABOUT_LEGAL_TEXT = """<h2>RC MetaStudio {version}</h2>
@@ -24,7 +30,7 @@ independently maintained. See NOTICE.md for provenance and affiliation details.<
 """
 
 
-class AboutLegalDialog(QDialog, forms.ui_about_legal.Ui_AboutLegalDialog):
+class AboutLegalDialog(QDialog, _ui_about_legal.Ui_AboutLegalDialog):
     def __init__(self, parent=None):
         super(AboutLegalDialog, self).__init__(parent)
         self.setupUi(self)

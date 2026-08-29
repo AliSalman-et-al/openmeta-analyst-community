@@ -35,7 +35,7 @@ class WindowRole(str, Enum):
     MAIN = "main"
     RESULTS = "results"
     EDIT_DATASET = "edit_dataset"
-    NETWORK_VIEW = "network_view"
+    NETWORK_VIEW = "network_view_dialog"
     WORKFLOW = "workflow"
     TRANSACTIONAL = "transactional"
     CONFIDENCE_LEVEL = "confidence_level"

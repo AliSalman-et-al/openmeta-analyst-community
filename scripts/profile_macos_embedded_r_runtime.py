@@ -451,38 +451,35 @@ def finalize(
     closure = hard_dependency_closure(resources / "library", roots, builtin)
     evidence.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-                "schema_version": 1,
-                "phase": "finalize",
-                "policy": quarantine_data["policy"],
-                "quarantine_evidence": {
-                    "path": quarantine_evidence.name,
-                    "sha256": sha256(quarantine_evidence),
-                },
-                "dependency_manifest": {
-                    "path": manifest_path.name,
-                    "sha256": manifest_sha256,
-                },
-                "hard_dependency_fields": list(DEPENDENCY_FIELDS),
-                "hard_dependency_roots": roots,
-                "base_or_recommended_roots": sorted(builtin, key=str.casefold),
-                "hard_dependency_closure": closure,
-                "source_framework": quarantine_data["source_framework"],
-                "excluded_surfaces": quarantine_data["excluded_surfaces"],
-                "post_profile_exclusions": quarantine_data[
-                    "post_profile_exclusions"
-                ],
-                "allowed_non_tcl_opt_r_dependencies": quarantine_data[
-                    "allowed_non_tcl_opt_r_dependencies"
-                ],
-            }
+        "schema_version": 1,
+        "phase": "finalize",
+        "policy": quarantine_data["policy"],
+        "quarantine_evidence": {
+            "path": quarantine_evidence.name,
+            "sha256": sha256(quarantine_evidence),
+        },
+        "dependency_manifest": {
+            "path": manifest_path.name,
+            "sha256": manifest_sha256,
+        },
+        "hard_dependency_fields": list(DEPENDENCY_FIELDS),
+        "hard_dependency_roots": roots,
+        "base_or_recommended_roots": sorted(builtin, key=str.casefold),
+        "hard_dependency_closure": closure,
+        "source_framework": quarantine_data["source_framework"],
+        "excluded_surfaces": quarantine_data["excluded_surfaces"],
+        "post_profile_exclusions": quarantine_data["post_profile_exclusions"],
+        "allowed_non_tcl_opt_r_dependencies": quarantine_data[
+            "allowed_non_tcl_opt_r_dependencies"
+        ],
+    }
     validate_profile_evidence(
         payload,
         expected_r_version=payload["source_framework"]["version"],
         expected_architecture=payload["source_framework"]["expected_architecture"],
     )
     evidence.write_text(
-        json.dumps(payload, indent=2, sort_keys=True)
-        + "\n",
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 

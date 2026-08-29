@@ -195,7 +195,11 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
-    assert "generated_form_modules" in spec
+    assert "generated_ui_collection.py" in spec
+    assert "pyinstaller_module_entries(qt6_build_root)" in spec
+    assert "a.pure.extend(generated_ui_modules)" in spec
+    assert 'str(generated_package)' not in spec
+    assert 'str(generated_forms)' not in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
     assert "a.datas.extend(" not in spec
@@ -221,7 +225,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "main_executable.chmod(main_executable.stat().st_mode | 0o111)" in build
     assert 'export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"' in build
     assert "MACOSX_DEPLOYMENT_TARGET=13.0" not in build
-    launch = text("src/rc_metastudio/launch.py")
+    launch = text("src/rc_metastudio/automation.py")
     assert "isTRUE(requireNamespace('tcltk', quietly=TRUE))" in launch
     assert "raise SystemExit(1) from exc" in launch
     spike = text("scripts/package-macos-x64-direct-r-spike.sh")
@@ -288,7 +292,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "Proving and relocating the rpy2 API bridge against staged R" in build
     assert 'install_name_tool -change "$dependency"' in build
     assert '"cffi_mode": os.environ.get("RPY2_CFFI_MODE")' in text(
-        "src/rc_metastudio/launch.py"
+        "src/rc_metastudio/automation.py"
     )
     assert "codesign --force --deep" not in build
     assert not (ROOT / "scripts/sign-notarize-macos-package.sh").exists()
@@ -1309,18 +1313,19 @@ def test_macos_inventory_allows_only_the_rpy2_api_native_bridge():
 
 
 def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
-    launch = text("src/rc_metastudio/launch.py")
-    native_dialog_bridge = launch.split("def _native_file_dialog_observation", 1)[
+    automation = text("src/rc_metastudio/automation.py")
+    launch = automation
+    native_dialog_bridge = automation.split("def _native_file_dialog_observation", 1)[
         1
     ].split("def start_package_surface_smoke", 1)[0]
 
-    assert 'platform_name != "cocoa"' in launch
-    assert '"native_menu": native_menu' in launch
-    assert '"native_file_dialog": native_file_dialog' in launch
-    assert '"accessibility": accessibility' in launch
-    assert "DontUseNativeDialog" in launch
-    assert "NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000" in launch
-    assert "setWindowModality(QtCore.Qt.WindowModality.WindowModal)" in launch
+    assert 'platform_name != "cocoa"' in automation
+    assert '"native_menu": native_menu' in automation
+    assert '"native_file_dialog": native_file_dialog' in automation
+    assert '"accessibility": accessibility' in automation
+    assert "DontUseNativeDialog" in automation
+    assert "NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000" in automation
+    assert "setWindowModality(QtCore.Qt.WindowModality.WindowModal)" in automation
     assert "file_dialog.open()" in launch
     assert "file_dialog.windowModality().name" in launch
     assert '"window_modality": "window-modal"' not in launch

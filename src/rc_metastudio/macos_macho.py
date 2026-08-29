@@ -52,6 +52,7 @@ def _read_java_bytes(stream: BinaryIO, size: int, label: str) -> bytes:
         raise _NotJavaClass(f"truncated Java {label}")
     return value
 
+
 def _skip_java_bytes(stream: BinaryIO, size: int, label: str) -> None:
     remaining = os.fstat(stream.fileno()).st_size - stream.tell()
     if size < 0 or size > remaining:
@@ -255,7 +256,9 @@ def _macho_cpu_identity(
 ) -> tuple[str, int, int]:
     architecture = CPU_ARCHITECTURES.get(cpu_type)
     if architecture is None:
-        raise MachOError(f"Mach-O file {path} has unsupported CPU type 0x{cpu_type:08x}")
+        raise MachOError(
+            f"Mach-O file {path} has unsupported CPU type 0x{cpu_type:08x}"
+        )
     base_subtype = raw_subtype & ~CPU_SUBTYPE_MASK
     capabilities = raw_subtype & CPU_SUBTYPE_MASK
     supported_capabilities = CPU_SUBTYPES[cpu_type].get(base_subtype)
@@ -356,7 +359,9 @@ def architectures(path: Path) -> list[str]:
                     or alignment > 63
                     or slice_offset % (1 << alignment) != 0
                 ):
-                    raise MachOError(f"Mach-O file {path} has an out-of-bounds fat slice")
+                    raise MachOError(
+                        f"Mach-O file {path} has an out-of-bounds fat slice"
+                    )
                 slice_end = slice_offset + slice_size
                 if any(
                     slice_offset < existing_end and existing_start < slice_end
@@ -377,7 +382,9 @@ def architectures(path: Path) -> list[str]:
                     )
                 architecture = actual[0]
                 if architecture in parsed:
-                    raise MachOError(f"Mach-O file {path} has a duplicate fat architecture")
+                    raise MachOError(
+                        f"Mach-O file {path} has a duplicate fat architecture"
+                    )
                 parsed.append(architecture)
             return sorted(parsed)
     except MachOError:

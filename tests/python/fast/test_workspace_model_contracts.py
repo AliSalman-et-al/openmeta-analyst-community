@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from PyQt6.QtCore import QModelIndex, Qt
 
-import edit_list_models
+from rc_metastudio import edit_list_models
 
 
 class WorkspaceDataset:

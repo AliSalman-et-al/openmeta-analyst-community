@@ -82,11 +82,12 @@ def prepare_qt_environment(build_root: Path) -> dict[str, str]:
             str(build_root),
         ]
     )
-    generated_package = build_root / "generated" / "rc_metastudio"
-    generated_forms = generated_package / "forms"
     env = dict(os.environ)
     env["RCMS_QT6_BUILD_ROOT"] = str(build_root)
-    path_entries = [str(generated_package), str(generated_forms)]
+    # ``rc_metastudio.qt6_ui`` extends the installed package paths with the
+    # generated tree. Keeping generated directories off ``PYTHONPATH`` avoids
+    # importing a second, marker-only rc_metastudio package.
+    path_entries = []
     if env.get("PYTHONPATH"):
         path_entries.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(path_entries)

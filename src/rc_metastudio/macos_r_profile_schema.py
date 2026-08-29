@@ -49,8 +49,7 @@ def validate_profile_evidence(
         and payload.get("hard_dependency_fields") == list(DEPENDENCY_FIELDS)
         and "tcltk"
         not in {
-            str(name).casefold()
-            for name in payload.get("hard_dependency_closure", [])
+            str(name).casefold() for name in payload.get("hard_dependency_closure", [])
         }
         and payload.get("post_profile_exclusions") == expected_paths
         and observed_paths == expected_paths

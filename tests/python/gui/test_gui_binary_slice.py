@@ -1,22 +1,22 @@
 import os
 import sys
 
+from rc_metastudio import automation
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.path.insert(0, os.path.abspath(os.path.join("src", "rc_metastudio")))
 
 
 REPO_ROOT = os.getcwd()
 
 
-def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
-    import launch
+def test_main_window_opens_binary_continuous_and_diagnostic_projects():
 
     for name, family, first_study in [
         ("amino.rcms", "binary", "Gonzalez"),
         ("continuous.rcms", "continuous", "Carroll"),
         ("lymph.rcms", "diagnostic", "Kinderman"),
     ]:
-        app, window = launch.start_automation()
+        app, window = automation.start_automation()
         try:
             assert (
                 window.open(os.path.abspath(os.path.join("sample_projects", name)))
@@ -34,11 +34,10 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
             os.chdir(REPO_ROOT)
 
 
-def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
-    import launch
+def test_main_window_standard_binary_action_opens_setup_dialog(monkeypatch):
 
-    app, window = launch.start_automation()
-    meta_form = sys.modules["meta_form"]
+    app, window = automation.start_automation()
+    main_window = sys.modules["rc_metastudio.main_window"]
     calls = []
 
     class SpecsDialog(object):
@@ -50,7 +49,9 @@ def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
         def show(self):
             pass
 
-    monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
+    monkeypatch.setattr(
+        main_window.analysis_setup_dialog, "AnalysisSetupDialog", SpecsDialog
+    )
 
     try:
         assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
@@ -63,10 +64,9 @@ def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
         os.chdir(REPO_ROOT)
 
 
-def test_real_metaform_preserves_standard_binary_rows():
-    import launch
+def test_main_window_preserves_standard_binary_rows():
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     try:
         assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         model = window.tableView.model()
@@ -85,9 +85,8 @@ def test_real_metaform_preserves_standard_binary_rows():
 
 
 def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     calls = []
 
     def choose_open_project(**kwargs):
@@ -99,12 +98,12 @@ def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
         return ("", "")
 
     try:
-        meta_form = sys.modules["meta_form"]
+        main_window = sys.modules["rc_metastudio.main_window"]
         monkeypatch.setattr(
-            meta_form.QFileDialog, "getOpenFileName", choose_open_project
+            main_window.QFileDialog, "getOpenFileName", choose_open_project
         )
         monkeypatch.setattr(
-            meta_form.QFileDialog, "getSaveFileName", choose_save_project
+            main_window.QFileDialog, "getSaveFileName", choose_save_project
         )
 
         assert window.open() is False

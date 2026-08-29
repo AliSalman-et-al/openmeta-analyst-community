@@ -83,7 +83,9 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
 
 def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
-    launcher = (ROOT / "src/rc_metastudio/launch.py").read_text(encoding="utf-8")
+    automation_source = (ROOT / "src/rc_metastudio/automation.py").read_text(
+        encoding="utf-8"
+    )
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
         encoding="utf-8"
     )
@@ -102,9 +104,12 @@ def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition
     )
     assert 'evidence.get("platform_plugin") != "cocoa"' in build
     assert 'not evidence.get("passed")' in build
-    assert "handle.isExposed()" in launcher
-    assert "geometry.width() <= 0 or geometry.height() <= 0" in launcher
-    assert '"rows": model.rowCount() if model is not None else 0' in launcher
+    assert "handle.isExposed()" in automation_source
+    assert "geometry.width() <= 0 or geometry.height() <= 0" in automation_source
+    assert (
+        '"rows": model.rowCount() if model is not None else 0'
+        in automation_source
+    )
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
     assert trust.count("--automation-startup-wizard-smoke") == 1

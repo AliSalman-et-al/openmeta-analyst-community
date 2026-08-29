@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Shared execution and bootstrap helpers for direct RCMetaR R drivers."""
 
 from __future__ import annotations

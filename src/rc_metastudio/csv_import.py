@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Parse CSV files into the workspace import contract."""
 
 from __future__ import annotations
@@ -8,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
-import tabular_data
+from rc_metastudio import tabular_data
 
 
 class CsvImportError(ValueError):
@@ -56,7 +58,6 @@ def parse_csv(
     year_column: int = 1,
 ) -> CsvImportResult:
     """Read, normalize, and validate one CSV file."""
-
     with Path(path).open(newline="") as stream:
         reader = (
             csv.reader(stream, dialect="excel")
@@ -91,7 +92,6 @@ def normalize_import_rows(
     rows: list[list[str]] | tuple[tuple[str, ...], ...], *, minimum_width: int = 0
 ) -> list[list[str]]:
     """Return mutable, rectangular rows for insertion into the Qt model."""
-
     return tabular_data.normalize_rows(
         [list(row) for row in rows], minimum_width=minimum_width
     )

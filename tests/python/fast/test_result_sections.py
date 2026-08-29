@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("src"))
 
-from result_sections import (
+from rc_metastudio.result_sections import (
     format_references,
     order_display_sections,
     order_text_sections,

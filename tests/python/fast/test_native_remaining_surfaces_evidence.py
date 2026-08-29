@@ -124,14 +124,6 @@ EXPECTED_SURFACES = {
         "content-preferred",
         "content_preferred",
     ),
-    "analysis-progress": (
-        "none",
-        "TRANSIENT",
-        "transient",
-        "application",
-        "content-preferred",
-        "content_preferred",
-    ),
     "shared-progress": (
         "none",
         "TRANSIENT",
@@ -375,16 +367,16 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
 
 
 def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp):
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
     # Do not replace a backend already shared by modules collected earlier in
     # this process. The isolated test still installs the stub on hosts without
     # an initialized R backend.
-    if meta_py_r_backend._registered_backend() is None:
-        meta_py_r_backend.install_stub_meta_py_r()
-    import main_wizard
+    if r_backend._registered_backend() is None:
+        r_backend.install_stub_r_bridge()
+    from rc_metastudio import main_wizard
 
     actions = native_smoke._observe_actions(
         qapp,

@@ -11,10 +11,10 @@ import sys
 import traceback
 import zipfile
 
-import headless_analysis
-import meta_globals
-from rc_metastudio import meta_py_r
-from plot_defaults import FOREST_ARM_LABELS
+from rc_metastudio import headless_analysis
+from rc_metastudio import meta_globals
+from rc_metastudio import r_bridge
+from rc_metastudio.plot_defaults import FOREST_ARM_LABELS
 
 
 DEFAULT_TOLERANCES = {
@@ -64,7 +64,7 @@ def _common_plot_params(path):
 
 
 def _analysis_output_path(filename):
-    import settings
+    from rc_metastudio import settings
 
     return settings.analysis_output_path(filename)
 
@@ -598,7 +598,7 @@ def _matching_key(mapping, expected):
 
 
 def run_curated_golden_set(report_path=None):
-    meta_py_r.RlibLoader().load_RCMetaR()
+    r_bridge.RLibraryLoader().load_rcmetar()
     reports = []
     for bundle in curated_golden_bundles():
         result = headless_analysis.run_headless_analysis(bundle["case"])
@@ -693,7 +693,7 @@ def capture_bundle(
 
 
 def capture_curated_binary_bundle(report_path=None):
-    meta_py_r.RlibLoader().load_RCMetaR()
+    r_bridge.RLibraryLoader().load_rcmetar()
     capture = capture_bundle(curated_golden_bundles()[0])
     if report_path:
         with open(report_path, "w") as f:
@@ -720,7 +720,7 @@ def capture_comprehensive_golden_baseline(
     _ensure_dir(captures_dir)
     _ensure_dir(artifacts_dir)
 
-    meta_py_r.RlibLoader().load_RCMetaR()
+    r_bridge.RLibraryLoader().load_rcmetar()
     rows = []
     for bundle in curated_golden_bundles(root_dir):
         capture = capture_bundle(
@@ -868,7 +868,7 @@ def _tool_versions():
         "platform": platform.platform(),
     }
     try:
-        versions["r"] = meta_py_r.get_r_version_string()
+        versions["r"] = r_bridge.get_r_version_string()
     except Exception:
         versions["r"] = None
     for distribution in ("rpy2", "rpy2-rinterface", "rpy2-robjects"):
@@ -904,7 +904,7 @@ def _package_versions(tool_versions):
 
 def _r_package_version(package_name):
     try:
-        return meta_py_r.get_r_package_version(package_name)
+        return r_bridge.get_r_package_version(package_name)
     except Exception:
         return None
 
