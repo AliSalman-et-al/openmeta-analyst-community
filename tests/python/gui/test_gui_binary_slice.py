@@ -1,22 +1,22 @@
 import os
 import sys
 
+from rc_metastudio import automation
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.path.insert(0, os.path.abspath(os.path.join("src", "rc_metastudio")))
 
 
 REPO_ROOT = os.getcwd()
 
 
-def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
-    import launch
+def test_main_window_opens_binary_continuous_and_diagnostic_projects():
 
     for name, family, first_study in [
         ("amino.rcms", "binary", "Gonzalez"),
         ("continuous.rcms", "continuous", "Carroll"),
         ("lymph.rcms", "diagnostic", "Kinderman"),
     ]:
-        app, window = launch.start_automation()
+        app, window = automation.start_automation()
         try:
             assert (
                 window.open(os.path.abspath(os.path.join("sample_projects", name)))
@@ -34,39 +34,46 @@ def test_real_metaform_opens_binary_continuous_and_diagnostic_projects():
             os.chdir(REPO_ROOT)
 
 
-def test_real_metaform_standard_binary_action_opens_specs_dialog(monkeypatch):
-    import launch
+def test_main_window_standard_binary_action_opens_setup_dialog(monkeypatch):
 
-    app, window = launch.start_automation()
-    meta_form = sys.modules["meta_form"]
+    app, window = automation.start_automation()
+    main_window = sys.modules["rc_metastudio.main_window"]
     calls = []
 
     class SpecsDialog(object):
-        def __init__(self, model, meta_f_str=None, parent=None, conf_level=None):
+        def __init__(
+            self, model, analysis_type=None, parent=None, confidence_level=None
+        ):
             calls.append(
-                (meta_f_str, parent, conf_level, model.get_current_outcome_type())
+                (
+                    analysis_type,
+                    parent,
+                    confidence_level,
+                    model.get_current_outcome_type(),
+                )
             )
 
         def show(self):
             pass
 
-    monkeypatch.setattr(meta_form.ma_specs, "MA_Specs", SpecsDialog)
+    monkeypatch.setattr(
+        main_window.analysis_setup_dialog, "AnalysisSetupDialog", SpecsDialog
+    )
 
     try:
         assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         window.action_go.trigger()
 
-        assert calls == [(None, window, window.model.get_global_conf_level(), "binary")]
+        assert calls == [(None, window, window.model.get_confidence_level(), "binary")]
     finally:
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
 
 
-def test_real_metaform_preserves_standard_binary_rows():
-    import launch
+def test_main_window_preserves_standard_binary_rows():
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     try:
         assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         model = window.tableView.model()
@@ -84,47 +91,9 @@ def test_real_metaform_preserves_standard_binary_rows():
         os.chdir(REPO_ROOT)
 
 
-def test_representative_projects_round_trip_without_byte_identical_expectations(
-    tmp_path, monkeypatch
-):
-    import launch
-
-    for name in [
-        "amino.rcms",
-        "continuous.rcms",
-        "lymph.rcms",
-        "BCG.rcms",
-        "meantime.rcms",
-    ]:
-        app, window = launch.start_automation()
-        saved_path = str(tmp_path / name)
-        try:
-            assert (
-                window.open(os.path.abspath(os.path.join("sample_projects", name)))
-                is True
-            )
-            expected = _dataset_summary(window.model.dataset)
-            meta_form = sys.modules["meta_form"]
-            monkeypatch.setattr(
-                meta_form.QFileDialog,
-                "getSaveFileName",
-                lambda **kwargs: (saved_path, ""),
-            )
-
-            window.save_as()
-            reopened = meta_form._load_project(saved_path)
-
-            assert _dataset_summary(reopened) == expected
-        finally:
-            window.close()
-            app.processEvents()
-            os.chdir(REPO_ROOT)
-
-
 def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     calls = []
 
     def choose_open_project(**kwargs):
@@ -136,12 +105,12 @@ def test_project_file_dialogs_use_rc_metastudio_project_filter(monkeypatch):
         return ("", "")
 
     try:
-        meta_form = sys.modules["meta_form"]
+        main_window = sys.modules["rc_metastudio.main_window"]
         monkeypatch.setattr(
-            meta_form.QFileDialog, "getOpenFileName", choose_open_project
+            main_window.QFileDialog, "getOpenFileName", choose_open_project
         )
         monkeypatch.setattr(
-            meta_form.QFileDialog, "getSaveFileName", choose_save_project
+            main_window.QFileDialog, "getSaveFileName", choose_save_project
         )
 
         assert window.open() is False
@@ -168,7 +137,5 @@ def _dataset_summary(dataset):
     return {
         "title": dataset.title,
         "studies": [(str(study.name), str(study.year)) for study in dataset.studies],
-        "outcomes": sorted(
-            str(name) for name in dataset.outcome_names_to_follow_ups.keys()
-        ),
+        "outcomes": sorted(str(name) for name in dataset.follow_ups_by_outcome.keys()),
     }

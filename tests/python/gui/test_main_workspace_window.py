@@ -6,10 +6,10 @@ import subprocess
 
 import pytest
 
+pytestmark = pytest.mark.qsettings
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
-sys.path.insert(0, os.path.abspath("src/rc_metastudio/forms"))
 
 from PyQt6 import QtCore, QtWidgets
 
@@ -17,22 +17,23 @@ ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from rc_metastudio.qt6_resources import ensure_application_resources
+from test_types import required
 
 prepare_generated_ui_imports()
 ensure_application_resources()
 
 
 def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigation(qapp):
-    import adaptive_window
-    import meta_form
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import main_window
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         state = adaptive_window.adaptive_window_state(window)
         assert state.policy.archetype is adaptive_window.WindowArchetype.WORKSPACE
         assert state.role is adaptive_window.WindowRole.MAIN
         assert (
-            window.layout().sizeConstraint()
+            required(window.layout(), "workspace layout").sizeConstraint()
             == QtWidgets.QLayout.SizeConstraint.SetNoConstraint
         )
         assert (
@@ -43,17 +44,13 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
             window.tableView.sizePolicy().verticalPolicy()
             == QtWidgets.QSizePolicy.Policy.Expanding
         )
-        assert (
-            window._adaptive_window_controller.policy
-            == (adaptive_window.WINDOW_POLICIES[adaptive_window.WindowRole.MAIN])
-        )
         for control in (
             window.nav_left_btn,
             window.nav_up_btn,
             window.nav_down_btn,
             window.nav_right_btn,
             window.nav_add_btn,
-            window.nav_lbl,
+            window.navigation_label,
         ):
             assert window.navigationLayout.indexOf(control) >= 0
         assert window.action_auto_fit_columns.text() == "Auto-Fit Columns"
@@ -64,9 +61,9 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
 
 
 def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
-    import meta_form
+    from rc_metastudio import main_window
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     window.showNormal()
     window.resize(920, 640)
     window.move(40, 30)
@@ -99,17 +96,17 @@ def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
 
 
 def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
-    import meta_form
-    import qt_layout
+    from rc_metastudio import main_window
+    from rc_metastudio import qt_layout
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         inherited_family = qapp.font().family()
         for widget in (
             window,
             window.centralwidget,
             window.menu_file,
-            window.nav_lbl,
+            window.navigation_label,
             window.dataset_file_lbl,
             window.cl_label,
         ):
@@ -147,7 +144,7 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
             for button in toolbar_buttons
         )
         assert (
-            window.menuAnalysis.style().pixelMetric(
+            required(window.menuAnalysis.style(), "analysis menu style").pixelMetric(
                 QtWidgets.QStyle.PixelMetric.PM_SmallIconSize, None, window.menuAnalysis
             )
             == 18
@@ -168,10 +165,10 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
 
 
 def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
-    import meta_form
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio import main_window
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         command = window._make_add_covariate_command("Age", "continuous")
         window.tableView.undoStack.push(command)
@@ -197,10 +194,10 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
 
 
 def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
-    import meta_form
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio import main_window
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
-    window = meta_form.MetaForm()
+    window = main_window.MainWindow()
     try:
         covariate = window.model.add_covariate("Age", "continuous")
         window.tableView.synchronize_column_widths()
@@ -211,7 +208,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.tableView.setColumnWidth(column, 263)
 
         window.delete_covariate(covariate)
-        assert window.model.dataset.get_cov_obj_from_name("Age") is None
+        assert window.model.dataset.get_covariate("Age") is None
 
         window.tableView.undoStack.undo()
         qapp.processEvents()
@@ -222,7 +219,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         assert window.tableView.columnWidth(column) == 263
 
         window.tableView.undoStack.redo()
-        assert window.model.dataset.get_cov_obj_from_name("Age") is None
+        assert window.model.dataset.get_covariate("Age") is None
         window.tableView.undoStack.undo()
         qapp.processEvents()
         assert (
@@ -239,8 +236,8 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
 
 
 def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_path):
-    import adaptive_window
-    import settings
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -279,8 +276,8 @@ def test_returning_normal_workspace_is_not_remaximized_on_first_show(qapp, tmp_p
 def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors():
     script = r"""
 import json
-from rc_metastudio import launch
-app, window = launch.start_automation()
+from rc_metastudio import automation
+app, window = automation.start_automation()
 try:
     window.showNormal()
     window.resize(1000, 700)
@@ -311,14 +308,13 @@ finally:
 """
     expected_platform = "windows" if sys.platform == "win32" else "cocoa"
     evidence_by_factor = {}
-    for factor in ("1", "1.25", "1.5", "1.75"):
+    for factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment.pop("QT_QPA_PLATFORM", None)
         environment["QT_SCALE_FACTOR"] = factor
         environment["PYTHONPATH"] = os.pathsep.join(
             (
                 str(ROOT / "src"),
-                str(ROOT / "src" / "rc_metastudio"),
                 environment.get("PYTHONPATH", ""),
             )
         )

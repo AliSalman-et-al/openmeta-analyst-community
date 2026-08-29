@@ -20,7 +20,6 @@ def parse_decimal(value):
     decimal convention at a time and rejects ambiguous thousands/grouping
     syntax rather than silently changing a scientific value.
     """
-
     text, valid = normalize_decimal_text(value)
     if not valid or not text:
         return 0.0, False
@@ -33,7 +32,6 @@ def parse_decimal(value):
 
 def normalize_decimal_text(value):
     """Return unambiguous finite numeric text in dot-decimal form."""
-
     text = to_native_text(value).strip()
     if not text:
         return "", True

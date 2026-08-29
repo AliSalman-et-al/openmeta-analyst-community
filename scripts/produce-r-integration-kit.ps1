@@ -78,7 +78,7 @@ if ($null -eq $bridge) { throw "rpy2 API bridge was not built" }
 $sourcePayload = Join-Path $work "source-payload"
 New-Item -ItemType Directory -Force -Path $sourcePayload | Out-Null
 Copy-Item -LiteralPath $env:RCMS_HSROC_ARCHIVE,$rcmetarArchive,$Rpy2Sdist,$Rpy2RinterfaceSdist,$Rpy2RobjectsSdist -Destination $sourcePayload
-$lockHash = (Get-FileHash -Algorithm SHA256 (Join-Path $repo "docs\verification\RCMetaR-r-dependencies.json")).Hash.ToLowerInvariant()
+$lockHash = (Get-FileHash -Algorithm SHA256 (Join-Path $repo "config\r-dependencies.json")).Hash.ToLowerInvariant()
 $uvLock = Join-Path $repo "uv.lock"
 $uvLockHash = (Get-FileHash -Algorithm SHA256 $uvLock).Hash.ToLowerInvariant()
 $uvCache = (& uv cache dir).Trim()

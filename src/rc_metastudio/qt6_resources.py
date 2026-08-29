@@ -32,7 +32,6 @@ class ResourceRegistration:
 
 def register_binary_resource(path: Path) -> ResourceRegistration:
     """Register a compiled ``.rcc`` file or fail before application startup."""
-
     resolved = path.expanduser().resolve()
     if not resolved.is_file():
         raise RuntimeError(f"Qt 6 binary resource does not exist: {resolved}")
@@ -56,7 +55,6 @@ def _default_resource_path() -> Path:
 
 def ensure_application_resources() -> ResourceRegistration:
     """Register the build-produced application resource exactly once."""
-
     global _registration
     if _registration is None or _registration._closed:
         _registration = register_binary_resource(_default_resource_path())

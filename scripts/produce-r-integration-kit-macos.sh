@@ -24,7 +24,7 @@ curl --fail --location --proto '=https' --tlsv1.2 "$rc_url" --output "$rc_archiv
 mkdir "$work/rc-source"; tar -xzf "$rc_archive" -C "$work/rc-source"; rc_package="$(find "$work/rc-source" -path '*/r/RCMetaR/DESCRIPTION' -print -quit | xargs dirname)"
 "$rscript" "$repo/scripts/install-rcmetar-source.R" "$rc_package" "$library" 2>&1 | tee "$logs/rcmetar.log"
 profile="$work/runtime-profile.json"
-"$python" "$repo/scripts/profile_macos_embedded_r_runtime.py" --resources "$staged_home" --evidence "$profile" --dependency-manifest "$repo/docs/verification/RCMetaR-r-dependencies.json" --r-version 4.6.1 --architecture "$arch" --source-resources "$r_home"
+"$python" "$repo/scripts/profile_macos_embedded_r_runtime.py" --resources "$staged_home" --evidence "$profile" --dependency-manifest "$repo/config/r-dependencies.json" --r-version 4.6.1 --architecture "$arch" --source-resources "$r_home"
 "$python" "$repo/scripts/relocate_macos_r_kit.py" --framework "$stage" --source-resources "$r_home" --version 4.6
 "$python" - "$staged_home/bin/R" <<'PY'
 from pathlib import Path
@@ -68,7 +68,7 @@ platlib="$($python -c 'import sysconfig; print(sysconfig.get_paths()["platlib"])
 "$python" "$repo/scripts/create_r_kit_provenance.py" --target "$target" --official-r-artifact "$official_artifact" --official-r-url "$official_url" --official-r-signature-identity "$signature" --official-r-artifact-type pkg --ppm-index "$work/ppm-index.json" --ppm-archive-root "$archives" --hsroc-archive "$RCMS_HSROC_ARCHIVE" --hsroc-url https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz --hsroc-build-log "$logs/r-packages.log" --rcmetar-archive "$rc_archive" --rcmetar-url "$rc_url" --rcmetar-build-log "$logs/rcmetar.log" --rpy2-sdist "$rpy2_sdist" --rpy2-sdist-url "$rpy2_url" --rpy2-rinterface-sdist "$rpy2_rinterface_sdist" --rpy2-rinterface-sdist-url "$rpy2_rinterface_url" --rpy2-robjects-sdist "$rpy2_robjects_sdist" --rpy2-robjects-sdist-url "$rpy2_robjects_url" --rpy2-build-log "$logs/rpy2.log" --rpy2-api-bridge "$bridge" --toolchain "R 4.6.1; Python 3.11.9; clang; uv" --output "$work/provenance.json"
 source_payload="$work/source-payload"; mkdir -p "$source_payload"
 cp "$RCMS_HSROC_ARCHIVE" "$rc_archive" "$rpy2_sdist" "$rpy2_rinterface_sdist" "$rpy2_robjects_sdist" "$source_payload/"
-lock="$($python "$repo/scripts/r_dependency_policy.py" --sha256 "$repo/docs/verification/RCMetaR-r-dependencies.json")"
+lock="$($python "$repo/scripts/r_dependency_policy.py" --sha256 "$repo/config/r-dependencies.json")"
 uv_lock_hash="$(shasum -a 256 "$repo/uv.lock" | awk '{print $1}')"
 uv_cache="$(uv cache dir)"
 "$python" "$repo/scripts/r_integration_kit.py" build --target "$target" --runtime "$stage" --library "$library" --api-bridge "$bridge" --output "$output" --provenance-manifest "$work/provenance.json" --runtime-profile "$profile" --package-lock-sha256 "$lock" --source-commit "$commit" --uv-cache "$uv_cache" --uv-lock "$repo/uv.lock" --uv-lock-sha256 "$uv_lock_hash" --source-payload "$source_payload"

@@ -59,19 +59,18 @@ def _validate_generated_forms(package_root: Path) -> None:
 def prepare_generated_ui_imports(
     build_root: Path | None = None,
 ) -> GeneratedUiLayout:
-    """Validate and prepend the sole generated-form import layout.
+    """Validate and register the sole generated-form package layout.
 
     Source and development launches consume ``build/qt6/generated``. Frozen
     packages must preserve the same ``rc_metastudio`` and ``forms`` module
     names in the PyInstaller import archive and call this boundary only during
     source execution; packaging qualification owns that frozen-layout proof.
     """
-
     if getattr(sys, "frozen", False):
         missing = []
         for destination in CANONICAL_FORMS.values():
             relative = destination.relative_to("rc_metastudio").with_suffix("")
-            module = ".".join(relative.parts)
+            module = ".".join(("rc_metastudio",) + relative.parts)
             if importlib.util.find_spec(module) is None:
                 missing.append(module)
         if missing:
@@ -86,28 +85,16 @@ def prepare_generated_ui_imports(
     forms_root = package_root / "forms"
     _validate_generated_forms(package_root)
 
-    loaded_forms = sys.modules.get("forms")
-    loaded_file = getattr(loaded_forms, "__file__", None)
-    if (
-        loaded_file is not None
-        and package_root not in Path(loaded_file).resolve().parents
-    ):
-        raise RuntimeError(
-            "forms was imported before the Qt6 generated-form bootstrap; restart "
-            "through the maintained rc-metastudio entry point"
-        )
-    for path in reversed((package_root, forms_root)):
-        text = str(path)
-        if text in sys.path:
-            sys.path.remove(text)
-        sys.path.insert(0, text)
-    generated_forms = importlib.import_module("forms")
-    generated_file = getattr(generated_forms, "__file__", None)
-    if (
-        generated_file is None
-        or package_root not in Path(generated_file).resolve().parents
-    ):
-        raise RuntimeError(
-            "generated forms package did not bind to the Qt6 build output"
-        )
+    import rc_metastudio
+
+    package_paths = list(rc_metastudio.__path__)
+    if str(package_root) not in package_paths:
+        package_paths.insert(0, str(package_root))
+        rc_metastudio.__path__ = package_paths
+
+    generated_forms = importlib.import_module("rc_metastudio.forms")
+    form_paths = list(generated_forms.__path__)
+    if str(forms_root) not in form_paths:
+        form_paths.insert(0, str(forms_root))
+        generated_forms.__path__ = form_paths
     return GeneratedUiLayout(resolved_build, package_root, forms_root)

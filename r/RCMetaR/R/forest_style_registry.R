@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Shared style registry and data seams for metafor-backed forest renderers.
-
 rcmetar.forest.style.default <- function(params) {
     style <- params$fp_style
     if (is.null(style) || length(style) == 0 || is.na(style) || style == "[default]") {

@@ -8,7 +8,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from PyQt6 import QtGui
 
@@ -41,16 +41,16 @@ def _fail(message: str) -> NoReturn:
     raise ValueError("Invalid adaptive-layout evidence: %s" % message)
 
 
-def _sha256(path):
+def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _physical_pixel_extent(logical_extent, device_pixel_ratio):
+def _physical_pixel_extent(logical_extent: float, device_pixel_ratio: float) -> int:
     """Match Qt's half-up conversion from positive logical to physical pixels."""
     return int((logical_extent * device_pixel_ratio) + 0.5)
 
 
-def _read_nonblank_png(path, expected_size=None):
+def _read_nonblank_png(path: Path, expected_size: Any = None) -> list[int]:
     image = QtGui.QImage(str(path))
     if image.isNull():
         _fail("%s is not a readable PNG" % path.name)
@@ -72,7 +72,7 @@ def _read_nonblank_png(path, expected_size=None):
     return actual
 
 
-def _rect(record, field):
+def _rect(record: dict[str, Any], field: str) -> tuple[int, int, int, int]:
     value = record.get(field)
     if not isinstance(value, dict):
         _fail("%s has no %s record" % (record.get("name"), field))
@@ -82,10 +82,12 @@ def _rect(record, field):
         _fail("%s has malformed %s" % (record.get("name"), field))
     if rect[2] < 1 or rect[3] < 1:
         _fail("%s has empty %s" % (record.get("name"), field))
-    return rect
+    return (rect[0], rect[1], rect[2], rect[3])
 
 
-def _contains(outer, inner):
+def _contains(
+    outer: tuple[int, int, int, int], inner: tuple[int, int, int, int]
+) -> bool:
     return (
         inner[0] >= outer[0]
         and inner[1] >= outer[1]
@@ -94,7 +96,7 @@ def _contains(outer, inner):
     )
 
 
-def _validate_scenario_semantics(record):
+def _validate_scenario_semantics(record: dict[str, Any]) -> tuple[int, int, int, int]:
     name = record["name"]
     archetype, exact_client_size, owner_size = EXPECTED_SCENARIO_CONTRACTS[name]
     if record.get("archetype") != archetype:
@@ -132,7 +134,7 @@ def _validate_scenario_semantics(record):
     return frame
 
 
-def _validate_unavailable_scenario(record, expected_scale):
+def _validate_unavailable_scenario(record: dict[str, Any], expected_scale: str) -> None:
     name = record.get("name")
     if name not in CAPABILITY_QUALIFIED_SCENARIOS:
         _fail("%s cannot be capability-unavailable" % name)
@@ -172,7 +174,9 @@ def _validate_unavailable_scenario(record, expected_scale):
         _fail("%s was marked unavailable even though its native frame fits" % name)
 
 
-def validate_evidence(root, expected_platform, expected_scale):
+def validate_evidence(
+    root: Path, expected_platform: str, expected_scale: str
+) -> dict[str, Any]:
     root = Path(root).resolve()
     manifest_path = root / "manifest.json"
     try:
@@ -272,7 +276,7 @@ def validate_evidence(root, expected_platform, expected_scale):
     return manifest
 
 
-def main(argv=None):
+def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
     parser.add_argument(

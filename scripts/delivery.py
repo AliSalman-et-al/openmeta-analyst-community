@@ -19,7 +19,7 @@ POLICY_INPUTS = (
     ".github/workflows/macos-trusted-release-candidate.yml",
     "uv.lock",
     "pyproject.toml",
-    "docs/verification/RCMetaR-r-dependencies.json",
+    "config/r-dependencies.json",
     "r/RCMetaR/DESCRIPTION",
     "delivery/targets.json",
     "scripts/build-windows-package.ps1",

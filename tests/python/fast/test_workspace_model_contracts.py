@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from PyQt6.QtCore import QModelIndex, Qt
 
-import edit_list_models
+from rc_metastudio import edit_list_models
 
 
 class WorkspaceDataset:
@@ -18,7 +18,7 @@ class WorkspaceDataset:
         self.studies = [SimpleNamespace(name="Alpha")]
         self.covariates = [SimpleNamespace(name="Age")]
 
-    def get_group_names_for_outcome_fu(self, _outcome, _follow_up):
+    def get_group_names_for_outcome_follow_up(self, _outcome, _follow_up):
         return list(self.groups)
 
     def get_group_names(self):
@@ -39,7 +39,7 @@ class WorkspaceDataset:
     def change_follow_up_name(self, _outcome, old, new):
         self.follow_ups[self.follow_ups.index(old)] = new
 
-    def get_cov_names(self):
+    def get_covariate_names(self):
         return [covariate.name for covariate in self.covariates]
 
     def change_covariate_name(self, covariate, new):

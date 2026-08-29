@@ -2,8 +2,10 @@ import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from collections.abc import Callable
 
 import pytest
+from rc_metastudio import automation
 from PyQt6 import QtCore, QtWidgets, sip
 
 
@@ -15,14 +17,25 @@ REPO_ROOT = os.getcwd()
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from rc_metastudio.analysis_results import parse_analysis_result
+from test_types import required
 
 prepare_generated_ui_imports()
+from rc_metastudio import progress_dialog
+
+
+def _set_backend(
+    monkeypatch, backend: object, name: str, replacement: Callable[..., object]
+) -> None:
+    """Patch a dynamic R backend seam without pretending its overloads are uniform."""
+
+    monkeypatch.setattr(backend, name, replacement, raising=False)
 
 
 def test_result_owner_exception_still_deletes_real_specs_and_progress(
     qapp, monkeypatch
 ):
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
     class Model:
         current_effect = "OR"
@@ -38,7 +51,7 @@ def test_result_owner_exception_still_deletes_real_specs_and_progress(
         def analysis(self, _result):
             raise RuntimeError("owner callback failed")
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     monkeypatch.setattr(
         backend, "get_available_methods", lambda **_kwargs: {"Random": "binary.random"}
     )
@@ -53,19 +66,23 @@ def test_result_owner_exception_still_deletes_real_specs_and_progress(
         raising=False,
     )
     monkeypatch.setattr(
-        backend, "ma_dataset_to_simple_binary_robj", lambda *_args, **_kwargs: None
+        backend,
+        "dataset_to_simple_binary_r_object",
+        lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         backend,
-        "run_binary_ma",
+        "run_binary_analysis",
         lambda *_args, **_kwargs: {"texts": {"Summary": "ok"}, "images": {}},
     )
     owner = Owner()
-    form = ma_specs.MA_Specs(Model(), parent=owner, conf_level=95.0)
+    form = analysis_setup_dialog.AnalysisSetupDialog(
+        Model(), parent=owner, confidence_level=95.0
+    )
 
     with pytest.raises(RuntimeError, match="owner callback failed"):
         form.run_ma()
-    progress = form.findChild(ma_specs.MetaProgress)
+    progress = form.findChild(progress_dialog.AnalysisProgressDialog)
     assert progress is not None
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     qapp.processEvents()
@@ -93,20 +110,19 @@ def _create_binary_dataset(window):
 
 
 def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypatch):
-    import launch
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
-    app, window = launch.start_automation()
-    backend = ma_specs.meta_py_r
+    app, window = automation.start_automation()
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_binary_robj",
-            "run_binary_ma",
-            "reset_Rs_working_dir",
+            "dataset_to_simple_binary_r_object",
+            "run_binary_analysis",
+            "reset_r_working_directory",
         )
     }
     shown = []
@@ -114,30 +130,49 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
     try:
         _create_binary_dataset(window)
 
-        backend.ma_dataset_to_simple_binary_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Binary Random-Effects": "binary.random"
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_binary_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {"Binary Random-Effects": "binary.random"},
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_binary_ma = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated R failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_binary_analysis",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated R failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
 
         monkeypatch.setattr(
-            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+            analysis_setup_dialog.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
         )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
         form.run_ma()
 
@@ -154,20 +189,19 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
 def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
     monkeypatch,
 ):
-    import launch
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
-    app, window = launch.start_automation()
-    backend = ma_specs.meta_py_r
+    app, window = automation.start_automation()
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_continuous_robj",
+            "dataset_to_simple_continuous_r_object",
             "run_workflow_analysis",
-            "reset_Rs_working_dir",
+            "reset_r_working_directory",
         )
     }
     shown = []
@@ -189,31 +223,50 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
             }
         )
 
-        backend.ma_dataset_to_simple_continuous_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Continuous Random-Effects": "continuous.random"
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_continuous_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {"Continuous Random-Effects": "continuous.random"},
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_workflow_analysis = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated recompute failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_workflow_analysis",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated recompute failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
 
         monkeypatch.setattr(
-            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+            analysis_setup_dialog.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
         )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            meta_f_str="leave-one-out",
-            conf_level=window.model.get_global_conf_level(),
+            analysis_type="leave-one-out",
+            confidence_level=window.model.get_confidence_level(),
         )
         form.run_ma()
 
@@ -227,18 +280,17 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
 
 
 def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
-    import launch
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
-    app, window = launch.start_automation()
-    backend = ma_specs.meta_py_r
+    app, window = automation.start_automation()
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
         )
     }
     try:
@@ -258,13 +310,27 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
             }
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -272,7 +338,7 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
             raising=False,
         )
         monkeypatch.setattr(
-            ma_specs,
+            analysis_setup_dialog,
             "add_plot_params",
             lambda specs_form: (_ for _ in ()).throw(
                 RuntimeError("simulated setup failure")
@@ -280,13 +346,15 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
         )
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec"],
+            confidence_level=window.model.get_confidence_level(),
         )
 
-        monkeypatch.setattr(ma_specs.QMessageBox, "critical", lambda *_args: None)
+        monkeypatch.setattr(
+            analysis_setup_dialog.QMessageBox, "critical", lambda *_args: None
+        )
         form.run_ma()
-        progress = form.findChild(ma_specs.MetaProgress)
+        progress = form.findChild(progress_dialog.AnalysisProgressDialog)
         assert progress is not None
         QtCore.QCoreApplication.sendPostedEvents(
             None, QtCore.QEvent.Type.DeferredDelete
@@ -301,11 +369,10 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
 
 
 def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
-    import launch
-    import ma_specs
-    import meta_form
+    from rc_metastudio import analysis_setup_dialog
+    from rc_metastudio import main_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     shown = []
     try:
         _create_binary_dataset(window)
@@ -313,15 +380,15 @@ def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
         def _boom(*args, **kwargs):
             raise TypeError("study name is missing")
 
-        monkeypatch.setattr(ma_specs, "MA_Specs", _boom)
+        monkeypatch.setattr(analysis_setup_dialog, "AnalysisSetupDialog", _boom)
         monkeypatch.setattr(
-            meta_form.QMessageBox,
+            main_window.QMessageBox,
             "critical",
             lambda *args, **kwargs: shown.append(args),
         )
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
 
         assert form is None
@@ -334,21 +401,20 @@ def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
 
 
 def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
-    import launch
-    import meta_form
+    from rc_metastudio import main_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     shown = []
     try:
         _create_binary_dataset(window)
         monkeypatch.setattr(
-            meta_form.QMessageBox,
+            main_window.QMessageBox,
             "critical",
             lambda *args, **kwargs: shown.append(args),
         )
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
 
         assert form is None
@@ -360,13 +426,13 @@ def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_results_window_accepts_incomplete_result_payload():
+def test_results_window_adds_no_results_message_to_valid_empty_payload():
     from PyQt6.QtWidgets import QApplication
 
-    import results_window
+    from rc_metastudio import results_window
 
     app = QApplication.instance() or QApplication([])
-    window = results_window.ResultsWindow({"texts": {}})
+    window = results_window.ResultsWindow(parse_analysis_result({"texts": {}}))
     try:
         assert window.texts == {"No Results": results_window.NO_RESULTS_MESSAGE}
         assert window.images == {}
@@ -376,24 +442,23 @@ def test_results_window_accepts_incomplete_result_payload():
 
 
 def test_results_window_build_failure_reports_display_error(monkeypatch):
-    import launch
-    import meta_form
+    from rc_metastudio import main_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     shown = []
     try:
 
         def _boom(*args, **kwargs):
             raise RuntimeError("plot image could not be loaded")
 
-        monkeypatch.setattr(meta_form.results_window, "ResultsWindow", _boom)
+        monkeypatch.setattr(main_window.results_window, "ResultsWindow", _boom)
         monkeypatch.setattr(
-            meta_form.QMessageBox,
+            main_window.QMessageBox,
             "critical",
             lambda *args, **kwargs: shown.append(args),
         )
 
-        window.analysis({"texts": {"Summary": "ok"}, "images": {}})
+        window.analysis(parse_analysis_result({"texts": {"Summary": "ok"}}))
 
         assert shown
         assert shown[0][1] == "Could Not Display Analysis Results"
@@ -404,10 +469,9 @@ def test_results_window_build_failure_reports_display_error(monkeypatch):
 
 
 def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
-    import launch
-    import meta_form
+    from rc_metastudio import main_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     shown = []
     try:
         _create_binary_dataset(window)
@@ -416,9 +480,9 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
         def _boom(*args, **kwargs):
             raise OSError("disk is full")
 
-        monkeypatch.setattr(meta_form.project_format, "save_project", _boom)
+        monkeypatch.setattr(main_window.project_format, "save_project", _boom)
         monkeypatch.setattr(
-            meta_form.QMessageBox,
+            main_window.QMessageBox,
             "critical",
             lambda *args, **kwargs: shown.append(args),
         )
@@ -433,18 +497,17 @@ def test_project_save_failure_reports_original_error(monkeypatch, tmp_path):
 
 
 def test_opening_non_project_payload_reports_invalid_project(monkeypatch, tmp_path):
-    import launch
-    import meta_form
+    from rc_metastudio import main_window
 
     invalid_project = tmp_path / "not-a-dataset.rcms"
     invalid_project.write_bytes(b"not a versioned RC MetaStudio project")
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     shown = []
     try:
         window.current_data_unsaved = False
         monkeypatch.setattr(
-            meta_form.QMessageBox,
+            main_window.QMessageBox,
             "critical",
             lambda *args, **kwargs: shown.append(args),
         )
@@ -470,7 +533,7 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
 ):
     from PyQt6.QtWidgets import QApplication
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     app = QApplication.instance() or QApplication([])
     log_path = tmp_path / "rc-metastudio-error.log"
@@ -496,7 +559,7 @@ def test_global_exception_handler_logs_trace_and_shows_recoverable_dialog(
 def test_safe_signal_connection_replaces_and_disconnects_wrapped_slots():
     from PyQt6.QtCore import QObject, pyqtSignal
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     class Emitter(QObject):
         fired = pyqtSignal()
@@ -519,7 +582,7 @@ def test_safe_signal_connection_replaces_and_disconnects_wrapped_slots():
 
 
 def test_safe_slot_discards_surplus_signal_arguments(monkeypatch):
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     unexpected_errors = []
     calls = []
@@ -537,7 +600,7 @@ def test_safe_slot_discards_surplus_signal_arguments(monkeypatch):
 
 
 def test_safe_slot_preserves_callback_type_errors(monkeypatch):
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     unexpected_errors = []
     monkeypatch.setattr(
@@ -561,9 +624,9 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
 ):
     from PyQt6.QtWidgets import QApplication, QDialogButtonBox
 
-    import app_error_handler
-    import meta_globals
-    import meta_reg_form
+    from rc_metastudio import app_error_handler
+    from rc_metastudio import meta_globals
+    from rc_metastudio import meta_regression_dialog
 
     class Covariate(object):
         def __init__(self, name):
@@ -572,7 +635,7 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
 
     class Study(object):
         def __init__(self):
-            self.covariate_dict = {"Dose": 1.0, "Age": 2.0}
+            self.covariate_values = {"Dose": 1.0, "Age": 2.0}
 
     class Dataset(object):
         covariates = [Covariate("Dose"), Covariate("Age")]
@@ -594,9 +657,11 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
         lambda *args, **kwargs: unexpected_errors.append(args),
     )
 
-    form = meta_reg_form.MetaRegForm(Model())
+    form = meta_regression_dialog.MetaRegressionDialog(Model())
     try:
-        ok_button = form.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button = required(
+            form.buttonBox.button(QDialogButtonBox.StandardButton.Ok), "ok button"
+        )
         assert ok_button.isEnabled() is True
 
         for _covariate, checkbox in form.covs_and_check_boxes:
@@ -616,10 +681,9 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
         app.processEvents()
 
 
-def test_metaform_model_reconnect_preserves_external_signal_subscribers():
-    import launch
+def test_main_window_model_reconnect_preserves_external_signal_subscribers():
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     calls = []
     try:
         window.tableView.dataDirtied.connect(lambda: calls.append("external"))
@@ -635,11 +699,10 @@ def test_metaform_model_reconnect_preserves_external_signal_subscribers():
 def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
     from PyQt6.QtGui import QAction
 
-    import launch
-    import app_error_handler
-    import meta_form
+    from rc_metastudio import app_error_handler
+    from rc_metastudio import main_window
 
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     log_path = tmp_path / "rc-metastudio-error.log"
     shown = []
     try:
@@ -652,7 +715,7 @@ def test_main_window_action_exceptions_are_recoverable(monkeypatch, tmp_path):
             lambda *args, **kwargs: shown.append(args),
         )
         action = QAction(window)
-        meta_form._connect_action(
+        main_window._connect_action(
             action,
             lambda: (_ for _ in ()).throw(RuntimeError("action exploded")),
         )
@@ -673,7 +736,7 @@ def test_safe_application_notify_reports_event_handler_exceptions(
     from PyQt6.QtCore import QEvent
     from PyQt6.QtWidgets import QWidget
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     app = app_error_handler.get_or_create_application([])
     log_path = tmp_path / "rc-metastudio-error.log"
@@ -686,7 +749,9 @@ def test_safe_application_notify_reports_event_handler_exceptions(
     )
 
     class RaisingWidget(QWidget):
-        def event(self, event):
+        # PyQt's runtime dispatch accepts this exact override; the bundled
+        # stubs expose an incompatible descriptor signature.
+        def event(self, event: QtCore.QEvent) -> bool:  # ty: ignore[invalid-method-override]
             raise RuntimeError("event exploded")
 
     widget = RaisingWidget()
@@ -702,7 +767,7 @@ def test_safe_application_notify_reports_event_handler_exceptions(
 def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
     from PyQt6.QtCore import QPoint
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     popups = []
 
@@ -763,7 +828,7 @@ def test_context_menu_popup_helper_ignores_reentrant_popups(monkeypatch):
 def test_context_menu_events_are_suppressed_while_menu_is_active(monkeypatch):
     from PyQt6.QtCore import QEvent
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     class FakeEvent(object):
         def type(self):
@@ -777,7 +842,7 @@ def test_context_menu_events_are_suppressed_while_menu_is_active(monkeypatch):
 def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
     from PyQt6.QtCore import QPoint
 
-    import app_error_handler
+    from rc_metastudio import app_error_handler
 
     handled = []
 

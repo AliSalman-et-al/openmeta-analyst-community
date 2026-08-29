@@ -2,17 +2,22 @@
 """Authoritative PyInstaller definition for the Windows x64 application."""
 
 import os
+import importlib.util
 from pathlib import Path
 
 from PyInstaller.utils.hooks import copy_metadata
 
 
 repo_root = Path(SPECPATH).resolve().parents[1]
+collection_spec = importlib.util.spec_from_file_location(
+    "rcms_generated_ui_collection",
+    repo_root / "packaging" / "pyinstaller" / "generated_ui_collection.py",
+)
+collection_module = importlib.util.module_from_spec(collection_spec)
+collection_spec.loader.exec_module(collection_module)
 app_source = repo_root / "src" / "rc_metastudio"
 pyqt_root = Path(os.environ["RCMS_PYQT_ROOT"]).resolve()
 qt6_build_root = Path(os.environ["RCMS_QT6_BUILD_ROOT"]).resolve()
-generated_package = qt6_build_root / "generated" / "rc_metastudio"
-generated_forms = generated_package / "forms"
 binary_resource = qt6_build_root / "resources" / "icons.rcc"
 project_schema_root = app_source / "project_schemas" / "v1"
 project_schema_data = [
@@ -22,7 +27,7 @@ project_schema_data = [
     )
     for path in sorted(project_schema_root.glob("*.schema.json"))
 ]
-generated_form_modules = sorted(path.stem for path in generated_forms.glob("ui_*.py"))
+generated_ui_modules = collection_module.pyinstaller_module_entries(qt6_build_root)
 required_plugins = (
     "platforms/qwindows.dll",
     "imageformats/qico.dll",
@@ -40,11 +45,18 @@ qt_plugin_binaries = [
     for relative in required_plugins
 ]
 
+
+def is_windows_system_runtime(entry):
+    name = Path(entry[0]).name.casefold()
+    return (
+        name.startswith("api-ms-win-")
+        or name.startswith("icudt")
+        or name in {"icu.dll", "icuin.dll", "icuuc.dll", "ucrtbase.dll"}
+    )
+
 a = Analysis(
     [str(app_source / "__main__.py")],
     pathex=[
-        str(generated_package),
-        str(generated_forms),
         str(app_source),
         str(app_source / "forms"),
     ],
@@ -61,8 +73,6 @@ a = Analysis(
         "PyQt6.QtNetwork",
         "PyQt6.QtSvg",
         "PyQt6.QtSvgWidgets",
-        *generated_form_modules,
-        *(f"forms.{name}" for name in generated_form_modules),
     ],
     hookspath=[],
     hooksconfig={},
@@ -71,6 +81,10 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# Never let an unrelated toolchain on PATH replace the Windows API-set, UCRT,
+# or system ICU forwarders with private copies in the application directory.
+a.binaries = [entry for entry in a.binaries if not is_windows_system_runtime(entry)]
+a.pure.extend(generated_ui_modules)
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,

@@ -15,7 +15,8 @@ from pathlib import Path
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
+from rc_metastudio.analysis_results import parse_analysis_result
 
 
 EVIDENCE_SCHEMA_VERSION = 2
@@ -87,38 +88,40 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
             "Adaptive-layout evidence project opened without table rows."
         )
 
-    import about_legal_dialog
-    import main_wizard
-    import progress_bar
-    import results_window
-    import settings
+    from rc_metastudio import about_legal_dialog
+    from rc_metastudio import main_wizard
+    from rc_metastudio import progress_dialog
+    from rc_metastudio import results_window
+    from rc_metastudio import settings
 
     plot_path = _create_intrinsic_ratio_artifact(output)
     results = results_window.ResultsWindow(
-        {
-            "texts": {
-                "Summary": (
-                    "Native adaptive-layout package evidence\n\n"
-                    "Required Content remains readable while the Results navigation "
-                    "and content panes are resized independently."
-                )
-            },
-            "images": {"Aspect-Ratio Plot": str(plot_path)},
-            "plot_capabilities": {
-                "Aspect-Ratio Plot": {
-                    "plot_kind": "other",
-                    "editable": False,
-                    "styleable": False,
-                    "regenerator": "none",
-                    "composition": "single",
-                }
-            },
-        },
+        parse_analysis_result(
+            {
+                "texts": {
+                    "Summary": (
+                        "Native adaptive-layout package evidence\n\n"
+                        "Required Content remains readable while the Results navigation "
+                        "and content panes are resized independently."
+                    )
+                },
+                "images": {"Aspect-Ratio Plot": str(plot_path)},
+                "plot_capabilities": {
+                    "Aspect-Ratio Plot": {
+                        "plot_kind": "other",
+                        "editable": False,
+                        "styleable": False,
+                        "regenerator": "none",
+                        "composition": "single",
+                    }
+                },
+            }
+        ),
         parent=main_window,
     )
     workflow = main_wizard.MainWizard(path="new_dataset", parent=main_window)
     transactional = about_legal_dialog.AboutLegalDialog(parent=main_window)
-    transient = progress_bar.MetaProgress(parent=main_window)
+    transient = progress_dialog.AnalysisProgressDialog(parent=main_window)
     transient.setWindowTitle("Adaptive layout verification")
     transient.progress_bar.setRange(0, 100)
     transient.progress_bar.setValue(45)
@@ -185,6 +188,14 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         remembered_geometry = _exercise_remembered_geometry(main_window, settings)
         splitter = _exercise_results_splitter(app, results)
         intrinsic_artifact = _intrinsic_artifact_record(results, plot_path)
+        table_record = {
+            "rows": model.rowCount(),
+            "columns": model.columnCount(),
+            "column_widths": [
+                main_window.tableView.columnWidth(index)
+                for index in range(model.columnCount())
+            ],
+        }
     finally:
         for _name, _archetype, window in reversed(surfaces[1:]):
             window.close()
@@ -210,14 +221,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         "device_pixel_ratio": round(screen.devicePixelRatio(), 2),
         "font": _font_record(font),
         "icon_available": not app.windowIcon().isNull(),
-        "table": {
-            "rows": model.rowCount(),
-            "columns": model.columnCount(),
-            "column_widths": [
-                main_window.tableView.columnWidth(index)
-                for index in range(model.columnCount())
-            ],
-        },
+        "table": table_record,
         "splitter": splitter,
         "intrinsic_artifact": intrinsic_artifact,
         "remembered_geometry": remembered_geometry,
@@ -380,7 +384,6 @@ def _capture_surface(
     paint_probe = window.grab()
     if paint_probe.isNull() or paint_probe.width() < 1 or paint_probe.height() < 1:
         raise RuntimeError("%s did not produce a painted client image." % name)
-    frame = window.frameGeometry()
     pixmap = _grab_painted_native_frame(app, screen, window)
     if pixmap.isNull() or pixmap.width() < 1 or pixmap.height() < 1:
         raise RuntimeError("QScreen.grabWindow could not capture %s." % name)
@@ -699,7 +702,7 @@ def _font_record(font):
         "family": font.family(),
         "point_size": font.pointSizeF(),
         "weight": font.weight(),
-        "style": int(font.style()),
+        "style": font.style().value,
     }
 
 

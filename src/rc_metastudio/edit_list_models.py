@@ -2,14 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Proxy models between dataset objects and editing dialogs."""
 
-# import pdb
-
 # core libraries
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 
-import name_validation
-import qt_text
-from ma_dataset import Dataset
+from rc_metastudio import name_validation
+from rc_metastudio import qt_text
+from rc_metastudio.analysis_dataset import Dataset
 
 
 def _require_dataset(dataset: Dataset | None) -> Dataset:
@@ -77,9 +75,8 @@ class ResettableTableModel(QAbstractTableModel):
 
 
 class TXGroupsModel(ResettableTableModel):
-    """
-    This module mediates between the classes comprising a dataset
-    (i.e., study & ma_unit objects) and the view. In particular, we
+    """This module mediates between the classes comprising a dataset
+    (i.e., study & analysis_unit objects) and the view. In particular, we
     subclass the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -87,15 +84,14 @@ class TXGroupsModel(ResettableTableModel):
     def __init__(self, filename="", dataset=None, outcome=None, follow_up=None):
         super(TXGroupsModel, self).__init__()
         self.dataset = _require_dataset(dataset)
-        self.current_outcome = outcome
+        self.current_outcome_name = outcome
         self.current_follow_up = follow_up
         self.refresh_group_list(outcome, follow_up)
 
     def refresh_group_list(self, outcome, follow_up):
-        self.group_list = self.dataset.get_group_names_for_outcome_fu(
+        self.group_list = self.dataset.get_group_names_for_outcome_follow_up(
             outcome, follow_up
         )
-        print("\ngroup names are: %s" % self.group_list)
         self.reset_model()
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
@@ -133,7 +129,6 @@ class TXGroupsModel(ResettableTableModel):
             return self.reject_edit(str(exc))
 
         self.dataset.change_group_name(old_name, new_name)  # , \
-        # outcome=self.current_outcome, follow_up=self.current_follow_up)
         self.group_list[row] = new_name
         return self.commit_edit(index)
 
@@ -146,8 +141,7 @@ class TXGroupsModel(ResettableTableModel):
 
 
 class OutcomesModel(ResettableTableModel):
-    """
-    A simple table model for editing/deleting/adding outcomes.
+    """A simple table model for editing/deleting/adding outcomes.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -155,7 +149,7 @@ class OutcomesModel(ResettableTableModel):
     def __init__(self, filename="", dataset=None):
         super(OutcomesModel, self).__init__()
         self.dataset = _require_dataset(dataset)
-        self.current_outcome = None
+        self.current_outcome_name = None
         self.outcome_list = self.dataset.get_outcome_names()
 
     def refresh_outcome_list(self):
@@ -200,9 +194,8 @@ class OutcomesModel(ResettableTableModel):
             return self.reject_edit(str(exc))
 
         self.dataset.change_outcome_name(old_outcome_name, new_outcome_name)
-        # issue #130: if we change an outcome name, set the current outcome
-        # to said outcome
-        self.current_outcome = new_outcome_name
+        # Keep the current selection aligned with the renamed outcome.
+        self.current_outcome_name = new_outcome_name
         self.outcome_list[row] = new_outcome_name
         return self.commit_edit(index)
 
@@ -215,8 +208,7 @@ class OutcomesModel(ResettableTableModel):
 
 
 class FollowUpsModel(ResettableTableModel):
-    """
-    A simple table model for editing/deleting/adding follow-ups.
+    """A simple table model for editing/deleting/adding follow-ups.
     Subclasses the QAbstractTableModel and provide the fields of interest
     to the view.
     """
@@ -224,15 +216,14 @@ class FollowUpsModel(ResettableTableModel):
     def __init__(self, filename="", dataset=None, outcome=None):
         super(FollowUpsModel, self).__init__()
         self.dataset = _require_dataset(dataset)
-        ## we maintain a current outcome string variable because
-        # the follow-ups are outcome specific
-        self.current_outcome = outcome
+        # Follow-ups belong to the selected outcome.
+        self.current_outcome_name = outcome
         self.follow_up_list = self._follow_up_names_for_current_outcome()
 
     def _follow_up_names_for_current_outcome(self):
-        if self.current_outcome is None:
+        if self.current_outcome_name is None:
             return []
-        return self.dataset.get_follow_up_names_for_outcome(self.current_outcome)
+        return self.dataset.get_follow_up_names_for_outcome(self.current_outcome_name)
 
     def refresh_follow_up_list(self):
         self.follow_up_list = self._follow_up_names_for_current_outcome()
@@ -269,14 +260,16 @@ class FollowUpsModel(ResettableTableModel):
                 "follow-up",
                 value,
                 _without_current_name(
-                    self.dataset.get_follow_up_names_for_outcome(self.current_outcome),
+                    self.dataset.get_follow_up_names_for_outcome(
+                        self.current_outcome_name
+                    ),
                     old_follow_up_name,
                 ),
             )
         except ValueError as exc:
             return self.reject_edit(str(exc))
         self.dataset.change_follow_up_name(
-            self.current_outcome, old_follow_up_name, new_follow_up_name
+            self.current_outcome_name, old_follow_up_name, new_follow_up_name
         )
         self.follow_up_list[row] = new_follow_up_name
         return self.commit_edit(index)
@@ -290,9 +283,7 @@ class FollowUpsModel(ResettableTableModel):
 
 
 class StudiesModel(ResettableTableModel):
-    """
-    Table model implementation for studies list.
-    """
+    """Table model implementation for studies list."""
 
     def __init__(self, filename="", dataset=None):
         super(StudiesModel, self).__init__()
@@ -345,9 +336,7 @@ class StudiesModel(ResettableTableModel):
 
 
 class CovariatesModel(ResettableTableModel):
-    """
-    Table model implementation for covariates.
-    """
+    """Table model implementation for covariates."""
 
     def __init__(self, filename="", dataset=None):
         super(CovariatesModel, self).__init__()
@@ -361,9 +350,9 @@ class CovariatesModel(ResettableTableModel):
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not self.valid_index(index, len(self.covariates_list)):
             return None
-        cov_name = self.covariates_list[index.row()].name
+        covariate_name = self.covariates_list[index.row()].name
         if role == Qt.ItemDataRole.DisplayRole:
-            return cov_name
+            return covariate_name
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return None
@@ -387,7 +376,9 @@ class CovariatesModel(ResettableTableModel):
             new_name = name_validation.validate_unique_name(
                 "covariate",
                 value,
-                _without_current_name(self.dataset.get_cov_names(), cov_object.name),
+                _without_current_name(
+                    self.dataset.get_covariate_names(), cov_object.name
+                ),
             )
         except ValueError as exc:
             return self.reject_edit(str(exc))

@@ -1,38 +1,16 @@
-# Domain Docs
+# Domain vocabulary
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+Use these terms in code, tests, documentation, and issues. Keep external field names unchanged when an R function or the versioned project schema owns them.
 
-## Before exploring, read these
+- **Project**: the portable document saved as an `.rcms` archive. A project contains an analysis dataset and the application state needed to reopen it.
+- **Analysis dataset**: the in-memory collection of studies, outcomes, follow-ups, groups, and covariates.
+- **Study**: one included or excluded research record. A study stores metadata, covariate values, and analysis units.
+- **Outcome**: a measured result with a binary, continuous, diagnostic, or other data type.
+- **Follow-up**: the time point for an outcome. Do not use `time point` as a second name in new APIs.
+- **Group**: one arm within an analysis unit, including control or diagnostic groups.
+- **Analysis unit**: one study outcome at one follow-up. It owns the raw group data and calculated effects for that combination.
+- **Covariate**: a study-level continuous or categorical value used by subgroup analysis or meta-regression.
+- **Metric**: the statistical measure selected for an analysis, such as odds ratio or standardized mean difference.
+- **Effect**: an estimate and its uncertainty for one metric and group comparison.
 
-- **`CONTEXT-MAP.md`** at the repo root. It points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`** for system-wide decisions.
-- **Context-scoped `docs/adr/` directories** near relevant context docs for local decisions.
-
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The producer skill (`/grill-with-docs`) creates them lazily when terms or decisions actually get resolved.
-
-## File structure
-
-This repo uses a multi-context layout:
-
-```text
-/
-|-- CONTEXT-MAP.md
-|-- docs/adr/
-`-- src/
-    |-- context-a/
-    |   |-- CONTEXT.md
-    |   `-- docs/adr/
-    `-- context-b/
-        |-- CONTEXT.md
-        `-- docs/adr/
-```
-
-## Use the glossary's vocabulary
-
-When your output names a domain concept in an issue title, refactor proposal, hypothesis, or test name, use the term as defined in the relevant `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
-
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use, or there's a real gap to resolve with `/grill-with-docs`.
-
-## Flag ADR conflicts
-
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding.
+Use full domain words in Python names. For example, use `confidence_level`, `covariate`, and `diagnostic_data`. Preserve schema keys such as `conf.level` only at the R boundary.

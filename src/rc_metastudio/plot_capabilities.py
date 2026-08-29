@@ -2,6 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Validate plot capabilities and resolve their user-interface contracts."""
 
+from collections.abc import Mapping
+from typing import TypedDict
+
+from rc_metastudio.analysis_results import (
+    PlotCapability,
+    PlotComposition,
+    PlotKind,
+    PlotRegenerator,
+)
+
+
+class _Regenerator(TypedDict):
+    function: str | None
+    plot_kinds: frozenset[str]
+
+
 REQUIRED_FIELDS = (
     "plot_kind",
     "editable",
@@ -27,7 +43,7 @@ PLOT_OPTION_GROUPS = {
     "other": frozenset(),
 }
 
-REGENERATORS = {
+REGENERATORS: dict[str, _Regenerator] = {
     "forest": {
         "function": "generate_forest_plot",
         "plot_kinds": frozenset(
@@ -47,20 +63,20 @@ REGENERATORS = {
 COMPOSITIONS = frozenset(("single",))
 
 
-def option_groups(plot_kind):
+def option_groups(plot_kind: str) -> frozenset[str]:
     return PLOT_OPTION_GROUPS.get(plot_kind, frozenset())
 
 
-def regenerator_name(regenerator):
+def regenerator_name(regenerator: str) -> str | None:
     try:
         return REGENERATORS[regenerator]["function"]
     except KeyError:
         raise ValueError("Unknown plot regenerator: %s" % regenerator)
 
 
-def validate_result(result):
-    images = result.get("images") or {}
-    descriptors = result.get("plot_capabilities") or {}
+def validate_result(result: Mapping[str, object]) -> dict[str, PlotCapability]:
+    images = _string_mapping(result.get("images"), "images")
+    descriptors = _descriptor_mapping(result.get("plot_capabilities"))
     missing = sorted(set(images) - set(descriptors))
     extra = sorted(set(descriptors) - set(images))
     if missing:
@@ -75,7 +91,9 @@ def validate_result(result):
     normalized = {
         title: _validate_descriptor(title, descriptors[title]) for title in images
     }
-    params_paths = result.get("image_params_paths") or {}
+    params_paths = _string_mapping(
+        result.get("image_params_paths"), "image_params_paths"
+    )
     missing_params = sorted(
         title
         for title, descriptor in normalized.items()
@@ -89,7 +107,38 @@ def validate_result(result):
     return normalized
 
 
-def _validate_descriptor(title, descriptor):
+def _string_mapping(value: object, label: str) -> dict[str, str]:
+    if value is None or value == [] or value == ():
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a mapping")
+    normalized: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not isinstance(item, str):
+            raise ValueError(f"{label} keys and values must be text")
+        normalized[key] = item
+    return normalized
+
+
+def _descriptor_mapping(value: object) -> dict[str, dict[str, object]]:
+    if value is None or value == [] or value == ():
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("plot_capabilities must be a mapping")
+    normalized: dict[str, dict[str, object]] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not isinstance(item, dict):
+            raise ValueError("plot capability entries must be named mappings")
+        descriptor: dict[str, object] = {}
+        for field, field_value in item.items():
+            if not isinstance(field, str):
+                raise ValueError("plot capability field names must be text")
+            descriptor[field] = field_value
+        normalized[key] = descriptor
+    return normalized
+
+
+def _validate_descriptor(title: str, descriptor: dict[str, object]) -> PlotCapability:
     if not isinstance(descriptor, dict):
         raise ValueError("Plot capability descriptor for %s must be a mapping" % title)
     missing = [field for field in REQUIRED_FIELDS if field not in descriptor]
@@ -100,34 +149,65 @@ def _validate_descriptor(title, descriptor):
             % (title, ", ".join(missing) or "none", ", ".join(extra) or "none")
         )
 
-    normalized = {field: descriptor[field] for field in REQUIRED_FIELDS}
-    plot_kind = str(normalized["plot_kind"])
-    if plot_kind not in PLOT_OPTION_GROUPS:
-        raise ValueError("Unknown plot_kind for %s: %s" % (title, plot_kind))
-    normalized["plot_kind"] = plot_kind
-
-    for field in ("editable", "styleable"):
-        if not isinstance(normalized[field], bool):
-            raise ValueError("%s for %s must be boolean" % (field, title))
-
-    composition = str(normalized["composition"])
-    if composition not in COMPOSITIONS:
-        raise ValueError("Unknown composition for %s: %s" % (title, composition))
-    normalized["composition"] = composition
-
-    regenerator = str(normalized["regenerator"])
+    plot_kind = _plot_kind(descriptor["plot_kind"], title)
+    editable = descriptor["editable"]
+    styleable = descriptor["styleable"]
+    if not isinstance(editable, bool):
+        raise ValueError("editable for %s must be boolean" % title)
+    if not isinstance(styleable, bool):
+        raise ValueError("styleable for %s must be boolean" % title)
+    composition = _composition(descriptor["composition"], title)
+    regenerator = _regenerator(descriptor["regenerator"], title)
     regenerator_name(regenerator)
-    normalized["regenerator"] = regenerator
-    if normalized["editable"] and regenerator == "none":
+    if editable and regenerator == "none":
         raise ValueError("Editable plot %s requires a regenerator" % title)
-    if (
-        normalized["editable"]
-        and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]
-    ):
+    if editable and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]:
         raise ValueError(
             "Plot regenerator %s does not support plot kind %s for %s"
             % (regenerator, plot_kind, title)
         )
-    if normalized["styleable"] and not option_groups(plot_kind):
+    if styleable and not option_groups(plot_kind):
         raise ValueError("Styleable plot %s requires option groups" % title)
-    return normalized
+    return {
+        "plot_kind": plot_kind,
+        "editable": editable,
+        "styleable": styleable,
+        "composition": composition,
+        "regenerator": regenerator,
+    }
+
+
+def _plot_kind(value: object, title: str) -> PlotKind:
+    if value == "forest":
+        return "forest"
+    if value == "cumulative_forest":
+        return "cumulative_forest"
+    if value == "leave_one_out_forest":
+        return "leave_one_out_forest"
+    if value == "subgroup_forest":
+        return "subgroup_forest"
+    if value == "regression":
+        return "regression"
+    if value == "roc":
+        return "roc"
+    if value == "sroc":
+        return "sroc"
+    if value == "other":
+        return "other"
+    raise ValueError("Unknown plot_kind for %s: %s" % (title, value))
+
+
+def _composition(value: object, title: str) -> PlotComposition:
+    if value == "single":
+        return "single"
+    raise ValueError("Unknown composition for %s: %s" % (title, value))
+
+
+def _regenerator(value: object, title: str) -> PlotRegenerator:
+    if value == "forest":
+        return "forest"
+    if value == "regression":
+        return "regression"
+    if value == "none":
+        return "none"
+    raise ValueError("Unknown plot regenerator for %s: %s" % (title, value))

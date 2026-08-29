@@ -6,6 +6,7 @@ import sys
 import types
 from contextlib import contextmanager
 from decimal import Decimal
+from types import ModuleType
 import zipfile
 
 import pytest
@@ -13,7 +14,7 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 ROOT = Path(__file__).resolve().parents[3]
 
-from analysis_regression_compare import (
+from rc_metastudio.analysis_regression_compare import (  # noqa: E402 - legacy module path bootstrap
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
     MISSING_OUTPUT,
@@ -29,15 +30,15 @@ from analysis_regression_compare import (
 )
 
 sys.path.insert(0, os.path.abspath("scripts"))
-import verify_golden_compatibility
-import verify_rcmetar_r_stack
+import verify_golden_compatibility  # noqa: E402 - scripts path bootstrap
+import verify_rcmetar_r_stack  # noqa: E402 - scripts path bootstrap
 
 
 def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
     report = compare_golden_baseline(_baseline(), _current())
 
     assert report["passed"] is True
-    assert report["rows"][0]["classification"] == PASS
+    assert report["rows"][0]["classification"] == "pass"
     assert report["rows"][0]["id"] == "amino-binary-random"
 
 
@@ -48,10 +49,9 @@ def test_analysis_regression_comparison_classifies_numeric_drift_with_row_contex
     row = next(
         row
         for row in compare_golden_baseline(_baseline(), current)["rows"]
-        if row["classification"] == NUMERIC_DRIFT
+        if row["classification"] == "numeric_drift"
     )
 
-    assert row["classification"] == NUMERIC_DRIFT
     assert row["id"] == "amino-binary-random"
     assert "Summary.estimate" in row["detail"]
 
@@ -124,10 +124,9 @@ def test_analysis_regression_comparison_classifies_non_numeric_result_drift():
     row = next(
         row
         for row in compare_golden_baseline(_baseline(), current)["rows"]
-        if row["classification"] == TEXT_ARTIFACT_DRIFT
+        if row["classification"] == "text_artifact_drift"
     )
 
-    assert row["classification"] == TEXT_ARTIFACT_DRIFT
     assert row["id"] == "amino-binary-random"
 
 
@@ -532,9 +531,7 @@ def test_numeric_contract_rejects_hash_canonicalization_and_coverage_tamper(tmp_
 def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path):
     root = _copy_frozen_contract(tmp_path)
     archive, reference = verify_golden_compatibility._load_frozen_reference(root)
-    descriptor_path = (
-        root / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
-    )
+    descriptor_path = root / "tests/analysis_regression/baseline/plot-descriptors.json"
     descriptor_path.write_text(
         descriptor_path.read_text(encoding="utf-8") + " ", encoding="utf-8"
     )
@@ -544,7 +541,7 @@ def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path)
         )
 
     shutil.copy2(
-        ROOT / "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json",
+        ROOT / "tests/analysis_regression/baseline/plot-descriptors.json",
         descriptor_path,
     )
     contract = verify_golden_compatibility._load_plot_descriptor_contract(
@@ -686,7 +683,9 @@ def test_scoped_exception_accepts_only_named_detail_and_classification():
         ],
     )
 
-    accepted = [row for row in report["rows"] if row["classification"] == ACCEPTED_EXCEPTION]
+    accepted = [
+        row for row in report["rows"] if row["classification"] == ACCEPTED_EXCEPTION
+    ]
     assert [row["detail"] for row in accepted] == [
         "Unexpected text section New Section was produced."
     ]
@@ -838,31 +837,35 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
 ):
     monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
+        from rc_metastudio import analysis_adapter
+
         calls = []
 
         class Model(object):
             dataset = object()
+            current_effect = "OR"
 
             def set_current_metric(self, metric):
                 calls.append(("metric", metric))
+                self.current_effect = metric
 
         monkeypatch.setattr(
             headless_analysis, "load_dataset_model", lambda path: Model()
         )
         monkeypatch.setattr(
-            headless_analysis.meta_py_r,
-            "ma_dataset_to_simple_binary_robj",
+            analysis_adapter.r_bridge,
+            "dataset_to_simple_binary_r_object",
             lambda model: calls.append(("data", "binary")),
             raising=False,
         )
         monkeypatch.setattr(
-            headless_analysis.meta_py_r,
-            "ma_dataset_to_simple_continuous_robj",
+            analysis_adapter.r_bridge,
+            "dataset_to_simple_continuous_r_object",
             lambda model: calls.append(("data", "continuous")),
             raising=False,
         )
         monkeypatch.setattr(
-            headless_analysis.meta_py_r,
+            analysis_adapter.r_bridge,
             "run_workflow_analysis",
             lambda workflow, method, params: {
                 "texts": {"Summary": "%s:%s" % (workflow, method)}
@@ -873,16 +876,14 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         binary = headless_analysis.HeadlessAnalysisCase(
             str(tmp_path / "b.rcms"),
             "binary.random",
-            {},
-            metric="OR",
+            {"measure": "OR"},
             data_type=meta_globals.BINARY,
             analysis_type="cumulative",
         )
         continuous = headless_analysis.HeadlessAnalysisCase(
             str(tmp_path / "c.rcms"),
             "continuous.random",
-            {},
-            metric="SMD",
+            {"measure": "SMD"},
             data_type=meta_globals.CONTINUOUS,
             analysis_type="leave-one-out",
         )
@@ -895,6 +896,154 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
             headless_analysis.run_headless_analysis(continuous)["texts"]["Summary"]
             == "leave-one-out:continuous.random"
         )
+        assert [call for call in calls if call[0] == "metric"] == [
+            ("metric", "OR"),
+            ("metric", "SMD"),
+        ]
+
+
+def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
+    monkeypatch, tmp_path
+):
+    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
+    with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
+        from rc_metastudio import analysis_adapter
+
+        class Model(object):
+            dataset = object()
+
+            def __init__(self, current_effect):
+                self.current_effect = current_effect
+
+            def set_current_metric(self, metric):
+                self.current_effect = metric
+
+        model = Model("OR")
+        monkeypatch.setattr(headless_analysis, "load_dataset_model", lambda path: model)
+        monkeypatch.setattr(
+            analysis_adapter.r_bridge,
+            "dataset_to_simple_binary_r_object",
+            lambda model: None,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            analysis_adapter.r_bridge,
+            "run_binary_analysis",
+            lambda method, params: {"texts": {"Summary": params["measure"]}},
+            raising=False,
+        )
+
+        explicit_case = headless_analysis.HeadlessAnalysisCase(
+            str(tmp_path / "explicit.rcms"),
+            "binary.random",
+            {"measure": "OR"},
+            metric="RR",
+            data_type=meta_globals.BINARY,
+        )
+        assert (
+            headless_analysis.run_headless_analysis(explicit_case)["texts"]["Summary"]
+            == "RR"
+        )
+        assert explicit_case.parameters == {"measure": "OR"}
+
+        model.current_effect = "OR"
+        restored_case = headless_analysis.HeadlessAnalysisCase(
+            str(tmp_path / "restored.rcms"),
+            "binary.random",
+            {},
+            data_type=meta_globals.BINARY,
+        )
+        assert (
+            headless_analysis.run_headless_analysis(restored_case)["texts"]["Summary"]
+            == "OR"
+        )
+
+        model.current_effect = None
+        with pytest.raises(ValueError, match="metric must be a non-empty string"):
+            headless_analysis.run_headless_analysis(restored_case)
+
+
+def test_headless_diagnostic_metric_overrides_stale_method_parameters(
+    monkeypatch, tmp_path
+):
+    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
+    with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
+        from rc_metastudio import analysis_adapter
+
+        class DiagnosticModel(object):
+            dataset = object()
+
+            def __init__(self):
+                self.current_metric = None
+
+            def included_studies_have_raw_data(self):
+                return True
+
+            def included_studies_have_point_estimates(self, effect):
+                return True
+
+            def set_current_metric(self, metric):
+                self.current_metric = metric
+
+        class DiagnosticBackend(object):
+            def __init__(self):
+                self.conversions = []
+                self.runs = []
+
+            def convert(self, model, **kwargs):
+                self.conversions.append((model, kwargs))
+
+            def run(self, method_names, parameter_values):
+                self.runs.append((method_names, parameter_values))
+                return {"texts": {}, "images": {}}
+
+        model = DiagnosticModel()
+        backend = DiagnosticBackend()
+
+        def load_model(path):
+            return model
+
+        monkeypatch.setattr(headless_analysis, "load_dataset_model", load_model)
+        monkeypatch.setattr(
+            analysis_adapter.r_bridge,
+            "dataset_to_simple_diagnostic_r_object",
+            backend.convert,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            analysis_adapter.r_bridge,
+            "run_diagnostic_multi",
+            backend.run,
+            raising=False,
+        )
+
+        parameters = [
+            {"measure": "DOR", "conf.level": 95.0},
+            {"measure": "PLR", "conf.level": 90.0},
+        ]
+        case = headless_analysis.HeadlessAnalysisCase(
+            str(tmp_path / "diagnostic.rcms"),
+            ["diagnostic.random", "diagnostic.bivariate.ml"],
+            parameters,
+            metric="Sens",
+            data_type=meta_globals.DIAGNOSTIC,
+        )
+
+        headless_analysis.run_headless_analysis(case)
+
+        assert backend.runs == [
+            (
+                ["diagnostic.random", "diagnostic.bivariate.ml"],
+                [
+                    {"measure": "Sens", "conf.level": 95.0},
+                    {"measure": "Sens", "conf.level": 90.0},
+                ],
+            )
+        ]
+        assert parameters == [
+            {"measure": "DOR", "conf.level": 95.0},
+            {"measure": "PLR", "conf.level": 90.0},
+        ]
 
 
 def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
@@ -902,35 +1051,56 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
 ):
     monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
+        from rc_metastudio import analysis_adapter
+
         calls = []
 
         class DataSet(object):
+            def get_covariate_values(self, covariate, ids_for_keys=False):
+                assert ids_for_keys is True
+                return {0: 1990}
+
             def add_covariate(self, covariate, values):
                 calls.append(("covariate", covariate, values))
 
+        class Study(object):
+            id = 0
+
         class Model(object):
-            dataset = DataSet()
+            def __init__(self):
+                self.dataset = DataSet()
+                self.studies = (Study(),)
+
+            def get_studies(self, only_if_included=True):
+                assert only_if_included is True
+                return list(self.studies)
 
             def set_current_metric(self, metric):
                 calls.append(("metric", metric))
+
+        class Covariate(object):
+            def __init__(self, name, data_type):
+                self.name = name
+                self.data_type = data_type
+
+        monkeypatch.setattr(headless_analysis.analysis_dataset, "Covariate", Covariate)
 
         covariates = [
             {"name": "golden_year", "type": "continuous", "values": {"Study A": 1990}}
         ]
 
+        model = Model()
+        monkeypatch.setattr(headless_analysis, "load_dataset_model", lambda path: model)
         monkeypatch.setattr(
-            headless_analysis, "load_dataset_model", lambda path: Model()
-        )
-        monkeypatch.setattr(
-            headless_analysis.meta_py_r,
-            "ma_dataset_to_simple_binary_robj",
+            analysis_adapter.r_bridge,
+            "dataset_to_simple_binary_r_object",
             lambda model, **kwargs: calls.append(("data", kwargs)),
             raising=False,
         )
         monkeypatch.setattr(
-            headless_analysis.meta_py_r,
+            analysis_adapter.r_bridge,
             "run_meta_regression",
-            lambda dataset, studies, covs, metric, conf_level=None, params=None: {
+            lambda dataset, studies, covs, metric, confidence_level=None, params=None, **kwargs: {
                 "texts": {"Summary": metric}
             },
             raising=False,
@@ -947,7 +1117,10 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         )
 
         assert headless_analysis.run_headless_analysis(case)["texts"]["Summary"] == "OR"
-        assert ("data", {"covs_to_include": [("golden_year", "continuous")]}) in calls
+        data_call = next(call for call in calls if call[0] == "data")
+        assert data_call[1]["include_raw_data"] is False
+        assert data_call[1]["studies"] == model.studies
+        assert data_call[1]["covs_to_include"][0].name == "golden_year"
 
 
 def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
@@ -967,9 +1140,9 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
             golden_analysis, "curated_golden_bundles", lambda root_dir=None: bundles
         )
         monkeypatch.setattr(
-            golden_analysis.meta_py_r,
-            "RlibLoader",
-            lambda: types.SimpleNamespace(load_RCMetaR=lambda: None),
+            golden_analysis.r_bridge,
+            "RLibraryLoader",
+            lambda: types.SimpleNamespace(load_rcmetar=lambda: None),
         )
         monkeypatch.setattr(golden_analysis, "_commit_sha", lambda: "abc123")
         monkeypatch.setattr(
@@ -1031,32 +1204,34 @@ def _import_legacy_golden_modules():
     names = [
         "golden_analysis",
         "headless_analysis",
-        "ma_data_table_model",
-        "ma_dataset",
+        "dataset_table_model",
+        "analysis_dataset",
         "meta_globals",
-        "meta_py_r",
-        "rc_metastudio.meta_py_r",
+        "r_bridge",
+        "rc_metastudio.r_bridge",
     ]
     previous = dict((name, sys.modules.get(name)) for name in names)
     try:
         for name in ["golden_analysis", "headless_analysis"]:
             sys.modules.pop(name, None)
-        sys.modules["ma_data_table_model"] = types.SimpleNamespace(DatasetModel=object)
-        sys.modules["ma_dataset"] = types.SimpleNamespace(
-            Covariate=lambda name, kind: (name, kind)
-        )
-        sys.modules["meta_globals"] = types.SimpleNamespace(
-            BINARY="binary",
-            CONTINUOUS="continuous",
-            DIAGNOSTIC="diagnostic",
-            VERSION="0.1.0",
-        )
-        r_boundary = types.SimpleNamespace(RlibLoader=lambda: None)
-        sys.modules["meta_py_r"] = r_boundary
-        sys.modules["rc_metastudio.meta_py_r"] = r_boundary
-        import golden_analysis
-        import headless_analysis
-        import meta_globals
+        model_module = ModuleType("dataset_table_model")
+        setattr(model_module, "DatasetTableModel", object)
+        sys.modules["dataset_table_model"] = model_module
+        dataset_module = ModuleType("analysis_dataset")
+        setattr(dataset_module, "Covariate", lambda name, kind: (name, kind))
+        sys.modules["analysis_dataset"] = dataset_module
+        globals_module = ModuleType("meta_globals")
+        setattr(globals_module, "BINARY", "binary")
+        setattr(globals_module, "CONTINUOUS", "continuous")
+        setattr(globals_module, "DIAGNOSTIC", "diagnostic")
+        setattr(globals_module, "VERSION", "0.1.0")
+        sys.modules["meta_globals"] = globals_module
+        r_boundary = ModuleType("r_bridge")
+        setattr(r_boundary, "RLibraryLoader", lambda: None)
+        sys.modules["rc_metastudio.r_bridge"] = r_boundary
+        from rc_metastudio import golden_analysis
+        from rc_metastudio import headless_analysis
+        from rc_metastudio import meta_globals
 
         yield golden_analysis, headless_analysis, meta_globals
     finally:
@@ -1128,14 +1303,14 @@ def _current(status="success", failure=None):
 
 def _copy_frozen_contract(tmp_path):
     root = tmp_path / "repo"
-    relative_dir = Path("docs/verification/pre-qt6-baseline")
+    relative_dir = Path("tests/analysis_regression/baseline")
     target_dir = root / relative_dir
     target_dir.mkdir(parents=True)
     for filename in (
         "manifest.json",
         "observed-golden-baseline.zip",
-        "golden-plot-descriptors.json",
-        "golden-numeric-contract.json",
+        "plot-descriptors.json",
+        "numeric-contract.json",
     ):
         shutil.copy2(ROOT / relative_dir / filename, target_dir / filename)
     return root

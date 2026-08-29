@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import importlib.util
 from importlib import metadata
 import json
 import os
@@ -14,17 +12,21 @@ import sys
 import tempfile
 from pathlib import Path
 
+if __package__:
+    from scripts import r_verification_support as r_support
+else:
+    import r_verification_support as r_support
+
 
 RCMetaR_PACKAGE = Path("r") / "RCMetaR"
 R_DEP_INSTALLER = Path("scripts") / "install-r-deps.R"
 R_BINARY_POLICY = Path("scripts") / "r_binary_policy.R"
 R_POLICY_LOADER = Path("scripts") / "r_dependency_policy.py"
+R_VERIFICATION_SUPPORT = Path("scripts") / "r_verification_support.py"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
-BRIDGE_TESTS = (
-    Path("tests") / "r_stack" / "test_inprocess_rpy2_backend.py",
-    Path("tests") / "python" / "fast" / "test_rcmetar_r_manifest_validation.py",
-)
+R_STACK_TESTS = (Path("tests") / "r_stack",)
+BRIDGE_TESTS = R_STACK_TESTS
 REQUIRED_RPY2_IDENTITIES = {
     "rpy2": "3.6.7",
     "rpy2-rinterface": "3.6.6",
@@ -104,165 +106,25 @@ def run_json(
         ) from exc
 
 
-def _candidate_rscript_names() -> list[str]:
-    return ["Rscript.exe", "Rscript"] if os.name == "nt" else ["Rscript"]
-
-
-def _rscript_paths_for_r_home(r_home: str | Path | None) -> list[Path]:
-    if not r_home:
-        return []
-    root = Path(r_home)
-    return [root / "bin" / name for name in _candidate_rscript_names()] + [
-        root / "bin" / "x64" / name for name in _candidate_rscript_names()
-    ]
-
-
-def _r_home_from_r_command(env: dict[str, str]) -> Path | None:
-    r_command = shutil.which("R", path=env.get("PATH"))
-    if not r_command:
-        return None
-    result = subprocess.run(
-        [r_command, "RHOME"],
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    r_home = result.stdout.strip()
-    return Path(r_home) if result.returncode == 0 and r_home else None
-
-
-def _windows_registry_r_homes() -> list[Path]:
-    if os.name != "nt":
-        return []
-    try:
-        import winreg
-    except ImportError:
-        return []
-
-    homes: list[Path] = []
-    roots = (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE)
-    keys = (
-        r"Software\R-core\R",
-        r"Software\WOW6432Node\R-core\R",
-    )
-    for root in roots:
-        for key_name in keys:
-            try:
-                with winreg.OpenKey(root, key_name) as key:
-                    try:
-                        install_path, _ = winreg.QueryValueEx(key, "InstallPath")
-                    except OSError:
-                        install_path = None
-                    if install_path:
-                        homes.append(Path(install_path))
-                    try:
-                        current_version, _ = winreg.QueryValueEx(key, "Current Version")
-                    except OSError:
-                        current_version = None
-                    if current_version:
-                        try:
-                            with winreg.OpenKey(key, current_version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(
-                                    version_key, "InstallPath"
-                                )
-                                if version_install_path:
-                                    homes.append(Path(version_install_path))
-                        except OSError:
-                            pass
-                    index = 0
-                    while True:
-                        try:
-                            version = winreg.EnumKey(key, index)
-                        except OSError:
-                            break
-                        index += 1
-                        try:
-                            with winreg.OpenKey(key, version) as version_key:
-                                version_install_path, _ = winreg.QueryValueEx(
-                                    version_key, "InstallPath"
-                                )
-                                if version_install_path:
-                                    homes.append(Path(version_install_path))
-                        except OSError:
-                            continue
-            except OSError:
-                continue
-    return homes
-
-
-def _common_rscript_candidates(env: dict[str, str] | None = None) -> list[Path]:
-    active_env = dict(os.environ) if env is None else env
-    candidates: list[Path] = []
-    if active_env.get("RCMS_RSCRIPT"):
-        candidates.append(Path(active_env["RCMS_RSCRIPT"]))
-    for variable in ("RCMS_R_HOME", "R_HOME"):
-        candidates.extend(_rscript_paths_for_r_home(active_env.get(variable)))
-    r_home = _r_home_from_r_command(active_env)
-    candidates.extend(_rscript_paths_for_r_home(r_home))
-    for r_home in _windows_registry_r_homes():
-        candidates.extend(_rscript_paths_for_r_home(r_home))
-    return candidates
-
-
 def resolve_rscript(name: str, env: dict[str, str] | None = None) -> Path:
-    active_env = dict(os.environ) if env is None else env
-    explicit = name and name != "Rscript"
-    if explicit:
-        requested = Path(name)
-        if requested.exists():
-            return requested.resolve()
-        resolved = shutil.which(name, path=active_env.get("PATH"))
-        if resolved:
-            return Path(resolved).resolve()
+    resolved = r_support.resolve_rscript(name, env)
+    if resolved is None:
         raise VerificationError(f"Rscript was not found: {name}")
-
-    for candidate in _common_rscript_candidates(active_env):
-        if candidate.exists():
-            return candidate.resolve()
-    resolved = shutil.which(name or "Rscript", path=active_env.get("PATH"))
-    if resolved:
-        return Path(resolved).resolve()
-    raise VerificationError(f"Rscript was not found: {name}")
+    return resolved
 
 
 def resolve_r_exe(rscript: Path, root: Path, env: dict[str, str]) -> Path:
-    result = subprocess.run(
-        [str(rscript), "-e", "cat(normalizePath(R.home('bin'), winslash='/'))"],
-        cwd=root,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        raise VerificationError(
-            result.stderr.strip() or "could not resolve R home from Rscript"
-        )
-    executable = "R.exe" if os.name == "nt" else "R"
-    r_exe = Path(result.stdout.strip()) / executable
-    if not r_exe.exists():
-        raise VerificationError(f"R executable was not found beside Rscript at {r_exe}")
-    return r_exe
+    try:
+        return r_support.resolve_r_exe(rscript, root, env)
+    except r_support.RVerificationSupportError as exc:
+        raise VerificationError(str(exc)) from exc
 
 
 def resolve_r_home(rscript: Path, root: Path, env: dict[str, str]) -> Path:
-    result = subprocess.run(
-        [str(rscript), "-e", "cat(normalizePath(R.home(), winslash='/'))"],
-        cwd=root,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        raise VerificationError(
-            result.stderr.strip() or "could not resolve R home from Rscript"
-        )
-    return Path(result.stdout.strip())
+    try:
+        return r_support.resolve_r_home(rscript, root, env)
+    except r_support.RVerificationSupportError as exc:
+        raise VerificationError(str(exc)) from exc
 
 
 def isolated_r_env(
@@ -284,60 +146,33 @@ def isolated_r_env(
     return env
 
 
-def file_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def r_version_key(rscript: Path, root: Path, env: dict[str, str]) -> str:
-    result = subprocess.run(
-        [
-            str(rscript),
-            "-e",
-            "cat(paste0('R-', getRversion(), '-', R.version$arch, '-', .Platform$pkgType))",
-        ],
-        cwd=root,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        raise VerificationError(result.stderr.strip() or "could not resolve R version")
-    return "".join(
-        character if character.isalnum() or character in "._-" else "_"
-        for character in result.stdout.strip()
-    )
-
-
 def dependency_cache_key(
     root: Path, rscript: Path, env: dict[str, str], cran_repo: str
 ) -> str:
-    digest = hashlib.sha256()
-    for relative_path in (
-        R_DEP_INSTALLER,
-        R_BINARY_POLICY,
-        R_POLICY_LOADER,
-        Path("docs") / "verification" / "RCMetaR-r-dependencies.json",
-        RCMetaR_PACKAGE / "DESCRIPTION",
-    ):
-        digest.update(file_digest(root / relative_path).encode("ascii"))
-    digest.update(cran_repo.encode("utf-8"))
-    return f"{r_version_key(rscript, root, env)}-rdeps-{digest.hexdigest()[:12]}"
+    try:
+        return r_support.dependency_cache_key(
+            root,
+            rscript,
+            env,
+            cran_repo,
+            (
+                R_DEP_INSTALLER,
+                R_BINARY_POLICY,
+                R_POLICY_LOADER,
+                R_VERIFICATION_SUPPORT,
+                r_support.DEPENDENCY_MANIFEST,
+                RCMetaR_PACKAGE / "DESCRIPTION",
+            ),
+            "rdeps",
+        )
+    except r_support.RVerificationSupportError as exc:
+        raise VerificationError(str(exc)) from exc
 
 
 def binary_dependency_policy(root: Path) -> dict:
-    helper = root / R_POLICY_LOADER
-    spec = importlib.util.spec_from_file_location("rcms_r_dependency_policy", helper)
-    if spec is None or spec.loader is None:
-        raise VerificationError(f"cannot load R dependency policy helper: {helper}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     try:
-        return module.load_policy(
-            root / "docs" / "verification" / "RCMetaR-r-dependencies.json"
-        )
-    except module.PolicyError as exc:
+        return r_support.load_binary_dependency_policy(root)
+    except r_support.RVerificationSupportError as exc:
         raise VerificationError(str(exc)) from exc
 
 
@@ -433,9 +268,7 @@ def verify_manifest_versions(
             "manifest dependency packages are not installed: " + ", ".join(missing)
         )
     manifest = json.loads(
-        (
-            root / Path("docs") / "verification" / "RCMetaR-r-dependencies.json"
-        ).read_text(encoding="utf-8")
+        (root / "config/r-dependencies.json").read_text(encoding="utf-8")
     )
     exact_versions = {
         dependency["name"]: dependency["installed_version"]
@@ -464,7 +297,7 @@ def verify(args: argparse.Namespace) -> None:
         str(Path(args.python).absolute()) if Path(args.python).exists() else args.python
     )
     rscript = resolve_rscript(args.rscript)
-    base_env = dict(os.environ)
+    base_env = r_support.verification_base_env(dict(os.environ))
     policy = binary_dependency_policy(root)
     configured_repo = args.cran_repo or base_env.get("RCMS_CRAN_REPO")
     if configured_repo and configured_repo != policy["repository"]:
@@ -528,6 +361,7 @@ def verify(args: argparse.Namespace) -> None:
         verify_manifest_versions(root, python, rscript, env)
         run([rscript, R_SMOKE_TEST], cwd=root, env=env)
 
+        env["RCMS_R_STACK_REQUIRED"] = "1"
         pytest_command = [args.pytest_runner, *map(str, BRIDGE_TESTS)]
         if args.pytest_runner == "uv":
             pytest_command = ["uv", "run", "pytest", *map(str, BRIDGE_TESTS)]

@@ -7,6 +7,8 @@
 
 import os
 import math
+from collections.abc import Callable, Sequence
+from typing import TypeVar, overload
 
 from PyQt6.QtGui import QColor, QUndoCommand
 
@@ -25,16 +27,13 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.2.3"
+VERSION = "0.3.0"
 
-DISABLE_NETWORK_STUFF = True  # disable this until we can package jags, rjags, getmc
+NETWORK_ANALYSIS_DISABLED = True
 DEFAULT_DATASET_NAME = "untitled_dataset"
 
-## For now we're going to hardcode which metrics are available.
-# In the future, we may want to pull these out dynamically from
-# the R side. But then meta-analytic methods would have either to
-# only operate over the effects and variances or else themselves
-# know how to compute arbitrary metrics.
+# Supported metrics are part of the application contract. R methods operate on
+# these known effects and variances.
 
 # Binary metrics
 BINARY_TWO_ARM_METRICS = ["OR", "RD", "RR", "AS", "YUQ", "YUY"]
@@ -74,10 +73,9 @@ DEFAULT_CONTINUOUS_TWO_ARM = "SMD"
 ONE_ARM_METRICS = BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS
 TWO_ARM_METRICS = BINARY_TWO_ARM_METRICS + CONTINUOUS_TWO_ARM_METRICS
 
-# Diagnostic metrics
 DIAGNOSTIC_METRICS = ["Sens", "Spec", "PLR", "NLR", "DOR"]
 DIAGNOSTIC_LOG_METRICS = ["PLR", "NLR", "DOR"]
-DIAGNOSTIC_METRIC_NAMES = {
+DIAGNOSTIC_METRIC_LABELS = {
     "Sens": "Sensitivity",
     "Spec": "Specificity",
     "PLR": "Positive Likelihood Ratio",
@@ -85,18 +83,15 @@ DIAGNOSTIC_METRIC_NAMES = {
     "DOR": "Diagnostic Odds Ratio",
 }
 
-# Construct dictionary of all the metric names
 ALL_METRIC_NAMES = {}
 ALL_METRIC_NAMES.update(BINARY_METRIC_NAMES)
 ALL_METRIC_NAMES.update(CONTINUOUS_METRIC_NAMES)
-ALL_METRIC_NAMES.update(DIAGNOSTIC_METRIC_NAMES)
+ALL_METRIC_NAMES.update(DIAGNOSTIC_METRIC_LABELS)
 
 # enumeration of data types and dictionaries mapping both ways
 BINARY, CONTINUOUS, DIAGNOSTIC, OTHER = range(4)
 
-# we need two types for covariates; factor and continuous. we'll use the
-# above definition (enumerated as part of a general data type) for continuous
-# and just define factor here.
+# Continuous shares the general data-type enumeration; factor is covariate-only.
 FACTOR = 4
 
 # making life easier
@@ -124,18 +119,23 @@ EMPTY_VALS = ("", None)  # these indicate an empty row/cell
 
 BASE_PATH = str(os.path.abspath(os.getcwd()))
 
-# def get_BASE_PATH():
-#    BASE_PATH = str(os.path.abspath(os.getcwd())) # where temporary R output should go
+_Value = TypeVar("_Value")
 
 
-# this is a useful function sometimes.
-none_to_str = lambda x: "" if x is None else x
+@overload
+def none_to_str(value: None) -> str: ...
 
-# for diagnostic data -- this dictionary maps
-# the mteric names as they appear in the UI/ure
-# used here to the names used in the model.
-# see get_diag_metrics_to_run.
-DIAG_METRIC_NAMES_D = {
+
+@overload
+def none_to_str(value: _Value) -> _Value: ...
+
+
+def none_to_str(value: object | None) -> object | str:
+    """Return an empty display value for ``None`` without changing other values."""
+    return "" if value is None else value
+
+
+DIAGNOSTIC_METRIC_GROUPS = {
     "sens": ["Sens"],
     "spec": ["Spec"],
     "dor": ["DOR"],
@@ -155,15 +155,11 @@ DEFAULT_GROUP_NAMES = ["tx A", "tx B"]
 
 
 def equal_close_enough(x, y):
-    THRESHOLD = 1e-4
-    if abs(x - y) < THRESHOLD:
-        return True
-    else:
-        return False
+    threshold = 1e-4
+    return abs(x - y) < threshold
 
 
-### CONFIDENCE LEVEL STUFF #####
-DEFAULT_CONF_LEVEL = 95.0  # (normal 95% CI)
+DEFAULT_CONFIDENCE_LEVEL = 95.0  # (normal 95% CI)
 CONFIDENCE_LEVEL_MIN = 0.0
 CONFIDENCE_LEVEL_MAX = 100.0
 CONFIDENCE_LEVEL_DISPLAY_MAX = 99.9
@@ -192,9 +188,9 @@ INVALID_CORRECTION_FACTOR_MESSAGE = (
 )
 
 
-def validate_confidence_level(conf_level):
+def validate_confidence_level(confidence_level):
     try:
-        value = float(conf_level)
+        value = float(confidence_level)
     except (TypeError, ValueError):
         raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
 
@@ -283,91 +279,105 @@ def normalize_confidence_level_params(params):
     return normalized
 
 
-"""
-some useful static methods
-"""
-
-
-def seems_sane(xticks):
-    num_list = xticks.split(",")
-    if len(num_list) == 1:
+def seems_sane(xticks: str) -> bool:
+    """Return whether a comma-separated tick list contains only finite numbers."""
+    raw_ticks = xticks.split(",")
+    if len(raw_ticks) < 2:
         return False
     try:
-        num_list = [eval(x) for x in num_list]
-    except:
+        ticks = [float(tick.strip()) for tick in raw_ticks]
+    except ValueError:
         return False
-    return True
+    return all(math.isfinite(tick) for tick in ticks)
 
 
-def check_plot_bound(bound):
+def check_plot_bound(bound: str | int | float | None) -> float | bool:
+    if bound is None:
+        return False
     try:
-        # errrm... this might cause a problem if
-        # bound is 0...
         return float(bound)
-    except:
+    except (TypeError, ValueError):
         return False
 
 
-def is_a_float(s):
+def is_a_float(value: object) -> bool:
     try:
-        float(s)
+        float(value)  # type: ignore[arg-type] -- This predicate intentionally accepts user input of unknown type.
         return True
-    except:
+    except (TypeError, ValueError):
         return False
 
 
-def is_empty(s):
-    return s is None or s == ""
+def is_empty(value: object | None) -> bool:
+    return value is None or value == ""
 
 
-def is_an_int(s):
+def is_an_int(value: object) -> bool:
     try:
-        int(s)
+        int(value)  # type: ignore[call-overload] -- This predicate intentionally accepts user input of unknown type.
         return True
-    except:
+    except (TypeError, ValueError):
         try:
-            value = float(s)
-            return value.is_integer()
-        except:
+            numeric_value = float(value)  # type: ignore[arg-type] -- This predicate intentionally accepts user input of unknown type.
+            return numeric_value.is_integer()
+        except (TypeError, ValueError):
             return False
 
 
-def is_NaN(x):
-    # there's no built-in for checking if a number is a NaN in
-    # Python < 2.6. checking if a number is equal to itself
-    # does the trick, though purportedly does not always work.
-    return x != x
+def is_nan(value: object) -> bool:
+    """Return whether ``value`` has IEEE NaN comparison behavior."""
+
+    return value != value
 
 
-class CommandGenericDo(QUndoCommand):
-    """
-    This is a generic undo/redo command that takes two unevaluated lambdas --
-    thunks, if you will -- one for doing and one for undoing.
-    """
+class CallbackCommand(QUndoCommand):
+    """Execute paired redo and undo callbacks."""
 
-    def __init__(self, redo_f, undo_f, description=""):
-        super(CommandGenericDo, self).__init__(description)
+    def __init__(
+        self,
+        redo_f: Callable[[], None],
+        undo_f: Callable[[], None],
+        description: str = "",
+    ) -> None:
+        super().__init__(description)
         self.redo_f = redo_f
         self.undo_f = undo_f
 
-    def redo(self):
+    def redo(self) -> None:
         self.redo_f()
 
-    def undo(self):
+    def undo(self) -> None:
         self.undo_f()
 
 
-def tabulate(lists, sep=" | ", return_col_widths=False, align=[]):
-    """Makes a pretty table from the lists in args"""
-    """ each arg is a list """
-    """ if return_max_col_lenths is true, the return type is a tuple of (str, col_widths) """
-    """ align is a list the same length as lists telling how the column should be aligned ('L','R') etc """
+@overload
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str = " | ",
+    return_col_widths: bool = False,
+    align: Sequence[str] | None = None,
+) -> str: ...
 
-    if len(align) != len(lists):
-        align = [
-            "L",
-        ] * len(lists)
-    print("Align is now %s: " % align)
+
+@overload
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str,
+    return_col_widths: bool,
+    align: Sequence[str] | None = None,
+) -> str | tuple[str, list[int]]: ...
+
+
+def tabulate(
+    lists: Sequence[Sequence[object]],
+    sep: str = " | ",
+    return_col_widths: bool = False,
+    align: Sequence[str] | None = None,
+) -> str | tuple[str, list[int]]:
+    """Render equally sized columns as a plain-text table."""
+    column_alignments = list(align) if align is not None else []
+    if len(column_alignments) != len(lists):
+        column_alignments = ["L"] * len(lists)
 
     # covert lists in args to string lists
     string_lists = []
@@ -388,7 +398,7 @@ def tabulate(lists, sep=" | ", return_col_widths=False, align=[]):
             "{0:{align}{width}}".format(
                 x, width=width, align="<" if row_alignment == "L" else ">"
             )
-            for x, width, row_alignment in zip(row, max_lengths, align)
+            for x, width, row_alignment in zip(row, max_lengths, column_alignments)
         ]
         row_str = sep.join(row_str)
         out.append(row_str)

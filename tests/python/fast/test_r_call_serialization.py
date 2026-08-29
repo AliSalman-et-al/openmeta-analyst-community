@@ -10,41 +10,35 @@ sys.path.insert(0, os.path.abspath("src"))
 from rc_metastudio import r_call_serialization
 
 
-def test_public_rpy2_paths_are_serialized_and_raw_gateways_enforce_transaction():
-    source = (Path("src/rc_metastudio/meta_py_r.py")).read_text(encoding="utf-8")
-    module = ast.parse(source)
-    functions = {
-        node.name: node for node in module.body if isinstance(node, ast.FunctionDef)
-    }
-    for name in ("get_R_libpaths", "get_params", "ma_dataset_to_simple_network"):
-        decorators = {
-            decorator.id
-            for decorator in functions[name].decorator_list
-            if isinstance(decorator, ast.Name)
-        }
-        assert "RfunctionCaller" in decorators
-    assert any(
-        isinstance(node, ast.For) for node in ast.walk(functions["get_R_libpaths"])
-    )
-    for name in ("execute_r_string", "execute_r_function"):
-        calls = {
-            node.func.id
-            for node in ast.walk(functions[name])
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        }
-        assert "require_r_transaction" in calls
-
-
-def test_application_code_does_not_bypass_serialized_r_backend_entrypoints():
+def test_application_code_uses_only_serialized_r_backend_entrypoints():
     root = Path(__file__).resolve().parents[3]
+    allowed = {
+        "r_bridge.py",
+        "r_backend.py",
+        "launch.py",
+        "qt6_macos_feasibility.py",
+    }
     offenders = []
 
     for path in (root / "src").rglob("*.py"):
-        if path.name in {"meta_py_r.py", "meta_py_r_backend.py", "launch.py"}:
+        if path.name in allowed:
             continue
-        text = path.read_text(encoding="utf-8")
-        if "meta_py_r.ro.r" in text:
-            offenders.append(str(path.relative_to(root)))
+        module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(module):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name) and node.func.id in {
+                "execute_r_string",
+                "execute_r_function",
+            }:
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "r"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "ro"
+            ):
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
 
     assert offenders == []
 

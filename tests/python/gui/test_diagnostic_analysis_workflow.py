@@ -1,21 +1,12 @@
-"""Regression tests for issue #53.
-
-In the maintained PyQt5 build the diagnostic meta-analysis workflow dead-ended
-silently: clicking "next >" in the Diagnostic Metrics dialog did nothing and
-showed no error. Two distinct defects caused this:
-
-1. ``Diag_Metrics.ok`` built ``MA_Specs`` directly, *without* the backend-error
-   handling that the binary/continuous path uses. A backend failure raised out
-   of the Qt slot and was swallowed by the event loop (no feedback at all).
-
-2. ``MA_Specs.setup_diagnostic_ui`` called ``QApplication.translate`` with a
-   removed four-argument signature. PyQt5 rejects that call shape, so even with
-   a working backend the dialog construction raised before it could be shown.
-"""
+"""Diagnostic analysis workflow behavior."""
 
 import os
 import sys
 from pathlib import Path
+from collections.abc import Callable
+
+import pytest
+from rc_metastudio import automation
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
@@ -28,6 +19,14 @@ os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verificat
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
+
+
+def _set_backend(
+    monkeypatch, backend: object, name: str, replacement: Callable[..., object]
+) -> None:
+    """Patch one dynamic R backend function at the test seam."""
+
+    monkeypatch.setattr(backend, name, replacement, raising=False)
 
 
 def _create_diagnostic_dataset(window):
@@ -48,16 +47,53 @@ def _create_diagnostic_dataset(window):
     )
 
 
+def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monkeypatch):
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio import analysis_setup_dialog
+
+    calls = []
+    monkeypatch.setattr(
+        analysis_setup_dialog.r_bridge,
+        "run_diagnostic_multi",
+        lambda methods, params: (
+            calls.append(("standard", methods, params)) or "standard"
+        ),
+    )
+    monkeypatch.setattr(
+        analysis_setup_dialog.r_bridge,
+        "run_diagnostic_workflow",
+        lambda workflow, methods, params: (
+            calls.append((workflow, methods, params)) or workflow
+        ),
+    )
+
+    assert (
+        analysis_adapter._run_diagnostic_backend(
+            "standard", ["diagnostic.random"], [{"measure": "Sens"}]
+        )
+        == "standard"
+    )
+    assert (
+        analysis_adapter._run_diagnostic_backend(
+            "subgroup", ["diagnostic.random"], [{"measure": "Sens"}]
+        )
+        == "subgroup"
+    )
+    assert calls == [
+        ("standard", ["diagnostic.random"], [{"measure": "Sens"}]),
+        ("subgroup", ["diagnostic.random"], [{"measure": "Sens"}]),
+    ]
+
+
 def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
-    import launch
 
-    app, window = launch.start_automation()
-    meta_form = sys.modules["meta_form"]
-    import diag_metrics
-    import ma_specs
+    app, window = automation.start_automation()
+    main_window = sys.modules["rc_metastudio.main_window"]
+    from rc_metastudio import diagnostic_metrics_dialog
+    from rc_metastudio import analysis_setup_dialog
 
-    original_specs = ma_specs.MA_Specs
-    original_critical = meta_form.QMessageBox.critical
+    original_specs = analysis_setup_dialog.AnalysisSetupDialog
+    original_critical = main_window.QMessageBox.critical
     shown = []
     try:
         _create_diagnostic_dataset(window)
@@ -67,14 +103,18 @@ def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
         def _boom(*args, **kwargs):
             raise ValueError("simulated preparation failure")
 
-        ma_specs.MA_Specs = _boom
+        setattr(analysis_setup_dialog, "AnalysisSetupDialog", _boom)
         # QMessageBox.critical (a modal exec) aborts under the offscreen
         # platform, so record the call instead of actually showing it.
-        meta_form.QMessageBox.critical = staticmethod(
-            lambda *args, **kwargs: shown.append(args)
+        setattr(
+            main_window.QMessageBox,
+            "critical",
+            staticmethod(lambda *args, **kwargs: shown.append(args)),
         )
 
-        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
+            window.model, parent=window
+        )
 
         # The bug: this used to raise out of the slot with no user feedback.
         form.ok()
@@ -84,25 +124,24 @@ def test_diagnostic_next_surfaces_specs_failure_instead_of_silent_dead_end():
         assert "simulated preparation failure" in shown[0][2]
         assert "backend is not available" not in shown[0][2]
     finally:
-        ma_specs.MA_Specs = original_specs
-        meta_form.QMessageBox.critical = original_critical
+        analysis_setup_dialog.AnalysisSetupDialog = original_specs
+        main_window.QMessageBox.critical = original_critical
         _close_without_prompt(app, window)
 
 
 def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
         )
     }
     try:
@@ -110,16 +149,30 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
 
         # Minimal working-backend stub so construction reaches the diagnostic UI
         # setup (and the previously-broken translate() call) without real R.
-        # populate_cbo_box builds the R data object for feasibility checks, so
+        # Parameter controls build the R data object for feasibility checks, so
         # that entry point has to be stubbed too.
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.hsroc",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.hsroc",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -128,12 +181,11 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
         )
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec"],
+            confidence_level=window.model.get_confidence_level(),
         )
 
-        # Construction succeeded (no swallowed exception) and the diagnostic
-        # window title was set via the PyQt5-compatible translate() call.
+        # The method dialog must open with the selected diagnostic metrics.
         assert form is not None
         assert str(form.windowTitle()) == (
             "Method & Parameters for Sensitivity and Specificity"
@@ -145,20 +197,19 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
 
 
 def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import diag_metrics
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import diagnostic_metrics_dialog
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
         )
     }
     try:
@@ -167,12 +218,26 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
             window.model, "included_studies_have_raw_data", lambda: True
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -180,7 +245,9 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
             raising=False,
         )
 
-        metrics_form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        metrics_form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
+            window.model, parent=window
+        )
         metrics_form.show()
         metrics_form.ok()
         app.processEvents()
@@ -201,21 +268,20 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
 
 
 def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
             "run_diagnostic_multi",
-            "reset_Rs_working_dir",
+            "reset_r_working_directory",
         )
     }
     shown = []
@@ -223,30 +289,51 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.run_diagnostic_multi = lambda *args, **kwargs: (_ for _ in ()).throw(
-            RuntimeError("simulated diagnostic failure")
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_diagnostic_multi",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated diagnostic failure")
+            ),
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
         monkeypatch.setattr(
-            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+            analysis_setup_dialog.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
         )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["lr", "dor"],
+            confidence_level=window.model.get_confidence_level(),
         )
 
         form.run_ma()
@@ -260,21 +347,21 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
 
 
 def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
-    import launch
+    from rc_metastudio.analysis_errors import DiagnosticExecutionError
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
             "run_diagnostic_multi",
-            "reset_Rs_working_dir",
+            "reset_r_working_directory",
         )
     }
     shown = []
@@ -282,50 +369,77 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
 
         def run_metric(method_names, param_vals):
             if len(param_vals) > 1:
-                raise RuntimeError("combined diagnostic failure")
+                raise DiagnosticExecutionError("combined diagnostic failure")
             metric = param_vals[0]["measure"]
             if metric == "Sens":
-                raise RuntimeError("HSROC failed to converge")
+                raise DiagnosticExecutionError("HSROC failed to converge")
+            title = "%s Forest plot" % metric
             return {
                 "texts": {
                     "%s Summary" % metric: "%s ok" % metric,
                 },
                 "images": {
-                    "%s Forest plot" % metric: "%s.png" % metric.lower(),
+                    title: "%s.png" % metric.lower(),
                 },
+                "display_images": {},
                 "image_var_names": {},
                 "image_params_paths": {},
-                "image_order": ["%s Forest plot" % metric],
+                "image_order": [title],
+                "plot_capabilities": {
+                    title: {
+                        "plot_kind": "forest",
+                        "editable": False,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
             }
 
-        backend.run_diagnostic_multi = run_metric
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
         monkeypatch.setattr(
-            ma_specs.QMessageBox, "critical", lambda *args, **kwargs: shown.append(args)
+            analysis_setup_dialog.QMessageBox,
+            "critical",
+            lambda *args, **kwargs: shown.append(args),
         )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "lr", "dor"],
+            confidence_level=window.model.get_confidence_level(),
         )
-        form.diag_metrics_to_analysis_details = {
+        form.diagnostic_analysis_details = {
             "Sens": ("diagnostic.hsroc", {"conf.level": 95.0}),
             "DOR": ("diagnostic.random", {"conf.level": 95.0}),
             "PLR": ("diagnostic.random", {"conf.level": 95.0}),
@@ -354,22 +468,21 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
 
 
 def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import ma_specs
-    import app_error_handler
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
+    from rc_metastudio import app_error_handler
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
             "run_diagnostic_multi",
-            "reset_Rs_working_dir",
+            "reset_r_working_directory",
         )
     }
     unexpected_errors = []
@@ -378,12 +491,22 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
 
         def get_params(method):
             if method == "diagnostic.hsroc":
@@ -412,8 +535,10 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             defaults = {"conf.level": 95.0, "adjust": 0.5, "to": "only0"}
             return (definitions, defaults, list(definitions), {})
 
-        backend.get_params = get_params
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(monkeypatch, backend, "get_params", get_params)
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -431,8 +556,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
                 "image_order": [],
             }
 
-        backend.run_diagnostic_multi = run_diagnostic
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_diagnostic)
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
         monkeypatch.setattr(
             app_error_handler,
             "handle_exception",
@@ -449,8 +574,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         )
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec", "lr", "dor"],
+            confidence_level=window.model.get_confidence_level(),
         )
         assert preparation_errors == [], "".join(
             __import__("traceback").format_exception(preparation_errors[0])
@@ -462,11 +587,13 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             {"conf.level": 90.0, "digits": 4, "adjust": 0.25, "to": "all"}
         )
         form.lr_dor_panel.params["rm.method"] = "REML"
-        form.add_cur_analysis_details()
+        form.add_current_analysis_details()
 
         assert form.windowTitle() == "Method & Parameters"
         assert (
-            form.buttonBox.button(ma_specs.QDialogButtonBox.StandardButton.Ok)
+            form.buttonBox.button(
+                analysis_setup_dialog.QDialogButtonBox.StandardButton.Ok
+            )
             is not None
         )
         assert form.method_lbl.text() == "Sensitivity and Specificity"
@@ -474,8 +601,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             "Likelihood Ratios and Diagnostic Odds Ratio"
         )
         assert not any(button.text() == "next >" for button in form.buttonBox.buttons())
-        sens_method, sens_params = form.diag_metrics_to_analysis_details["Sens"]
-        dor_method, dor_params = form.diag_metrics_to_analysis_details["DOR"]
+        sens_method, sens_params = form.diagnostic_analysis_details["Sens"]
+        dor_method, dor_params = form.diagnostic_analysis_details["DOR"]
         assert sens_method == "diagnostic.hsroc"
         assert sens_params == {"num.iters": 5000}
         assert dor_method == "diagnostic.random"
@@ -487,8 +614,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             "to": "all",
         }
         monkeypatch.setattr(
-            ma_specs,
-            "MA_Specs",
+            analysis_setup_dialog,
+            "AnalysisSetupDialog",
             lambda *args, **kwargs: (_ for _ in ()).throw(
                 AssertionError("opened a second Method & Parameters dialog")
             ),
@@ -505,12 +632,16 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_per_metric_diagnostic_merge_preserves_display_artifacts():
-    import analysis_adapter
-    import ma_specs
+def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio.analysis_errors import DiagnosticExecutionError
 
-    def run_metric(request):
-        metric = request.metric
+    def run_backend(_workflow, _methods, parameter_values):
+        if len(_methods) > 1:
+            raise DiagnosticExecutionError(
+                "combined execution is intentionally unavailable"
+            )
+        metric = parameter_values[0]["measure"]
         title = "%s Forest Plot" % metric
         return {
             "texts": {"%s Summary" % metric: "%s ok" % metric},
@@ -530,19 +661,31 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts():
             "image_order": [title],
         }
 
-    result = ma_specs._run_diagnostic_methods_per_metric(
-        tuple(
-            analysis_adapter.make_analysis_request(
-                data_type="diagnostic",
-                workflow="standard",
-                method="diagnostic.random",
-                metric=metric,
-                parameters={"measure": metric},
-            )
-            for metric in ("Sens", "Spec")
-        ),
-        run_metric,
+    monkeypatch.setattr(analysis_adapter, "_run_diagnostic_backend", run_backend)
+    monkeypatch.setattr(
+        analysis_adapter.r_bridge,
+        "dataset_to_simple_diagnostic_r_object",
+        lambda *_args, **_kwargs: None,
     )
+    requests = tuple(
+        analysis_adapter.make_analysis_request(
+            data_type="diagnostic",
+            workflow="standard",
+            method="diagnostic.random",
+            metric=metric,
+            parameters={"measure": metric},
+        )
+        for metric in ("Sens", "Spec")
+    )
+    model = type(
+        "Model",
+        (),
+        {
+            "included_studies_have_raw_data": lambda self: True,
+            "included_studies_have_point_estimates": lambda self, effect: True,
+        },
+    )()
+    result = analysis_adapter.execute_analysis_requests(model, requests)
 
     assert result["display_images"] == {
         "Sens Forest Plot": "sens.display.svg",
@@ -550,51 +693,106 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts():
     }
 
 
+def test_unexpected_combined_diagnostic_error_is_not_retried(monkeypatch):
+    from rc_metastudio import analysis_adapter
+
+    calls = []
+
+    def run_backend(_workflow, _methods, _parameter_values):
+        calls.append("combined")
+        raise ValueError("programming error")
+
+    monkeypatch.setattr(analysis_adapter, "_run_diagnostic_backend", run_backend)
+    monkeypatch.setattr(
+        analysis_adapter.r_bridge,
+        "dataset_to_simple_diagnostic_r_object",
+        lambda *_args, **_kwargs: None,
+    )
+    requests = tuple(
+        analysis_adapter.make_analysis_request(
+            data_type="diagnostic",
+            workflow="standard",
+            method="diagnostic.random",
+            metric=metric,
+            parameters={"measure": metric},
+        )
+        for metric in ("Sens", "Spec")
+    )
+
+    model = type(
+        "Model",
+        (),
+        {
+            "included_studies_have_raw_data": lambda self: True,
+            "included_studies_have_point_estimates": lambda self, effect: True,
+        },
+    )()
+    with pytest.raises(ValueError, match="programming error"):
+        analysis_adapter.execute_analysis_requests(model, requests)
+    assert calls == ["combined"]
+
+
 def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import analysis_adapter
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
             "run_diagnostic_multi",
-            "reset_Rs_working_dir",
+            "reset_r_working_directory",
         )
     }
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: (
-            {"conf.level": "float"},
-            {"conf.level": 95.0},
-            ["conf.level"],
-            {},
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
         )
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_params",
+            lambda method: (
+                {"conf.level": "float"},
+                {"conf.level": 95.0},
+                ["conf.level"],
+                {},
+            ),
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
             lambda *args, **kwargs: [],
             raising=False,
         )
-        backend.reset_Rs_working_dir = lambda: None
+        _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec", "lr", "dor"],
+            confidence_level=window.model.get_confidence_level(),
         )
         requests = form.analysis_requests()
 
@@ -621,19 +819,18 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
 
 
 def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name, None)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
             "run_diagnostic_multi",
             "run_diagnostic_multi_for_entered_effects",
         )
@@ -653,11 +850,20 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
             lambda effect=None: effect in ("Sens", "Spec"),
         )
 
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -680,13 +886,18 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
                 "image_order": None,
             }
 
-        backend.ma_dataset_to_simple_diagnostic_robj = build_metric
-        backend.run_diagnostic_multi = run_metric
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            build_metric,
+        )
+        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec"],
+            confidence_level=window.model.get_confidence_level(),
         )
         built_metrics[:] = []
 
@@ -711,10 +922,9 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
 
 
 def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import diag_metrics
+    app, window = automation.start_automation()
+    from rc_metastudio import diagnostic_metrics_dialog
 
     captured = []
 
@@ -739,7 +949,9 @@ def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypat
             lambda **kwargs: captured.append(kwargs) or _ShownForm(),
         )
 
-        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
+            window.model, parent=window
+        )
 
         assert form.get_selected_metrics() == ["sens", "spec"]
         assert not form.chk_box_lr.isChecked()
@@ -749,16 +961,15 @@ def test_diagnostic_metric_dialog_defaults_to_supported_direct_effects(monkeypat
 
         form.ok()
 
-        assert captured[0]["diag_metrics"] == ["sens", "spec"]
+        assert captured[0]["diagnostic_metrics"] == ["sens", "spec"]
     finally:
         _close_without_prompt(app, window)
 
 
 def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import diag_metrics
+    app, window = automation.start_automation()
+    from rc_metastudio import diagnostic_metrics_dialog
 
     warnings = []
     captured = []
@@ -780,12 +991,14 @@ def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypa
             lambda **kwargs: captured.append(kwargs),
         )
         monkeypatch.setattr(
-            diag_metrics.QMessageBox,
+            diagnostic_metrics_dialog.QMessageBox,
             "warning",
             lambda *args: warnings.append(args),
         )
 
-        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
+            window.model, parent=window
+        )
 
         assert form.get_selected_metrics() == []
         assert form.btn_ok.isEnabled() is False
@@ -805,11 +1018,10 @@ def test_diagnostic_metric_dialog_does_not_run_without_selected_metrics(monkeypa
 def test_diagnostic_metric_toggles_refresh_ok_button_without_unexpected_error(
     monkeypatch,
 ):
-    import launch
 
-    app, window = launch.start_automation()
-    import app_error_handler
-    import diag_metrics
+    app, window = automation.start_automation()
+    from rc_metastudio import app_error_handler
+    from rc_metastudio import diagnostic_metrics_dialog
 
     unexpected_errors = []
     try:
@@ -823,7 +1035,9 @@ def test_diagnostic_metric_toggles_refresh_ok_button_without_unexpected_error(
             lambda *args, **kwargs: unexpected_errors.append(args),
         )
 
-        form = diag_metrics.Diag_Metrics(window.model, parent=window)
+        form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
+            window.model, parent=window
+        )
 
         assert form.btn_ok.isEnabled() is True
         for metric in form.SELECTABLE_METRICS:
@@ -843,19 +1057,18 @@ def test_diagnostic_metric_toggles_refresh_ok_button_without_unexpected_error(
 
 
 def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch):
-    import launch
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
         )
     }
     try:
@@ -870,15 +1083,29 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
             lambda effect=None: effect in ("Sens", "Spec"),
         )
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-            "HSROC": "diagnostic.hsroc",
-            "Diagnostic Random-Effects": "diagnostic.random",
-            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+                "HSROC": "diagnostic.hsroc",
+                "Diagnostic Random-Effects": "diagnostic.random",
+                "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -887,8 +1114,8 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
         )
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec"],
+            confidence_level=window.model.get_confidence_level(),
         )
 
         method_names = [
@@ -909,34 +1136,47 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
 
 
 def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkeypatch):
-    import adaptive_controls
-    import adaptive_window
-    import launch
+    from rc_metastudio import adaptive_controls
+    from rc_metastudio import adaptive_window
     from PyQt6 import QtCore, QtWidgets
 
-    app, window = launch.start_automation()
-    import ma_specs
+    app, window = automation.start_automation()
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = sys.modules.get("meta_py_r", ma_specs.meta_py_r)
+    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
     saved = {
         name: getattr(backend, name)
         for name in (
             "get_available_methods",
             "get_params",
             "get_method_description",
-            "ma_dataset_to_simple_diagnostic_robj",
+            "dataset_to_simple_diagnostic_r_object",
         )
     }
     try:
         _create_diagnostic_dataset(window)
 
-        backend.ma_dataset_to_simple_diagnostic_robj = lambda model, **kwargs: None
-        backend.get_available_methods = lambda **kwargs: {
-            "Diagnostic Random-Effects": "diagnostic.random",
-            "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
-        }
-        backend.get_params = lambda method: ({}, {}, [], {})
-        backend.get_method_description = lambda method: "stub method"
+        _set_backend(
+            monkeypatch,
+            backend,
+            "dataset_to_simple_diagnostic_r_object",
+            lambda model, **kwargs: None,
+        )
+        _set_backend(
+            monkeypatch,
+            backend,
+            "get_available_methods",
+            lambda **kwargs: {
+                "Diagnostic Random-Effects": "diagnostic.random",
+                "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
+            },
+        )
+        _set_backend(
+            monkeypatch, backend, "get_params", lambda method: ({}, {}, [], {})
+        )
+        _set_backend(
+            monkeypatch, backend, "get_method_description", lambda method: "stub method"
+        )
         monkeypatch.setattr(
             backend,
             "get_analysis_plot_capabilities",
@@ -945,8 +1185,8 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
         )
 
         form = window._build_analysis_specs_dialog(
-            diag_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            diagnostic_metrics=["sens", "spec"],
+            confidence_level=window.model.get_confidence_level(),
         )
         form.show()
         app.processEvents()

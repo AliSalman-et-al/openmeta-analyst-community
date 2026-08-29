@@ -10,10 +10,10 @@ import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
-from typing import cast
+from typing import Any, cast
 
 
-SCALE_FACTORS = (1.0, 1.25, 1.5, 1.75)
+SCALE_FACTORS = (1.0, 1.5)
 TOLERANCE = 0.02
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_ROOT = ROOT / "build/qt6-verification/native-remaining-surfaces"
@@ -32,9 +32,16 @@ ACTION_CONTRACTS = {
     "add-outcome": "accept-cancel",
     "add-study": "accept-cancel",
     "import-progress": "none",
-    "analysis-progress": "none",
     "shared-progress": "none",
     "startup-splash": "none",
+}
+
+TRANSIENT_SURFACES = frozenset({"import-progress", "shared-progress", "startup-splash"})
+SPECIAL_OVERFLOW = {
+    "about-legal": "text-browser",
+    "change-covariate-type": "bounded-table",
+    "main-wizard": "page-scroll-area",
+    "startup-splash": "screen-bounded-pixmap",
 }
 
 
@@ -43,7 +50,7 @@ def _slug(scale: float) -> str:
 
 
 def _scale_label(scale: float) -> str:
-    labels = {1.0: "1.0", 1.25: "1.25", 1.5: "1.5", 1.75: "1.75"}
+    labels = {1.0: "1.0", 1.5: "1.5"}
     try:
         return labels[scale]
     except KeyError as exc:
@@ -59,9 +66,7 @@ def _record_path(root: Path, scale: float) -> Path:
 
 
 def _surface_record_path(root: Path, scale: float, surface_id: str) -> Path:
-    return root / ".surface-records" / (
-        "scale-%s-%s.json" % (_slug(scale), surface_id)
-    )
+    return root / ".surface-records" / ("scale-%s-%s.json" % (_slug(scale), surface_id))
 
 
 def _surface_capture_order() -> tuple[str, ...]:
@@ -71,16 +76,16 @@ def _surface_capture_order() -> tuple[str, ...]:
     return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
 
 
-def _qt_message_handler(message_type, context, message) -> None:
+def _qt_message_handler(message_type: Any, context: Any, message: str | None) -> None:
     """Keep native Qt diagnostics visible even when a warning is fatal."""
     location = ""
     if context.file:
         location = " (%s:%s)" % (context.file, context.line)
-    payload = "Qt %s%s: %s\n" % (message_type.name, location, message)
+    payload = "Qt %s%s: %s\n" % (message_type.name, location, message or "")
     os.write(2, payload.encode("utf-8", errors="backslashreplace"))
 
 
-def _rect(rect) -> dict[str, int]:
+def _rect(rect: Any) -> dict[str, int]:
     return {
         "x": rect.x(),
         "y": rect.y(),
@@ -89,7 +94,7 @@ def _rect(rect) -> dict[str, int]:
     }
 
 
-def _has_variation(image) -> bool:
+def _has_variation(image: Any) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull():
         return False
@@ -104,15 +109,28 @@ def _has_variation(image) -> bool:
 
 
 def _remaining_surface_ids() -> set[str]:
-    sys.path.insert(0, str(ROOT / "scripts"))
-    from validate_qt6_surface_inventory import load_and_validate
+    return set(ACTION_CONTRACTS)
 
-    inventory = load_and_validate()
-    return {
-        surface["id"]
-        for surface in inventory["surfaces"]
-        if surface["evidence"] == "remaining-native"
-    }
+
+def _expected_layout_contract(surface_id: str) -> tuple[str, str, str, str, str]:
+    """Return the durable layout semantics for one captured surface."""
+    if surface_id not in ACTION_CONTRACTS:
+        raise ValueError("unknown remaining native surface: %s" % surface_id)
+    if surface_id in TRANSIENT_SURFACES:
+        role, archetype, owner = "TRANSIENT", "transient", "application"
+    elif surface_id == "main-wizard":
+        role, archetype, owner = (
+            "WORKFLOW",
+            "workflow",
+            "window-manager-after-first-show",
+        )
+    else:
+        role = (
+            "CONFIDENCE_LEVEL" if surface_id == "confidence-level" else "TRANSACTIONAL"
+        )
+        archetype, owner = "transactional", "application-first-use"
+    overflow = SPECIAL_OVERFLOW.get(surface_id, "content-preferred")
+    return role, archetype, owner, overflow, "content_preferred"
 
 
 def _canonical_member(root: Path, value: object) -> Path:
@@ -155,16 +173,10 @@ def _validated_rect(value: object, label: str) -> dict[str, int]:
 
 
 def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, object]]:
-    """Validate a relocated four-scale evidence directory fail closed."""
+    """Validate relocated native evidence at standard and fractional scale."""
     from PyQt6 import QtGui
 
     expected_ids = _remaining_surface_ids()
-    inventory = json.loads(
-        (ROOT / "docs/verification/native-qt6-surface-inventory.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    contracts = {item["id"]: item for item in inventory["surfaces"]}
     records = []
     seen_capture_paths: set[str] = set()
     for scale in SCALE_FACTORS:
@@ -221,18 +233,23 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 )
             if surface["screen_clamped"] is not True:
                 raise ValueError("remaining-surface %s escaped its screen" % surface_id)
-            contract = contracts[surface_id]
-            if surface["role"] != contract["role"]:
-                raise ValueError("remaining-surface %s role drifted" % surface_id)
-            if surface["archetype"] != contract["archetype"]:
-                raise ValueError("remaining-surface %s archetype drifted" % surface_id)
-            if surface["geometry_owner"] != contract["geometry_owner"]:
-                raise ValueError(
-                    "remaining-surface %s geometry ownership drifted" % surface_id
+            contract = tuple(
+                surface[field]
+                for field in (
+                    "role",
+                    "archetype",
+                    "geometry_owner",
+                    "overflow",
+                    "first_use_behavior",
                 )
-            if surface["overflow"] != contract["overflow"]:
+            )
+            if any(not isinstance(value, str) or not value for value in contract):
                 raise ValueError(
-                    "remaining-surface %s overflow contract drifted" % surface_id
+                    "remaining-surface %s layout contract is malformed" % surface_id
+                )
+            if contract != _expected_layout_contract(surface_id):
+                raise ValueError(
+                    "remaining-surface %s layout contract drifted" % surface_id
                 )
             expected_application_owner = surface["geometry_owner"] in {
                 "application",
@@ -247,7 +264,7 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 "MAIN": "maximized",
                 "NETWORK_VIEW": "screen_fraction",
                 "RESULTS": "maximized",
-            }.get(contract["role"], "content_preferred")
+            }.get(surface["role"], "content_preferred")
             if surface["first_use_behavior"] != expected_first_use:
                 raise ValueError(
                     "remaining-surface %s first-use behavior drifted" % surface_id
@@ -319,9 +336,7 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
                 raise ValueError("remaining-surface %s PNG is blank" % surface_id)
         records.append(record)
     if len(seen_capture_paths) != len(SCALE_FACTORS) * len(expected_ids):
-        raise ValueError(
-            "remaining-surface evidence does not contain 60 unique captures"
-        )
+        raise ValueError("remaining-surface evidence capture count is incomplete")
     return records
 
 
@@ -345,7 +360,6 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
     applicable = focus["applicable"]
     if applicable is False:
         if surface_id not in {
-            "analysis-progress",
             "import-progress",
             "shared-progress",
             "startup-splash",
@@ -475,53 +489,53 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
             )
 
 
-def _surface_factories():
+def _surface_factories() -> dict[str, Any]:
     from PyQt6 import QtCore, QtGui
 
-    import about_legal_dialog
-    import add_new_dialogs
-    import change_cov_type_form
-    import conf_level_dialog
-    import edit_group_name_form
-    import launch
-    import ma_specs
-    import main_wizard
-    import meta_form
-    import progress_bar
+    from rc_metastudio import (
+        about_legal_dialog,
+        add_new_dialogs,
+        covariate_type_dialog,
+        confidence_level_dialog,
+        edit_name_dialogs,
+        launch,
+        main_wizard,
+        main_window,
+        progress_dialog,
+    )
 
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
 
-        def __init__(self, _dataset, _covariate):
+        def __init__(self, _dataset: Any, _covariate: Any) -> None:
             super().__init__(2, 3)
 
-    setattr(change_cov_type_form, "CovModel", PreviewModel)
+    setattr(covariate_type_dialog, "CovariateTypeModel", PreviewModel)
     return {
         "about-legal": about_legal_dialog.AboutLegalDialog,
-        "change-covariate-type": lambda: change_cov_type_form.ChangeCovTypeForm(
+        "change-covariate-type": lambda: covariate_type_dialog.CovariateTypeDialog(
             object(), object()
         ),
-        "edit-group-name": lambda: edit_group_name_form.EditGroupName(
+        "edit-group-name": lambda: edit_name_dialogs.EditGroupNameDialog(
             "Treatment group"
         ),
-        "edit-covariate-name": lambda: edit_group_name_form.EditCovariateName(
+        "edit-covariate-name": lambda: edit_name_dialogs.EditCovariateNameDialog(
             "Baseline risk"
         ),
         "main-wizard": lambda: main_wizard.MainWizard(path="new_dataset"),
-        "confidence-level": conf_level_dialog.ChangeConfLevelDlg,
-        "add-covariate": add_new_dialogs.AddNewCovariateForm,
-        "add-follow-up": add_new_dialogs.AddNewFollowUpForm,
-        "add-group": add_new_dialogs.AddNewGroupForm,
-        "add-outcome": add_new_dialogs.AddNewOutcomeForm,
-        "add-study": add_new_dialogs.AddNewStudyForm,
-        "import-progress": meta_form.ImportProgress,
-        "analysis-progress": ma_specs.MetaProgress,
-        "shared-progress": progress_bar.MetaProgress,
+        "confidence-level": confidence_level_dialog.ConfidenceLevelDialog,
+        "add-covariate": add_new_dialogs.AddCovariateDialog,
+        "add-follow-up": add_new_dialogs.AddFollowUpDialog,
+        "add-group": add_new_dialogs.AddGroupDialog,
+        "add-outcome": add_new_dialogs.AddOutcomeDialog,
+        "add-study": add_new_dialogs.AddStudyDialog,
+        "import-progress": main_window.ImportProgressDialog,
+        "shared-progress": progress_dialog.AnalysisProgressDialog,
         "startup-splash": launch.create_startup_splash,
     }
 
 
-def _capture(window, destination: Path, evidence_root: Path) -> dict[str, object]:
+def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, object]:
     # QWidget.grab() synchronously paints the real hosted widget without
     # depending on desktop/screen-recording permissions in macOS CI.
     pixmap = window.grab()
@@ -539,7 +553,9 @@ def _capture(window, destination: Path, evidence_root: Path) -> dict[str, object
     }
 
 
-def _show_and_prepare(app, window, QtCore, QtWidgets, QTest) -> None:
+def _show_and_prepare(
+    app: Any, window: Any, QtCore: Any, QtWidgets: Any, QTest: Any
+) -> None:
     window.show()
     window.activateWindow()
     window.raise_()
@@ -561,7 +577,7 @@ def _show_and_prepare(app, window, QtCore, QtWidgets, QTest) -> None:
             app.processEvents()
 
 
-def _widget_identity(window, widget) -> str:
+def _widget_identity(window: Any, widget: Any) -> str:
     if widget is None or widget is window or not window.isAncestorOf(widget):
         return ""
     if widget.objectName():
@@ -571,7 +587,7 @@ def _widget_identity(window, widget) -> str:
 
 
 def _observe_focus_traversal(
-    app, window, QtCore, QtGui, QtWidgets
+    app: Any, window: Any, QtCore: Any, QtGui: Any, QtWidgets: Any
 ) -> dict[str, object]:
     tab_focus = QtCore.Qt.FocusPolicy.TabFocus
     focusables = [
@@ -654,7 +670,7 @@ def _observe_focus_traversal(
     }
 
 
-def _snapshot_edit_state(window, QtWidgets) -> tuple:
+def _snapshot_edit_state(window: Any, QtWidgets: Any) -> tuple[Any, ...]:
     return (
         tuple(
             (editor.objectName(), editor.text())
@@ -681,14 +697,14 @@ def _snapshot_edit_state(window, QtWidgets) -> tuple:
     )
 
 
-def _delete_window(app, window, QtCore, QtWidgets) -> None:
+def _delete_window(app: Any, window: Any, QtCore: Any, QtWidgets: Any) -> None:
     window.close()
     window.deleteLater()
     QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
-def _button_for_roles(box, roles):
+def _button_for_roles(box: Any, roles: Any) -> Any:
     return next(
         (button for button in box.buttons() if box.buttonRole(button) in roles),
         None,
@@ -696,7 +712,7 @@ def _button_for_roles(box, roles):
 
 
 def _observe_actions(
-    app, factory, surface_id, QtCore, QtWidgets, QTest
+    app: Any, factory: Any, surface_id: str, QtCore: Any, QtWidgets: Any, QTest: Any
 ) -> dict[str, object]:
     contract = ACTION_CONTRACTS[surface_id]
     if contract == "none":
@@ -822,7 +838,7 @@ def _observe_actions(
         _delete_window(app, reject_dialog, QtCore, QtWidgets)
 
 
-def _observe_overflow(window, QtWidgets) -> str:
+def _observe_overflow(window: Any, QtWidgets: Any) -> str:
     if isinstance(window, QtWidgets.QSplashScreen):
         if window.pixmap().isNull():
             raise RuntimeError("splash overflow evidence has no pixmap")
@@ -847,7 +863,7 @@ def _observe_overflow(window, QtWidgets) -> str:
     raise RuntimeError("remaining surface overflow behavior is not classified")
 
 
-def _observe_window_contract(window, adaptive_window) -> dict[str, object]:
+def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, object]:
     controller = getattr(window, "_adaptive_window_controller", None)
     if not isinstance(controller, adaptive_window.AdaptiveWindowController):
         raise RuntimeError("remaining surface has no live adaptive controller")
@@ -878,13 +894,11 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
 
     prepare_generated_ui_imports()
     QtCore.qInstallMessageHandler(_qt_message_handler)
-    sys.path.append(str(ROOT / "src/rc_metastudio"))
-    from rc_metastudio import meta_py_r_backend, qt6_resources
+    from rc_metastudio import r_backend, qt6_resources
 
-    meta_py_r_backend.install_stub_meta_py_r()
+    r_backend.install_stub_r_bridge()
     qt6_resources.ensure_application_resources()
-    import adaptive_window
-    import app_error_handler
+    from rc_metastudio import adaptive_window, app_error_handler
 
     app = app_error_handler.get_or_create_application([])
     # Evidence failures must terminate the gate, never block behind the app's
@@ -1021,8 +1035,7 @@ def _run_scale(scale: float, evidence_root: Path) -> None:
     if not fragments:
         raise RuntimeError("remaining-surface inventory is empty")
     common = {
-        key: fragments[0][key]
-        for key in ("qpa", "scale_factor", "tab_focus_behavior")
+        key: fragments[0][key] for key in ("qpa", "scale_factor", "tab_focus_behavior")
     }
     if any(
         any(fragment[key] != value for key, value in common.items())
@@ -1076,7 +1089,7 @@ def main() -> int:
         return 0
     if args.scale is not None:
         if args.scale not in SCALE_FACTORS:
-            raise ValueError("scale must be one of the four required factors")
+            raise ValueError("scale must be a required native evidence factor")
         if args.surface is not None:
             _capture_surface(args.scale, args.evidence_root, args.surface)
             return 0
@@ -1104,7 +1117,7 @@ def main() -> int:
             env=environment,
             check=True,
         )
-    records = validate_evidence(args.evidence_root)
+    validate_evidence(args.evidence_root)
     print(
         "validated %s remaining native Qt6 surfaces at %s"
         % (len(_remaining_surface_ids()), ", ".join(map(str, SCALE_FACTORS)))

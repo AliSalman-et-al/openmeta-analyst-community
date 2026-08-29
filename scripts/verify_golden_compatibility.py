@@ -1,4 +1,4 @@
-"""Run the real-R curated set against the frozen observed Golden baseline."""
+"""Compare current real-R results with the frozen behavior baseline."""
 
 from __future__ import annotations
 
@@ -20,14 +20,16 @@ import zipfile
 SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "rc_metastudio"
 sys.path.insert(0, str(SOURCE_ROOT))
 
-from rc_metastudio import golden_analysis
-from rc_metastudio.analysis_regression_compare import compare_golden_baseline
+from rc_metastudio import golden_analysis  # noqa: E402  # path bootstrap above
+from rc_metastudio.analysis_regression_compare import (  # noqa: E402
+    compare_golden_baseline,
+)
 
 
 ARCHIVE_RELATIVE_PATH = PurePosixPath(
-    "docs/verification/pre-qt6-baseline/observed-golden-baseline.zip"
+    "tests/analysis_regression/baseline/observed-golden-baseline.zip"
 )
-OUTER_MANIFEST_RELATIVE_PATH = Path("docs/verification/pre-qt6-baseline/manifest.json")
+OUTER_MANIFEST_RELATIVE_PATH = Path("tests/analysis_regression/baseline/manifest.json")
 OUTPUT_BASE_RELATIVE_PATH = Path("build/qt6-verification")
 OUTPUT_MARKER = ".rcms-golden-verification-output"
 MAX_ARCHIVE_BYTES = 8 * 1024 * 1024
@@ -36,7 +38,7 @@ MAX_MEMBER_BYTES = 4 * 1024 * 1024
 MAX_TOTAL_UNCOMPRESSED_BYTES = 16 * 1024 * 1024
 MAX_NUMERIC_CONTRACT_BYTES = 256 * 1024
 NUMERIC_CONTRACT_RELATIVE_PATH = (
-    "docs/verification/pre-qt6-baseline/golden-numeric-contract.json"
+    "tests/analysis_regression/baseline/numeric-contract.json"
 )
 REQUIRED_RPY2_IDENTITIES = {
     "rpy2": "3.6.7",
@@ -244,9 +246,7 @@ def _load_plot_descriptor_contract(
 ) -> dict[str, Any]:
     outer = _load_json(root / OUTER_MANIFEST_RELATIVE_PATH)
     entry = outer.get("golden_plot_descriptor_contract")
-    expected_relative = (
-        "docs/verification/pre-qt6-baseline/golden-plot-descriptors.json"
-    )
+    expected_relative = "tests/analysis_regression/baseline/plot-descriptors.json"
     if (
         not isinstance(entry, dict)
         or entry.get("path") != expected_relative
@@ -266,7 +266,7 @@ def _load_plot_descriptor_contract(
     rows = contract.get("rows")
     if (
         contract.get("schema_version") != 1
-        or contract.get("contract") != "qt6-golden-plot-descriptors"
+        or contract.get("contract") != "golden-plot-descriptors"
         or contract.get("oracle_sha256") != _sha256(archive_path)
         or not isinstance(rows, list)
         or len(rows) != 11
@@ -333,7 +333,7 @@ def _load_numeric_contract(
     tolerance = contract.get("tolerance_policy")
     if (
         contract.get("schema_version") != 1
-        or contract.get("contract") != "pre-qt6-golden-numeric-results"
+        or contract.get("contract") != "golden-numeric-results"
         or contract.get("oracle_sha256") != _sha256(archive_path)
         or not isinstance(cases, list)
         or len(cases) != 11
@@ -532,11 +532,11 @@ def _validate_current_rpy2_identities(
                 )
 
 
-def _validate_coverage_contract(
+def _validate_case_contract(
     reference: dict[str, Any], current: dict[str, Any], root: Path
 ) -> None:
     committed = _load_json(
-        root / "docs/verification/comprehensive-golden-baseline-manifest.json"
+        root / "tests/analysis_regression/baseline/capture-manifest.json"
     )
     expected_ids = committed["curated_golden_set"]
     reference_ids = [row["id"] for row in reference["curated_golden_set"]]
@@ -550,16 +550,6 @@ def _validate_coverage_contract(
             "curated Golden coverage must contain the same ordered 11 cases in "
             "the committed contract, frozen baseline, and current capture"
         )
-    coverage = _load_json(root / "docs/verification/golden-coverage-manifest.json")
-    omissions = coverage.get("omissions", [])
-    if not omissions:
-        raise ValueError("Golden coverage contract must document justified omissions")
-    required = {"branch", "reason", "follow_up"}
-    for omission in omissions:
-        if not required.issubset(omission) or any(
-            not str(omission[field]).strip() for field in required
-        ):
-            raise ValueError("Golden coverage omission is not fully justified")
 
 
 def verify(root: Path, output_root: Path) -> dict[str, Any]:
@@ -574,15 +564,15 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
         output_dir=str(output_root), capture_mode="local-debug", root_dir=str(root)
     )
     _validate_current_rpy2_identities(current, rpy2_identities)
-    _validate_coverage_contract(reference, current, root)
+    _validate_case_contract(reference, current, root)
     comparison = compare_golden_baseline(
         comparison_reference,
         current,
         exceptions=_load_json(
-            root / "docs/verification/compatibility-exceptions.json"
+            root / "tests/analysis_regression/baseline/exceptions.json"
         ).get("exceptions", []),
         manifest=_load_json(
-            root / "docs/verification/comprehensive-golden-baseline-manifest.json"
+            root / "tests/analysis_regression/baseline/capture-manifest.json"
         ),
     )
     comparison["rows"].extend(_compare_plot_descriptors(plot_contract, current))

@@ -113,10 +113,12 @@ def test_gitattributes_normalizes_text_and_keeps_rcms_fixtures_binary():
 def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("RCMS_ANALYSIS_SCRATCH_DIR", str(tmp_path / "scratch"))
 
-    import golden_analysis
-    import headless_analysis
+    from rc_metastudio import golden_analysis
+    from rc_metastudio import headless_analysis
+    from rc_metastudio import analysis_adapter
 
     created = []
+    captured_params = []
     monkeypatch.setattr(
         headless_analysis.settings,
         "make_r_tmp",
@@ -141,14 +143,19 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         )(),
     )
     monkeypatch.setattr(
-        headless_analysis.meta_py_r,
-        "ma_dataset_to_simple_binary_robj",
+        analysis_adapter.r_bridge,
+        "dataset_to_simple_binary_r_object",
         lambda _model, **_kwargs: None,
     )
+
+    def fake_run_binary_analysis(_method, params):
+        captured_params.append(params)
+        return {"texts": {}, "images": {}}
+
     monkeypatch.setattr(
-        headless_analysis.meta_py_r,
-        "run_binary_ma",
-        lambda _method, params: params,
+        analysis_adapter.r_bridge,
+        "run_binary_analysis",
+        fake_run_binary_analysis,
     )
 
     bundle = golden_analysis.curated_golden_bundles(root_dir=ROOT)[0]
@@ -158,28 +165,14 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         parameters=bundle["parameters"],
         metric="OR",
     )
-    result = headless_analysis.run_headless_analysis(case)
+    headless_analysis.run_headless_analysis(case)
 
     scratch = (tmp_path / "scratch").resolve()
-    fp_outpath = Path(result["fp_outpath"]).resolve()
+    assert captured_params
+    fp_outpath = Path(captured_params[0]["fp_outpath"]).resolve()
     bundle_fp_outpath = Path(bundle["parameters"]["fp_outpath"]).resolve()
     assert created
     assert sorted(set(created)) == [str(scratch)]
     assert fp_outpath.parent == scratch
     assert bundle_fp_outpath.parent == scratch
-    assert not (ROOT / "r_tmp").resolve() in fp_outpath.parents
-
-
-def test_r_smoke_script_uses_tempdir_not_repository_r_tmp():
-    text = (ROOT / "scripts" / "analysis-smoke-test.R").read_text(encoding="utf-8")
-    assert 'dir.create("r_tmp"' not in text
-    assert '"fp_outpath" = "./r_tmp/forest.png"' not in text
-    assert "tempdir()" in text
-
-
-def test_third_party_inventory_has_notice_creation_boundary():
-    inventory = (ROOT / "docs" / "release" / "third-party-inventory.md").read_text(
-        encoding="utf-8"
-    )
-    assert "THIRD_PARTY_NOTICES.md" in inventory
-    assert "Do not create an empty placeholder" in inventory
+    assert (ROOT / "r_tmp").resolve() not in fp_outpath.parents

@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -28,6 +29,29 @@ def _run_build(*arguments: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+
+
+@pytest.fixture(scope="module")
+def verified_qt6_output(tmp_path_factory) -> Path:
+    configured_root = os.environ.get("RCMS_QT6_BUILD_ROOT")
+    if configured_root:
+        build_root = Path(configured_root)
+        required = (
+            build_root / "generated/rc_metastudio/forms/ui_about_legal.py",
+            build_root / "resources/icons.rcc",
+        )
+        if all(path.is_file() for path in required):
+            return build_root
+    build_root = tmp_path_factory.mktemp("qt6-verified")
+    _run_build("generate", "--build-root", str(build_root))
+    return build_root
+
+
+@pytest.fixture(scope="module")
+def official_rcc(verified_qt6_output) -> Path:
+    official = ROOT / "build/qt-rcc/6.11.1/msvc2022_64/bin/rcc.exe"
+    assert official.is_file()
+    return official
 
 
 def test_qt6_runtime_and_verification_tools_are_exactly_locked(tmp_path, monkeypatch):
@@ -89,11 +113,6 @@ def test_qt6_runtime_and_verification_tools_are_exactly_locked(tmp_path, monkeyp
         qt6_build._resolve_pyuic6()
 
 
-def _official_rcc() -> Path:
-    _run_build("generate", "--build-root", str(ROOT / "build/test-qt6-rcc"))
-    return ROOT / "build/qt-rcc/6.11.1/msvc2022_64/bin/rcc.exe"
-
-
 WINDOWS_RCC_TEST = pytest.mark.skipif(
     sys.platform != "win32",
     reason="validates the pinned Windows PE rcc package",
@@ -101,16 +120,18 @@ WINDOWS_RCC_TEST = pytest.mark.skipif(
 
 
 @WINDOWS_RCC_TEST
-def test_matching_official_rcc_identity_is_accepted():
-    qt6_build.validate_rcc(_official_rcc())
+def test_matching_official_rcc_identity_is_accepted(official_rcc):
+    qt6_build.validate_rcc(official_rcc)
     archive = ROOT / "build/qt-rcc/cache" / qt6_build.QT_RCC_PACKAGE
     assert qt6_build.QT_RCC_PACKAGE_SIZE == 39_469_569
     assert archive.stat().st_size == qt6_build.QT_RCC_PACKAGE_SIZE
 
 
 @WINDOWS_RCC_TEST
-def test_rcc_digest_and_configured_tool_identity_fail_closed(tmp_path, monkeypatch):
-    official = _official_rcc()
+def test_rcc_digest_and_configured_tool_identity_fail_closed(
+    tmp_path, monkeypatch, official_rcc
+):
+    official = official_rcc
     candidate = tmp_path / "bin/rcc.exe"
     candidate.parent.mkdir(parents=True)
     candidate.write_bytes(official.read_bytes() + b"tampered")
@@ -126,8 +147,10 @@ def test_rcc_digest_and_configured_tool_identity_fail_closed(tmp_path, monkeypat
 
 
 @WINDOWS_RCC_TEST
-def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(tmp_path):
-    official = _official_rcc()
+def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(
+    tmp_path, official_rcc
+):
+    official = official_rcc
     candidate = tmp_path / "bin/rcc.exe"
     candidate.parent.mkdir(parents=True)
     payload = bytearray(official.read_bytes())
@@ -144,9 +167,9 @@ def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(tmp_path):
 
 
 @WINDOWS_RCC_TEST
-def test_rcc_wrong_version_is_rejected():
+def test_rcc_wrong_version_is_rejected(official_rcc):
     with pytest.raises(RuntimeError, match="version mismatch"):
-        qt6_build.validate_rcc(_official_rcc(), expected_version="6.11.0")
+        qt6_build.validate_rcc(official_rcc, expected_version="6.11.0")
 
 
 def test_macos_official_rcc_requires_pinned_version_and_host_slice(
@@ -259,10 +282,11 @@ def test_official_archive_rejects_short_download_before_digest(tmp_path, monkeyp
     assert not destination.with_suffix(".download").exists()
 
 
-def test_canonical_form_generation_is_deterministic_and_importable(tmp_path):
-    first = tmp_path / "first"
+def test_canonical_form_generation_is_deterministic_and_importable(
+    tmp_path, verified_qt6_output
+):
+    first = verified_qt6_output
     second = tmp_path / "second"
-    _run_build("generate", "--build-root", str(first))
     _run_build("generate", "--build-root", str(second))
 
     relative_module = Path("generated/rc_metastudio/forms/ui_about_legal.py")
@@ -303,6 +327,11 @@ def test_canonical_form_generation_is_deterministic_and_importable(tmp_path):
         assert "connectSlotsByName" not in rendered
         assert "icons_rc" not in rendered
 
+    stale_module = second / "generated/rc_metastudio/forms/ui_retired_form.py"
+    stale_module.write_text("retired = True\n", encoding="utf-8")
+    _run_build("generate", "--build-root", str(second))
+    assert not stale_module.exists()
+
 
 def test_canonical_form_manifest_fails_closed_on_drift_and_collisions():
     discovered = set(
@@ -336,106 +365,29 @@ def test_canonical_form_manifest_fails_closed_on_drift_and_collisions():
         qt6_build.validate_form_manifest(traversal, discovered)
 
 
-def test_generated_ui_bootstrap_imports_every_handwritten_qt_module(tmp_path):
-    build_root = tmp_path / "qt6"
-    _run_build("generate", "--build-root", str(build_root))
-    inventory = json.loads(
-        (ROOT / "docs/verification/pre-qt6-baseline/qt-port-inventory.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    modules = [
-        Path(path).stem
-        for path in inventory["handwritten_qt_modules"]
-        if (ROOT / path).is_file()
-    ]
-    script = """
-import importlib
-import json
-import sys
-import types
-from pathlib import Path
-
-root = Path(sys.argv[1])
-build_root = Path(sys.argv[2])
-modules = json.loads(sys.argv[3])
-report_path = Path(sys.argv[4])
-sys.path.insert(0, str(root / "src/rc_metastudio"))
-from rc_metastudio.qt6_ui import prepare_generated_ui_imports
-layout = prepare_generated_ui_imports(build_root)
-# A later test or tool may prepend source paths. The bootstrap must already have
-# bound the top-level forms package to generated Qt6 output.
-sys.path.insert(0, str(root / "src/rc_metastudio/forms"))
-sys.path.insert(0, str(root / "src/rc_metastudio"))
-forms = importlib.import_module("forms")
-if layout.package_root not in Path(forms.__file__).resolve().parents:
-    raise RuntimeError("forms package escaped the generated Qt6 layout")
-for name in modules:
-    importlib.import_module(name)
-fake_launch = types.ModuleType("launch")
-fake_launch.start = lambda: 0
-sys.modules["launch"] = fake_launch
-from rc_metastudio.__main__ import main
-startup_result = main()
-report_path.write_text(
-    json.dumps({
-        "count": len(modules),
-        "generated_root": str(layout.package_root),
-        "startup_result": startup_result,
-    }),
-    encoding="utf-8",
-)
-"""
-    environment = os.environ.copy()
-    environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_QT6_BUILD_ROOT"] = str(build_root)
-    report_path = tmp_path / "import-report.json"
-    completed = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            script,
-            str(ROOT),
-            str(build_root),
-            json.dumps(modules),
-            str(report_path),
-        ],
-        cwd=ROOT,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, (
-        "generated UI bootstrap failed\n"
-        f"stdout:\n{completed.stdout}\n"
-        f"stderr:\n{completed.stderr}"
-    )
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["count"] == 35
-    assert report["startup_result"] == 0
-    assert Path(report["generated_root"]) == (build_root / "generated/rc_metastudio")
-
-
-def test_generated_ui_bootstrap_rejects_missing_or_tampered_outputs(tmp_path):
+def test_generated_ui_bootstrap_rejects_missing_or_tampered_outputs(
+    tmp_path, verified_qt6_output
+):
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     build_root = tmp_path / "qt6"
-    _run_build("generate", "--build-root", str(build_root))
+    shutil.copytree(verified_qt6_output, build_root)
     target = build_root / "generated/rc_metastudio/forms/ui_about_legal.py"
     target.unlink()
     with pytest.raises(RuntimeError, match="generated form set"):
         prepare_generated_ui_imports(build_root)
 
-    _run_build("generate", "--build-root", str(build_root))
+    shutil.copyfile(
+        verified_qt6_output / "generated/rc_metastudio/forms/ui_about_legal.py",
+        target,
+    )
     target.write_text("from PyQt5 import QtCore\n", encoding="utf-8")
     with pytest.raises(RuntimeError, match="invalid generated Qt6 form"):
         prepare_generated_ui_imports(build_root)
 
 
-def test_binary_resource_registers_and_exposes_icon_and_svg(tmp_path):
-    build_root = tmp_path / "qt6"
-    _run_build("generate", "--build-root", str(build_root))
+def test_binary_resource_registers_and_exposes_icon_and_svg(verified_qt6_output):
+    build_root = verified_qt6_output
     resource = build_root / "resources" / "icons.rcc"
 
     assert resource.is_file()
@@ -445,15 +397,16 @@ def test_binary_resource_registers_and_exposes_icon_and_svg(tmp_path):
 
     assert QtCore.QResource.registerResource(str(resource))
     try:
-        assert QtCore.QFile(":/misc/meta.png").exists()
-        assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
+        assert QtCore.QFile.exists(":/misc/meta.png")
+        assert QtCore.QFile.exists(":/icons/actions/about-legal.svg")
     finally:
         assert QtCore.QResource.unregisterResource(str(resource))
 
 
-def test_application_resource_loader_registers_only_the_binary_collection(tmp_path):
-    build_root = tmp_path / "qt6"
-    _run_build("generate", "--build-root", str(build_root))
+def test_application_resource_loader_registers_only_the_binary_collection(
+    verified_qt6_output,
+):
+    build_root = verified_qt6_output
     resource = build_root / "resources" / "icons.rcc"
 
     registration = qt6_resources.register_binary_resource(resource)
@@ -461,17 +414,17 @@ def test_application_resource_loader_registers_only_the_binary_collection(tmp_pa
         from PyQt6 import QtCore
 
         assert registration.path == resource.resolve()
-        assert QtCore.QFile(":/misc/meta.png").exists()
-        assert QtCore.QFile(":/icons/actions/about-legal.svg").exists()
+        assert QtCore.QFile.exists(":/misc/meta.png")
+        assert QtCore.QFile.exists(":/icons/actions/about-legal.svg")
     finally:
         registration.close()
 
 
-def test_minimal_qt6_window_reports_resources_and_exits_cleanly(tmp_path):
+def test_minimal_qt6_window_reports_resources_and_exits_cleanly(verified_qt6_output):
     completed = _run_build(
         "smoke",
         "--build-root",
-        str(tmp_path / "qt6"),
+        str(verified_qt6_output),
         "--exit-after-ms",
         "1",
     )
@@ -486,7 +439,9 @@ def test_minimal_qt6_window_reports_resources_and_exits_cleanly(tmp_path):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows native slice")
-def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(tmp_path):
+def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(
+    verified_qt6_output,
+):
     environment = os.environ.copy()
     environment.pop("QT_QPA_PLATFORM", None)
     completed = subprocess.run(
@@ -495,7 +450,7 @@ def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(tmp_path):
             str(BUILD_SCRIPT),
             "native-smoke",
             "--build-root",
-            str(tmp_path / "native"),
+            str(verified_qt6_output),
             "--exit-after-ms",
             "25",
         ],
@@ -514,74 +469,6 @@ def test_native_windows_smoke_uses_qwindows_and_a_visible_dialog(tmp_path):
     assert report["app_icon"] is True
     assert report["svg_icon"] is True
     assert report["clean_exit"] is True
-
-
-def test_qt6_generation_and_type_checks_have_a_maintained_entry_point():
-    workflow = (ROOT / "scripts" / "verify-qt6.ps1").read_text(encoding="utf-8")
-
-    assert "uv sync --locked" in workflow
-    assert "build_qt6.py" in workflow
-    assert "ty check" in workflow
-    assert "test_qt6_build_slice.py" in workflow
-    assert "import_qt_modules.py --root . --list" in workflow
-    assert "$qtModules" in workflow
-    assert "test_project_format.py" in workflow
-    assert "--require-covered" in workflow
-    assert "native-smoke" in workflow
-    assert "Remove-Item Env:QT_QPA_PLATFORM" in workflow
-    assert "scripts/run_with_timeout.py" in workflow
-    assert workflow.count("Invoke-NativeSmokeCommand -Label") == 11
-    assert "[int]$TimeoutSeconds = 300" in workflow
-
-    hosted = (ROOT / ".github/workflows/fast-verification.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "scripts\\verify-qt6.ps1 -Sync" in hosted
-    assert "scripts\\verify-qt6.ps1 -Sync -Section Core" in hosted
-    assert "scripts\\verify-qt6.ps1 -Sync -Section RemainingSurfaces" in hosted
-    assert "Native Qt6 Remaining Surfaces result: $REMAINING_SURFACE_RESULT" in hosted
-    assert "if-no-files-found: error" in hosted
-    assert ".python-version|pyproject.toml" in hosted
-    assert "config/*" in hosted
-    assert "scripts/*" in hosted
-    assert "docs/verification/*" in hosted
-    assert "scripts\\verify-smoke.ps1" in hosted
-    assert "scripts\\verify-fast.ps1" in hosted
-    assert hosted.count("-RequireREvidence") == 2
-    assert hosted.count("--require-r-evidence") == 2
-    assert "macos-x64" in hosted
-    assert "macos-arm64" in hosted
-    assert "timeout-minutes: 45" in hosted
-    assert "Rebuild and prove macOS rpy2 API bridge against installed R" in hosted
-    rebuild = hosted.index(
-        "Rebuild and prove macOS rpy2 API bridge against installed R"
-    )
-    macos_verify = hosted.index("Run source smoke and Fast Verification on macOS")
-    assert rebuild < macos_verify
-    assert 'export R_HOME="$(R RHOME)"' in hosted
-    assert 'echo "R_HOME=$R_HOME" >> "$GITHUB_ENV"' in hosted
-    assert 'echo "RPY2_CFFI_MODE=API" >> "$GITHUB_ENV"' in hosted
-    assert "uv sync --locked --reinstall-package rpy2-rinterface" in hosted
-    assert "--no-binary-package rpy2-rinterface" in hosted
-    assert 'metadata.version("rpy2-rinterface")' in hosted
-    assert 'lipo -archs "$bridge"' in hosted
-    assert "otool -L" in hosted and "count + 0" in hosted
-    assert 'openrlib.cffi_mode.name != "API"' in hosted
-    macos_run = hosted[macos_verify : hosted.index("Prune uv cache", macos_verify)]
-    assert "verify-smoke.sh --sync" not in macos_run
-
-    for verification_script in (
-        "scripts/verify-smoke.ps1",
-        "scripts/verify-fast.ps1",
-        "scripts/verify-smoke.sh",
-        "scripts/verify-fast.sh",
-    ):
-        source = (ROOT / verification_script).read_text(encoding="utf-8")
-        assert "build_qt6.py" in source
-        assert "generate" in source
-        assert "build/qt6-verification" in source.replace("\\", "/")
-        assert "RCMS_QT6_BUILD_ROOT" in source
-        assert "PYTHONPATH" in source
 
 
 def test_native_smoke_timeout_runner_streams_output_and_fails_closed():

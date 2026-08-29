@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     replacements = [
         (
             root / "pyproject.toml",
-            r'(?m)^version = "\d+\.\d+\.\d+"$',
+            r'(?m)^version = "\d+\.\d+\.\d+"(?=\r?$)',
             f'version = "{args.version}"',
         ),
         (
@@ -63,12 +63,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
         (
             root / "src" / "rc_metastudio" / "__init__.py",
-            r'(?m)^__version__ = "\d+\.\d+\.\d+"$',
+            r'(?m)^__version__ = "\d+\.\d+\.\d+"(?=\r?$)',
             f'__version__ = "{args.version}"',
         ),
         (
             root / "src" / "rc_metastudio" / "meta_globals.py",
-            r'(?m)^VERSION = "\d+\.\d+\.\d+"$',
+            r'(?m)^VERSION = "\d+\.\d+\.\d+"(?=\r?$)',
             f'VERSION = "{args.version}"',
         ),
         (

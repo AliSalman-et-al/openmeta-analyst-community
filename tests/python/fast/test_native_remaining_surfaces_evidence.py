@@ -1,4 +1,4 @@
-"""Fail-closed contracts for the remaining native Qt6 surface inventory."""
+"""Behavioral contracts for native Qt surface evidence."""
 
 from __future__ import annotations
 
@@ -25,27 +25,143 @@ def _load_script(name: str):
     return module
 
 
-inventory_validator = _load_script("validate_qt6_surface_inventory")
 native_smoke = _load_script("native_remaining_surfaces_smoke")
 
+EXPECTED_SURFACES = {
+    "about-legal": (
+        "close",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "text-browser",
+        "content_preferred",
+    ),
+    "change-covariate-type": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "bounded-table",
+        "content_preferred",
+    ),
+    "edit-group-name": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "edit-covariate-name": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "main-wizard": (
+        "wizard-next-cancel",
+        "WORKFLOW",
+        "workflow",
+        "window-manager-after-first-show",
+        "page-scroll-area",
+        "content_preferred",
+    ),
+    "confidence-level": (
+        "accept-cancel",
+        "CONFIDENCE_LEVEL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "add-covariate": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "add-follow-up": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "add-group": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "add-outcome": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "add-study": (
+        "accept-cancel",
+        "TRANSACTIONAL",
+        "transactional",
+        "application-first-use",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "import-progress": (
+        "none",
+        "TRANSIENT",
+        "transient",
+        "application",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "shared-progress": (
+        "none",
+        "TRANSIENT",
+        "transient",
+        "application",
+        "content-preferred",
+        "content_preferred",
+    ),
+    "startup-splash": (
+        "none",
+        "TRANSIENT",
+        "transient",
+        "application",
+        "screen-bounded-pixmap",
+        "content_preferred",
+    ),
+}
 
-def test_native_smoke_registers_application_resources_before_surface_factories():
-    source = (ROOT / "scripts/native_remaining_surfaces_smoke.py").read_text(
-        encoding="utf-8"
-    )
 
-    registration = source.index("qt6_resources.ensure_application_resources()")
-    factory_construction = source.index("factories = _surface_factories()")
-    assert registration < factory_construction
+def test_layout_contract_rules_cover_each_distinct_surface_behavior():
+    assert set(native_smoke.ACTION_CONTRACTS) == set(EXPECTED_SURFACES)
+    for surface_id, (action, *layout) in EXPECTED_SURFACES.items():
+        assert native_smoke.ACTION_CONTRACTS[surface_id] == action
+        assert native_smoke._expected_layout_contract(surface_id) == tuple(layout)
 
 
 def _write_bundle(root: Path) -> None:
-    inventory = inventory_validator.load_and_validate()
-    contracts = {
-        item["id"]: item
-        for item in inventory["surfaces"]
-        if item["evidence"] == "remaining-native"
-    }
+    contracts = {}
+    for surface_id, expected in EXPECTED_SURFACES.items():
+        action, role, archetype, geometry_owner, overflow, first_use_behavior = expected
+        contracts[surface_id] = {
+            "action": action,
+            "archetype": archetype,
+            "first_use_behavior": first_use_behavior,
+            "geometry_owner": geometry_owner,
+            "overflow": overflow,
+            "role": role,
+        }
     for scale in native_smoke.SCALE_FACTORS:
         image_dir = root / ("scale-%s" % native_smoke._scale_label(scale))
         image_dir.mkdir(parents=True)
@@ -57,7 +173,7 @@ def _write_bundle(root: Path) -> None:
             image.setPixelColor(20, 15, QtGui.QColor("navy"))
             assert image.save(str(image_path), "PNG")
             payload = image_path.read_bytes()
-            action_contract = native_smoke.ACTION_CONTRACTS[surface_id]
+            action_contract = contract["action"]
             actions = {
                 "none": {"contract": "none", "not_applicable": True},
                 "close": {
@@ -135,7 +251,7 @@ def _write_bundle(root: Path) -> None:
                 },
                 "close_semantics": True,
                 "device_pixel_ratio": scale,
-                "first_use_behavior": "content_preferred",
+                "first_use_behavior": contract["first_use_behavior"],
                 "focus": focus,
                 "geometry_owner": contract["geometry_owner"],
                 "logical_frame": {"x": 10, "y": 20, "width": 100, "height": 80},
@@ -163,93 +279,7 @@ def _write_bundle(root: Path) -> None:
         )
 
 
-def test_surface_inventory_matches_canonical_forms_factories_tests_and_document():
-    payload = inventory_validator.load_and_validate()
-
-    assert len(payload["forms"]) == 29
-    assert inventory_validator.render_markdown(
-        payload
-    ) == inventory_validator.DOCUMENT_PATH.read_text(encoding="utf-8")
-    assert not (ROOT / ".github/workflows/qt6-macos-feasibility.yml").exists()
-    assert (ROOT / ".github/workflows/package-target.yml").exists()
-
-
-def test_surface_inventory_rejects_canonical_form_drift(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["forms"].pop("welcome_page.ui")
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="29 canonical forms"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_unmaintained_evidence_command(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["evidence"]["remaining-native"]["command"] = "python arbitrary.py"
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="allowed maintained invocation"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_extra_or_mistyped_evidence(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["evidence"]["unused-native"] = {
-        "issue": True,
-        "command": "uv run python scripts/native_analysis_smoke.py",
-        "artifact": "unused",
-    }
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="audited closed world"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_mistyped_evidence_field(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["evidence"]["remaining-native"]["issue"] = True
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="invalid field types"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_unreferenced_surface(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["forms"]["about_legal.ui"] = ["main-wizard"]
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="every and only declared surface"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_generic_or_unknown_factory(tmp_path):
-    payload = inventory_validator.load_and_validate()
-    payload["surfaces"][0]["factory"] = "adaptive_window.py:AdaptiveWindowController"
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-
-    with pytest.raises(ValueError, match="audited runtime allowlist"):
-        inventory_validator.load_and_validate(path)
-
-
-def test_surface_inventory_rejects_wrong_top_level_type(monkeypatch):
-    monkeypatch.setitem(
-        inventory_validator.FACTORY_ALLOWLIST,
-        "about_legal_dialog.py:AboutLegalDialog",
-        "main-window",
-    )
-
-    with pytest.raises(ValueError, match="wrong top-level type"):
-        inventory_validator.load_and_validate()
-
-
-def test_native_remaining_surface_evidence_accepts_relocated_four_scale_bundle(
+def test_native_remaining_surface_evidence_accepts_relocated_scale_bundle(
     tmp_path,
 ):
     _write_bundle(tmp_path)
@@ -274,13 +304,41 @@ def test_native_remaining_surface_evidence_accepts_cocoa_focus_sequences(tmp_pat
     assert {record["qpa"] for record in records} == {"cocoa"}
 
 
+def test_native_remaining_surface_evidence_rejects_semantic_layout_drift(tmp_path):
+    _write_bundle(tmp_path)
+    for scale in native_smoke.SCALE_FACTORS:
+        record_path = native_smoke._record_path(tmp_path, scale)
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        surface = record["surfaces"]["add-covariate"]
+        surface.update(
+            {
+                "archetype": "bogus",
+                "first_use_behavior": "bogus",
+                "geometry_owner": "bogus",
+                "overflow": "bogus",
+                "role": "bogus",
+            }
+        )
+        record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="layout contract drifted"):
+        native_smoke.validate_evidence(tmp_path)
+
+
 def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab(qapp):
     class TabConsumingDialog(QtWidgets.QDialog):
-        def event(self, event):
-            if event.type() in {
-                QtCore.QEvent.Type.KeyPress,
-                QtCore.QEvent.Type.KeyRelease,
-            } and event.key() in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}:
+        def event(  # ty: ignore[invalid-method-override] - PyQt6 test-double stub mismatch.
+            self, event: QtCore.QEvent | None
+        ) -> bool:
+            if (
+                isinstance(event, QtGui.QKeyEvent)
+                and event.type()
+                in {
+                    QtCore.QEvent.Type.KeyPress,
+                    QtCore.QEvent.Type.KeyRelease,
+                }
+                and event.key() in {QtCore.Qt.Key.Key_Tab, QtCore.Qt.Key.Key_Backtab}
+            ):
                 event.accept()
                 return True
             return super().event(event)
@@ -309,12 +367,16 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
 
 
 def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp):
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    meta_py_r_backend.install_stub_meta_py_r()
-    import main_wizard
+    # Do not replace a backend already shared by modules collected earlier in
+    # this process. The isolated test still installs the stub on hosts without
+    # an initialized R backend.
+    if r_backend._registered_backend() is None:
+        r_backend.install_stub_r_bridge()
+    from rc_metastudio import main_wizard
 
     actions = native_smoke._observe_actions(
         qapp,
@@ -395,7 +457,7 @@ def test_native_remaining_surface_evidence_rejects_mismatched_scale_surface_path
     _write_bundle(tmp_path)
     record_path = native_smoke._record_path(tmp_path, 1.0)
     record = json.loads(record_path.read_text(encoding="utf-8"))
-    record["surfaces"]["add-group"]["capture"]["path"] = "scale-1.25/add-group.png"
+    record["surfaces"]["add-group"]["capture"]["path"] = "scale-1.5/add-group.png"
     record_path.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(ValueError, match="does not match its scale and surface"):

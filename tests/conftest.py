@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 from pathlib import Path
@@ -11,11 +10,12 @@ os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _ROOT = Path(__file__).resolve().parents[1]
-_APP_PACKAGE = _ROOT / "src" / "rc_metastudio"
-for _path in (_APP_PACKAGE, _APP_PACKAGE / "forms"):
-    _path_text = str(_path)
-    if _path_text not in sys.path:
-        sys.path.insert(0, _path_text)
+if str(_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "src"))
+
+from rc_metastudio import r_backend
+
+r_backend.install_stub_r_bridge()
 
 _QAPPLICATION = None
 
@@ -43,31 +43,12 @@ def _qapplication_for_qt_test_selections(request):
     return None
 
 
-def _taxonomy_entries():
-    taxonomy_path = _ROOT / "docs" / "verification" / "test-taxonomy.json"
-    try:
-        taxonomy = json.loads(taxonomy_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    return {
-        entry["nodeid"].replace("\\", "/"): entry
-        for entry in taxonomy.get("tests", [])
-        if isinstance(entry, dict) and "nodeid" in entry
-    }
-
-
-def _entry_requires_qt(entry):
-    return entry and (
-        "qt" in entry.get("external_dependencies", [])
-        or "gui_compatibility" in entry.get("evidence", [])
-    )
-
-
 @pytest.fixture(autouse=True)
 def _isolate_qsettings_for_qt_tests(request, tmp_path):
-    entries = _taxonomy_entries()
-    entry = entries.get(request.node.nodeid.replace("\\", "/"))
-    if not _entry_requires_qt(entry):
+    relative = request.node.path.resolve().relative_to(_ROOT).as_posix()
+    if "/python/gui/" not in f"/{relative}" and not request.node.get_closest_marker(
+        "qsettings"
+    ):
         return
 
     from PyQt6 import QtCore
@@ -81,17 +62,7 @@ def _isolate_qsettings_for_qt_tests(request, tmp_path):
 
 
 def pytest_collection_modifyitems(config, items):
-    entries = _taxonomy_entries()
-    config._needs_qapplication = False
-    for item in items:
-        entry = entries.get(item.nodeid.replace("\\", "/"))
-        if not entry:
-            continue
-        if _entry_requires_qt(entry):
-            config._needs_qapplication = True
-        marker_names = {entry.get("size"), entry.get("lane")}
-        marker_names.update(entry.get("evidence", []))
-        if entry.get("runtime_class") == "minutes":
-            marker_names.add("slow")
-        for marker_name in sorted(name for name in marker_names if name):
-            item.add_marker(marker_name)
+    config._needs_qapplication = any(
+        "/python/gui/" in f"/{item.path.resolve().relative_to(_ROOT).as_posix()}"
+        for item in items
+    )

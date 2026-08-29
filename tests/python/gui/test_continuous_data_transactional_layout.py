@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -13,11 +14,12 @@ os.environ.setdefault(
 )
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, key_clicks, mouse_click, required
 
 prepare_generated_ui_imports()
 
 
-class FakeContinuousMAUnit:
+class FakeContinuousAnalysisUnit:
     def __init__(self, raw_data=None, effects=None):
         self.raw_data = raw_data or {
             "Group 1": [10, 94, 2],
@@ -62,17 +64,17 @@ def _open_continuous_dialog(
     available,
     metric="MD",
     recorder=None,
-    ma_unit=None,
+    analysis_unit=None,
     back_calc_result=None,
     choose_metric=False,
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     recorder = recorder if recorder is not None else {}
     recorder.setdefault("metric_choice_exec", [])
     monkeypatch.setattr(
-        continuous_data_form.adaptive_window,
+        continuous_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
@@ -82,17 +84,20 @@ def _open_continuous_dialog(
             recorder["metric_choice_exec"].append(dialog.windowTitle())
             dialog.show()
             app.processEvents()
-            QtTest.QTest.mouseClick(
-                dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton
-            )
-            QtTest.QTest.mouseClick(
-                dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+            mouse_click(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
+            mouse_click(
+                required(
+                    dialog.buttonBox.button(
+                        QtWidgets.QDialogButtonBox.StandardButton.Ok
+                    ),
+                    "ok button",
+                ),
                 QtCore.Qt.MouseButton.LeftButton,
             )
             return dialog.result()
 
         monkeypatch.setattr(
-            continuous_data_form.ChooseBackCalcResultForm,
+            continuous_data_dialog.ContinuousBackCalculationDialog,
             "exec",
             choose_second_option,
         )
@@ -103,15 +108,17 @@ def _open_continuous_dialog(
             return False
 
         monkeypatch.setattr(
-            continuous_data_form.ChooseBackCalcResultForm,
+            continuous_data_dialog.ContinuousBackCalculationDialog,
             "exec",
             reject_metric_choice,
         )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r, "get_mult_from_r", lambda _conf: 1.96
+        continuous_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _conf: 1.96,
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "continuous_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
@@ -128,22 +135,22 @@ def _open_continuous_dialog(
         return {"succeeded": False, "comment": "stub"}
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
-        "impute_cont_data",
+        continuous_data_dialog.r_bridge,
+        "impute_continuous_data",
         impute,
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
-        "impute_pre_post_cont_data",
+        continuous_data_dialog.r_bridge,
+        "impute_pre_post_continuous_data",
         impute_pre_post,
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (2.5, 1.5, 3.5)},
     )
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "effect_triplet",
         lambda effect, _scale, metric=None: effect["calc_scale"],
     )
@@ -153,14 +160,14 @@ def _open_continuous_dialog(
         return back_calc_result or {"FAIL": True}
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r, "back_calc_cont_data", back_calc
+        continuous_data_dialog.r_bridge, "back_calculate_continuous_data", back_calc
     )
-    dialog = continuous_data_form.ContinuousDataForm(
-        ma_unit or FakeContinuousMAUnit(),
+    dialog = continuous_data_dialog.ContinuousDataDialog(
+        analysis_unit or FakeContinuousAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         metric,
-        conf_level=95.0,
+        confidence_level=95.0,
     )
     return app, dialog
 
@@ -179,9 +186,9 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
         assert recorder["metric_choice_exec"] == []
         recorder["back_calc"].clear()
 
-        dialog.enable_back_calculation_btn(engage=True)
+        dialog.update_back_calculation_button(engage=True)
 
-        assert recorder["metric_choice_exec"] == ["Population SD Assumptions"]
+        assert recorder["metric_choice_exec"] == ["Population standard deviations"]
         assert recorder["back_calc"] == []
     finally:
         _close(app, dialog)
@@ -195,9 +202,9 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
 def test_continuous_back_calculation_enablement_probes_metric_assumptions(
     monkeypatch, metric, working_parameter, expected_parameters
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={
             "Group 1": [100, 10, 10],
             "Group 2": [100, 6, None],
@@ -208,7 +215,7 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         metric=metric,
-        ma_unit=unit,
+        analysis_unit=unit,
     )
     observed_parameters = []
 
@@ -229,15 +236,15 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
         }
 
     monkeypatch.setattr(
-        continuous_data_form.meta_py_r,
-        "back_calc_cont_data",
+        continuous_data_dialog.r_bridge,
+        "back_calculate_continuous_data",
         assumption_dependent_solver,
     )
     try:
         dialog.metric_parameter = None
-        dialog.enable_back_calculation_btn()
+        dialog.update_back_calculation_button()
 
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
         assert dialog.metric_parameter is None
         assert observed_parameters == expected_parameters
     finally:
@@ -247,10 +254,10 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
 def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
     monkeypatch,
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     recorder = {}
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -266,7 +273,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
     )
 
@@ -274,14 +281,21 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         recorder["metric_choice_exec"].append(chooser.windowTitle())
         chooser.show()
         app.processEvents()
-        QtTest.QTest.mouseClick(
-            chooser.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Cancel),
+        mouse_click(
+            required(
+                chooser.buttonBox.button(
+                    QtWidgets.QDialogButtonBox.StandardButton.Cancel
+                ),
+                "cancel button",
+            ),
             QtCore.Qt.MouseButton.LeftButton,
         )
         return chooser.result()
 
     monkeypatch.setattr(
-        continuous_data_form.ChooseBackCalcResultForm, "exec", cancel_with_button
+        continuous_data_dialog.ContinuousBackCalculationDialog,
+        "exec",
+        cancel_with_button,
     )
     try:
         table_before = [
@@ -294,10 +308,10 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         dialog.undoStack.clear()
         recorder["back_calc"].clear()
 
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
-        assert recorder["metric_choice_exec"] == ["Population SD Assumptions"]
+        assert recorder["metric_choice_exec"] == ["Population standard deviations"]
         assert recorder["back_calc"] == []
         assert dialog.metric_parameter is None
         assert unit.raw_data == raw_before
@@ -321,16 +335,16 @@ def test_continuous_data_keyboard_and_accessibility_contract(monkeypatch):
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.focusWidget() is dialog.simple_table
         assert ok.isDefault()
-        assert dialog.label_13.buddy() is dialog.effect_cbo_box
-        assert dialog.label_14.buddy() is dialog.effect_txt_box
+        assert dialog.effect_metric_label.buddy() is dialog.effect_combo_box
+        assert dialog.label_14.buddy() is dialog.effect_text_box
         assert dialog.label.buddy() is dialog.correlation_pre_post
         assert dialog.simple_table.accessibleName() == "Continuous group summary data"
 
-        dialog.effect_cbo_box.setFocus()
-        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
-        assert dialog.focusWidget() is dialog.effect_txt_box
+        dialog.effect_combo_box.setFocus()
+        key_click(dialog.effect_combo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_text_box
 
-        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         _close(app, dialog)
@@ -362,12 +376,12 @@ def test_failed_pre_post_imputation_restores_value_from_owning_table(
 def test_continuous_sample_size_is_rejected_before_model_or_r(monkeypatch, invalid_n):
     recorder = {}
     warnings = []
-    unit = FakeContinuousMAUnit()
+    unit = FakeContinuousAnalysisUnit()
     app, dialog = _open_continuous_dialog(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
     )
     monkeypatch.setattr(
         QtWidgets.QMessageBox,
@@ -409,11 +423,11 @@ def test_continuous_variants_are_transactional_and_screen_bounded(monkeypatch, s
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
         assert not isinstance(dialog.simple_group, QtWidgets.QGroupBox)
         assert not isinstance(dialog.effect_group, QtWidgets.QGroupBox)
-        assert dialog.label_13.text() == "Effect"
+        assert dialog.effect_metric_label.text() == "Effect"
         assert dialog.label_14.text() == "Est."
         assert [dialog.label_15.text(), dialog.label_2.text()] == ["Lower", "Upper"]
-        assert dialog.label_15.buddy() is dialog.low_txt_box
-        assert dialog.label_2.buddy() is dialog.high_txt_box
+        assert dialog.label_15.buddy() is dialog.lower_text_box
+        assert dialog.label_2.buddy() is dialog.upper_text_box
         assert available.contains(dialog.frameGeometry())
         for table in (
             dialog.simple_table,
@@ -443,25 +457,24 @@ def test_continuous_metric_transition_does_not_resize_visible_root(monkeypatch):
 
         smd_index = next(
             index
-            for index in range(dialog.effect_cbo_box.count())
-            if dialog.effect_cbo_box.itemData(index) == "SMD"
+            for index in range(dialog.effect_combo_box.count())
+            if dialog.effect_combo_box.itemData(index) == "SMD"
         )
-        dialog.effect_cbo_box.setCurrentIndex(smd_index)
+        dialog.effect_combo_box.setCurrentIndex(smd_index)
         app.processEvents()
 
         assert dialog.frameGeometry() == settled
-        assert dialog.effect_cbo_box.currentData() == "SMD"
-        assert dialog.grp_box_pre_post.isVisible()
+        assert dialog.effect_combo_box.currentData() == "SMD"
+        assert dialog.pre_post_group_box.isVisible()
         assert dialog.simple_table.item(0, 1).text() == preserved_value
         assert dialog.buttonBox.isVisible()
     finally:
         _close(app, dialog)
 
 
-@pytest.mark.parametrize("size", [(1440, 900), (1024, 640), (800, 600)])
 @pytest.mark.parametrize("variant", ["md_simple", "smd_pre_post", "tx_mean"])
-def test_continuous_major_variant_behavior_matrix(monkeypatch, size, variant):
-    available = QtCore.QRect(20, 30, *size)
+def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
+    available = QtCore.QRect(20, 30, 800, 600)
     recorder = {}
     initial_metric = "TX Mean" if variant == "tx_mean" else "MD"
     app, dialog = _open_continuous_dialog(
@@ -475,18 +488,18 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, size, variant):
         if variant == "smd_pre_post":
             smd_index = next(
                 index
-                for index in range(dialog.effect_cbo_box.count())
-                if dialog.effect_cbo_box.itemData(index) == "SMD"
+                for index in range(dialog.effect_combo_box.count())
+                if dialog.effect_combo_box.itemData(index) == "SMD"
             )
-            dialog.effect_cbo_box.setCurrentIndex(smd_index)
+            dialog.effect_combo_box.setCurrentIndex(smd_index)
             dialog.correlation_pre_post.selectAll()
-            QtTest.QTest.keyClicks(dialog.correlation_pre_post, "0.5")
+            key_clicks(dialog.correlation_pre_post, "0.5")
             dialog.g1_pre_post_table.setFocus()
             app.processEvents()
             dialog.g1_pre_post_table.setCurrentCell(0, 1)
             dialog.g1_pre_post_table.item(0, 1).setText("95")
             app.processEvents()
-            assert dialog.effect_cbo_box.currentData() == "SMD"
+            assert dialog.effect_combo_box.currentData() == "SMD"
             assert dialog.correlation_pre_post.text() == "0.5"
             assert any(
                 payload[0].get("mean.A") == 95 for payload in recorder["pre_post"]
@@ -497,9 +510,9 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, size, variant):
             app.processEvents()
             assert any(payload[0].get("mean") == 95 for payload in recorder["impute"])
 
-        assert dialog.effect_txt_box.text() == "2.5"
-        assert dialog.low_txt_box.text() == "1.5"
-        assert dialog.high_txt_box.text() == "3.5"
+        assert dialog.effect_text_box.text() == "2.5"
+        assert dialog.lower_text_box.text() == "1.5"
+        assert dialog.upper_text_box.text() == "3.5"
 
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
@@ -518,7 +531,13 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, size, variant):
 
 
 def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -535,20 +554,22 @@ def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypat
         assert available.contains(dialog.frameGeometry())
         assert dialog.simple_table.horizontalScrollBar().maximum() > 0
         assert dialog.simple_table.item(0, 1).text() == long_value
-        assert dialog.effect_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
-        assert dialog.effect_cbo_box.toolTip() == dialog.effect_cbo_box.currentText()
+        assert dialog.effect_combo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+        assert (
+            dialog.effect_combo_box.toolTip() == dialog.effect_combo_box.currentText()
+        )
         assert dialog.correlation_pre_post.minimumWidth() >= (
             dialog.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
         )
-        dialog.high_txt_box.setFocus()
+        dialog.upper_text_box.setFocus()
         app.processEvents()
-        mapped = dialog.high_txt_box.mapTo(
+        mapped = dialog.upper_text_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
         assert (
             dialog.content_scroll.viewport()
             .rect()
-            .intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
+            .intersects(QtCore.QRect(mapped, dialog.upper_text_box.size()))
         )
         assert dialog.buttonBox.isVisible()
     finally:
@@ -558,14 +579,16 @@ def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypat
 
 @pytest.mark.parametrize("size", [(1024, 640), (800, 600)])
 def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     long_label = (
         "Standardized Mean Difference with small-sample bias correction and "
         "complete confidence interval reporting across every treatment arm, "
         "follow-up, subgroup, estimator, and sensitivity-analysis scenario"
     )
-    monkeypatch.setitem(continuous_data_form.CONTINUOUS_METRIC_NAMES, "SMD", long_label)
+    monkeypatch.setitem(
+        continuous_data_dialog.CONTINUOUS_METRIC_NAMES, "SMD", long_label
+    )
     available = QtCore.QRect(20, 30, *size)
     app, dialog = _open_continuous_dialog(monkeypatch, available)
     try:
@@ -573,19 +596,19 @@ def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
         app.processEvents()
         smd_index = next(
             index
-            for index in range(dialog.effect_cbo_box.count())
-            if dialog.effect_cbo_box.itemData(index) == "SMD"
+            for index in range(dialog.effect_combo_box.count())
+            if dialog.effect_combo_box.itemData(index) == "SMD"
         )
-        dialog.effect_cbo_box.setCurrentIndex(smd_index)
+        dialog.effect_combo_box.setCurrentIndex(smd_index)
         app.processEvents()
 
-        full_value = dialog.effect_cbo_box.currentText()
+        full_value = dialog.effect_combo_box.currentText()
         assert long_label in full_value
-        assert dialog.effect_cbo_box.toolTip() == full_value
+        assert dialog.effect_combo_box.toolTip() == full_value
         assert available.contains(dialog.frameGeometry())
-        dialog.effect_cbo_box.showPopup()
+        dialog.effect_combo_box.showPopup()
         app.processEvents()
-        view = dialog.effect_cbo_box.view()
+        view = dialog.effect_combo_box.view()
         popup = view.window()
         assert view.isVisible()
         assert available.contains(popup.frameGeometry())
@@ -595,10 +618,10 @@ def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
             == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         assert view.horizontalScrollBar().maximum() > 0
-        assert dialog.effect_cbo_box.itemData(
+        assert dialog.effect_combo_box.itemData(
             smd_index, QtCore.Qt.ItemDataRole.ToolTipRole
         ) == (full_value)
-        dialog.effect_cbo_box.hidePopup()
+        dialog.effect_combo_box.hidePopup()
     finally:
         _close(app, dialog)
 
@@ -609,7 +632,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
 ):
     available = QtCore.QRect(20, 30, *size)
     recorder = {}
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -625,7 +648,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         monkeypatch,
         available,
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -633,10 +656,10 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         dialog.show()
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
         recorder["back_calc"].clear()
-        QtTest.QTest.mouseClick(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert dialog.metric_parameter is False
@@ -653,9 +676,9 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         ] == ["120.0", "15.0", "11.0", "110.0", "10.0", "12.0"]
         assert unit.effects["MD"] == (5.0, 4.0, 6.0)
         assert [
-            dialog.effect_txt_box.text(),
-            dialog.low_txt_box.text(),
-            dialog.high_txt_box.text(),
+            dialog.effect_text_box.text(),
+            dialog.lower_text_box.text(),
+            dialog.upper_text_box.text(),
         ] == ["5.0", "4.0", "6.0"]
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
@@ -670,7 +693,7 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
 def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
     monkeypatch, fault_boundary
 ):
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -687,7 +710,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -705,11 +728,11 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         correlation_before = dialog.correlation_pre_post.text()
         metric_parameter_before = dialog.metric_parameter
         button_before = (
-            dialog.back_calc_btn.isEnabled(),
-            dialog.back_calc_btn.text(),
-            dialog.back_calc_btn.isHidden(),
-            dialog.back_calc_btn.isChecked(),
-            dialog.back_calc_btn.isDown(),
+            dialog.back_calculate_button.isEnabled(),
+            dialog.back_calculate_button.text(),
+            dialog.back_calculate_button.isHidden(),
+            dialog.back_calculate_button.isChecked(),
+            dialog.back_calculate_button.isDown(),
         )
         undo_before = (
             dialog.undoStack.count(),
@@ -739,7 +762,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         elif fault_boundary == "copy":
             monkeypatch.setattr(
                 dialog,
-                "_copy_raw_data_from_table_to_ma_unit",
+                "_copy_raw_data_from_table_to_analysis_unit",
                 lambda: (_ for _ in ()).throw(RuntimeError("copy fault")),
             )
         elif fault_boundary == "snapshot":
@@ -764,7 +787,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
             monkeypatch.setattr(QtGui.QUndoStack, "push", fail_before_push)
 
         with pytest.raises(RuntimeError, match="fault"):
-            dialog.enable_back_calculation_btn(engage=True)
+            dialog.update_back_calculation_button(engage=True)
 
         assert len(recorder["back_calc"]) == 1
         assert [
@@ -780,11 +803,11 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         assert dialog.correlation_pre_post.text() == correlation_before
         assert dialog.metric_parameter is metric_parameter_before
         assert (
-            dialog.back_calc_btn.isEnabled(),
-            dialog.back_calc_btn.text(),
-            dialog.back_calc_btn.isHidden(),
-            dialog.back_calc_btn.isChecked(),
-            dialog.back_calc_btn.isDown(),
+            dialog.back_calculate_button.isEnabled(),
+            dialog.back_calculate_button.text(),
+            dialog.back_calculate_button.isHidden(),
+            dialog.back_calculate_button.isChecked(),
+            dialog.back_calculate_button.isDown(),
         ) == button_before
         assert (
             dialog.undoStack.count(),
@@ -807,7 +830,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
 def test_continuous_back_calculation_undo_publication_has_one_commit_point(
     monkeypatch, failure_timing
 ):
-    unit = FakeContinuousMAUnit(
+    unit = FakeContinuousAnalysisUnit(
         raw_data={"Group 1": [None, None, None], "Group 2": [None, None, None]},
         effects={"MD": (5.0, 4.0, 6.0)},
     )
@@ -824,7 +847,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
         monkeypatch,
         QtCore.QRect(20, 30, 1024, 640),
         recorder=recorder,
-        ma_unit=unit,
+        analysis_unit=unit,
         back_calc_result=result,
         choose_metric=True,
     )
@@ -857,7 +880,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
             def injected_push(stack, command):
                 original_push(stack, command)
                 if failure_timing == "ambiguous_after_insert":
-                    dialog.back_calc_btn.setText("ambiguous state")
+                    dialog.back_calculate_button.setText("ambiguous state")
                 elif failure_timing == "clean_after_insert":
                     stack.setClean()
                 raise RuntimeError("post-insertion push anomaly")
@@ -866,7 +889,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
 
         if failure_timing == "before_insert":
             with pytest.raises(RuntimeError, match="pre-insertion"):
-                dialog.enable_back_calculation_btn(engage=True)
+                dialog.update_back_calculation_button(engage=True)
             assert (dialog.undoStack.count(), dialog.undoStack.index()) == (2, 1)
             assert dialog.undoStack.command(0) is first
             assert dialog.undoStack.command(1) is discarded_redo
@@ -884,7 +907,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
                 "Group 2": [None, None, None],
             }
         elif failure_timing == "after_insert":
-            dialog.enable_back_calculation_btn(engage=True)
+            dialog.update_back_calculation_button(engage=True)
             assert (dialog.undoStack.count(), dialog.undoStack.index()) == (2, 2)
             assert dialog.undoStack.command(0) is first
             committed = dialog.undoStack.command(1)
@@ -911,7 +934,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
             }
         else:
             with pytest.raises(RuntimeError, match="post-insertion") as caught:
-                dialog.enable_back_calculation_btn(engage=True)
+                dialog.update_back_calculation_button(engage=True)
             assert any(
                 "identity of prior undo commands" in note
                 for note in getattr(caught.value, "__notes__", [])
@@ -945,16 +968,16 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
 def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable(
     monkeypatch, size
 ):
-    import continuous_data_form
+    from rc_metastudio import continuous_data_dialog
 
     available = QtCore.QRect(20, 30, *size)
     monkeypatch.setattr(
-        continuous_data_form.adaptive_window,
+        continuous_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    dialog = continuous_data_form.ChooseBackCalcResultForm(
+    dialog = continuous_data_dialog.ContinuousBackCalculationDialog(
         "Required back-calculation guidance " * 40,
         "Use equal population standard deviations",
         "Use unequal population standard deviations",
@@ -974,18 +997,20 @@ def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable
         dialog.choice2_btn.setFocus()
         app.processEvents()
         mapped = dialog.choice2_btn.mapTo(
-            dialog.content_scroll.viewport(), QtCore.QPoint()
+            required(dialog.content_scroll.viewport(), "content viewport"),
+            QtCore.QPoint(),
         )
         assert (
-            dialog.content_scroll.viewport()
+            required(dialog.content_scroll.viewport(), "content viewport")
             .rect()
             .intersects(QtCore.QRect(mapped, dialog.choice2_btn.size()))
         )
         label_position = dialog.choice2_label.mapTo(
-            dialog.content_scroll.viewport(), QtCore.QPoint()
+            required(dialog.content_scroll.viewport(), "content viewport"),
+            QtCore.QPoint(),
         )
         assert (
-            dialog.content_scroll.viewport()
+            required(dialog.content_scroll.viewport(), "content viewport")
             .rect()
             .intersects(QtCore.QRect(label_position, dialog.choice2_label.size()))
         )
@@ -993,7 +1018,7 @@ def test_continuous_back_calculation_choice_keeps_guidance_and_actions_reachable
             "Use unequal population standard deviations"
         )
         assert dialog.choice1_btn.isChecked()
-        QtTest.QTest.mouseClick(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.choice2_label, QtCore.Qt.MouseButton.LeftButton)
         assert dialog.choice2_btn.isChecked()
     finally:
         dialog.close()

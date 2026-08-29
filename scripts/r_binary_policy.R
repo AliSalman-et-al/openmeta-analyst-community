@@ -3,7 +3,7 @@ split_policy_field <- function(value) {
 }
 
 load_rcms_r_binary_policy <- function(repo_root, python = Sys.getenv("RCMS_POLICY_PYTHON", "python")) {
-  manifest <- file.path(repo_root, "docs", "verification", "RCMetaR-r-dependencies.json")
+  manifest <- file.path(repo_root, "config", "r-dependencies.json")
   helper <- file.path(repo_root, "scripts", "r_dependency_policy.py")
   output <- system2(
     python,

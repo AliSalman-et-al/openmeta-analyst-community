@@ -5,7 +5,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QTableView
 
-from workspace_column_identity import (
+from rc_metastudio.workspace_column_identity import (
     WORKSPACE_COLUMN_IDENTITY_ROLE,
     WorkspaceColumnIdentity,
     WorkspaceColumnWidthState,
@@ -48,7 +48,7 @@ class WorkspaceColumnWidthController(object):
     def synchronize_schema(self):
         """Restore known sections and content-fit only previously unseen ones."""
         # The controller is constructed before the workspace installs its
-        # DatasetModel, so query the Qt base class without invoking the
+        # DatasetTableModel, so query the Qt base class without invoking the
         # workspace view's maintained-model contract.
         model = QTableView.model(self.table)
         if model is None:

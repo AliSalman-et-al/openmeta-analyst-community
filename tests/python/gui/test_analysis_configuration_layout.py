@@ -1,13 +1,14 @@
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 import subprocess
 import sys
 from types import SimpleNamespace
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
+from rc_metastudio import analysis_dataset
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,15 +16,22 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required, wait
 
 prepare_generated_ui_imports()
+
+if TYPE_CHECKING:
+    from ui_analysis_setup_dialog import Ui_AnalysisSetupDialog
+else:
+    from rc_metastudio.forms.ui_analysis_setup_dialog import Ui_AnalysisSetupDialog
 
 
 class _AnalysisModel(object):
     def __init__(self, data_type, covariates=()):
         self._data_type = data_type
         self.current_effect = "Sens" if data_type == "diagnostic" else "OR"
-        self.dataset = SimpleNamespace(covariates=list(covariates))
+        self.dataset = analysis_dataset.Dataset()
+        self.dataset.covariates = list(covariates)
 
     def get_current_outcome_type(self):
         return self._data_type
@@ -31,8 +39,11 @@ class _AnalysisModel(object):
     def included_studies_have_raw_data(self):
         return True
 
+    def included_studies_have_point_estimates(self, effect):
+        return True
 
-def _install_analysis_backend(monkeypatch, ma_specs):
+
+def _install_analysis_backend(monkeypatch, analysis_setup_dialog):
     methods = {
         "A concise random-effects method": "random",
         "A deliberately long fixed-effect method whose full name must remain selectable": "fixed",
@@ -56,8 +67,8 @@ def _install_analysis_backend(monkeypatch, ma_specs):
         "digits": 2,
         "label": "complete editable value",
     }
-    backend = sys.modules.get("meta_py_r", ma_specs.meta_py_r)
-    monkeypatch.setattr(ma_specs, "meta_py_r", backend)
+    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    monkeypatch.setattr(analysis_setup_dialog, "r_bridge", backend)
     monkeypatch.setattr(
         backend,
         "get_available_methods",
@@ -95,9 +106,9 @@ def _install_analysis_backend(monkeypatch, ma_specs):
         lambda method: ("A long method description that wraps locally. " * 8) + method,
     )
     for name in (
-        "ma_dataset_to_simple_binary_robj",
-        "ma_dataset_to_simple_continuous_robj",
-        "ma_dataset_to_simple_diagnostic_robj",
+        "dataset_to_simple_binary_r_object",
+        "dataset_to_simple_continuous_r_object",
+        "dataset_to_simple_diagnostic_r_object",
     ):
         monkeypatch.setattr(backend, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
@@ -113,18 +124,15 @@ def _install_analysis_backend(monkeypatch, ma_specs):
 
 
 def test_method_parameters_declares_scroll_body_with_actions_outside(qapp):
-    from forms.ui_ma_specs import Ui_Dialog
-
     dialog = QtWidgets.QDialog()
-    ui = Ui_Dialog()
+    ui = Ui_AnalysisSetupDialog()
     ui.setupUi(dialog)
     try:
         assert ui.content_scroll_area.widgetResizable()
         assert ui.content_scroll_area.isAncestorOf(ui.specs_tab)
         assert not ui.content_scroll_area.isAncestorOf(ui.buttonBox)
-        assert dialog.layout().indexOf(ui.buttonBox) > dialog.layout().indexOf(
-            ui.content_scroll_area
-        )
+        layout = required(dialog.layout(), "dialog layout")
+        assert layout.indexOf(ui.buttonBox) > layout.indexOf(ui.content_scroll_area)
     finally:
         dialog.close()
 
@@ -150,13 +158,13 @@ def test_method_dialog_wording_is_scoped_to_its_analysis_family(
     expected_title,
     expected_method_label,
 ):
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
-    _install_analysis_backend(monkeypatch, ma_specs)
-    dialog = ma_specs.MA_Specs(
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
         _AnalysisModel(data_type),
-        diag_metrics=diagnostic_metrics,
-        conf_level=95.0,
+        diagnostic_metrics=diagnostic_metrics,
+        confidence_level=95.0,
     )
     try:
         assert dialog.windowTitle() == expected_title
@@ -166,10 +174,10 @@ def test_method_dialog_wording_is_scoped_to_its_analysis_family(
 
 
 def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
-    import adaptive_window
-    import ma_specs
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import analysis_setup_dialog
 
-    _install_analysis_backend(monkeypatch, ma_specs)
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
     monkeypatch.setattr(
         adaptive_window,
         "available_geometry_for_window",
@@ -191,11 +199,11 @@ def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
             ("continuous", None, "meta-regression", (long_covariate,)),
             ("continuous", None, "subgroup", ()),
         ):
-            dialog = ma_specs.MA_Specs(
+            dialog = analysis_setup_dialog.AnalysisSetupDialog(
                 _AnalysisModel(data_type, covariates),
-                meta_f_str=workflow,
-                diag_metrics=diagnostic_metrics,
-                conf_level=95.0,
+                analysis_type=workflow,
+                diagnostic_metrics=diagnostic_metrics,
+                confidence_level=95.0,
             )
             dialogs.append(dialog)
             font = QtGui.QFont(dialog.font())
@@ -222,58 +230,90 @@ def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
                 assert plot_was_enabled is True
                 assert dialog.plot_tab.isEnabled() is False
 
-            enum_control = dialog.parameter_grp_box.findChild(QtWidgets.QComboBox)
+            enum_control = cast(
+                QtWidgets.QComboBox,
+                required(
+                    dialog.parameter_grp_box.findChild(QtWidgets.QComboBox),
+                    "parameter combo",
+                ),
+            )
             assert enum_control.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             complete_value_width = max(
                 enum_control.fontMetrics().horizontalAdvance(enum_control.itemText(i))
                 for i in range(enum_control.count())
             )
-            assert enum_control.view().minimumWidth() <= 800
-            if complete_value_width > enum_control.view().viewport().width():
+            combo_view = required(enum_control.view(), "parameter combo view")
+            assert combo_view.minimumWidth() <= 800
+            if (
+                complete_value_width
+                > required(combo_view.viewport(), "combo viewport").width()
+            ):
                 enum_control.showPopup()
                 qapp.processEvents()
-                assert enum_control.view().window().frameGeometry().width() <= 800
-                assert enum_control.view().horizontalScrollBar().maximum() > 0
+                assert (
+                    required(combo_view.window(), "combo popup").frameGeometry().width()
+                    <= 800
+                )
+                assert (
+                    required(
+                        combo_view.horizontalScrollBar(), "combo scrollbar"
+                    ).maximum()
+                    > 0
+                )
                 enum_control.hidePopup()
-            editable_value = dialog.parameter_grp_box.findChild(QtWidgets.QLineEdit)
             if data_type != "diagnostic":
+                editable_value = cast(
+                    QtWidgets.QLineEdit,
+                    required(
+                        dialog.parameter_grp_box.findChild(QtWidgets.QLineEdit),
+                        "editable value",
+                    ),
+                )
                 assert editable_value.text() == "complete editable value"
-                dialog.content_scroll_area.verticalScrollBar().setValue(0)
+                required(
+                    dialog.content_scroll_area.verticalScrollBar(), "vertical scrollbar"
+                ).setValue(0)
                 editable_value.setFocus()
                 qapp.processEvents()
-                visible_region = dialog.content_scroll_area.viewport().rect()
+                visible_region = required(
+                    dialog.content_scroll_area.viewport(), "content viewport"
+                ).rect()
                 control_center = editable_value.mapTo(
-                    dialog.content_scroll_area.viewport(),
+                    required(dialog.content_scroll_area.viewport(), "content viewport"),
                     editable_value.rect().center(),
                 )
                 assert visible_region.contains(control_center)
-            assert dialog.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Ok
+            assert required(
+                dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
+                "ok button",
             ).isVisible()
-            assert dialog.buttonBox.button(
-                QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            assert required(
+                dialog.buttonBox.button(
+                    QtWidgets.QDialogButtonBox.StandardButton.Cancel
+                ),
+                "cancel button",
             ).isVisible()
 
             dialog.method_cbo_box.setFocus()
-            initial_focus = qapp.focusWidget()
-            QTest.keyClick(initial_focus, QtCore.Qt.Key.Key_Tab)
+            initial_focus = required(qapp.focusWidget(), "initial focus")
+            key_click(initial_focus, QtCore.Qt.Key.Key_Tab)
             qapp.processEvents()
-            forward_focus = qapp.focusWidget()
+            forward_focus = required(qapp.focusWidget(), "forward focus")
             assert forward_focus is not initial_focus
-            QTest.keyClick(forward_focus, QtCore.Qt.Key.Key_Backtab)
+            key_click(forward_focus, QtCore.Qt.Key.Key_Backtab)
             qapp.processEvents()
             assert qapp.focusWidget() is not forward_focus
-            assert dialog.isAncestorOf(qapp.focusWidget())
+            assert dialog.isAncestorOf(required(qapp.focusWidget(), "current focus"))
     finally:
         for dialog in dialogs:
             dialog.close()
 
 
 def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatch):
-    import adaptive_window
-    import ma_specs
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import analysis_setup_dialog
 
-    _install_analysis_backend(monkeypatch, ma_specs)
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
     monkeypatch.setattr(
         adaptive_window,
         "available_geometry_for_window",
@@ -285,25 +325,32 @@ def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatc
         lambda _controller, _screen: None,
     )
 
-    dialog = ma_specs.MA_Specs(_AnalysisModel("binary"), conf_level=95.0)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        _AnalysisModel("binary"), confidence_level=95.0
+    )
     try:
         dialog.show()
-        QTest.qWait(1)
+        wait(1)
         qapp.processEvents()
 
         assert dialog.frameGeometry().width() <= 1728
-        assert dialog.content_scroll_area.horizontalScrollBar().maximum() == 0
+        assert (
+            required(
+                dialog.content_scroll_area.horizontalScrollBar(), "horizontal scrollbar"
+            ).maximum()
+            == 0
+        )
     finally:
         dialog.close()
 
 
 def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monkeypatch):
-    import adaptive_controls
-    import adaptive_window
-    import change_cov_type_form
-    import meta_reg_form
-    import meta_subgroup_form
-    from meta_globals import FACTOR
+    from rc_metastudio import adaptive_controls
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import covariate_type_dialog
+    from rc_metastudio import meta_regression_dialog
+    from rc_metastudio import subgroup_analysis_dialog
+    from rc_metastudio.meta_globals import FACTOR
 
     long_name = "A factor covariate " + ("complete-value-" * 80)
     available = QtCore.QRect(100, 50, 800, 600)
@@ -321,13 +368,13 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         def get_data_type(self):
             return FACTOR
 
-    study = SimpleNamespace(covariate_dict={long_name: "north"}, id=1)
+    study = SimpleNamespace(covariate_values={long_name: "north"}, id=1)
 
     class Model(object):
         current_effect = "OR"
         dataset = SimpleNamespace(
             covariates=[Covariate()],
-            get_values_for_cov=lambda *_args, **_kwargs: {1: "north"},
+            get_covariate_values=lambda *_args, **_kwargs: {1: "north"},
         )
 
         def get_current_outcome_type(self):
@@ -337,9 +384,9 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             return [study]
 
     parent = QtWidgets.QWidget()
-    parent.meta_subgroup = lambda _covariate: None
-    regression = meta_reg_form.MetaRegForm(Model(), parent=parent)
-    subgroup = meta_subgroup_form.MetaSubgroupForm(Model(), parent=parent)
+    setattr(parent, "meta_subgroup", lambda _covariate: None)
+    regression = meta_regression_dialog.MetaRegressionDialog(Model(), parent=parent)
+    subgroup = subgroup_analysis_dialog.SubgroupAnalysisDialog(Model(), parent=parent)
 
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
@@ -347,8 +394,8 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         def __init__(self, _dataset, _covariate):
             super(PreviewModel, self).__init__(2, 3)
 
-    monkeypatch.setattr(change_cov_type_form, "CovModel", PreviewModel)
-    covariate_type = change_cov_type_form.ChangeCovTypeForm(
+    monkeypatch.setattr(covariate_type_dialog, "CovariateTypeModel", PreviewModel)
+    covariate_type = covariate_type_dialog.CovariateTypeDialog(
         SimpleNamespace(), SimpleNamespace(), parent=parent
     )
     try:
@@ -361,39 +408,47 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             adaptive_window.adaptive_window_state(regression).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert regression.content_scroll_area.isAncestorOf(regression.cov_grp_box)
+        assert regression.content_scroll_area.isAncestorOf(
+            regression.covariate_group_box
+        )
         assert not regression.content_scroll_area.isAncestorOf(regression.buttonBox)
         assert (
             adaptive_window.adaptive_window_state(subgroup).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert subgroup.cov_subgroup_cbo_box.currentText() == long_name
-        choice = subgroup.cov_subgroup_cbo_box
+        assert subgroup.covariate_combo_box.currentText() == long_name
+        choice = subgroup.covariate_combo_box
         subgroup.move(available.right() - 20, available.top() + 40)
-        original_column_width = choice.view().sizeHintForColumn(0)
+        choice_view = cast(
+            QtWidgets.QAbstractItemView, required(choice.view(), "choice view")
+        )
+        original_column_width = choice_view.sizeHintForColumn(0)
         enlarged = QtGui.QFont(choice.font())
         enlarged.setPointSize(enlarged.pointSize() + 6)
         choice.setFont(enlarged)
         choice.showPopup()
         qapp.processEvents()
         qapp.processEvents()
-        popup = choice.view().window()
+        popup = required(choice_view.window(), "choice popup")
         assert available.contains(popup.frameGeometry())
-        assert choice.view().textElideMode() == QtCore.Qt.TextElideMode.ElideNone
+        assert choice_view.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
         assert (
-            choice.view().horizontalScrollBarPolicy()
+            choice_view.horizontalScrollBarPolicy()
             == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
-        assert choice.view().horizontalScrollBar().maximum() > 0
+        assert (
+            required(choice_view.horizontalScrollBar(), "choice scrollbar").maximum()
+            > 0
+        )
         assert choice.itemData(0, QtCore.Qt.ItemDataRole.ToolTipRole) == long_name
         assert choice.toolTip() == long_name
-        assert choice.view().sizeHintForColumn(0) > original_column_width
+        assert choice_view.sizeHintForColumn(0) > original_column_width
         choice.hidePopup()
         assert (
             adaptive_window.adaptive_window_state(covariate_type).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert covariate_type.cov_prev_table.verticalScrollMode() == (
+        assert covariate_type.covariate_preview_table.verticalScrollMode() == (
             QtWidgets.QAbstractItemView.ScrollMode.ScrollPerItem
         )
         assert covariate_type.buttonBox.isVisible()
@@ -407,7 +462,7 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
 def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     qapp, monkeypatch
 ):
-    import adaptive_controls
+    from rc_metastudio import adaptive_controls
 
     monkeypatch.setattr(
         adaptive_controls,
@@ -420,13 +475,14 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     combo.resize(180, combo.sizeHint().height())
     combo.show()
     qapp.processEvents()
-    initial_width = combo.view().minimumWidth()
+    combo_view = required(combo.view(), "combo view")
+    initial_width = combo_view.minimumWidth()
 
     font = QtGui.QFont(combo.font())
     font.setPointSize(font.pointSize() + 6)
     combo.setFont(font)
     qapp.processEvents()
-    font_width = combo.view().minimumWidth()
+    font_width = combo_view.minimumWidth()
 
     class WideChromeStyle(QtWidgets.QProxyStyle):
         def pixelMetric(self, metric, option=None, widget=None):
@@ -442,8 +498,10 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
     qapp.processEvents()
     try:
         assert font_width > initial_width
-        assert combo.view().minimumWidth() > font_width
-        assert combo.view().window().frameGeometry().width() <= 2000
+        assert combo_view.minimumWidth() > font_width
+        assert (
+            required(combo_view.window(), "combo popup").frameGeometry().width() <= 2000
+        )
         assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
             1
         )
@@ -453,9 +511,11 @@ def test_choice_control_remeasures_font_and_style_before_bounded_popup(
 
 
 def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
-    import adaptive_controls
+    from rc_metastudio import adaptive_controls
 
-    available = QtCore.QRect(qapp.primaryScreen().availableGeometry())
+    available = QtCore.QRect(
+        required(qapp.primaryScreen(), "primary screen").availableGeometry()
+    )
     combo = adaptive_controls.AdaptiveComboBox()
     combo.addItems(["short", "complete choice " * 80])
     combo.resize(180, combo.sizeHint().height())
@@ -463,6 +523,7 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
     controller = adaptive_controls.configure_choice_control(combo)
     combo.show()
     qapp.processEvents()
+    combo_view = required(combo.view(), "combo view")
     baseline = (
         controller.measurement_applied_count,
         controller.tooltip_scan_applied_count,
@@ -479,8 +540,12 @@ def test_choice_popup_show_burst_coalesces_measurement_tooltips_and_clamp(qapp):
             controller.popup_clamp_applied_count - baseline[2],
         )
         assert applied == (1, 1, 1)
-        assert available.contains(combo.view().window().frameGeometry())
-        assert combo.view().horizontalScrollBar().maximum() > 0
+        assert available.contains(
+            required(combo_view.window(), "combo popup").frameGeometry()
+        )
+        assert (
+            required(combo_view.horizontalScrollBar(), "combo scrollbar").maximum() > 0
+        )
         assert combo.itemData(1, QtCore.Qt.ItemDataRole.ToolTipRole) == combo.itemText(
             1
         )
@@ -495,19 +560,19 @@ def test_native_windows_promoted_choice_popup_is_bounded_at_real_right_edge():
 
     script = r"""
 import json
-import app_error_handler
+from rc_metastudio import app_error_handler
 from PyQt6 import QtCore, QtWidgets
-import adaptive_controls
+from rc_metastudio import adaptive_controls
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-from forms.ui_cov_subgroup_dlg import Ui_cov_subgroup_dialog
+from rc_metastudio.forms.ui_subgroup_analysis_dialog import Ui_SubgroupAnalysisDialog
 
 app = app_error_handler.get_or_create_application([])
 dialog = QtWidgets.QDialog()
-ui = Ui_cov_subgroup_dialog()
+ui = Ui_SubgroupAnalysisDialog()
 ui.setupUi(dialog)
-combo = ui.cov_subgroup_cbo_box
+combo = ui.covariate_combo_box
 assert isinstance(combo, adaptive_controls.AdaptiveComboBox)
 combo.addItem("short")
 controller = adaptive_controls.configure_choice_control(combo)
@@ -556,7 +621,6 @@ app.processEvents()
     environment["PYTHONPATH"] = os.pathsep.join(
         [
             str(ROOT / "src"),
-            str(ROOT / "src" / "rc_metastudio"),
         ]
     )
     completed = subprocess.run(
@@ -587,12 +651,14 @@ app.processEvents()
 
 
 def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch):
-    import ma_specs
+    from rc_metastudio import analysis_setup_dialog
 
-    _install_analysis_backend(monkeypatch, ma_specs)
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
 
     def make_dialog():
-        dialog = ma_specs.MA_Specs(_AnalysisModel("binary"), conf_level=95.0)
+        dialog = analysis_setup_dialog.AnalysisSetupDialog(
+            _AnalysisModel("binary"), confidence_level=95.0
+        )
         dialog.buttonBox.accepted.disconnect()
         dialog.buttonBox.accepted.connect(dialog.accept)
         dialog.show()
@@ -601,13 +667,13 @@ def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch
 
     accepted = make_dialog()
     accepted.method_cbo_box.setFocus()
-    QTest.keyClick(accepted.method_cbo_box, QtCore.Qt.Key.Key_Return)
+    key_click(accepted.method_cbo_box, QtCore.Qt.Key.Key_Return)
     qapp.processEvents()
     assert accepted.result() == QtWidgets.QDialog.DialogCode.Accepted
 
     cancelled = make_dialog()
     cancelled.method_cbo_box.setFocus()
-    QTest.keyClick(cancelled.method_cbo_box, QtCore.Qt.Key.Key_Escape)
+    key_click(cancelled.method_cbo_box, QtCore.Qt.Key.Key_Escape)
     qapp.processEvents()
     assert cancelled.result() == QtWidgets.QDialog.DialogCode.Rejected
     accepted.close()
@@ -623,8 +689,9 @@ from PyQt6 import QtCore, QtWidgets
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-import app_error_handler
-import ma_specs
+from rc_metastudio import app_error_handler
+from rc_metastudio import analysis_adapter
+from rc_metastudio import analysis_setup_dialog
 
 class Model:
     current_effect = "OR"
@@ -634,9 +701,9 @@ class Model:
     def included_studies_have_raw_data(self):
         return True
 
-backend = ma_specs.meta_py_r
+backend = analysis_setup_dialog.r_bridge
 data_calls = []
-backend.ma_dataset_to_simple_binary_robj = lambda *args, **kwargs: data_calls.append("binary")
+backend.dataset_to_simple_binary_r_object = lambda *args, **kwargs: data_calls.append("binary")
 backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
 backend.get_params = lambda method: (
     {"conf.level": "float"}, {"conf.level": 95.0}, ["conf.level"], {}
@@ -648,14 +715,14 @@ app = app_error_handler.get_or_create_application([])
 observed = []
 backend_calls = []
 execution_data_calls = []
-backend.run_binary_ma = lambda method, params: backend_calls.append(
+backend.run_binary_analysis = lambda method, params: backend_calls.append(
     [method, params["conf.level"]]
 ) or {"texts": {}}
 for locale, text in (
     (QtCore.QLocale(QtCore.QLocale.Language.English), "90.5"),
     (QtCore.QLocale(QtCore.QLocale.Language.German), "90,5"),
 ):
-    dialog = ma_specs.MA_Specs(Model(), conf_level=95.0)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(Model(), confidence_level=95.0)
     confidence_inputs = dialog.parameter_grp_box.findChildren(
         QtWidgets.QDoubleSpinBox
     )
@@ -668,7 +735,7 @@ for locale, text in (
     observed.append(request.parameter_values()["conf.level"])
     confidence_input.setValue(11.0)
     data_calls.clear()
-    ma_specs._execute_analysis_requests(dialog.model, (request,))
+    analysis_adapter.execute_analysis_requests(dialog.model, (request,))
     execution_data_calls.extend(data_calls)
     dialog.close()
     app.processEvents()
@@ -681,9 +748,7 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(ROOT / "src"), str(ROOT / "src" / "rc_metastudio")]
-    )
+    environment["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src")])
     completed = subprocess.run(
         [sys.executable, "-c", script],
         cwd=ROOT,
@@ -708,21 +773,21 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
 
 def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
     cases = [
-        ("binary", "standard", "run_binary_ma"),
+        ("binary", "standard", "run_binary_analysis"),
         ("binary", "cumulative", "run_workflow_analysis"),
-        ("continuous", "standard", "run_continuous_ma"),
+        ("continuous", "standard", "run_continuous_analysis"),
         ("continuous", "leave-one-out", "run_workflow_analysis"),
         ("diagnostic", "standard", "run_diagnostic_multi"),
         ("diagnostic", "subgroup", "run_diagnostic_workflow"),
     ]
-    import analysis_adapter
-    import ma_specs
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio import analysis_setup_dialog
 
-    backend = ma_specs.meta_py_r
+    backend = analysis_setup_dialog.r_bridge
     for converter in (
-        "ma_dataset_to_simple_binary_robj",
-        "ma_dataset_to_simple_continuous_robj",
-        "ma_dataset_to_simple_diagnostic_robj",
+        "dataset_to_simple_binary_r_object",
+        "dataset_to_simple_continuous_r_object",
+        "dataset_to_simple_diagnostic_r_object",
     ):
         monkeypatch.setattr(backend, converter, lambda *_args, **_kwargs: None)
 
@@ -734,7 +799,11 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
             return {"texts": {"Summary": "ok"}, "images": {}}
 
         monkeypatch.setattr(backend, backend_name, capture)
-        metric = "DOR" if data_type == "diagnostic" else "OR"
+        metric = {
+            "binary": "OR",
+            "continuous": "SMD",
+            "diagnostic": "DOR",
+        }[data_type]
         mutable_parameters = {"conf.level": 90.5, "measure": metric}
         request = analysis_adapter.make_analysis_request(
             data_type=data_type,
@@ -748,7 +817,9 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
         mutable_parameters["conf.level"] = 1.0
         mutable_parameters["measure"] = "MUTATED"
 
-        ma_specs._execute_analysis_requests(_AnalysisModel(data_type), (request,))
+        analysis_adapter.execute_analysis_requests(
+            _AnalysisModel(data_type), (request,)
+        )
 
         rendered = repr(calls)
         assert "90.5" in rendered
@@ -757,8 +828,8 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
 
 
 def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
-    import analysis_adapter
-    import ma_specs
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio import analysis_setup_dialog
 
     calls = []
     model = _AnalysisModel("continuous")
@@ -772,23 +843,28 @@ def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
     )
     parameters["conf.level"] = 1.0
     monkeypatch.setattr(
-        ma_specs.meta_py_r,
-        "ma_dataset_to_simple_continuous_robj",
+        analysis_setup_dialog.r_bridge,
+        "dataset_to_simple_continuous_r_object",
         lambda model, **kwargs: calls.append(("data", kwargs)),
     )
     monkeypatch.setattr(
-        ma_specs.meta_py_r,
+        analysis_setup_dialog.r_bridge,
         "run_meta_regression",
         lambda *args, **kwargs: calls.append(("backend", args, kwargs)) or {},
     )
 
-    ma_specs._execute_meta_regression_request(
-        model, ("study",), ("covariate",), request, True, 95.0
+    analysis_adapter.execute_meta_regression_request(
+        model,
+        (analysis_dataset.Study("Study"),),
+        (analysis_dataset.Covariate("Covariate", "continuous"),),
+        request,
+        True,
+        95.0,
     )
 
     rendered = repr(calls)
     assert "90.5" in rendered
     assert "1.0" not in rendered
     assert "SMD" in rendered
-    assert "study" in rendered
-    assert "covariate" in rendered
+    assert isinstance(calls[0][1]["studies"][0], analysis_dataset.Study)
+    assert isinstance(calls[0][1]["covs_to_include"][0], analysis_dataset.Covariate)

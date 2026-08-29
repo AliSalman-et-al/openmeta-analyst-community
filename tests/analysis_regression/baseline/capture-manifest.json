@@ -1,0 +1,61 @@
+{
+  "artifact_bundle": {
+    "path": "artifacts/golden-baseline/comprehensive-golden-baseline.zip",
+    "storage": "ignored-local-or-ci-release-artifact"
+  },
+  "baseline": "comprehensive-golden",
+  "bundle_contents": [
+    "capture",
+    "texts",
+    "artifacts",
+    "plot-similarity-metadata",
+    "omissions"
+  ],
+  "captured_at": "2026-06-23T00:00:00Z",
+  "capture_metadata": {
+    "authoritative_capture_mode": "authoritative",
+    "authoritative_requires_baseline_environment_match": true,
+    "authority_values": [
+      "authoritative",
+      "local-debug"
+    ],
+    "baseline": "rc-metastudio-behavior",
+    "baseline_environment": {
+      "id": "rc-metastudio-python3-pyqt5-r4-RCMetaR",
+      "os": "Windows",
+      "package": "RCMetaR",
+      "pyqt": "5.15.11",
+      "python": "3.11",
+      "r": "R version 4.6.0",
+      "rpy2": "3.6.7"
+    },
+    "local_default_capture_mode": "local-debug",
+    "required_fields": [
+      "python",
+      "os",
+      "r",
+      "rpy2",
+      "pyqt",
+      "package_versions",
+      "commit_sha",
+      "capture_mode",
+      "capture_command",
+      "baseline_environment",
+      "authoritative",
+      "authority"
+    ]
+  },
+  "curated_golden_set": [
+    "amino-binary-random",
+    "continuous-random",
+    "lymph-diagnostic-random-dor",
+    "amino-binary-cumulative",
+    "amino-binary-leave-one-out",
+    "continuous-cumulative",
+    "continuous-leave-one-out",
+    "amino-binary-meta-regression",
+    "continuous-meta-regression",
+    "amino-binary-subgroup",
+    "continuous-subgroup"
+  ]
+}

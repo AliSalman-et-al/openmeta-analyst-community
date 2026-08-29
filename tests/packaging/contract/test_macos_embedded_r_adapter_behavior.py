@@ -12,15 +12,13 @@ import zipfile
 
 import pytest
 
+from ._workflow import load_module_from_path
+
 ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_script(name: str, relative: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / relative)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_module_from_path(name, ROOT / relative)
 
 
 def load_embedded_r_adapter():
@@ -84,9 +82,7 @@ def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
     )
     toc = {entry["destination"]: entry for entry in adapter.explicit_toc(framework)}
     assert toc["R.framework/Versions/4.6-x86_64/R"]["type"] == "DATA"
-    runtime_entry = toc[
-        "R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"
-    ]
+    runtime_entry = toc["R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"]
     assert runtime_entry["type"] == "SYMLINK"
     assert Path(runtime_entry["source"]) == Path("../../R")
 
@@ -274,7 +270,7 @@ if compgen -G "${source_path}.rcms-isolated.*" >/dev/null; then exit 34; fi
 
 def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
     from rc_metastudio import __main__ as application_entry
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
 
     events = []
     monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -282,16 +278,16 @@ def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
     monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     import rc_metastudio
 
-    monkeypatch.delattr(rc_metastudio, "meta_py_r", raising=False)
+    monkeypatch.delattr(rc_metastudio, "r_bridge", raising=False)
     for name in tuple(sys.modules):
         if (
-            name == "meta_py_r"
-            or name == "rc_metastudio.meta_py_r"
+            name == "r_bridge"
+            or name == "rc_metastudio.r_bridge"
             or name.startswith("rpy2")
         ):
             monkeypatch.delitem(sys.modules, name, raising=False)
 
-    fake_runtime = types.ModuleType("r_runtime")
+    fake_runtime = types.ModuleType("rc_metastudio.r_runtime")
 
     def configure():
         import threading
@@ -301,7 +297,8 @@ def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
         events.append("configure-bundled-r")
 
     setattr(fake_runtime, "configure_bundled_r_environment", configure)
-    monkeypatch.setitem(sys.modules, "r_runtime", fake_runtime)
+    monkeypatch.setitem(sys.modules, "rc_metastudio.r_runtime", fake_runtime)
+    monkeypatch.setattr(rc_metastudio, "r_runtime", fake_runtime, raising=False)
     fake_qt_ui = types.ModuleType("rc_metastudio.qt6_ui")
     setattr(
         fake_qt_ui, "prepare_generated_ui_imports", lambda: events.append("prepare-ui")
@@ -310,25 +307,25 @@ def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
     real_import = builtins.__import__
 
     def observing_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "rc_metastudio" and "meta_py_r" in (fromlist or ()):
+        if name == "rc_metastudio" and "r_bridge" in (fromlist or ()):
             assert events[-1] == "configure-bundled-r"
             events.append("rpy2-import")
-            fake_backend = types.ModuleType("rc_metastudio.meta_py_r")
-            monkeypatch.setitem(sys.modules, "rc_metastudio.meta_py_r", fake_backend)
-            monkeypatch.setitem(sys.modules, "meta_py_r", fake_backend)
+            fake_backend = types.ModuleType("rc_metastudio.r_bridge")
+            monkeypatch.setitem(sys.modules, "rc_metastudio.r_bridge", fake_backend)
             import rc_metastudio
 
-            monkeypatch.setattr(rc_metastudio, "meta_py_r", fake_backend, raising=False)
+            monkeypatch.setattr(rc_metastudio, "r_bridge", fake_backend, raising=False)
         return real_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", observing_import)
-    fake_launch = types.ModuleType("launch")
+    fake_launch = types.ModuleType("rc_metastudio.launch")
     setattr(
         fake_launch,
         "start",
-        lambda: (meta_py_r_backend.install_meta_py_r_backend(), 0)[1],
+        lambda: (r_backend.install_r_backend(), 0)[1],
     )
-    monkeypatch.setitem(sys.modules, "launch", fake_launch)
+    monkeypatch.setitem(sys.modules, "rc_metastudio.launch", fake_launch)
+    monkeypatch.setattr(rc_metastudio, "launch", fake_launch, raising=False)
     assert application_entry.main() == 0
     assert events == ["prepare-ui", "configure-bundled-r", "rpy2-import"]
 
@@ -337,8 +334,8 @@ def test_pkgutil_signature_parser_handles_certificate_chain_and_rejectable_team(
     spec = importlib.util.spec_from_file_location(
         "pkg_signature", ROOT / "scripts" / "macos_pkg_signature.py"
     )
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     payload = module.parse_pkgutil_signature(
         "Package: R-4.6.1-x86_64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
@@ -647,45 +644,45 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
     marker = tmp_path / "launch.json"
     evidence.write_text(
         json.dumps(
-                {
-                    "passed": True,
-                    "failures": [],
-                    "surface_progress": [],
-                    "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
-                    "workflows": {
-                        "automation_entry_point": True,
-                        "representative_edit": True,
-                        "real_r_analysis": True,
-                        "result_text": True,
-                        "save_reopen": True,
-                        "analysis_after_reopen": True,
-                        "converted_sample": "BCG.rcms",
-                        "expected_normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
-                        "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
-                        "raw_summary_sha256": "a" * 64,
-                        "svg_sha256": {"forest": "b" * 64},
-                        "locale_variants": [
+            {
+                "passed": True,
+                "failures": [],
+                "surface_progress": [],
+                "scales": [{"requested": scale} for scale in ("1.25", "1.50", "1.75")],
+                "workflows": {
+                    "automation_entry_point": True,
+                    "representative_edit": True,
+                    "real_r_analysis": True,
+                    "result_text": True,
+                    "save_reopen": True,
+                    "analysis_after_reopen": True,
+                    "converted_sample": "BCG.rcms",
+                    "expected_normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                    "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                    "raw_summary_sha256": "a" * 64,
+                    "svg_sha256": {"forest": "b" * 64},
+                    "locale_variants": [
+                        {
+                            "locale": locale,
+                            "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
+                            "raw_summary_sha256": "a" * 64,
+                        }
+                        for locale in ("en_US", "de_DE")
+                    ],
+                    "sample_projects": {
+                        "passed": True,
+                        "manifest_sha256": "c" * 64,
+                        "projects": [
                             {
-                                "locale": locale,
-                                "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
-                                "raw_summary_sha256": "a" * 64,
+                                "project": "BCG.rcms",
+                                "sha256": "d" * 64,
+                                "semantic_sha256": "e" * 64,
+                                "opened_in_packaged_application": True,
                             }
-                            for locale in ("en_US", "de_DE")
                         ],
-                        "sample_projects": {
-                            "passed": True,
-                            "manifest_sha256": "c" * 64,
-                            "projects": [
-                                {
-                                    "project": "BCG.rcms",
-                                    "sha256": "d" * 64,
-                                    "semantic_sha256": "e" * 64,
-                                    "opened_in_packaged_application": True,
-                                }
-                            ],
-                        },
                     },
-                }
+                },
+            }
         ),
         encoding="utf-8",
     )

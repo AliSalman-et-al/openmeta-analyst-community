@@ -11,15 +11,14 @@ import posixpath
 from collections.abc import Mapping
 from dataclasses import dataclass
 from PyQt6 import QtCore, QtGui
-import qt_text
-from workspace_column_identity import WorkspaceColumnWidthState
+from rc_metastudio import qt_text
+from rc_metastudio.workspace_column_identity import WorkspaceColumnWidthState
 
 QColor = QtGui.QColor
 QDir = QtCore.QDir
 QSettings = QtCore.QSettings
 ANALYSIS_SCRATCH_ENV_VAR = "RCMS_ANALYSIS_SCRATCH_DIR"
 
-##################### HANDLE SETTINGS #####################
 
 MAX_RECENT_FILES = 10
 SIGNED_INT32_MIN = -(2**31)
@@ -32,14 +31,13 @@ WORKSPACE_LAYOUT_SCHEMA_VERSION = 2
 MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
 RESULTS_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/results"
 EDIT_DATASET_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/edit_dataset"
-NETWORK_VIEW_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/network_view"
+NETWORK_VIEW_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/network_view_dialog"
 DEFAULT_RESULTS_SPLITTER_PROPORTIONS = (0.30, 0.70)
 DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS = (1.0 / 3.0,) * 3
 DEFAULT_SETTINGS = {
     "splash": True,
     "digits": 2,
     "recent_files": [],
-    # "method_params":{},
 }
 
 
@@ -182,7 +180,6 @@ def get_setting(field):
     try:
         return _get_setting_helper(field)
     except (TypeError, ValueError, json.JSONDecodeError):
-        print("Invalid value for setting '%s'; resetting only that field" % field)
         update_setting(field, SETTING_SPECS[field].default)
         return _get_setting_helper(field)
 
@@ -228,9 +225,6 @@ def _get_setting_helper(field):
 
 def save_settings():
     """Mark completion after callers' setValue writes without forcing RegFlushKey."""
-    print("saved settings", flush=True)
-    print("RCMS_SETTINGS_PHASE before-former-sync", flush=True)
-    print("RCMS_SETTINGS_PHASE after-former-sync", flush=True)
 
 
 def migrate_workspace_layout_settings():
@@ -415,7 +409,7 @@ def _available_screen_geometries():
 
 
 def _screen_safe_geometry(frame_geometry, available_geometries):
-    from adaptive_window import clamp_frame_geometry
+    from rc_metastudio.adaptive_window import clamp_frame_geometry
 
     frame = QtCore.QRect(frame_geometry)
     screens = [QtCore.QRect(rect) for rect in available_geometries if rect.isValid()]
@@ -428,7 +422,7 @@ def _screen_safe_geometry(frame_geometry, available_geometries):
 
 
 def load_workspace_placement(group, available_geometries=None, default_maximized=True):
-    """Load one Workspace role through the shared ADR 0196 policy."""
+    """Load a workspace placement and clamp it to an available screen."""
     migrate_workspace_layout_settings()
     settings = QSettings()
     geometry = _read_frame_geometry(settings, group + "/frame_geometry")
@@ -631,7 +625,7 @@ def restore_edit_dataset_window_state(window):
     return state
 
 
-def load_network_view_placement(available_geometries=None):
+def load_network_view_dialog_placement(available_geometries=None):
     """Load Network View's independent screen-safe Workspace placement."""
     return load_workspace_placement(
         NETWORK_VIEW_WORKSPACE_GROUP,
@@ -640,15 +634,15 @@ def load_network_view_placement(available_geometries=None):
     )
 
 
-def save_network_view_placement(window):
+def save_network_view_dialog_placement(window):
     """Persist Network View geometry independently of other Workspaces."""
     settings = save_workspace_placement(NETWORK_VIEW_WORKSPACE_GROUP, window)
     settings.sync()
 
 
-def restore_network_view_placement(window):
+def restore_network_view_dialog_placement(window):
     """Restore Network View placement without displaying the modeless window."""
-    placement = load_network_view_placement()
+    placement = load_network_view_dialog_placement()
     restore_workspace_placement(
         window,
         placement,
@@ -685,9 +679,9 @@ def load_main_column_widths():
 
 
 def load_settings():
-    """loads settings from QSettings object, setting suitable defaults if
-    there are missing fields"""
-
+    """Loads settings from QSettings object, setting suitable defaults if
+    there are missing fields
+    """
     migrate_application_settings()
     settings = QSettings()
 
@@ -701,16 +695,13 @@ def load_settings():
             field
         ) or field_is_toplevel_child_group_keys(field)
         if not setting_present:
-            print(("Filling in setting for %s" % field))
             update_setting(field, value)
 
     save_settings()
-    print("loaded settings")
     return settings
 
 
 def reset_settings():
-    print("Resetting settings to default")
     settings = QSettings()
     settings.clear()
 
@@ -784,24 +775,19 @@ def get_default_open_directory(recent_files=None):
     return "."
 
 
-################ END HANDLE SETTINGS ######################
-
-
-###### HANDLE ANALYSIS SCRATCH DIRECTORY ###################
 def setup_directories():
     """Create and clear the managed scratch directory for analysis artifacts.
 
     Python stays in the application data directory; R is reset to the same base
     directory and writes analysis artifacts under the managed scratch folder.
     """
-
     # Create the application data root and managed analysis scratch folder.
     base_path = make_base_path()
     make_r_tmp()
 
-    from rc_metastudio import meta_py_r
+    from rc_metastudio import r_bridge
 
-    meta_py_r.reset_Rs_working_dir()  # set working directory on R side
+    r_bridge.reset_r_working_directory()  # set working directory on R side
     os.chdir(os.path.normpath(base_path))  # set working directory on python side
 
     clear_r_tmp()
@@ -809,21 +795,19 @@ def setup_directories():
 
 def make_base_path():
     """Create the application data path if needed and return it."""
-
     base_path = get_base_path()
 
     success = QDir().mkpath(base_path)
     if not success:
         raise Exception("Could not create base path at %s" % base_path)
-    print(("Made base path: %s" % base_path))
     return base_path
 
 
 def get_base_path(normalize=False):
-    """normalize changes the path separators according to the OS,
+    """Normalize changes the path separators according to the OS,
     Usually this shouldn't be done because R is confused by backward slashes \
-    because it sees it as an escape character and Qt is fine with / throughout """
-
+    because it sees it as an escape character and Qt is fine with / throughout
+    """
     base_path = str(
         QtCore.QStandardPaths.writableLocation(
             QtCore.QStandardPaths.StandardLocation.AppDataLocation
@@ -831,7 +815,6 @@ def get_base_path(normalize=False):
     )
     if normalize:
         base_path = str(QDir.toNativeSeparators(base_path))
-    print(("Base path is: %s" % base_path))
     return base_path
 
 
@@ -852,7 +835,6 @@ def make_r_tmp():
     success = QDir().mkpath(r_tmp_path)
     if not success:
         raise Exception("Could not create r_tmp path at %s" % r_tmp_path)
-    print(("Made r_tmp_path at %s" % r_tmp_path))
     return r_tmp_path
 
 
@@ -869,24 +851,21 @@ def to_posix_path(path):
 
     The input must already be a literal path, not an escaped string.
     """
-
     new_path = path.replace("\\", "/")
     return new_path
 
 
 def clear_r_tmp():
     r_tmp_dir = get_r_tmp_path(normalize=True)
-    print(("Clearing %s" % r_tmp_dir))
     if not os.path.isdir(r_tmp_dir):
         return
     for file_p in os.listdir(r_tmp_dir):
         file_path = os.path.join(r_tmp_dir, file_p)
         try:
             if os.path.isfile(file_path):
-                print(("deleting %s" % file_path))
                 os.unlink(file_path)  # same as remove
-        except Exception as e:
-            print(e)
+        except OSError:
+            pass
 
 
 def get_user_documents_path():
@@ -896,6 +875,3 @@ def get_user_documents_path():
         )
     )
     return docs_path
-
-
-############## END OF HANDLE R_TEMP IN USER-AREA DIRECTORY ####################

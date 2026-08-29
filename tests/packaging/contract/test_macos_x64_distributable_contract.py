@@ -187,26 +187,25 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "Analysis(" in spec
     assert "BUNDLE(" in spec
     assert (
-        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")'
-        in spec
+        'icon=str(app_source / "images" / "rc-metastudio-app-icon-rounded.png")' in spec
     )
     assert (
-        ROOT
-        / "src"
-        / "rc_metastudio"
-        / "images"
-        / "rc-metastudio-app-icon-rounded.png"
+        ROOT / "src" / "rc_metastudio" / "images" / "rc-metastudio-app-icon-rounded.png"
     ).is_file()
     assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
-    assert "generated_form_modules" in spec
+    assert "generated_ui_collection.py" in spec
+    assert "pyinstaller_module_entries(qt6_build_root)" in spec
+    assert "a.pure.extend(generated_ui_modules)" in spec
+    assert 'str(generated_package)' not in spec
+    assert 'str(generated_forms)' not in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
     assert "a.datas.extend(" not in spec
-    assert 'RCMS_STAGED_R_FRAMEWORK' in spec
-    assert 'a.binaries = adapter_module.filter_pyinstaller_r_binaries' in spec
-    assert 'a.datas = adapter_module.filter_pyinstaller_r_binaries' in spec
+    assert "RCMS_STAGED_R_FRAMEWORK" in spec
+    assert "a.binaries = adapter_module.filter_pyinstaller_r_binaries" in spec
+    assert "a.datas = adapter_module.filter_pyinstaller_r_binaries" in spec
     assert 'copy_tree "$staged_r_framework" "$r_framework"' in build
     assert '(direct_r_framework, "R.framework")' not in spec
     assert '"direct-r-spike.marker"' in spec
@@ -226,7 +225,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "main_executable.chmod(main_executable.stat().st_mode | 0o111)" in build
     assert 'export MACOSX_DEPLOYMENT_TARGET="$minimum_macos_version"' in build
     assert "MACOSX_DEPLOYMENT_TARGET=13.0" not in build
-    launch = text("src/rc_metastudio/launch.py")
+    launch = text("src/rc_metastudio/automation.py")
     assert "isTRUE(requireNamespace('tcltk', quietly=TRUE))" in launch
     assert "raise SystemExit(1) from exc" in launch
     spike = text("scripts/package-macos-x64-direct-r-spike.sh")
@@ -293,7 +292,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "Proving and relocating the rpy2 API bridge against staged R" in build
     assert 'install_name_tool -change "$dependency"' in build
     assert '"cffi_mode": os.environ.get("RPY2_CFFI_MODE")' in text(
-        "src/rc_metastudio/launch.py"
+        "src/rc_metastudio/automation.py"
     )
     assert "codesign --force --deep" not in build
     assert not (ROOT / "scripts/sign-notarize-macos-package.sh").exists()
@@ -342,9 +341,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert '--sdk-root "$PWD/build/qt-sdk/6.11.1/macos"' in rcc_resolve["run"]
     assert '--github-env "$GITHUB_ENV"' in rcc_resolve["run"]
     assert steps.index(rcc_resolve) < steps.index(
-        steps_by_name[
-            "Build and run the first-green packaged workflow"
-        ]
+        steps_by_name["Build and run the first-green packaged workflow"]
     )
 
 
@@ -477,8 +474,8 @@ def test_private_r_launcher_configuration_is_exact_and_precedes_rpy2_build(tmp_p
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     resources = tmp_path / "Resources"
     binary = resources / "bin/R"
@@ -611,8 +608,8 @@ def test_private_r_config_wrapper_fails_closed_on_upstream_drift(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     resources = tmp_path / "Resources"
     binary = resources / "bin/R"
@@ -634,8 +631,8 @@ def test_private_r_launcher_rejects_unsafe_existing_real_rscript(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_launchers", ROOT / "scripts" / "configure_macos_r_launchers.py"
     )
+    assert spec is not None and spec.loader is not None
     launchers = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(launchers)
     kinds = ["directory"] if os.name == "nt" else ["directory", "nonexec"]
     for kind in kinds:
@@ -893,8 +890,8 @@ def test_official_r_component_resolver_requires_exact_private_payload(tmp_path):
     spec = importlib.util.spec_from_file_location(
         "r_component", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
     (component / "Payload" / "R.framework").mkdir(parents=True)
@@ -945,8 +942,8 @@ def test_official_r_component_resolver_rejects_invalid_metadata(tmp_path, xml, m
         "r_component_invalid",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "component"
     (component / "Payload/R.framework").mkdir(parents=True)
@@ -961,8 +958,8 @@ def test_official_r_component_resolver_preserves_framework_symlinks_and_rejects_
     spec = importlib.util.spec_from_file_location(
         "r_component_links", ROOT / "scripts" / "resolve_macos_r_framework_component.py"
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "org.R-project.x86_64.R.fw.pkg"
     framework = component / "Payload/R.framework"
@@ -1006,8 +1003,8 @@ def test_official_r_component_resolver_rejects_framework_root_symlink_and_xml_bo
         "r_component_specific_bounds",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     component = tmp_path / "component"
     payload = component / "Payload"
@@ -1058,8 +1055,8 @@ def test_official_r_component_resolver_caps_diagnostic_characters_before_count(
         "r_component_diag_chars",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     # Six entries are below the count cap, but their legal field lengths exceed
     # the total diagnostic character budget unless the resolver truncates them.
@@ -1081,8 +1078,8 @@ def test_official_r_component_resolver_bounds_files_and_rejects_symlinks(tmp_pat
         "r_component_bounds",
         ROOT / "scripts" / "resolve_macos_r_framework_component.py",
     )
+    assert spec is not None and spec.loader is not None
     resolver = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(resolver)
     oversized = tmp_path / "oversized"
     oversized.mkdir()
@@ -1316,18 +1313,19 @@ def test_macos_inventory_allows_only_the_rpy2_api_native_bridge():
 
 
 def test_macos_surface_smoke_exercises_native_acceptance_surfaces():
-    launch = text("src/rc_metastudio/launch.py")
-    native_dialog_bridge = launch.split("def _native_file_dialog_observation", 1)[
+    automation = text("src/rc_metastudio/automation.py")
+    launch = automation
+    native_dialog_bridge = automation.split("def _native_file_dialog_observation", 1)[
         1
     ].split("def start_package_surface_smoke", 1)[0]
 
-    assert 'platform_name != "cocoa"' in launch
-    assert '"native_menu": native_menu' in launch
-    assert '"native_file_dialog": native_file_dialog' in launch
-    assert '"accessibility": accessibility' in launch
-    assert "DontUseNativeDialog" in launch
-    assert "NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000" in launch
-    assert "setWindowModality(QtCore.Qt.WindowModality.WindowModal)" in launch
+    assert 'platform_name != "cocoa"' in automation
+    assert '"native_menu": native_menu' in automation
+    assert '"native_file_dialog": native_file_dialog' in automation
+    assert '"accessibility": accessibility' in automation
+    assert "DontUseNativeDialog" in automation
+    assert "NATIVE_FILE_DIALOG_TIMEOUT_MS = 10_000" in automation
+    assert "setWindowModality(QtCore.Qt.WindowModality.WindowModal)" in automation
     assert "file_dialog.open()" in launch
     assert "file_dialog.windowModality().name" in launch
     assert '"window_modality": "window-modal"' not in launch
@@ -1626,13 +1624,15 @@ def test_macho_discriminator_excludes_java_without_trusting_extensions(
 
     large_attribute = tmp_path / "large-attribute.class"
     large_attribute.write_bytes(minimal_java_class(attribute_body=b"x" * 1_000_000))
-    original_read = feasibility._read_java_bytes
+    from rc_metastudio import macos_macho
+
+    original_read = macos_macho._read_java_bytes
 
     def reject_unbounded_read(stream, size, label):
         assert size < 100_000, f"attribute body was materialized: {size}"
         return original_read(stream, size, label)
 
-    monkeypatch.setattr(feasibility, "_read_java_bytes", reject_unbounded_read)
+    monkeypatch.setattr(macos_macho, "_read_java_bytes", reject_unbounded_read)
     assert feasibility.is_valid_java_class(large_attribute)
     assert not feasibility.is_macho_candidate(large_attribute)
 
@@ -3023,9 +3023,7 @@ def test_cocoa_accessibility_finds_exact_exposed_descendant_fail_closed():
 def test_direct_macos_inputs_remain_manual_and_do_not_block_windows_release_gate():
     policy = load_package_policy()
     direct_inputs = [
-        "scripts/validate_test_taxonomy.py",
         "scripts/verify_rcmetar_r_stack.py",
-        "docs/verification/test-taxonomy.json",
         "scripts/delivery.py",
         "scripts/inspect_macos_deployment.py",
         "scripts/qt6_macos_feasibility.py",

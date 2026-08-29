@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -13,6 +14,7 @@ os.environ.setdefault(
 )
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required
 
 prepare_generated_ui_imports()
 
@@ -25,11 +27,11 @@ class FakeDiagnosticGroup:
         self.raw_data = raw_data
 
 
-class FakeDiagnosticMAUnit:
+class FakeDiagnosticAnalysisUnit:
     def __init__(self, raw_data=None, effects=None):
         self.raw_data = list(raw_data or [12, 3, 4, 21])
         self.effects = dict(effects or {})
-        self.tx_groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
+        self.groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
 
     def get_raw_data_for_group(self, _group):
         return self.raw_data
@@ -67,65 +69,71 @@ class FakeDiagnosticModel:
     def included_studies_have_point_estimates(self, effect):
         return effect in self.entered_effects
 
-    def get_global_conf_level(self):
+    def get_confidence_level(self):
         return 95.0
 
 
 def _open_data_dialog(
     monkeypatch, raw_data=None, effects=None, imputed=None, available=AVAILABLE
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     monkeypatch.setattr(
-        diagnostic_data_form.adaptive_window,
+        diagnostic_data_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(available),
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r, "get_mult_from_r", lambda _conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "diagnostic_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
-        "impute_diag_data",
+        diagnostic_data_dialog.r_bridge,
+        "impute_diagnostic_data",
         lambda _data: imputed or {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         },
     )
     monkeypatch.setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "effect_triplet",
         lambda effect, scale, metric=None: effect[scale],
     )
-    dialog = diagnostic_data_form.DiagnosticDataForm(
-        FakeDiagnosticMAUnit(raw_data=raw_data, effects=effects),
+    dialog = diagnostic_data_dialog.DiagnosticDataDialog(
+        FakeDiagnosticAnalysisUnit(raw_data=raw_data, effects=effects),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
     return app, dialog
 
 
 def _open_metrics_dialog(monkeypatch, model):
-    import diag_metrics
+    from rc_metastudio import diagnostic_metrics_dialog
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = required(
+        QtWidgets.QApplication.instance() or QtWidgets.QApplication([]), "application"
+    )
     monkeypatch.setattr(
-        diag_metrics.adaptive_window,
+        diagnostic_metrics_dialog.adaptive_window,
         "available_geometry_for_window",
         lambda _window: QtCore.QRect(AVAILABLE),
     )
-    dialog = diag_metrics.Diag_Metrics(model)
+    dialog = diagnostic_metrics_dialog.DiagnosticMetricsDialog(model)
     return app, dialog
 
 
@@ -144,7 +152,7 @@ def test_diagnostic_data_declares_transactional_overflow_and_reachable_actions(
         assert isinstance(dialog.content_scroll, QtWidgets.QScrollArea)
         assert dialog.content_scroll.widgetResizable()
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
-        assert dialog.layout().indexOf(dialog.buttonBox) >= 0
+        assert required(dialog.layout(), "dialog layout").indexOf(dialog.buttonBox) >= 0
         assert AVAILABLE.contains(dialog.frameGeometry())
         assert (
             dialog.two_by_two_table.horizontalScrollBarPolicy()
@@ -167,18 +175,18 @@ def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.focusWidget() is dialog.two_by_two_table
         assert ok.isDefault()
-        assert dialog.prevalence_lbl.buddy() is dialog.prevalence_txt_box
-        assert dialog.label_13.buddy() is dialog.effect_cbo_box
-        assert dialog.label_14.buddy() is dialog.effect_txt_box
+        assert dialog.prevalence_lbl.buddy() is dialog.prevalence_text_box
+        assert dialog.effect_metric_label.buddy() is dialog.effect_combo_box
+        assert dialog.label_14.buddy() is dialog.effect_text_box
         assert dialog.two_by_two_table.accessibleName() == (
             "Diagnostic two by two counts"
         )
 
-        dialog.effect_cbo_box.setFocus()
-        QtTest.QTest.keyClick(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
-        assert dialog.focusWidget() is dialog.effect_txt_box
+        dialog.effect_combo_box.setFocus()
+        key_click(dialog.effect_combo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_text_box
 
-        QtTest.QTest.keyClick(dialog, QtCore.Qt.Key.Key_Escape)
+        key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
     finally:
         dialog.close()
@@ -189,13 +197,13 @@ def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
 def test_count_entry_preserves_diagnostic_behavior_without_root_growth(
     monkeypatch, size
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
     available = QtCore.QRect(20, 30, *size)
     app, dialog = _open_data_dialog(monkeypatch, available=available)
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.QMessageBox,
+        diagnostic_data_dialog.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )
@@ -209,10 +217,10 @@ def test_count_entry_preserves_diagnostic_behavior_without_root_growth(
         app.processEvents()
 
         assert warnings == []
-        assert dialog.ma_unit.raw_data == [15.0, 3.0, 4.0, 21.0]
+        assert dialog.analysis_unit.raw_data == [15.0, 3.0, 4.0, 21.0]
         assert dialog.two_by_two_table.item(0, 2).text() == "19"
         assert dialog.two_by_two_table.item(2, 2).text() == "43"
-        assert dialog.ma_unit.effects["Sens"] == (0.8, 0.7, 0.9)
+        assert dialog.analysis_unit.effects["Sens"] == (0.8, 0.7, 0.9)
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
         assert dialog.frameGeometry().width() <= int(available.width() * 0.9) + 2
@@ -236,21 +244,21 @@ def test_entered_effect_switching_is_semantically_sized_and_geometry_stable(
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
 
-        spec_index = dialog.effect_cbo_box.findText("Spec")
-        dialog.effect_cbo_box.setCurrentIndex(spec_index)
+        spec_index = dialog.effect_combo_box.findText("Spec")
+        dialog.effect_combo_box.setCurrentIndex(spec_index)
         app.processEvents()
 
-        assert dialog.cur_effect == "Spec"
+        assert dialog.current_effect == "Spec"
         assert [
-            dialog.effect_txt_box.text(),
-            dialog.low_txt_box.text(),
-            dialog.high_txt_box.text(),
+            dialog.effect_text_box.text(),
+            dialog.lower_text_box.text(),
+            dialog.upper_text_box.text(),
         ] == ["0.8", "0.7", "0.9"]
         for field in (
-            dialog.prevalence_txt_box,
-            dialog.effect_txt_box,
-            dialog.low_txt_box,
-            dialog.high_txt_box,
+            dialog.prevalence_text_box,
+            dialog.effect_text_box,
+            dialog.lower_text_box,
+            dialog.upper_text_box,
         ):
             required = field.fontMetrics().horizontalAdvance("1.0000")
             assert field.minimumWidth() >= required
@@ -273,13 +281,13 @@ def test_back_calculation_updates_counts_without_root_growth(monkeypatch):
         dialog.show()
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
-        assert dialog.back_calc_Btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
         QtWidgets.QApplication.processEvents()
-        dialog.back_calc_Btn.click()
+        dialog.back_calculate_button.click()
         app.processEvents()
 
-        assert dialog.ma_unit.raw_data == [12.0, 3.0, 4.0, 21.0]
+        assert dialog.analysis_unit.raw_data == [12.0, 3.0, 4.0, 21.0]
         assert [
             dialog.two_by_two_table.item(row, column).text()
             for row in range(2)
@@ -293,7 +301,13 @@ def test_back_calculation_updates_counts_without_root_growth(monkeypatch):
 
 
 def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -322,15 +336,15 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
         assert (
             table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
         )
-        dialog.high_txt_box.setFocus()
+        dialog.upper_text_box.setFocus()
         app.processEvents()
-        mapped = dialog.high_txt_box.mapTo(
+        mapped = dialog.upper_text_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
         assert (
             dialog.content_scroll.viewport()
             .rect()
-            .intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
+            .intersects(QtCore.QRect(mapped, dialog.upper_text_box.size()))
         )
         assert dialog.buttonBox.isVisible()
     finally:
@@ -339,10 +353,81 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
         app.processEvents()
 
 
-def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
-    import diagnostic_data_form
+@pytest.mark.parametrize("initially_blocked", [False, True])
+def test_diagnostic_set_val_restores_table_signal_state(initially_blocked):
+    from rc_metastudio import diagnostic_data_dialog
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
+    table = QtWidgets.QTableWidget(1, 1)
+
+    class StubDialog:
+        two_by_two_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            return True
+
+    table.blockSignals(initially_blocked)
+    diagnostic_data_dialog.DiagnosticDataDialog._set_val(
+        cast(diagnostic_data_dialog.DiagnosticDataDialog, StubDialog()), 0, 0, 3
+    )
+
+    assert table.signalsBlocked() is initially_blocked
+    table.deleteLater()
+    app.processEvents()
+
+
+def test_diagnostic_set_val_restores_blocked_state_when_item_update_fails(monkeypatch):
+    from rc_metastudio import diagnostic_data_dialog
+
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
+    table = QtWidgets.QTableWidget(1, 1)
+    table.setItem(0, 0, QtWidgets.QTableWidgetItem("old"))
+
+    class StubDialog:
+        two_by_two_table = table
+
+        @staticmethod
+        def _raw_count_cell_is_editable(_row, _col):
+            return True
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("injected item update failure")
+
+    monkeypatch.setattr(diagnostic_data_dialog, "required", fail)
+    table.blockSignals(True)
+    with pytest.raises(RuntimeError, match="injected item update failure"):
+        diagnostic_data_dialog.DiagnosticDataDialog._set_val(
+            cast(diagnostic_data_dialog.DiagnosticDataDialog, StubDialog()), 0, 0, 3
+        )
+
+    assert table.signalsBlocked()
+    table.deleteLater()
+    app.processEvents()
+
+
+def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
+    from rc_metastudio import diagnostic_data_dialog
+
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -350,7 +435,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
     app, dialog = _open_data_dialog(monkeypatch)
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.QMessageBox,
+        diagnostic_data_dialog.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )
@@ -368,7 +453,7 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         assert dialog.inconsistencyLabel.isVisible()
         assert dialog.inconsistencyLabel.wordWrap()
         assert "whole number" in dialog.inconsistencyLabel.text()
-        assert dialog.ma_unit.raw_data == [12, 3, 4, 21]
+        assert dialog.analysis_unit.raw_data == [12, 3, 4, 21]
         assert dialog.two_by_two_table.item(0, 0).text() == "12"
         mapped = dialog.inconsistencyLabel.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
@@ -382,8 +467,8 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         assert ok.isEnabled()
         assert ok.isVisible()
         assert AVAILABLE.contains(dialog.frameGeometry())
-        spec_index = dialog.effect_cbo_box.findText("Spec")
-        dialog.effect_cbo_box.setCurrentIndex(spec_index)
+        spec_index = dialog.effect_combo_box.findText("Spec")
+        dialog.effect_combo_box.setCurrentIndex(spec_index)
         app.processEvents()
         assert ok.isEnabled()
     finally:
@@ -395,17 +480,23 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
 @pytest.mark.parametrize(
     ("field_name", "invalid_value", "guidance", "restored"),
     [
-        ("effect_txt_box", "not numeric", "must be numeric", "0.75"),
-        ("low_txt_box", "0.95", "lower CI must be less", "0.6"),
+        ("effect_text_box", "not numeric", "must be numeric", "0.75"),
+        ("lower_text_box", "0.95", "lower CI must be less", "0.6"),
     ],
     ids=["effect", "interval"],
 )
 def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
     monkeypatch, field_name, invalid_value, guidance, restored
 ):
-    import diagnostic_data_form
+    from rc_metastudio import diagnostic_data_dialog
 
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))
@@ -417,7 +508,7 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
     )
     warnings = []
     monkeypatch.setattr(
-        diagnostic_data_form.calc_fncs.QMessageBox,
+        diagnostic_data_dialog.calc_fncs.QMessageBox,
         "warning",
         lambda _parent, _title, message: warnings.append(message),
     )
@@ -499,7 +590,13 @@ def test_diagnostic_metric_availability_preserves_workflow_and_explains_limits(
 
 
 def test_metric_guidance_and_focus_remain_reachable_with_large_font(monkeypatch):
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    app = cast(
+        QtWidgets.QApplication,
+        required(
+            QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
+            "application",
+        ),
+    )
     old_font = app.font()
     enlarged = QtGui.QFont(old_font)
     enlarged.setPointSize(max(16, old_font.pointSize() + 6))

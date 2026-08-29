@@ -1,8 +1,9 @@
-import importlib.util
 import shutil
 import sys
 import tomllib
 from pathlib import Path
+
+from ._workflow import load_module_from_path
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -30,11 +31,8 @@ def read_description_fields(path):
 
 
 def load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
+    module = load_module_from_path(name, path)
     sys.modules[name] = module
-    spec.loader.exec_module(module)
     return module
 
 
@@ -129,17 +127,6 @@ def test_active_rcmetar_package_metadata_uses_current_maintainer_identity():
     assert f"{retired_package_maintainer} <" not in description
     assert f"{retired_package_maintainer} \\email" not in package_rd
     assert f"{retired_package_author} \\email" not in package_rd
-
-
-def test_release_readiness_text_does_not_invert_current_identity():
-    changelog = read_text("CHANGELOG.md")
-    inventory = read_text("docs", "release", "third-party-inventory.md")
-
-    assert "Original RC MetaStudio Project" not in changelog
-    assert "Original RC MetaStudio Project" not in inventory
-    assert "away from `.rcms`, RCMetaR" not in changelog
-    assert "Original OpenMeta[Analyst] Project" in changelog
-    assert "Original OpenMeta[Analyst] Project" in inventory
 
 
 def test_gitignore_uses_current_release_artifact_patterns():

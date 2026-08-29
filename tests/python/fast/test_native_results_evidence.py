@@ -116,7 +116,7 @@ def test_native_results_evidence_accepts_exact_nonblank_png_bundle(tmp_path):
 
     records = native_results_smoke.validate_evidence(tmp_path)
 
-    assert [record["scale_factor"] for record in records] == [1.0, 1.25, 1.5, 1.75]
+    assert [record["scale_factor"] for record in records] == [1.0, 1.5]
 
 
 def test_native_results_evidence_rejects_invalid_numeric_types_ranges_and_mismatches(

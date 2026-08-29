@@ -3,9 +3,9 @@
 """Render and export meta-analysis results."""
 
 import gzip
-import random
 import re
 from collections import namedtuple
+from typing import TYPE_CHECKING
 from PyQt6.QtCore import (
     QByteArray,
     QEvent,
@@ -14,12 +14,10 @@ from PyQt6.QtCore import (
     QRectF,
     QTimer,
     Qt,
-    pyqtSignal,
 )
 from PyQt6.QtGui import (
     QAction,
     QCloseEvent,
-    QColor,
     QFont,
     QFontDatabase,
     QFontMetricsF,
@@ -34,9 +32,6 @@ from PyQt6.QtGui import (
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
     QApplication,
-    QColorDialog,
-    QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QGraphicsItem,
     QGraphicsPixmapItem,
@@ -49,22 +44,25 @@ from PyQt6.QtWidgets import (
 )
 import os
 import sys
-import ui_results_window
-import app_error_handler
-import ui_edit_forest_plot
-from rc_metastudio import meta_py_r
-from plot_defaults import FOREST_ARM_LABELS
-import plot_capabilities
-from plot_text import apply_plot_text_input_limits, plot_text_value, set_plot_text_value
-import qt_text
-import result_sections
-import adaptive_window
+from rc_metastudio import (
+    adaptive_window,
+    app_error_handler,
+    plot_capabilities,
+    r_bridge,
+    result_sections,
+)
+from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.plot_editor_dialog import EditPlotDialog
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
-from settings import (
+from rc_metastudio.settings import (
     restore_results_window_state,
     save_results_window_state,
 )
-# import shutil
+
+if TYPE_CHECKING:
+    from ui_results_window import Ui_ResultsWindow
+else:
+    from rc_metastudio.ui_results_window import Ui_ResultsWindow
 
 PageSize = (612, 792)
 padding = 25
@@ -90,19 +88,6 @@ PLOT_EXPORT_GUIDANCE = {
     "svg": "Scalable vector format; ideal for editing and lossless resizing.",
     "tiff": "Publication-grade 600 dpi raster export with lossless compression.",
     "png": "Publication-grade 600 dpi raster export for compatible submission systems.",
-}
-PLOT_EDITOR_SAVE_FILTER = "Plot images (*.pdf *.png *.tif *.tiff *.svg);;All files (*)"
-
-FOREST_STYLE_LABELS = {
-    "default": "Default (metafor)",
-    "revman": "RevMan",
-    "bmj": "BMJ",
-}
-FOREST_STYLE_VALUES = {label: value for value, label in FOREST_STYLE_LABELS.items()}
-FOREST_STYLE_DEFAULT_COLORS = {
-    "default": "#2f5597",
-    "revman": "#000000",
-    "bmj": "#6b58a6",
 }
 NO_RESULTS_MESSAGE = "No results could be computed for this analysis."
 ROW_HEIGHT = 15  # by trial-and-error; seems to work very well
@@ -244,230 +229,8 @@ def _pixmap_device_independent_size(pixmap):
     return (float(pixmap.width()) / dpr, float(pixmap.height()) / dpr)
 
 
-class EditPlotDialog(QDialog, ui_edit_forest_plot.Ui_edit_forest_plot_dlg):
-    applied = pyqtSignal()
-
-    def __init__(self, plot_params, image_path, parent=None, plot_type="forest"):
-        super(EditPlotDialog, self).__init__(parent)
-        self.setupUi(self)
-        apply_plot_text_input_limits(self)
-        self._loading_style = False
-        self._params = dict(plot_params or {})
-        self.plot_type = plot_type
-        self._option_groups = plot_capabilities.option_groups(plot_type)
-
-        self.color_btn.clicked.connect(
-            app_error_handler.safe_slot(self._choose_color, parent=self)
-        )
-        self.save_btn.clicked.connect(
-            app_error_handler.safe_slot(self._browse_image_path, parent=self)
-        )
-        self.style_cbo.currentTextChanged.connect(
-            app_error_handler.safe_slot(self._style_changed, parent=self)
-        )
-        apply_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Apply)
-        if apply_button is not None:
-            apply_button.clicked.connect(self.applied.emit)
-        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
-        if ok_button is not None:
-            ok_button.clicked.connect(self.applied.emit)
-
-        self._load_params(image_path)
-        self._configure_option_groups()
-        adaptive_window.register_adaptive_window(
-            self, adaptive_window.WindowRole.TRANSACTIONAL
-        )
-
-    def _configure_option_groups(self):
-        self.groupBox.setVisible("columns" in self._option_groups)
-        self.default_panel.setVisible("forest" in self._option_groups)
-        self.label_16.setVisible("summary" in self._option_groups)
-        self.show_summary_line.setVisible("summary" in self._option_groups)
-        self.regression_group.setVisible("regression" in self._option_groups)
-
-    def _load_params(self, image_path):
-        self._loading_style = True
-        try:
-            style = self._normalized_style(
-                self._params.get(self._param_name("style"), "default")
-            )
-            self.style_cbo.setCurrentText(FOREST_STYLE_LABELS[style])
-            self._set_text(
-                self.col1_str_edit, self._params.get("fp_col1_str", "Study or Subgroup")
-            )
-            self._set_text(
-                self.col2_str_edit, self._params.get("fp_col2_str", "[default]")
-            )
-            self._set_text(
-                self.col3_str_edit,
-                self._params.get("fp_col3_str", FOREST_ARM_LABELS[0]),
-            )
-            self._set_text(
-                self.col4_str_edit,
-                self._params.get("fp_col4_str", FOREST_ARM_LABELS[1]),
-            )
-            self.show_1.setChecked(self._bool_param("fp_show_col1", True))
-            self.show_2.setChecked(self._bool_param("fp_show_col2", True))
-            self.show_3.setChecked(self._bool_param("fp_show_col3", True))
-            self.show_4.setChecked(self._bool_param("fp_show_col4", True))
-            self.show_raw_counts.setChecked(
-                self._bool_param("fp_show_raw_counts", True)
-            )
-            self.show_headers.setChecked(self._bool_param("fp_show_headers", True))
-            self.show_annotation.setChecked(
-                self._bool_param("fp_show_annotation", True)
-            )
-            self._set_text(
-                self.x_lbl_le, self._params.get(self._param_name("xlabel"), "[default]")
-            )
-            self._set_text(
-                self.plot_lb_le,
-                self._params.get(self._param_name("plot_lb"), "[default]"),
-            )
-            self._set_text(
-                self.plot_ub_le,
-                self._params.get(self._param_name("plot_ub"), "[default]"),
-            )
-            ticks_name = "bp_xticks" if self.plot_type == "regression" else "fp_xticks"
-            self._set_text(self.x_ticks_le, self._params.get(ticks_name, "[default]"))
-            self.show_summary_line.setChecked(
-                self._bool_param("fp_show_summary_line", True)
-            )
-            self._set_text(
-                self.image_path,
-                image_path or self._params.get(self._param_name("outpath"), ""),
-            )
-            color = (
-                self._params.get(self._param_name("accent_color"))
-                or FOREST_STYLE_DEFAULT_COLORS[style]
-            )
-            self._set_accent_color(color)
-            self.point_size_multiplier.setValue(
-                self._float_param(self._param_name("point_size_multiplier"), 1.0)
-            )
-            self.show_regression_line.setChecked(
-                self._bool_param("bp_show_regression_line", True)
-            )
-            self.show_confidence_band.setChecked(
-                self._bool_param("bp_show_confidence_band", True)
-            )
-            self.show_prediction_interval.setChecked(
-                self._bool_param("bp_show_prediction_interval", False)
-            )
-            self.show_legend.setChecked(self._bool_param("bp_show_legend", False))
-        finally:
-            self._loading_style = False
-
-    def _style_changed(self, label):
-        if self._loading_style:
-            return
-        style = FOREST_STYLE_VALUES.get(str(label), "default")
-        self._set_accent_color(FOREST_STYLE_DEFAULT_COLORS[style])
-
-    def _choose_color(self):
-        current = QColor(self.accent_color.text())
-        color = QColorDialog.getColor(current, self, "Plot Accent Color")
-        if color.isValid():
-            self._set_accent_color(color.name())
-
-    def _browse_image_path(self):
-        selected_path, _selected_filter = QFileDialog.getSaveFileName(
-            self,
-            "Save %s Plot Image" % self.plot_type.title(),
-            qt_text.to_native_text(self.image_path.text()),
-            PLOT_EDITOR_SAVE_FILTER,
-        )
-        if selected_path:
-            self.image_path.setText(selected_path)
-
-    def _set_accent_color(self, color):
-        text = str(color or FOREST_STYLE_DEFAULT_COLORS["default"])
-        self.accent_color.setText(text)
-        self.color_btn.setStyleSheet("background-color: %s;" % text)
-
-    def _set_text(self, widget, value):
-        set_plot_text_value(widget, self._scalar(value))
-
-    def _scalar(self, value):
-        if isinstance(value, (list, tuple)) and value:
-            return value[0]
-        return value
-
-    def _bool_param(self, name, default):
-        value = self._scalar(self._params.get(name, default))
-        if isinstance(value, str):
-            return value.lower() in ("true", "t", "1", "yes")
-        return bool(value)
-
-    def _float_param(self, name, default):
-        try:
-            return float(self._scalar(self._params.get(name, default)))
-        except (TypeError, ValueError):
-            return default
-
-    def _normalized_style(self, style):
-        style = str(self._scalar(style) or "default").strip().lower()
-        return style if style in FOREST_STYLE_LABELS else "default"
-
-    def _param_name(self, suffix):
-        return "%s_%s" % ("bp" if self.plot_type == "regression" else "fp", suffix)
-
-    def plot_params(self):
-        style = FOREST_STYLE_VALUES.get(str(self.style_cbo.currentText()), "default")
-        params = {
-            "fp_style": style,
-            "fp_show_col1": self.show_1.isChecked(),
-            "fp_col1_str": qt_text.to_native_text(plot_text_value(self.col1_str_edit)),
-            "fp_show_col2": self.show_2.isChecked(),
-            "fp_col2_str": qt_text.to_native_text(plot_text_value(self.col2_str_edit)),
-            "fp_show_col3": self.show_3.isChecked(),
-            "fp_col3_str": qt_text.to_native_text(plot_text_value(self.col3_str_edit)),
-            "fp_show_col4": self.show_4.isChecked(),
-            "fp_col4_str": qt_text.to_native_text(plot_text_value(self.col4_str_edit)),
-            "fp_show_raw_counts": self.show_raw_counts.isChecked(),
-            "fp_show_headers": self.show_headers.isChecked(),
-            "fp_show_annotation": self.show_annotation.isChecked(),
-            "fp_accent_color": qt_text.to_native_text(self.accent_color.text()),
-            "fp_point_size_multiplier": self.point_size_multiplier.value(),
-            "fp_xlabel": qt_text.to_native_text(plot_text_value(self.x_lbl_le)),
-            "fp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
-            "fp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
-            "fp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
-            "fp_show_summary_line": self.show_summary_line.isChecked(),
-            "fp_outpath": qt_text.to_native_text(self.image_path.text()),
-        }
-        forest_display_path = self._scalar(self._params.get("fp_display_path", ""))
-        if forest_display_path:
-            params["fp_display_path"] = forest_display_path
-        if self.plot_type == "regression":
-            params = {
-                "bp_style": style,
-                "bp_accent_color": qt_text.to_native_text(self.accent_color.text()),
-                "bp_point_size_multiplier": self.point_size_multiplier.value(),
-                "bp_xlabel": qt_text.to_native_text(plot_text_value(self.x_lbl_le)),
-                "bp_plot_lb": qt_text.to_native_text(self.plot_lb_le.text()),
-                "bp_plot_ub": qt_text.to_native_text(self.plot_ub_le.text()),
-                "bp_xticks": qt_text.to_native_text(self.x_ticks_le.text()),
-                "bp_show_regression_line": self.show_regression_line.isChecked(),
-                "bp_show_confidence_band": self.show_confidence_band.isChecked(),
-                "bp_show_prediction_interval": self.show_prediction_interval.isChecked(),
-                "bp_show_legend": self.show_legend.isChecked(),
-                "bp_outpath": qt_text.to_native_text(self.image_path.text()),
-            }
-            regression_display_path = self._scalar(
-                self._params.get("bp_display_path", "")
-            )
-            if regression_display_path:
-                params["bp_display_path"] = regression_display_path
-        return params
-
-
-# Compatibility name for callers and tests that still target the forest-only API.
-EditForestPlotDialog = EditPlotDialog
-
-
-class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
-    def __init__(self, results, parent=None):
+class ResultsWindow(QMainWindow, Ui_ResultsWindow):
+    def __init__(self, results: AnalysisResult, parent=None):
 
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
@@ -528,11 +291,9 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
 
         self.images = results["images"]
         self.display_images = results["display_images"]
-        print("images returned from analytic routine: %s" % self.images)
         self.image_order = None
         if "image_order" in results:
             self.image_order = results["image_order"]
-            print("image display order: %s" % self.image_order)
 
         self.params_paths = {}
         if "image_params_paths" in results:
@@ -574,16 +335,12 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 )
 
     def add_image_section(self, title, display_title, image):
-        print("title: %s; image: %s" % (title, image))
-        cur_y = max(0, self.y_coord)
-        print("cur_y: %s" % cur_y)
         params_path = None
         if self.params_paths is not None and title in self.params_paths:
             params_path = self.params_paths[title]
 
         artifact = self.create_plot_artifact(title, image, params_path=params_path)
         if not artifact.can_display():
-            print("Skipping image that Qt could not load: %s" % image)
             return
 
         qt_item = self.add_title(display_title)
@@ -602,21 +359,10 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
 
     def add_text_section(self, title, display_title, text):
-        try:
-            print("title: %s; text: %s" % (title, text))
-            cur_y = max(0, self.y_coord)
-            print("cur_y: %s" % cur_y)
-            # first add the title
-            qt_item = self.add_title(display_title)
-
-            # now the text
-            text_item_rect, pos = self.create_text_item(
-                str(text), self.position(), wrap=True
-            )
-            self.items_to_coords[id(qt_item)] = pos
-            self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
-        except:
-            pass
+        qt_item = self.add_title(display_title)
+        _, pos = self.create_text_item(str(text), self.position(), wrap=True)
+        self.items_to_coords[id(qt_item)] = pos
+        self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
 
     def generate_pixmap(self, image):
         # now the image
@@ -702,7 +448,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         self._nav_items_to_sections[id(qt_item)] = self._layout_items[-1]
 
     def add_title(self, title):
-        print("Adding title")
         text = QGraphicsTextItem(str(title))
         title_font = QFont(self.font())
         title_font.setBold(True)
@@ -715,7 +460,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         document.setDefaultTextOption(text_option)
         text.setTextWidth(self._text_wrap_width())
         self._wrapped_text_items.append(text)
-        print("  title at: %s" % self.y_coord)
         self.scene.addItem(text)
         self._layout_items.append(text)
         qt_item = QTreeWidgetItem(self.nav_tree, [title])
@@ -726,8 +470,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.scene.width(),
             self.y_coord + text.boundingRect().height() + padding,
         )
-        print(("  Setting position at (%.2f,%.2f)" % (self.x_coord, self.y_coord)))
-        text.setPos(self.position())  #####
+        text.setPos(self.position())
         self.y_coord += text.boundingRect().height()
         return qt_item
 
@@ -745,7 +488,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return max(bounding_height, document_height, line_height)
 
     def item_clicked(self, item, column):
-        print(self.items_to_coords[id(item)])
         self.graphics_view.centerOn(self.items_to_coords[id(item)])
 
     def create_text_item(self, text, position, wrap=False):
@@ -771,9 +513,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         )
         self.scene.addItem(txt_item)
         self._layout_items.append(txt_item)
-        # fix for issue #149; was formerly txt_item.boundingRect().size().height()
-
-        # self.y_coord += txt_item.boundingRect.height()  #ROW_HEIGHT*text.count("\n")
         text_height = self._advance_past_text_item(txt_item, text)
         # layout-audit: allow=intrinsic-ratio; reason=scene follows its intrinsic-ratio visual artifact
         self.scene.setSceneRect(
@@ -1006,9 +745,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.y_coord + item.boundingRect().size().height() + padding,
         )
 
-        print("creating item @:%s" % position)
-
-        # item.setMatrix(matrix)
         self.scene.clearSelection()
         self.scene.addItem(item)
         self._raster_plot_items.append(item)
@@ -1059,7 +795,6 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
             self.y_coord + scaled_height + padding,
         )
 
-        print("creating item @:%s" % position)
         self.scene.clearSelection()
         self.scene.addItem(item)
         self._svg_plot_items.append(item)
@@ -1123,18 +858,18 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def edit_plot(self, artifact, plot_item):
         regenerator = artifact.capability["regenerator"]
         if regenerator == "forest":
-            self.edit_forest_plot(artifact, plot_item)
+            self._edit_forest_plot(artifact, plot_item)
         elif regenerator == "regression":
             self.edit_regression_plot(artifact, plot_item)
 
-    def edit_forest_plot(self, artifact, plot_item):
-        plot_params = meta_py_r.load_vars_for_plot(
+    def _edit_forest_plot(self, artifact, plot_item):
+        plot_params = r_bridge.load_vars_for_plot(
             artifact.params_path, return_params_dict=True
         )
         if plot_params is False:
             return
 
-        dialog = EditForestPlotDialog(plot_params, artifact.image_path, parent=self)
+        dialog = EditPlotDialog(plot_params, artifact.image_path, parent=self)
         dialog.applied.connect(
             app_error_handler.safe_slot(
                 lambda: self._apply_forest_plot_edits(dialog, artifact, plot_item),
@@ -1144,7 +879,7 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         dialog.exec()
 
     def edit_regression_plot(self, artifact, plot_item):
-        plot_params = meta_py_r.load_vars_for_plot(
+        plot_params = r_bridge.load_vars_for_plot(
             artifact.params_path, return_params_dict=True
         )
         if plot_params is False:
@@ -1164,27 +899,27 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
     def _apply_regression_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["bp_outpath"] or artifact.image_path
-        meta_py_r.update_plot_params(
+        r_bridge.update_plot_params(
             updated_params,
             write_them_out=True,
             outpath="%s.params" % artifact.params_path,
         )
-        meta_py_r.regenerate_regression_plot_data()
-        meta_py_r.generate_reg_plot(outpath)
-        meta_py_r.write_out_plot_data(artifact.params_path)
+        r_bridge.regenerate_regression_plot_data()
+        r_bridge.generate_reg_plot(outpath)
+        r_bridge.write_out_plot_data(artifact.params_path)
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _apply_forest_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or artifact.image_path
-        meta_py_r.update_plot_params(
+        r_bridge.update_plot_params(
             updated_params,
             write_them_out=True,
             outpath="%s.params" % artifact.params_path,
         )
-        meta_py_r.regenerate_plot_data()
-        meta_py_r.generate_forest_plot(outpath)
-        meta_py_r.write_out_plot_data(artifact.params_path)
+        r_bridge.regenerate_plot_data()
+        r_bridge.generate_forest_plot(outpath)
+        r_bridge.write_out_plot_data(artifact.params_path)
 
         self._refresh_plot_item(plot_item, artifact, outpath)
 
@@ -1224,10 +959,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
 
         if not unscaled_image:
-            # note that the params object will, by convention,
-            # have the (generic) name 'plot.data' -- after this
-            # call, this object will be in the namespace
-            meta_py_r.load_in_R("%s.plotdata" % artifact.params_path)
+            # Loading the artifact exposes its conventional ``plot.data`` object.
+            r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
 
             regenerator = artifact.capability["regenerator"]
             default_path = {
@@ -1249,8 +982,8 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
                 function_name = plot_capabilities.regenerator_name(regenerator)
                 if function_name is None:
                     raise ValueError("Plot is not regeneratable: %s" % artifact.title)
-                getattr(meta_py_r, function_name)(file_path)
-        else:  # case where we just have the png and can't regenerate the pdf from plot data
+                getattr(r_bridge, function_name)(file_path)
+        else:
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
                 self,
@@ -1271,26 +1004,18 @@ class ResultsWindow(QMainWindow, ui_results_window.Ui_ResultsWindow):
         return viewport.width()
 
 
-def _normalize_results(results):
-    if not isinstance(results, dict):
-        return _empty_results()
-
-    normalized = dict(results)
-    normalized["texts"] = dict(normalized.get("texts") or {})
-    normalized["images"] = dict(normalized.get("images") or {})
-    normalized["display_images"] = dict(normalized.get("display_images") or {})
-    normalized["image_var_names"] = dict(normalized.get("image_var_names") or {})
-    normalized["image_params_paths"] = dict(normalized.get("image_params_paths") or {})
-    normalized["plot_capabilities"] = plot_capabilities.validate_result(normalized)
-    extra_display_images = sorted(
-        set(normalized["display_images"]) - set(normalized["images"])
-    )
-    if extra_display_images:
-        raise ValueError(
-            "Display artifacts have no matching plot artifact: %s"
-            % ", ".join(extra_display_images)
-        )
-    normalized.setdefault("image_order", None)
+def _normalize_results(results: AnalysisResult) -> AnalysisResult:
+    normalized: AnalysisResult = {
+        "texts": dict(results["texts"]),
+        "images": dict(results["images"]),
+        "display_images": dict(results["display_images"]),
+        "image_var_names": dict(results["image_var_names"]),
+        "image_params_paths": dict(results["image_params_paths"]),
+        "image_order": (
+            None if results["image_order"] is None else list(results["image_order"])
+        ),
+        "plot_capabilities": dict(results["plot_capabilities"]),
+    }
 
     if not normalized["texts"] and not normalized["images"]:
         normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE
@@ -1298,23 +1023,12 @@ def _normalize_results(results):
     return normalized
 
 
-def _empty_results():
-    return {
-        "texts": {"No Results": NO_RESULTS_MESSAGE},
-        "images": {},
-        "display_images": {},
-        "image_var_names": {},
-        "image_params_paths": {},
-        "image_order": None,
-        "plot_capabilities": {},
-    }
-
-
 if __name__ == "__main__":
     # make test results based on results from when meta-analysis run from amino sample project
-    import settings
+    from rc_metastudio import settings
+    from rc_metastudio.analysis_results import empty_analysis_result
 
-    test_results = {}
+    test_results = empty_analysis_result()
     test_results["images"] = {
         "Forest Plot": settings.analysis_output_path("forest.png")
     }

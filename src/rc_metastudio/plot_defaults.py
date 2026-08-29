@@ -1,6 +1,6 @@
 """Generated user-facing forest-plot defaults. Do not edit directly."""
 
-FOREST_ARM_LABELS = ('Intervention', 'Control')
+FOREST_ARM_LABELS = ("Intervention", "Control")
 
 
 def apply_default_forest_arm_labels(surface):

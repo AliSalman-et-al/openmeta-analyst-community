@@ -1,9 +1,7 @@
 import os
-import shutil
-import subprocess
 import textwrap
 
-import pytest
+from ._r_driver_support import build_r_driver, run_r_driver
 
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -11,10 +9,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 _HSROC_RETRY_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
+    __RCMETAR_BOOTSTRAP__
 
     work <- tempfile("hsroc_retry_")
     dir.create(work)
@@ -105,6 +100,7 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
       num.iters=10,
       burn.in=1,
       thin=1,
+      digits=3,
       lambda.lower=-2,
       lambda.upper=2,
       theta.lower=-2,
@@ -202,12 +198,13 @@ _HSROC_RETRY_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_HSROC_RETRY_DRIVER = build_r_driver(_HSROC_RETRY_DRIVER)
 
 
 _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
+    __RCMETAR_BOOTSTRAP__
     required <- c("coda", "MCMCpack")
     missing <- required[!vapply(required, requireNamespace, logical(1), quietly=TRUE)]
     if (length(missing) > 0) {
@@ -270,16 +267,13 @@ _HSROC_NAMESPACE_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_HSROC_NAMESPACE_DRIVER = build_r_driver(_HSROC_NAMESPACE_DRIVER)
 
 
 _HSROC_HEADER_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
-
+    __RCMETAR_BOOTSTRAP__
     between.study <- matrix(
       c(0.624, 1.110, 0.817, 1.907, 1.493, 1.356),
       nrow=2
@@ -335,16 +329,13 @@ _HSROC_HEADER_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_HSROC_HEADER_DRIVER = build_r_driver(_HSROC_HEADER_DRIVER)
 
 
 _HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
-
+    __RCMETAR_BOOTSTRAP__
     between.study <- matrix(
       c(
         0.148, 1.368, 0.293, 0.650, 0.287, 0.677, 0.830, 0.698, 0.793,
@@ -436,16 +427,13 @@ _HSROC_CLINICAL_SUMMARY_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_HSROC_CLINICAL_SUMMARY_DRIVER = build_r_driver(_HSROC_CLINICAL_SUMMARY_DRIVER)
 
 
 _HSROC_SUMMARY_WIDTH_DRIVER = textwrap.dedent(
     r"""
-    repo <- normalizePath(__REPO_ROOT__, winslash = "/")
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
-
+    __RCMETAR_BOOTSTRAP__
     with.width.80 <- function(expr) {
       old.options <- options(width=80)
       on.exit(options(old.options), add=TRUE)
@@ -497,120 +485,25 @@ _HSROC_SUMMARY_WIDTH_DRIVER = textwrap.dedent(
 
     cat("OK\n")
     """
-).replace("__REPO_ROOT__", repr(REPO_ROOT).replace("\\", "/"))
+)
+_HSROC_SUMMARY_WIDTH_DRIVER = build_r_driver(_HSROC_SUMMARY_WIDTH_DRIVER)
 
 
 def test_hsroc_retries_failed_chain_once_in_clean_directory():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_HSROC_RETRY_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    if result.returncode == 42:
-        pytest.skip(result.stdout.strip())
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_HSROC_RETRY_DRIVER)
 
 
 def test_hsroc_summary_namespace_imports_as_mcmc():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_HSROC_NAMESPACE_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    if result.returncode == 42:
-        pytest.skip(result.stdout.strip())
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_HSROC_NAMESPACE_DRIVER)
 
 
 def test_hsroc_fallback_summary_uses_canonical_hpd_interval_headers():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_HSROC_HEADER_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_HSROC_HEADER_DRIVER)
 
 
 def test_hsroc_summary_uses_clinical_labels_and_study_names():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_HSROC_CLINICAL_SUMMARY_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_HSROC_CLINICAL_SUMMARY_DRIVER)
 
 
 def test_hsroc_summary_tables_do_not_wrap_at_default_r_print_width():
-    rscript = shutil.which("Rscript")
-    if not rscript:
-        pytest.skip("Rscript executable not found")
-
-    result = subprocess.run(
-        [rscript, "-"],
-        cwd=REPO_ROOT,
-        input=_HSROC_SUMMARY_WIDTH_DRIVER,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    assert result.returncode == 0, "driver failed (rc=%s)\nSTDOUT:\n%s\nSTDERR:\n%s" % (
-        result.returncode,
-        result.stdout[-2000:],
-        result.stderr[-2000:],
-    )
-    assert "OK" in result.stdout
+    run_r_driver(_HSROC_SUMMARY_WIDTH_DRIVER)

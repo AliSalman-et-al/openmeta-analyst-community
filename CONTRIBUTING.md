@@ -1,11 +1,7 @@
-# Contribution Policy
+# Contributing
 
-RC MetaStudio is independently maintained by Ali Salman and RC MetaStudio contributors for Research Consultancy (RC).
+RC MetaStudio is independently maintained by Research Consultancy (RC). Public pull requests are not currently accepted.
 
-Unsolicited public code contributions are not currently accepted. This repository does not provide a public pull-request workflow, contributor onboarding path, or governance process for outside code changes.
+Use [GitHub Issues](https://github.com/AliSalman-et-al/rc-metastudio/issues) for bug reports and product feedback. Include the observed behavior, expected behavior, operating system, application version, and steps to reproduce the problem. Share project files or diagnostic output only when you have removed sensitive data and intend to make the material public.
 
-Public GitHub Issues may be used for bug reports and feedback: https://github.com/AliSalman-et-al/rc-metastudio/issues
-
-Please keep issue reports focused on observable behavior, expected behavior, environment details, and reproduction steps. Do not include private project data unless you intentionally choose to share it.
-
-RC MetaStudio does not automatically collect, upload, or attach diagnostics to issue reports. Any diagnostic material shared in an issue is supplied manually by the reporter.
+RC MetaStudio does not collect or upload diagnostics automatically.

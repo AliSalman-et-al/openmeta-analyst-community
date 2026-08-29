@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import ModuleType
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,7 +26,7 @@ ALIASES = {
 }
 
 
-def load_adapter():
+def load_adapter() -> ModuleType:
     location = ROOT / "scripts/macos_embedded_r_adapter.py"
     spec = importlib.util.spec_from_file_location("rcms_embedded_r_adapter", location)
     if spec is None or spec.loader is None:

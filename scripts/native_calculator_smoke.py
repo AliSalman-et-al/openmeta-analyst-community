@@ -10,9 +10,9 @@ import os
 from pathlib import Path
 from pathlib import PurePosixPath
 import sys
-from typing import Callable, TextIO
+from typing import Any, Callable, TextIO
 
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+from rc_metastudio import automation
 
 from PIL import Image
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -24,6 +24,13 @@ from rc_metastudio.runtime_types import required
 
 def _phase(name: str) -> None:
     print("RCMS_NATIVE_CALCULATOR_PHASE " + name, flush=True)
+
+
+def _install_backend_stub(
+    backend: object, name: str, implementation: Callable[..., object]
+) -> None:
+    """Install a deliberate runtime test double at the R backend seam."""
+    setattr(backend, name, implementation)
 
 
 def _write_evidence(path: Path, evidence: list[dict[str, object]]) -> None:
@@ -95,12 +102,12 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
     encoded.save(path, format="PNG")
 
 
-def install_native_stub_backend():
+def install_native_stub_backend() -> Any:
     """Install and verify the calculator smoke's non-R backend boundary."""
-    from rc_metastudio import meta_py_r_backend
+    from rc_metastudio import r_backend
 
-    backend = meta_py_r_backend.install_stub_meta_py_r()
-    if getattr(backend, "_oma_stub_backend", False) is not True:
+    backend = r_backend.install_stub_r_bridge()
+    if getattr(backend, "_rcms_stub_backend", False) is not True:
         raise RuntimeError("native calculator smoke did not install the stub backend")
     if "rpy2.rinterface" in sys.modules:
         raise RuntimeError(
@@ -190,84 +197,103 @@ def _run_main() -> int:
     prepare_generated_ui_imports()
     ensure_application_resources()
     repo_root = Path(__file__).resolve().parents[1]
-    sys.path.append(str(repo_root / "src" / "rc_metastudio"))
     install_native_stub_backend()
 
-    import binary_data_form
-    import continuous_data_form
-    import diagnostic_data_form
-    import launch
-    import ma_data_table_model
+    from rc_metastudio import (
+        binary_data_dialog,
+        continuous_data_dialog,
+        diagnostic_data_dialog,
+        dataset_table_model,
+    )
 
-    binary_data_form.meta_py_r.get_mult_from_r = lambda _level: 1.96
+    _install_backend_stub(
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _level: 1.96,
+    )
     setattr(
-        binary_data_form.meta_py_r,
+        binary_data_dialog.r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    binary_data_form.meta_py_r.impute_bin_data = lambda _data: {"FAIL": True}
-    binary_data_form.meta_py_r.effect_for_study = lambda *args, **kwargs: {
-        "calc_scale": (1.2, 0.8, 1.8)
-    }
+    _install_backend_stub(
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda _data: {"FAIL": True},
+    )
+    _install_backend_stub(
+        binary_data_dialog.r_bridge,
+        "effect_for_study",
+        lambda *_args, **_kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
+    )
     setattr(
-        binary_data_form.meta_py_r,
+        binary_data_dialog.r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    continuous_data_form.meta_py_r.impute_cont_data = lambda _data, _alpha: {
-        "succeeded": False,
-        "comment": "complete input",
-    }
-    continuous_data_form.meta_py_r.continuous_effect_for_study = (
-        lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)}
+    _install_backend_stub(
+        continuous_data_dialog.r_bridge,
+        "impute_continuous_data",
+        lambda _data, _alpha: {
+            "succeeded": False,
+            "comment": "complete input",
+        },
+    )
+    _install_backend_stub(
+        continuous_data_dialog.r_bridge,
+        "continuous_effect_for_study",
+        lambda *_args, **_kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
     )
     setattr(
-        continuous_data_form.meta_py_r,
+        continuous_data_dialog.r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
-    continuous_data_form.meta_py_r.back_calc_cont_data = lambda *args, **kwargs: {
-        "FAIL": True
-    }
+    _install_backend_stub(
+        continuous_data_dialog.r_bridge,
+        "back_calculate_continuous_data",
+        lambda *_args, **_kwargs: {"FAIL": True},
+    )
     setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    diagnostic_data_form.meta_py_r.impute_diag_data = lambda _data: {
-        "TP": None,
-        "FP": None,
-        "FN": None,
-        "TN": None,
-    }
-    diagnostic_data_form.meta_py_r.diagnostic_effects_for_study = (
-        lambda *args, metrics, **kwargs: {
+    _install_backend_stub(
+        diagnostic_data_dialog.r_bridge,
+        "impute_diagnostic_data",
+        lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
+    )
+    _install_backend_stub(
+        diagnostic_data_dialog.r_bridge,
+        "diagnostic_effects_for_study",
+        lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
-        }
+        },
     )
     setattr(
-        diagnostic_data_form.meta_py_r,
+        diagnostic_data_dialog.r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
-    setattr(diagnostic_data_form.QMessageBox, "warning", lambda *args, **kwargs: None)
+    setattr(diagnostic_data_dialog.QMessageBox, "warning", lambda *args, **kwargs: None)
     setattr(
-        ma_data_table_model.meta_py_r,
+        dataset_table_model.r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        ma_data_table_model.meta_py_r,
+        dataset_table_model.r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        ma_data_table_model.meta_py_r,
+        dataset_table_model.r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -275,11 +301,11 @@ def _run_main() -> int:
     evidence_root = repo_root / "build/qt6-verification/native-calculators"
     evidence_path = evidence_root / "evidence.json"
     evidence: list[dict[str, object]] = []
-    app, window = launch.start_automation()
+    app, window = automation.start_automation()
     cases = (
-        ("binary", "proportions", "OR", binary_data_form.BinaryDataForm2),
-        ("continuous", "means", "MD", continuous_data_form.ContinuousDataForm),
-        ("diagnostic", None, "Sens", diagnostic_data_form.DiagnosticDataForm),
+        ("binary", "proportions", "OR", binary_data_dialog.BinaryDataDialog),
+        ("continuous", "means", "MD", continuous_data_dialog.ContinuousDataDialog),
+        ("diagnostic", None, "Sens", diagnostic_data_dialog.DiagnosticDataDialog),
     )
     try:
         window.show()
@@ -302,16 +328,16 @@ def _run_main() -> int:
             )
             model = window.model
             table_view = window.tableView
-            unit = model.get_current_ma_unit_for_study(0)
+            unit = model.get_current_analysis_unit_for_study(0)
             if data_type == "binary":
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [6, 20]
-                unit.get_raw_data_for_group(model.current_txs[1])[:] = [8, 22]
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [6, 20]
+                unit.get_raw_data_for_group(model.current_groups[1])[:] = [8, 22]
             elif data_type == "continuous":
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [10, 94, 2]
-                unit.get_raw_data_for_group(model.current_txs[1])[:] = [12, 90, 3]
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
+                unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
             else:
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [12, 3, 4, 21]
-            before = list(unit.get_raw_data_for_group(model.current_txs[0]))
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
+            before = list(unit.get_raw_data_for_group(model.current_groups[0]))
             table_view.undoStack.clear()
             table_view.undoStack.setClean()
             window.current_data_unsaved = False
@@ -332,14 +358,14 @@ def _run_main() -> int:
                     if not required(ok, "calculator OK button").isDefault():
                         raise RuntimeError("OK is not the default calculator action")
                     if data_type == "binary":
-                        if not isinstance(dialog, binary_data_form.BinaryDataForm2):
+                        if not isinstance(dialog, binary_data_dialog.BinaryDataDialog):
                             raise RuntimeError(
                                 "binary calculator opened the wrong dialog"
                             )
                         expected_focus = dialog.raw_data_table
                     elif data_type == "continuous":
                         if not isinstance(
-                            dialog, continuous_data_form.ContinuousDataForm
+                            dialog, continuous_data_dialog.ContinuousDataDialog
                         ):
                             raise RuntimeError(
                                 "continuous calculator opened the wrong dialog"
@@ -347,7 +373,7 @@ def _run_main() -> int:
                         expected_focus = dialog.simple_table
                     else:
                         if not isinstance(
-                            dialog, diagnostic_data_form.DiagnosticDataForm
+                            dialog, diagnostic_data_dialog.DiagnosticDataDialog
                         ):
                             raise RuntimeError(
                                 "diagnostic calculator opened the wrong dialog"
@@ -359,7 +385,7 @@ def _run_main() -> int:
                         )
 
                     if data_type == "binary":
-                        assert isinstance(dialog, binary_data_form.BinaryDataForm2)
+                        assert isinstance(dialog, binary_data_dialog.BinaryDataDialog)
                         dialog.raw_data_table.setCurrentCell(0, 0)
                         required(
                             dialog.raw_data_table.item(0, 0), "binary smoke cell"
@@ -368,7 +394,7 @@ def _run_main() -> int:
                         expected_result = "accepted"
                     elif data_type == "continuous":
                         assert isinstance(
-                            dialog, continuous_data_form.ContinuousDataForm
+                            dialog, continuous_data_dialog.ContinuousDataDialog
                         )
                         dialog.simple_table.setCurrentCell(0, 1)
                         required(
@@ -378,7 +404,7 @@ def _run_main() -> int:
                         expected_result = "accepted"
                     else:
                         assert isinstance(
-                            dialog, diagnostic_data_form.DiagnosticDataForm
+                            dialog, diagnostic_data_dialog.DiagnosticDataDialog
                         )
                         dialog.two_by_two_table.setCurrentCell(0, 0)
                         required(
@@ -444,8 +470,8 @@ def _run_main() -> int:
             if not captured:
                 raise RuntimeError("native %s calculator was not exercised" % data_type)
 
-            after = model.get_current_ma_unit_for_study(0).get_raw_data_for_group(
-                model.current_txs[0]
+            after = model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
+                model.current_groups[0]
             )
             if data_type == "binary" and after != [7, 21]:
                 raise RuntimeError("binary accepted edit did not reach the model")
@@ -486,6 +512,7 @@ def _run_main() -> int:
 
 
 def main() -> int:
+    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     faulthandler.enable()
     faulthandler.dump_traceback_later(30, repeat=True)
     try:

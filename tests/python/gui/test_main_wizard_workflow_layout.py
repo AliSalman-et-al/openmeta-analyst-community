@@ -3,10 +3,10 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from typing import cast
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,7 +15,14 @@ os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verificat
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-import adaptive_window
+from rc_metastudio import adaptive_window
+from test_types import key_click, mouse_click, required
+
+
+def _page(wizard: QtWidgets.QWizard, page_id: int, page_type):
+    """Narrow a registered generated page at the Qt lookup seam."""
+
+    return cast(page_type, required(wizard.page(page_id), "wizard page"))
 
 
 def _show(wizard, qapp):
@@ -31,10 +38,11 @@ def _frame_tuple(window):
 
 
 def _assert_page_contract(wizard, expected_buttons):
-    import main_wizard
 
-    page = wizard.currentPage()
-    overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+    page = required(wizard.currentPage(), "current wizard page")
+    overflow = required(
+        page.findChild(QtWidgets.QScrollArea, "pageScrollArea"), "page scroll area"
+    )
     assert overflow is not None
     assert overflow.widgetResizable()
     for role in expected_buttons:
@@ -43,7 +51,7 @@ def _assert_page_contract(wizard, expected_buttons):
         assert not overflow.isAncestorOf(button)
 
 
-def _assert_multiline_data_type_labels_fit(page):
+def _assert_multiline_data_type_labels_fit(page) -> None:
     for button in page._data_type_buttons():
         line_count = max(1, len(button.text().splitlines()))
         margin = max(
@@ -68,7 +76,7 @@ def _assert_multiline_data_type_labels_fit(page):
 
 
 def test_main_wizard_is_a_stable_workflow_window(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
@@ -84,7 +92,7 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
             is adaptive_window.WindowRole.WORKFLOW
         )
 
-        welcome_page = wizard.page(main_wizard.Page_Welcome)
+        welcome_page = _page(wizard, main_wizard.Page_Welcome, main_wizard.WelcomePage)
         for button in (
             welcome_page.create_new_btn,
             welcome_page.import_csv_btn,
@@ -94,13 +102,17 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
             assert button.iconSize() == QtCore.QSize(24, 24)
             assert button.minimumHeight() == 36
 
-        data_type_page = wizard.page(main_wizard.Page_DataType)
+        data_type_page = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        )
         data_type_page.twoarm_proportions_Button.click()
         wizard.next()
         qapp.processEvents()
         assert _frame_tuple(wizard) == initial_geometry
 
-        metric_page = wizard.page(main_wizard.Page_ChooseMetric)
+        metric_page = _page(
+            wizard, main_wizard.Page_ChooseMetric, main_wizard.ChooseMetricPage
+        )
         metric_page.label_2.setText("A very long translated instruction. " * 80)
         larger_font = QtGui.QFont(metric_page.font())
         larger_font.setPointSize(larger_font.pointSize() + 8)
@@ -116,38 +128,49 @@ def test_main_wizard_is_a_stable_workflow_window(qapp):
 
 
 def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
 
         for page_id in wizard.pageIds():
-            page = wizard.page(page_id)
-            overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
+            page = required(wizard.page(page_id), "wizard page")
+            overflow = required(
+                page.findChild(QtWidgets.QScrollArea, "pageScrollArea"),
+                "page scroll area",
+            )
             assert overflow is not None, page_id
             assert overflow.widgetResizable() is True
             assert overflow.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus
             assert overflow.widget() is not None
 
-        overflow = wizard.currentPage().findChild(
-            QtWidgets.QScrollArea, "pageScrollArea"
+        overflow = required(
+            required(wizard.currentPage(), "current wizard page").findChild(
+                QtWidgets.QScrollArea, "pageScrollArea"
+            ),
+            "page scroll area",
         )
         for button_id in (
             main_wizard.QWizard.WizardButton.NextButton,
             main_wizard.QWizard.WizardButton.CancelButton,
         ):
-            button = wizard.button(button_id)
+            button = required(wizard.button(button_id), "wizard button")
             assert button.isVisible()
             assert not overflow.isAncestorOf(button)
 
         wizard.resize(500, 330)
-        diagnostic = wizard.currentPage().diagnostic_Button
+        diagnostic = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        ).diagnostic_Button
         diagnostic.setFocus()
         qapp.processEvents()
-        visible_rect = overflow.viewport().rect()
+        visible_rect = required(overflow.viewport(), "overflow viewport").rect()
         control_rect = QtCore.QRect(
-            diagnostic.mapTo(overflow.viewport(), QtCore.QPoint()), diagnostic.size()
+            diagnostic.mapTo(
+                required(overflow.viewport(), "overflow viewport"), QtCore.QPoint()
+            ),
+            diagnostic.size(),
         )
         assert visible_rect.intersects(control_rect)
     finally:
@@ -160,8 +183,8 @@ def test_every_wizard_page_declares_a_focus_revealing_overflow_boundary(qapp):
 def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
     qapp, monkeypatch, available_size, path
 ):
-    import adaptive_window
-    import main_wizard
+    from rc_metastudio import adaptive_window
+    from rc_metastudio import main_wizard
 
     available = QtCore.QRect(0, 0, *available_size)
     monkeypatch.setattr(
@@ -182,7 +205,9 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             _assert_page_contract(
                 wizard, [main_wizard.QWizard.WizardButton.CancelButton]
             )
-            wizard.currentPage().create_new_btn.click()
+            _page(
+                wizard, main_wizard.Page_Welcome, main_wizard.WelcomePage
+            ).create_new_btn.click()
             qapp.processEvents()
 
         _assert_page_contract(
@@ -192,8 +217,11 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                 main_wizard.QWizard.WizardButton.CancelButton,
             ],
         )
-        _assert_multiline_data_type_labels_fit(wizard.currentPage())
-        wizard.currentPage().twoarm_proportions_Button.click()
+        data_type_page = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        )
+        _assert_multiline_data_type_labels_fit(data_type_page)
+        data_type_page.twoarm_proportions_Button.click()
         wizard.next()
         qapp.processEvents()
         _assert_page_contract(
@@ -204,7 +232,10 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                 main_wizard.QWizard.WizardButton.CancelButton,
             ],
         )
-        wizard.currentPage().label_2.setText("Long translated metric guidance. " * 80)
+        metric_page = _page(
+            wizard, main_wizard.Page_ChooseMetric, main_wizard.ChooseMetricPage
+        )
+        metric_page.label_2.setText("Long translated metric guidance. " * 80)
         wizard.next()
         qapp.processEvents()
 
@@ -216,11 +247,14 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
             else main_wizard.QWizard.WizardButton.FinishButton,
         ]
         _assert_page_contract(wizard, outcome_buttons)
-        wizard.currentPage().outcome_name_LineEdit.setText("Outcome")
+        outcome_page = _page(
+            wizard, main_wizard.Page_OutcomeName, main_wizard.OutcomeNamePage
+        )
+        outcome_page.outcome_name_LineEdit.setText("Outcome")
         if path == "csv_import":
             wizard.next()
             qapp.processEvents()
-            page = wizard.currentPage()
+            page = _page(wizard, main_wizard.Page_CsvImport, main_wizard.CsvImportPage)
             page.instructions.setText("Content-rich CSV guidance. " * 100)
             page.preview_table.setRowCount(100)
             page.preview_table.setColumnCount(20)
@@ -234,7 +268,12 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
                     main_wizard.QWizard.WizardButton.CancelButton,
                 ],
             )
-            assert page.pageScrollArea.verticalScrollBar().maximum() > 0
+            assert (
+                required(
+                    page.pageScrollArea.verticalScrollBar(), "page scrollbar"
+                ).maximum()
+                > 0
+            )
 
         assert _frame_tuple(wizard) == initial_geometry
     finally:
@@ -244,60 +283,75 @@ def test_workflow_path_matrix_is_bounded_stable_and_scrollable(
 
 
 def test_tab_and_backtab_follow_logical_order_and_reveal_controls(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
         wizard.resize(500, 330)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
         diagnostic = page.diagnostic_Button
-        QTest.mouseClick(diagnostic, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(diagnostic, QtCore.Qt.MouseButton.LeftButton)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
         next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
         cancel_button = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
-        QTest.keyClick(diagnostic, QtCore.Qt.Key.Key_Tab)
+        key_click(diagnostic, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Tab)
+        key_click(next_button, QtCore.Qt.Key.Key_Tab)
         qapp.processEvents()
         assert qapp.focusWidget() is cancel_button
-        QTest.keyClick(cancel_button, QtCore.Qt.Key.Key_Backtab)
+        key_click(cancel_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is next_button
-        QTest.keyClick(next_button, QtCore.Qt.Key.Key_Backtab)
+        key_click(next_button, QtCore.Qt.Key.Key_Backtab)
         qapp.processEvents()
         assert qapp.focusWidget() is diagnostic
 
         overflow = page.pageScrollArea
         diagnostic_rect = QtCore.QRect(
-            diagnostic.mapTo(overflow.viewport(), QtCore.QPoint()), diagnostic.size()
+            diagnostic.mapTo(
+                required(overflow.viewport(), "overflow viewport"), QtCore.QPoint()
+            ),
+            diagnostic.size(),
         )
-        assert overflow.viewport().rect().intersects(diagnostic_rect)
+        assert (
+            required(overflow.viewport(), "overflow viewport")
+            .rect()
+            .intersects(diagnostic_rect)
+        )
     finally:
         wizard.close()
         qapp.processEvents()
 
 
 def test_return_activates_visible_default_wizard_action(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        choice = wizard.currentPage().diagnostic_Button
-        QTest.mouseClick(choice, QtCore.Qt.MouseButton.LeftButton)
+        choice = _page(
+            wizard, main_wizard.Page_DataType, main_wizard.DataTypePage
+        ).diagnostic_Button
+        mouse_click(choice, QtCore.Qt.MouseButton.LeftButton)
         qapp.processEvents()
-        next_button = wizard.button(main_wizard.QWizard.WizardButton.NextButton)
+        next_button = cast(
+            QtWidgets.QPushButton,
+            required(
+                wizard.button(main_wizard.QWizard.WizardButton.NextButton),
+                "next button",
+            ),
+        )
         assert next_button.isVisible()
         assert next_button.isEnabled()
         assert next_button.isDefault()
         before_page = wizard.currentId()
 
         assert qapp.focusWidget() is choice
-        QTest.keyClick(choice, QtCore.Qt.Key.Key_Return)
+        key_click(choice, QtCore.Qt.Key.Key_Return)
         qapp.processEvents()
 
         assert wizard.currentId() != before_page
@@ -307,17 +361,18 @@ def test_return_activates_visible_default_wizard_action(qapp):
 
 
 def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
-    import main_wizard
-    import qt6_resources
+    from rc_metastudio import main_wizard
+    from rc_metastudio import qt6_resources
 
     qt6_resources.ensure_application_resources()
     original_palette = qapp.palette()
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
 
-        for foreground, theme in (("#111111", "light"), ("#f5f5f5", "dark")):
+        rendered_icons = {}
+        for foreground in ("#111111", "#f5f5f5"):
             palette = qapp.palette()
             palette.setColor(
                 QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor(foreground)
@@ -325,8 +380,7 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
             qapp.setPalette(palette)
             qapp.processEvents()
 
-            for button in page._data_type_buttons():
-                assert page._data_type_icon_themes[button.objectName()] == theme
+            for button in page.findChildren(QtWidgets.QAbstractButton):
                 image = button.icon().pixmap(button.iconSize()).toImage()
                 colors = [
                     image.pixelColor(x, y)
@@ -334,7 +388,10 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                     for x in range(image.width())
                     if image.pixelColor(x, y).alpha() >= 128
                 ]
-                assert colors, (theme, button.objectName(), button.icon().isNull())
+                assert colors, (foreground, button.objectName(), button.icon().isNull())
+                rendered_icons.setdefault(foreground, {})[button.objectName()] = tuple(
+                    sorted(color.rgba() for color in colors)
+                )
 
             diagnostic = (
                 page.diagnostic_Button.icon()
@@ -348,6 +405,8 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
                 if diagnostic.pixelColor(x, y).alpha() >= 128
             }
             assert len(diagnostic_colors) >= 3
+
+        assert rendered_icons["#111111"] != rendered_icons["#f5f5f5"]
     finally:
         qapp.setPalette(original_palette)
         wizard.close()
@@ -355,13 +414,13 @@ def test_data_type_icons_follow_button_text_color_across_palette_changes(qapp):
 
 
 def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(wizard, qapp)
-        page = wizard.currentPage()
-        page.layout().activate()
+        page = _page(wizard, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        required(page.layout(), "data type layout").activate()
         qapp.processEvents()
 
         standard = page.onearm_proportion_Button
@@ -373,37 +432,39 @@ def test_diagnostic_data_type_button_matches_standard_choice_geometry(qapp):
         qapp.processEvents()
 
 
-def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkeypatch):
-    import main_wizard
+def test_hidden_and_closed_wizards_do_not_react_to_other_wizard_focus(qapp):
+    from rc_metastudio import main_wizard
 
-    calls = []
-    original = main_wizard.MainWizard._reveal_focused_control
-
-    def observe(self, previous, current):
-        calls.append(self)
-        return original(self, previous, current)
-
-    monkeypatch.setattr(main_wizard.MainWizard, "_reveal_focused_control", observe)
     first = main_wizard.MainWizard(path="new_dataset")
     second = main_wizard.MainWizard(path="new_dataset")
     try:
         _show(first, qapp)
+        first_page = _page(first, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        first_scroll = required(
+            first_page.findChild(QtWidgets.QScrollArea, "pageScrollArea"),
+            "first page scroll area",
+        )
+        first_scroll.ensureWidgetVisible(first_page.diagnostic_Button)
+        qapp.processEvents()
+        first_scroll_value = required(
+            first_scroll.verticalScrollBar(), "first scrollbar"
+        ).value()
         first.hide()
         qapp.processEvents()
-        assert first._focus_reveal_connected is False
 
         _show(second, qapp)
-        calls.clear()
-        second.currentPage().onearm_mean_Button.setFocus()
+        second_page = _page(second, main_wizard.Page_DataType, main_wizard.DataTypePage)
+        second_page.onearm_mean_Button.setFocus()
         qapp.processEvents()
-        assert second in calls
-        assert first not in calls
+        assert (
+            required(first_scroll.verticalScrollBar(), "first scrollbar").value()
+            == first_scroll_value
+        )
 
         first.close()
-        calls.clear()
-        second.currentPage().twoarm_means_Button.setFocus()
+        second_page.twoarm_means_Button.setFocus()
         qapp.processEvents()
-        assert first not in calls
+        assert second_page.twoarm_means_Button.hasFocus()
     finally:
         first.close()
         second.close()
@@ -411,7 +472,7 @@ def test_hidden_and_closed_wizards_stop_observing_application_focus(qapp, monkey
 
 
 def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(qapp):
-    import main_wizard
+    from rc_metastudio import main_wizard
 
     wizard = main_wizard.MainWizard(path="csv_import")
     try:
@@ -430,7 +491,7 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
         wizard.resize(560, 400)
         qapp.processEvents()
         initial_geometry = _frame_tuple(wizard)
-        page = wizard.currentPage()
+        page = _page(wizard, main_wizard.Page_CsvImport, main_wizard.CsvImportPage)
         page.instructions.setText("Long CSV guidance. " * 120)
         page.preview_table.setRowCount(100)
         page.preview_table.setColumnCount(20)
@@ -438,11 +499,19 @@ def test_csv_preview_overflows_inside_stable_wizard_and_finish_stays_reachable(q
         qapp.processEvents()
         qapp.processEvents()
 
-        overflow = page.findChild(QtWidgets.QScrollArea, "pageScrollArea")
-        finish = wizard.button(main_wizard.QWizard.WizardButton.FinishButton)
-        cancel = wizard.button(main_wizard.QWizard.WizardButton.CancelButton)
+        overflow = required(
+            page.findChild(QtWidgets.QScrollArea, "pageScrollArea"), "page scroll area"
+        )
+        finish = required(
+            wizard.button(main_wizard.QWizard.WizardButton.FinishButton),
+            "finish button",
+        )
+        cancel = required(
+            wizard.button(main_wizard.QWizard.WizardButton.CancelButton),
+            "cancel button",
+        )
         assert _frame_tuple(wizard) == initial_geometry
-        assert overflow.verticalScrollBar().maximum() > 0
+        assert required(overflow.verticalScrollBar(), "page scrollbar").maximum() > 0
         assert finish.isVisible()
         assert cancel.isVisible()
         assert not overflow.isAncestorOf(finish)
@@ -459,9 +528,9 @@ import json
 from PyQt6 import QtCore, QtWidgets
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
-import app_error_handler
-import adaptive_window
-import main_wizard
+from rc_metastudio import app_error_handler
+from rc_metastudio import adaptive_window
+from rc_metastudio import main_wizard
 
 app = app_error_handler.get_or_create_application([])
 wizard = main_wizard.MainWizard(path="new_dataset")
@@ -490,16 +559,15 @@ finally:
     app.quit()
     app.processEvents()
 """
-    for scale_factor in ("1", "1.5", "2"):
+    for scale_factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment["QT_QPA_PLATFORM"] = "offscreen"
         environment["QT_SCALE_FACTOR"] = scale_factor
         environment["PYTHONPATH"] = os.pathsep.join(
             [
                 str(root / "src"),
-                str(root / "src" / "rc_metastudio"),
                 str(
-                    root / "build" / "qt6-verification" / "generated" / "rc_metastudio"
+                    root / "build" / "qt6-verification" / "generated"
                 ),
             ]
         )

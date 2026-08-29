@@ -22,7 +22,7 @@ def stable_covariate_identity(dataset, covariate):
     ordinal = dataset.covariates.index(covariate)
     legacy_schema = {
         "title": dataset.title or "",
-        "is_diagnostic": bool(dataset.is_diag),
+        "is_diagnostic": bool(dataset.is_diagnostic),
         "outcomes": [
             {
                 "name": name,

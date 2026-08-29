@@ -3,12 +3,13 @@
 """Release contracts for native adaptive-layout package evidence."""
 
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 from PyQt6 import QtGui
+
+from ._workflow import load_module_from_path, load_workflow
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -62,19 +63,28 @@ def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
 
 
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():
-    workflow = _text(".github", "workflows", "package-verification.yml")
-    target = _text(".github", "workflows", "package-target.yml")
-    windows = _text(".github", "workflows", "package-windows.yml")
+    workflow = load_workflow(".github/workflows/package-verification.yml")
+    target = load_workflow(".github/workflows/package-target.yml")
+    windows = load_workflow(".github/workflows/package-windows.yml")
 
-    assert "uses: ./.github/workflows/package-windows.yml" in workflow
-    assert "uses: ./.github/workflows/package-target.yml" in workflow
-    assert "target: macos-x64" in target
-    assert "target: macos-arm64" in target
-    assert "Upload adaptive-layout evidence" not in target
-    assert "evidence_path" not in target
-    assert "adaptive-layout-evidence" not in workflow
-    assert "adaptive-layout-evidence" not in windows
-    assert target.count("if-no-files-found: error") >= 1
+    assert (
+        workflow["jobs"]["windows-package"]["uses"]
+        == "./.github/workflows/package-windows.yml"
+    )
+    assert (
+        workflow["jobs"]["macos-packages"]["uses"]
+        == "./.github/workflows/package-target.yml"
+    )
+    targets = target["jobs"]["package"]["strategy"]["matrix"]["include"]
+    assert {item["target"] for item in targets} == {"macos-x64", "macos-arm64"}
+    steps = target["jobs"]["package"]["steps"] + windows["jobs"]["package"]["steps"]
+    assert not any(
+        "adaptive-layout-evidence" in str(step) or "evidence_path" in str(step)
+        for step in steps
+    )
+    assert any(
+        step.get("with", {}).get("if-no-files-found") == "error" for step in steps
+    )
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():
@@ -113,10 +123,7 @@ def test_native_evidence_runner_covers_the_release_review_contract():
 
 def _load_validator():
     validator_path = ROOT / "scripts" / "validate_adaptive_layout_evidence.py"
-    spec = importlib.util.spec_from_file_location("evidence_validator", validator_path)
-    validator = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(validator)
-    return validator
+    return load_module_from_path("evidence_validator", validator_path)
 
 
 def test_native_evidence_validator_matches_qt_half_up_pixel_rounding():
@@ -321,7 +328,7 @@ def test_native_evidence_validator_rejects_semantic_contract_mutations(
 
 
 def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
-    launch = _text("src", "rc_metastudio", "launch.py")
+    launch = _text("src", "rc_metastudio", "automation.py")
 
     assert '"--automation-adaptive-layout-evidence"' in launch
     assert "start_adaptive_layout_evidence" in launch

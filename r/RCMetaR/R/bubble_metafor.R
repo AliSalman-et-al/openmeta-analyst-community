@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Metafor-backed meta-regression bubble plot renderer.
-
 rcmetar.bubble.style <- function(params) {
     style <- params$bp_style
     if (!is.null(style) && length(style) > 0 && !is.na(style[1]) && nzchar(as.character(style[1]))) {

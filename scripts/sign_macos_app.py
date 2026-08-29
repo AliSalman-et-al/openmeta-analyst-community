@@ -12,7 +12,7 @@ import plistlib
 import stat
 import subprocess
 import sys
-from typing import NoReturn, Sequence
+from typing import Iterator, NoReturn, Sequence
 
 from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
 
@@ -53,7 +53,7 @@ def _raise_walk_error(error: OSError) -> None:
     raise error
 
 
-def _walk(root: Path):
+def _walk(root: Path) -> Iterator[tuple[Path, list[str], list[str]]]:
     for directory, dirnames, filenames in os.walk(
         root, followlinks=False, onerror=_raise_walk_error
     ):
@@ -256,12 +256,15 @@ def _diagnose_deep_verification_failure(plan: SigningPlan) -> None:
     for path in sorted(plan.app.rglob("*")):
         if not path.is_symlink():
             continue
+        target = "<unavailable>"
         try:
             target = os.readlink(path)
             resolved = path.resolve(strict=True)
             resolved.relative_to(plan.app.resolve(strict=True))
         except (OSError, RuntimeError, ValueError) as exc:
-            print(f"{prefix} invalid symlink {path}: {target!r}: {exc}", file=sys.stderr)
+            print(
+                f"{prefix} invalid symlink {path}: {target!r}: {exc}", file=sys.stderr
+            )
 
     probes = [
         ["--display", "--verbose=4", str(plan.app)],

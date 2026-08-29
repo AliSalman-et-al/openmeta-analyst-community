@@ -1,9 +1,12 @@
 import types
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
 
 import pytest
-from PyQt6 import QtCore, QtGui, QtTest, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
+
+pytestmark = pytest.mark.qsettings
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -12,19 +15,20 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import key_click, required
 
 prepare_generated_ui_imports()
-import adaptive_window
+from rc_metastudio import adaptive_window
 
 
 DATASET_FORM_PATHS = (
-    "edit_dialog2.ui",
-    "new_study_dlg.ui",
-    "new_outcome_dlg.ui",
-    "new_follow_up_dlg.ui",
-    "new_group_dlg.ui",
-    "new_covariate_dlg.ui",
-    "change_group_name_dlg.ui",
+    "edit_dialog.ui",
+    "new_study_dialog.ui",
+    "new_outcome_dialog.ui",
+    "new_follow_up_dialog.ui",
+    "new_group_dialog.ui",
+    "new_covariate_dialog.ui",
+    "edit_name_dialog.ui",
 )
 
 
@@ -32,17 +36,17 @@ class _DatasetParent(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.model = types.SimpleNamespace(
-            current_outcome="Outcome",
+            current_outcome_name="Outcome",
             get_current_follow_up_name=lambda: "first",
         )
 
 
 def _empty_edit_dialog(parent):
-    import edit_dialog
-    import ma_dataset
+    from rc_metastudio import edit_dialog
+    from rc_metastudio import analysis_dataset
 
-    dataset = ma_dataset.Dataset()
-    dataset.add_outcome(ma_dataset.Outcome("Outcome", ma_dataset.BINARY))
+    dataset = analysis_dataset.Dataset()
+    dataset.add_outcome(analysis_dataset.Outcome("Outcome", analysis_dataset.BINARY))
     return edit_dialog.EditDialog(dataset, parent=parent)
 
 
@@ -57,7 +61,7 @@ def _dispose(qapp, *widgets):
 def test_edit_dataset_first_use_tracks_logical_screen_contract(
     qapp, monkeypatch, screen_size
 ):
-    import adaptive_window
+    from rc_metastudio import adaptive_window
 
     available = QtCore.QRect(0, 0, *screen_size)
     monkeypatch.setattr(
@@ -82,8 +86,8 @@ def test_edit_dataset_first_use_tracks_logical_screen_contract(
 def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
     qapp, tmp_path
 ):
-    import ma_dataset
-    import settings
+    from rc_metastudio import analysis_dataset
+    from rc_metastudio import settings
 
     parent = _DatasetParent()
     parent.setGeometry(0, 0, 800, 600)
@@ -160,22 +164,31 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
         assert first.rect().contains(first.buttonBox.geometry().center())
         for index in range(40):
             first.dataset.add_study(
-                ma_dataset.Study(index, name=("Very long study name " * 8) + str(index))
+                analysis_dataset.Study(
+                    index, name=("Very long study name " * 8) + str(index)
+                )
             )
         first.studies_model.update_study_list()
         first.edit_tab.setCurrentWidget(first.tab_2)
         qapp.processEvents()
         assert first.geometry() == stable_geometry
         assert first.study_list.textElideMode() == QtCore.Qt.TextElideMode.ElideNone
-        assert first.study_list.horizontalScrollBar().maximum() > 0
+        assert (
+            required(
+                first.study_list.horizontalScrollBar(), "study scrollbar"
+            ).maximum()
+            > 0
+        )
 
         first.edit_tab.setCurrentWidget(first.tab)
         first.activateWindow()
         first.outcome_list.setFocus()
         traversed = set()
         for _ in range(8):
-            QtTest.QTest.keyClick(qapp.focusWidget(), QtCore.Qt.Key.Key_Tab)
-            traversed.add(qapp.focusWidget().objectName())
+            key_click(
+                required(qapp.focusWidget(), "focus widget"), QtCore.Qt.Key.Key_Tab
+            )
+            traversed.add(required(qapp.focusWidget(), "focus widget").objectName())
         assert {
             "add_outcome_btn",
             "follow_up_list",
@@ -233,8 +246,8 @@ def test_edit_dataset_is_modal_workspace_with_persisted_placement_and_panes(
 
 
 def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(qapp):
-    import add_new_dialogs
-    import edit_group_name_form
+    from rc_metastudio import add_new_dialogs
+    from rc_metastudio import edit_name_dialogs
 
     old_font = QtGui.QFont(qapp.font())
     enlarged = QtGui.QFont(old_font)
@@ -242,13 +255,13 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
     qapp.setFont(enlarged)
     long_name = "A very long dataset structure name " * 12
     dialogs = [
-        add_new_dialogs.AddNewStudyForm(),
-        add_new_dialogs.AddNewOutcomeForm(),
-        add_new_dialogs.AddNewFollowUpForm(),
-        add_new_dialogs.AddNewGroupForm(),
-        add_new_dialogs.AddNewCovariateForm(),
-        edit_group_name_form.EditGroupName(long_name),
-        edit_group_name_form.EditCovariateName(long_name),
+        add_new_dialogs.AddStudyDialog(),
+        add_new_dialogs.AddOutcomeDialog(),
+        add_new_dialogs.AddFollowUpDialog(),
+        add_new_dialogs.AddGroupDialog(),
+        add_new_dialogs.AddCovariateDialog(),
+        edit_name_dialogs.EditGroupNameDialog(long_name),
+        edit_name_dialogs.EditCovariateNameDialog(long_name),
     ]
     try:
         for dialog in dialogs:
@@ -263,23 +276,23 @@ def test_dataset_nested_actions_keep_long_required_content_and_keyboard_access(q
             assert dialog.buttonBox.isVisible()
             assert dialog.rect().contains(dialog.buttonBox.geometry().center())
 
-        outcome = dialogs[1]
+        outcome = cast(add_new_dialogs.AddOutcomeDialog, dialogs[1])
         outcome.activateWindow()
         outcome.raise_()
         qapp.processEvents()
         outcome.outcome_name_le.setText(long_name)
         outcome.outcome_name_le.setFocus()
-        QtTest.QTest.keyClick(outcome.outcome_name_le, QtCore.Qt.Key.Key_Tab)
+        key_click(outcome.outcome_name_le, QtCore.Qt.Key.Key_Tab)
         assert outcome.datatype_cbo_box.hasFocus()
         assert outcome.outcome_name_le.text() == long_name
 
-        rename = dialogs[-1]
+        rename = cast(edit_name_dialogs.EditCovariateNameDialog, dialogs[-1])
         rename.activateWindow()
         rename.raise_()
         qapp.processEvents()
         assert rename.group_name_le.text() == long_name
         rename.group_name_le.setFocus()
-        QtTest.QTest.keyClick(rename.group_name_le, QtCore.Qt.Key.Key_Tab)
+        key_click(rename.group_name_le, QtCore.Qt.Key.Key_Tab)
         assert qapp.focusWidget() in rename.buttonBox.buttons()
     finally:
         qapp.setFont(old_font)

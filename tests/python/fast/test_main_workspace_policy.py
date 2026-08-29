@@ -4,17 +4,16 @@ import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-sys.path.insert(0, os.path.abspath("src/rc_metastudio"))
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 import pytest
 
+pytestmark = pytest.mark.qsettings
 
-def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
-    import settings
 
-    capsys.readouterr()
+def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch):
+    from rc_metastudio import settings
 
     class UnexpectedSettings:
         def __init__(self):
@@ -23,12 +22,6 @@ def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch, capsys):
     monkeypatch.setattr(settings, "QSettings", UnexpectedSettings)
 
     settings.save_settings()
-
-    assert capsys.readouterr().out.splitlines() == [
-        "saved settings",
-        "RCMS_SETTINGS_PHASE before-former-sync",
-        "RCMS_SETTINGS_PHASE after-former-sync",
-    ]
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows registry contract")
@@ -61,7 +54,7 @@ class IdentityTableModel(QtGui.QStandardItemModel):
         self.identities = list(identities)
 
     def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
-        from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+        from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
         if (
             orientation == QtCore.Qt.Orientation.Horizontal
@@ -72,7 +65,7 @@ class IdentityTableModel(QtGui.QStandardItemModel):
 
 
 def test_layout_settings_migration_deletes_only_legacy_main_geometry(tmp_path):
-    import settings
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -97,7 +90,7 @@ def test_layout_settings_migration_deletes_only_legacy_main_geometry(tmp_path):
 
 
 def test_stale_main_placement_is_clamped_to_available_screen(tmp_path):
-    import settings
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -121,7 +114,7 @@ def test_stale_main_placement_is_clamped_to_available_screen(tmp_path):
 
 
 def test_fresh_main_placement_defaults_to_maximized(tmp_path):
-    import settings
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -139,7 +132,7 @@ def test_fresh_main_placement_defaults_to_maximized(tmp_path):
 
 
 def test_main_and_results_share_typed_workspace_placement_policy(tmp_path):
-    import settings
+    from rc_metastudio import settings
 
     QtCore.QSettings.setPath(
         QtCore.QSettings.Format.IniFormat,
@@ -171,8 +164,8 @@ def test_main_and_results_share_typed_workspace_placement_policy(tmp_path):
 
 
 def test_main_column_widths_round_trip_in_versioned_workspace_state(tmp_path, qapp):
-    import settings
-    from workspace_column_identity import (
+    from rc_metastudio import settings
+    from rc_metastudio.workspace_column_identity import (
         WorkspaceColumnIdentity,
         WorkspaceColumnWidthState,
     )
@@ -198,7 +191,7 @@ def test_main_column_widths_round_trip_in_versioned_workspace_state(tmp_path, qa
 
 
 def test_workspace_columns_preserve_user_widths_and_initialize_only_new_columns(qapp):
-    from workspace_columns import WorkspaceColumnWidthController
+    from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
 
     table = QtWidgets.QTableView()
     model = IdentityTableModel([("fixed", "study"), ("outcome", "estimate")])
@@ -228,7 +221,7 @@ def test_workspace_columns_preserve_user_widths_and_initialize_only_new_columns(
 
 
 def test_workspace_columns_keep_width_when_display_header_is_renamed(qapp):
-    from workspace_columns import WorkspaceColumnWidthController
+    from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
 
     table = QtWidgets.QTableView()
     model = IdentityTableModel([("fixed", "study")])
@@ -250,7 +243,7 @@ def test_workspace_columns_keep_width_when_display_header_is_renamed(qapp):
 
 
 def test_workspace_columns_survive_middle_insertion_and_removal_by_identity(qapp):
-    from workspace_columns import WorkspaceColumnWidthController
+    from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
 
     table = QtWidgets.QTableView()
     model = IdentityTableModel(
@@ -285,13 +278,15 @@ def test_workspace_columns_survive_middle_insertion_and_removal_by_identity(qapp
 
 
 def test_dataset_model_covariate_identity_survives_rename(qapp):
-    import ma_data_table_model
-    import ma_dataset
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio import dataset_table_model
+    from rc_metastudio import analysis_dataset
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
 
-    dataset = ma_dataset.Dataset()
-    dataset.add_covariate(ma_dataset.Covariate("Age", "continuous"))
-    model = ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
+    dataset = analysis_dataset.Dataset()
+    dataset.add_covariate(analysis_dataset.Covariate("Age", "continuous"))
+    model = dataset_table_model.DatasetTableModel(
+        dataset=dataset, add_blank_study=False
+    )
     identity_before = model.headerData(
         3, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
     )
@@ -305,17 +300,19 @@ def test_dataset_model_covariate_identity_survives_rename(qapp):
 
 
 def test_legacy_covariate_identity_and_widths_are_deterministic_across_loads(qapp):
-    import ma_data_table_model
-    import ma_dataset
-    from workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
-    from workspace_columns import WorkspaceColumnWidthController
+    from rc_metastudio import dataset_table_model
+    from rc_metastudio import analysis_dataset
+    from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+    from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
 
     def legacy_model():
-        dataset = ma_dataset.Dataset(title="Untouched legacy project")
-        covariate = ma_dataset.Covariate("Age", "continuous")
+        dataset = analysis_dataset.Dataset(title="Untouched legacy project")
+        covariate = analysis_dataset.Covariate("Age", "continuous")
         del covariate.stable_id
         dataset.add_covariate(covariate)
-        return ma_data_table_model.DatasetModel(dataset=dataset, add_blank_study=False)
+        return dataset_table_model.DatasetTableModel(
+            dataset=dataset, add_blank_study=False
+        )
 
     first_model = legacy_model()
     first_identity = first_model.headerData(
@@ -342,7 +339,7 @@ def test_legacy_covariate_identity_and_widths_are_deterministic_across_loads(qap
 
 
 def test_explicit_auto_fit_transfers_new_widths_to_user_ownership(qapp):
-    from workspace_columns import WorkspaceColumnWidthController
+    from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
 
     table = QtWidgets.QTableView()
     model = QtGui.QStandardItemModel(1, 1)

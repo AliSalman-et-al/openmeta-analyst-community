@@ -2,43 +2,38 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Batch dataset editing dialog."""
 
-#  This form is for 'batch' editing a dataset. Note that any
-#  edits apply to *all* MetaAnalyticUnit objects known. So
-#  e.g., if a group name is changed, it will be changed
-# *everywhere*.
-#
-#  Note also that this form doesn't itself provide any
-#  undo/redo functionality. Rather, the strategy is to
-#  treat *all* editing done via this form as one
-#  undoable action.
+# Batch edits apply to every analysis unit in the dataset and commit as one
+# undoable action.
 
-# import pdb
-
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
-import forms.ui_edit_dialog
-import edit_list_models
-import add_new_dialogs
-import app_error_handler
-import meta_globals
-import ma_dataset
-import ma_data_table_model
-import adaptive_window
-import qt_layout
-from settings import (
+from rc_metastudio import edit_list_models
+from rc_metastudio import add_new_dialogs
+from rc_metastudio import app_error_handler
+from rc_metastudio import meta_globals
+from rc_metastudio import analysis_dataset
+from rc_metastudio import dataset_table_model
+from rc_metastudio import adaptive_window
+from rc_metastudio import qt_layout
+from rc_metastudio.settings import (
     restore_edit_dataset_window_state,
     save_edit_dataset_window_state,
 )
 
+if TYPE_CHECKING:
+    import ui_edit_dialog as _ui_edit_dialog
+else:
+    from rc_metastudio.forms import ui_edit_dialog as _ui_edit_dialog
+
 
 class EditDialogOwner(Protocol):
-    model: ma_data_table_model.DatasetModel
+    model: dataset_table_model.DatasetTableModel
 
 
-class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
+class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
     def __init__(self, dataset, parent=None):
         super(EditDialog, self).__init__(parent)
         self.setupUi(self)
@@ -54,27 +49,25 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.dataset_structure_splitter.setStretchFactor(1, 1)
         self.dataset_structure_splitter.setStretchFactor(2, 1)
 
-        ### outcomes
         if parent is None:
-            raise RuntimeError("EditDialog requires its owning MetaForm")
+            raise RuntimeError("EditDialog requires its owning MainWindow")
         owner = cast(EditDialogOwner, parent)
         self.outcomes_model = edit_list_models.OutcomesModel(dataset=dataset)
         self.outcome_list.setModel(self.outcomes_model)
         try:
             index_of_outcome_to_select = self.outcomes_model.outcome_list.index(
-                owner.model.current_outcome
+                owner.model.current_outcome_name
             )
             outcome_index = self.outcomes_model.createIndex(
                 index_of_outcome_to_select, 0
             )
             self.outcome_list.setCurrentIndex(outcome_index)
-            self.selected_outcome = owner.model.current_outcome
+            self.selected_outcome = owner.model.current_outcome_name
             self.remove_outcome_btn.setEnabled(True)
-        except:
+        except (IndexError, KeyError, ValueError):
             # no outcomes.
             self.selected_outcome = None
 
-        ### follow-ups
         # notice that we pass the follow ups model the current outcome, because it will display only
         # those follow-ups included for this outcome
         self.follow_ups_model = edit_list_models.FollowUpsModel(
@@ -93,7 +86,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         else:
             self.selected_follow_up = None
 
-        ### groups
         self.groups_model = edit_list_models.TXGroupsModel(
             dataset=dataset,
             outcome=self.selected_outcome,
@@ -101,15 +93,11 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         )
         self.group_list.setModel(self.groups_model)
 
-        ### studies
         # The final row is the blank append row; batch edits operate only on
         # real studies.
-        # self.blank_study = dataset.studies[-1]
-        # dataset.studies = dataset.studies[:-1]
         self.studies_model = edit_list_models.StudiesModel(dataset=dataset)
         self.study_list.setModel(self.studies_model)
 
-        ### covariates
         self.covariates_model = edit_list_models.CovariatesModel(dataset=dataset)
         self.covariate_list.setModel(self.covariates_model)
 
@@ -179,7 +167,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         ]:
             model.dataError.connect(app_error_handler.safe_slot(self.data_error, self))
 
-        ###
         # groups
         self.add_group_btn.pressed.connect(
             app_error_handler.safe_slot(self.add_group, self)
@@ -191,7 +178,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             app_error_handler.safe_slot(self.group_selected, self)
         )
 
-        ###
         # outcomes
         self.add_outcome_btn.pressed.connect(
             app_error_handler.safe_slot(self.add_outcome, self)
@@ -203,7 +189,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             app_error_handler.safe_slot(self.outcome_selected, self)
         )
 
-        ###
         # follow-ups
         self.add_follow_up_btn.pressed.connect(
             app_error_handler.safe_slot(self.add_follow_up, self)
@@ -215,7 +200,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             app_error_handler.safe_slot(self.follow_up_selected, self)
         )
 
-        ###
         # studies
         self.add_study_btn.pressed.connect(
             app_error_handler.safe_slot(self.add_study, self)
@@ -227,7 +211,6 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             app_error_handler.safe_slot(lambda _index: self.study_selected(), self)
         )
 
-        ###
         # covariates
         self.add_covariate_btn.pressed.connect(
             app_error_handler.safe_slot(self.add_covariate, self)
@@ -243,11 +226,11 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         QMessageBox.warning(self, "Warning", msg)
 
     def add_group(self):
-        form = add_new_dialogs.AddNewGroupForm(self)
+        form = add_new_dialogs.AddGroupDialog(self)
         form.group_name_le.setFocus()
         if form.exec():
             try:
-                new_group_name = ma_data_table_model.validate_new_group_name(
+                new_group_name = dataset_table_model.validate_new_group_name(
                     self.groups_model.dataset, form.group_name_le.text()
                 )
             except ValueError as exc:
@@ -261,7 +244,7 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
     def remove_group(self):
         index = self.group_list.currentIndex()
         selected_group = self.groups_model.group_list[index.row()]
-        self.groups_model.dataset.delete_group(selected_group)
+        self.groups_model.dataset.remove_group(selected_group)
         self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
@@ -272,14 +255,16 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.remove_group_btn.setEnabled(True)
 
     def add_outcome(self):
-        form = add_new_dialogs.AddNewOutcomeForm(self, is_diag=self.dataset.is_diag)
+        form = add_new_dialogs.AddOutcomeDialog(
+            self, is_diagnostic=self.dataset.is_diagnostic
+        )
         form.outcome_name_le.setFocus()
         if form.exec():
             # then the user clicked ok and has added a new outcome.
             # here we want to add the outcome to the dataset, and then
             # display it
             try:
-                new_outcome_name = ma_data_table_model.validate_new_outcome_name(
+                new_outcome_name = dataset_table_model.validate_new_outcome_name(
                     self.outcomes_model.dataset, form.outcome_name_le.text()
                 )
             except ValueError as exc:
@@ -290,11 +275,11 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
             data_type = str(form.datatype_cbo_box.currentText())
             data_type = meta_globals.STR_TO_TYPE_DICT[data_type.lower()]
             self.outcomes_model.dataset.add_outcome(
-                ma_dataset.Outcome(new_outcome_name, data_type)
+                analysis_dataset.Outcome(new_outcome_name, data_type)
             )
 
             self.outcomes_model.refresh_outcome_list()
-            self.outcomes_model.current_outcome = new_outcome_name
+            self.outcomes_model.current_outcome_name = new_outcome_name
 
     def get_selected_outcome(self):
         index = self.outcome_list.currentIndex()
@@ -317,17 +302,14 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.selected_outcome = self.get_selected_outcome()
         # update the follow-ups list as appropriate
         if self.selected_outcome is not None:
-            self.follow_ups_model.current_outcome = self.selected_outcome
-            print("\ncurrent outcome updated. is now: %s" % self.selected_outcome)
+            self.follow_ups_model.current_outcome_name = self.selected_outcome
             self.follow_ups_model.refresh_follow_up_list()
             self.selected_follow_up = self.get_selected_follow_up()
-            ## also update the groups and follow-up lists
             self.groups_model.refresh_group_list(
                 self.selected_outcome, self.selected_follow_up
             )
         else:
-            ## the assumption in this case is that all outcomes have been deleted
-            # so we clear the follow up and group lists.
+            # Clear dependent lists when all outcomes have been deleted.
             self.follow_ups_model.follow_up_list = []
             self.follow_ups_model.reset_model()
             self.groups_model.group_list = []
@@ -335,21 +317,20 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
 
     def outcome_selected(self, index):
         self.selected_outcome = self.get_selected_outcome()
-        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.current_outcome_name = self.selected_outcome
         self.follow_ups_model.refresh_follow_up_list()
         self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
-        ## update
         self.disable_remove_buttons()
         self.remove_outcome_btn.setEnabled(True)
 
     def add_follow_up(self):
-        form = add_new_dialogs.AddNewFollowUpForm(self)
+        form = add_new_dialogs.AddFollowUpDialog(self)
         form.follow_up_name_le.setFocus()
         if form.exec():
             try:
-                follow_up_lbl = ma_data_table_model.validate_new_global_follow_up_name(
+                follow_up_lbl = dataset_table_model.validate_new_global_follow_up_name(
                     self.follow_ups_model.dataset,
                     form.follow_up_name_le.text(),
                 )
@@ -357,16 +338,11 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             self.follow_ups_model.dataset.add_follow_up(follow_up_lbl)
-            self.follow_ups_model.current_outcome = self.selected_outcome
+            self.follow_ups_model.current_outcome_name = self.selected_outcome
             self.follow_ups_model.refresh_follow_up_list()
 
     def get_selected_follow_up(self):
         index = self.follow_up_list.currentIndex()
-        print("index is: %s" % index.row())
-        print(
-            "here is the current follow-up list: %s"
-            % self.follow_ups_model.follow_up_list
-        )
         return self.follow_ups_model.follow_up_list[index.row()]
 
     def get_selected_study(self):
@@ -380,30 +356,32 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.remove_covariate_btn.setEnabled(True)
 
     def add_covariate(self):
-        form = add_new_dialogs.AddNewCovariateForm(self)
+        form = add_new_dialogs.AddCovariateDialog(self)
         form.covariate_name_le.setFocus()
         if form.exec():
             try:
-                new_covariate_name = ma_data_table_model.validate_new_covariate_name(
+                new_covariate_name = dataset_table_model.validate_new_covariate_name(
                     self.covariates_model.dataset, form.covariate_name_le.text()
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             new_covariate_type = str(form.datatype_cbo_box.currentText())
-            cov_obj = ma_dataset.Covariate(new_covariate_name, new_covariate_type)
-            self.covariates_model.dataset.add_covariate(cov_obj)
+            covariate = analysis_dataset.Covariate(
+                new_covariate_name, new_covariate_type
+            )
+            self.covariates_model.dataset.add_covariate(covariate)
             self.covariates_model.update_covariates_list()
 
     def remove_covariate(self):
-        cov_obj = self.get_selected_covariate()
-        self.covariates_model.dataset.remove_covariate(cov_obj)
+        covariate = self.get_selected_covariate()
+        self.covariates_model.dataset.remove_covariate(covariate)
         self.covariates_model.update_covariates_list()
 
     def remove_follow_up(self):
         self.selected_follow_up = self.get_selected_follow_up()
         self.follow_ups_model.dataset.remove_follow_up(self.selected_follow_up)
-        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.current_outcome_name = self.selected_outcome
         self.follow_ups_model.refresh_follow_up_list()
 
     def follow_up_selected(self, index):
@@ -425,18 +403,18 @@ class EditDialog(QDialog, forms.ui_edit_dialog.Ui_edit_dialog):
         self.remove_outcome_btn.setEnabled(False)
 
     def add_study(self):
-        form = add_new_dialogs.AddNewStudyForm(self)
+        form = add_new_dialogs.AddStudyDialog(self)
         form.study_lbl.setFocus()
         if form.exec():
             try:
-                study_name = ma_data_table_model.validate_new_study_name(
+                study_name = dataset_table_model.validate_new_study_name(
                     form.study_lbl.text()
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             study_id = self.studies_model.dataset.max_study_id() + 1
-            new_study = ma_dataset.Study(study_id, name=study_name)
+            new_study = analysis_dataset.Study(study_id, name=study_name)
             self.studies_model.dataset.add_study(new_study)
             self.studies_model.update_study_list()
 
