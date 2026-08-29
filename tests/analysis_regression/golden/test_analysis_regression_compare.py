@@ -928,7 +928,7 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_binary_ma",
+            "run_binary_analysis",
             lambda method, params: {"texts": {"Summary": params["measure"]}},
             raising=False,
         )
@@ -1056,7 +1056,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         calls = []
 
         class DataSet(object):
-            def get_values_for_cov(self, covariate, ids_for_keys=False):
+            def get_covariate_values(self, covariate, ids_for_keys=False):
                 assert ids_for_keys is True
                 return {0: 1990}
 
@@ -1100,7 +1100,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
             "run_meta_regression",
-            lambda dataset, studies, covs, metric, conf_level=None, params=None, **kwargs: {
+            lambda dataset, studies, covs, metric, confidence_level=None, params=None, **kwargs: {
                 "texts": {"Summary": metric}
             },
             raising=False,

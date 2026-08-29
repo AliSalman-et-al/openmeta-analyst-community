@@ -41,9 +41,16 @@ def test_main_window_standard_binary_action_opens_setup_dialog(monkeypatch):
     calls = []
 
     class SpecsDialog(object):
-        def __init__(self, model, meta_f_str=None, parent=None, conf_level=None):
+        def __init__(
+            self, model, analysis_type=None, parent=None, confidence_level=None
+        ):
             calls.append(
-                (meta_f_str, parent, conf_level, model.get_current_outcome_type())
+                (
+                    analysis_type,
+                    parent,
+                    confidence_level,
+                    model.get_current_outcome_type(),
+                )
             )
 
         def show(self):
@@ -57,7 +64,7 @@ def test_main_window_standard_binary_action_opens_setup_dialog(monkeypatch):
         assert window.open(os.path.abspath("sample_projects/amino.rcms")) is True
         window.action_go.trigger()
 
-        assert calls == [(None, window, window.model.get_global_conf_level(), "binary")]
+        assert calls == [(None, window, window.model.get_confidence_level(), "binary")]
     finally:
         window.close()
         app.processEvents()
@@ -130,7 +137,5 @@ def _dataset_summary(dataset):
     return {
         "title": dataset.title,
         "studies": [(str(study.name), str(study.year)) for study in dataset.studies],
-        "outcomes": sorted(
-            str(name) for name in dataset.outcome_names_to_follow_ups.keys()
-        ),
+        "outcomes": sorted(str(name) for name in dataset.follow_ups_by_outcome.keys()),
     }

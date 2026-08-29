@@ -35,7 +35,7 @@
       </attribute>
       <layout class="QVBoxLayout" name="covariates_tab_layout">
        <item>
-        <widget class="QGroupBox" name="cov_grp_box">
+        <widget class="QGroupBox" name="covariate_group_box">
          <property name="title">
           <string>Select covariates for regression</string>
          </property>

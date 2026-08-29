@@ -40,7 +40,7 @@ def _remaining_surface_inventory():
         (
             "add-diagnostic-outcome",
             "choice",
-            add_new_dialogs.AddOutcomeDialog(is_diag=True),
+            add_new_dialogs.AddOutcomeDialog(is_diagnostic=True),
         ),
         ("add-study", "compact", add_new_dialogs.AddStudyDialog()),
         ("add-covariate", "choice", add_new_dialogs.AddCovariateDialog()),
@@ -267,7 +267,7 @@ def test_compact_transactional_keyboard_and_accessibility_matrix(qapp, monkeypat
         (
             "change-covariate-type",
             lambda: covariate_type_dialog.CovariateTypeDialog(object(), object()),
-            "cov_prev_table",
+            "covariate_preview_table",
         ),
     )
 
@@ -499,7 +499,8 @@ from rc_metastudio import about_legal_dialog, add_new_dialogs, edit_name_dialogs
 app = app_error_handler.get_or_create_application([])
 windows = [
     add_new_dialogs.AddGroupDialog(), add_new_dialogs.AddFollowUpDialog(),
-    add_new_dialogs.AddOutcomeDialog(), add_new_dialogs.AddOutcomeDialog(is_diag=True),
+    add_new_dialogs.AddOutcomeDialog(),
+    add_new_dialogs.AddOutcomeDialog(is_diagnostic=True),
     add_new_dialogs.AddStudyDialog(), add_new_dialogs.AddCovariateDialog(),
     edit_name_dialogs.EditGroupNameDialog("Group"),
     edit_name_dialogs.EditCovariateNameDialog("Covariate"),
@@ -528,19 +529,14 @@ print("COMPACT_LAYOUT=" + json.dumps(payload), flush=True)
     for scale_factor in ("1", "1.5"):
         environment = os.environ.copy()
         environment.update(
-                {
-                    "QT_QPA_PLATFORM": "offscreen",
-                    "QT_SCALE_FACTOR": scale_factor,
-                    "RCMS_STUB_BACKEND": "1",
-                    "PYTHONPATH": os.pathsep.join(
+            {
+                "QT_QPA_PLATFORM": "offscreen",
+                "QT_SCALE_FACTOR": scale_factor,
+                "RCMS_STUB_BACKEND": "1",
+                "PYTHONPATH": os.pathsep.join(
                     [
                         str(ROOT / "src"),
-                        str(
-                            ROOT
-                            / "build"
-                            / "qt6-verification"
-                            / "generated"
-                        ),
+                        str(ROOT / "build" / "qt6-verification" / "generated"),
                     ]
                 ),
                 "RCMS_QT6_BUILD_ROOT": str(ROOT / "build" / "qt6-verification"),

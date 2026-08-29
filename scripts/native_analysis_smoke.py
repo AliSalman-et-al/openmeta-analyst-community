@@ -139,7 +139,7 @@ def main() -> int:
         calls.append({"method": method, "parameters": dict(parameters)})
         return {"texts": {"Summary": "ok"}, "images": {}}
 
-    _install_backend_stub(backend, "run_binary_ma", run_backend)
+    _install_backend_stub(backend, "run_binary_analysis", run_backend)
     _install_backend_stub(backend, "reset_r_working_directory", lambda: None)
 
     def deferred_delete() -> None:
@@ -150,7 +150,7 @@ def main() -> int:
 
     def make_configuration() -> Any:
         dialog = analysis_setup_dialog.AnalysisSetupDialog(
-            Model(), parent=owner, conf_level=95.0
+            Model(), parent=owner, confidence_level=95.0
         )
         dialog.show()
         app.processEvents()
@@ -219,7 +219,7 @@ def main() -> int:
     failing = make_configuration()
     _phase("failure-configuration-created")
     progress_count = len(created_progress_dialogs)
-    backend.run_binary_ma = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+    backend.run_binary_analysis = lambda *_args, **_kwargs: (_ for _ in ()).throw(
         RuntimeError("native backend failure")
     )
     original_critical = analysis_setup_dialog.QMessageBox.critical

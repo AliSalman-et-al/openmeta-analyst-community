@@ -1,6 +1,3 @@
-###############################################################################
-# Package-private value set from python to control confidence level. At the
-# moment, it only affects calc.box.sizes in plotting.R.
 .rcmetar.state <- new.env(parent=emptyenv())
 .rcmetar.state$CONF.LEVEL.GLOBAL <- 95
 
@@ -26,7 +23,6 @@ get.mult.from.conf.level <- function(conf.level=get.global.conf.level()) {
 set.global.conf.level <- function(conf.level) {
 	conf.level <- validate.conf.level(conf.level)
 	.rcmetar.state$CONF.LEVEL.GLOBAL <- conf.level
-	#cat("R: Confidence level is now", CONF.LEVEL.GLOBAL)
 	return(.rcmetar.state$CONF.LEVEL.GLOBAL)
 }
 
@@ -40,5 +36,3 @@ get.global.conf.level <- function(NA.if.missing=FALSE) {
 	}
 	return(.rcmetar.state$CONF.LEVEL.GLOBAL)
 }
-################################################################################
-	

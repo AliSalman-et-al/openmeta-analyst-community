@@ -81,7 +81,7 @@ def test_issue_94_current_outcome_and_follow_up_labels_can_expand():
     ui = Ui_MainWindow()
     ui.setupUi(window)
 
-    for label in (ui.cur_outcome_lbl, ui.cur_time_lbl):
+    for label in (ui.current_outcome_label, ui.current_follow_up_label):
         assert label.maximumWidth() > 80
         assert (
             label.sizePolicy().horizontalPolicy() != QtWidgets.QSizePolicy.Policy.Fixed

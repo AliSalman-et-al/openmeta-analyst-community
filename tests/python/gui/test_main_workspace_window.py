@@ -50,7 +50,7 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
             window.nav_down_btn,
             window.nav_right_btn,
             window.nav_add_btn,
-            window.nav_lbl,
+            window.navigation_label,
         ):
             assert window.navigationLayout.indexOf(control) >= 0
         assert window.action_auto_fit_columns.text() == "Auto-Fit Columns"
@@ -106,7 +106,7 @@ def test_main_inherits_fonts_and_navigation_icons_from_active_style(qapp):
             window,
             window.centralwidget,
             window.menu_file,
-            window.nav_lbl,
+            window.navigation_label,
             window.dataset_file_lbl,
             window.cl_label,
         ):
@@ -208,7 +208,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.tableView.setColumnWidth(column, 263)
 
         window.delete_covariate(covariate)
-        assert window.model.dataset.get_cov_obj_from_name("Age") is None
+        assert window.model.dataset.get_covariate("Age") is None
 
         window.tableView.undoStack.undo()
         qapp.processEvents()
@@ -219,7 +219,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         assert window.tableView.columnWidth(column) == 263
 
         window.tableView.undoStack.redo()
-        assert window.model.dataset.get_cov_obj_from_name("Age") is None
+        assert window.model.dataset.get_covariate("Age") is None
         window.tableView.undoStack.undo()
         qapp.processEvents()
         assert (

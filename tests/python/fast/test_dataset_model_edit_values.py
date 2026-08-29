@@ -27,9 +27,9 @@ def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drif
     index = model.index(0, model.columnCount() - 1)
 
     assert model.setData(index, "1.25") is True
-    assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+    assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
     assert model.setData(index, "1,25") is True
-    assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+    assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
 
 
 def test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation():
@@ -42,7 +42,7 @@ def test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation(
 
     for invalid in ("1,234.5", "NaN", "Infinity"):
         assert model.setData(index, invalid) is False
-        assert model.dataset.studies[0].covariate_dict["Dose"] == 5.5
+        assert model.dataset.studies[0].covariate_values["Dose"] == 5.5
 
 
 def test_raw_data_uses_the_shared_strict_decimal_parser(monkeypatch):
@@ -51,7 +51,7 @@ def test_raw_data_uses_the_shared_strict_decimal_parser(monkeypatch):
     index = model.index(0, model.RAW_DATA[0])
     raw_data = (
         model.get_current_analysis_unit_for_study(0)
-        .tx_groups[model.current_txs[0]]
+        .groups[model.current_groups[0]]
         .raw_data
     )
 
@@ -75,7 +75,7 @@ def test_direct_outcomes_use_the_shared_strict_decimal_parser(monkeypatch):
     )
     index = model.index(0, model.OUTCOMES[0])
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group = model.get_cur_group_str()
+    group = model.get_current_group_comparison()
 
     assert model.setData(index, "1.25") is True
     assert analysis_unit.get_entered_effect_and_ci("OR", group)[0] == 1.25
@@ -236,18 +236,18 @@ def test_workspace_edit_emits_one_settled_semantic_payload_and_view_range(monkey
 
 
 def _diagnostic_model_with_empty_cells():
-    dataset = analysis_dataset.Dataset(is_diag=True)
+    dataset = analysis_dataset.Dataset(is_diagnostic=True)
     study = analysis_dataset.Study(1, name="Alpha", year=None)
     outcome = analysis_dataset.Outcome("Accuracy", meta_globals.DIAGNOSTIC)
     study.add_outcome(outcome)
     dataset.add_study(study)
-    dataset.outcome_names_to_follow_ups["Accuracy"] = {0: "first"}
+    dataset.follow_ups_by_outcome["Accuracy"] = {0: "first"}
 
     model = dataset_table_model.DatasetTableModel(
         dataset=dataset, add_blank_study=False
     )
-    model.current_outcome = "Accuracy"
-    model.current_txs = ["test 1"]
+    model.current_outcome_name = "Accuracy"
+    model.current_groups = ["test 1"]
     model.update_column_indices()
     return model
 
@@ -261,24 +261,26 @@ def _binary_model_with_blank_study():
     model = dataset_table_model.DatasetTableModel(
         dataset=dataset, add_blank_study=False
     )
-    model.current_outcome = "Mortality"
+    model.current_outcome_name = "Mortality"
     model.current_effect = "OR"
-    model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
+    model.current_groups = meta_globals.DEFAULT_GROUP_NAMES
     model.update_column_indices()
     return model
 
 
 def _model_with_real_study_and_empty_new_entry_row(data_type):
-    dataset = analysis_dataset.Dataset(is_diag=data_type == meta_globals.DIAGNOSTIC)
+    dataset = analysis_dataset.Dataset(
+        is_diagnostic=data_type == meta_globals.DIAGNOSTIC
+    )
     study = analysis_dataset.Study(1, name="Alpha", year=2020)
     outcome = analysis_dataset.Outcome("Outcome", data_type)
     dataset.add_study(study)
     dataset.add_outcome(outcome)
 
     model = dataset_table_model.DatasetTableModel(dataset=dataset, add_blank_study=True)
-    model.current_outcome = "Outcome"
+    model.current_outcome_name = "Outcome"
     model.current_effect = "OR" if data_type == meta_globals.BINARY else "MD"
-    model.current_txs = (
+    model.current_groups = (
         ["test 1"]
         if data_type == meta_globals.DIAGNOSTIC
         else meta_globals.DEFAULT_GROUP_NAMES
@@ -296,9 +298,9 @@ def _continuous_model_with_named_study():
     model = dataset_table_model.DatasetTableModel(
         dataset=dataset, add_blank_study=False
     )
-    model.current_outcome = "Score"
+    model.current_outcome_name = "Score"
     model.current_effect = "MD"
-    model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
+    model.current_groups = meta_globals.DEFAULT_GROUP_NAMES
     model.update_column_indices()
     return model
 
@@ -405,7 +407,7 @@ def test_main_data_grid_display_headers_use_desktop_casing_without_changing_keys
 def test_empty_editable_cells_return_blank_edit_text():
     model = _diagnostic_model_with_empty_cells()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    analysis_unit.tx_groups["test 1"].raw_data[0] = None
+    analysis_unit.groups["test 1"].raw_data[0] = None
     model.dataset.add_covariate(analysis_dataset.Covariate("Dose", "continuous"))
     model.update_column_indices()
 
@@ -542,7 +544,9 @@ def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch)
     analysis_unit = model.get_current_analysis_unit_for_study(0)
     assert errors == ["Please enter a study name before entering study data."]
     assert study.include is False
-    assert analysis_unit.get_entered_effect_and_ci("OR", model.get_cur_group_str()) == (
+    assert analysis_unit.get_entered_effect_and_ci(
+        "OR", model.get_current_group_comparison()
+    ) == (
         None,
         None,
         None,
@@ -611,14 +615,14 @@ def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():
     assert model.setData(covariate_index, "not numeric") is False
 
     assert errors == ["Covariate values for continuous covariates need to be numeric."]
-    assert model.dataset.studies[0].covariate_dict["Dose"] == 5.5
+    assert model.dataset.studies[0].covariate_values["Dose"] == 5.5
 
 
 def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     model = _diagnostic_model_with_empty_cells()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group_comparison].raw_data = [19.0, 10.0, 1.0, 81.0]
     errors = []
     model.dataError.connect(errors.append)
 
@@ -646,13 +650,15 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is True
 
     assert errors == []
-    assert analysis_unit.tx_groups[group_str].raw_data[0] == 20.0
-    assert analysis_unit.get_effect_and_ci("Sens", group_str, model.get_mult()) == (
+    assert analysis_unit.groups[group_comparison].raw_data[0] == 20.0
+    assert analysis_unit.get_effect_and_ci(
+        "Sens", group_comparison, model.get_confidence_multiplier()
+    ) == (
         0.75,
         None,
         None,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_str) == (
+    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
         0.95,
         0.88,
         0.99,
@@ -664,8 +670,8 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
 ):
     model = _diagnostic_model_with_empty_cells()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group_comparison].raw_data = [19.0, 10.0, 1.0, 81.0]
     errors = []
     model.dataError.connect(errors.append)
 
@@ -694,12 +700,12 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
     assert model.setData(model.index(0, model.RAW_DATA[0]), "30") is True
 
     assert errors == []
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_str) == (
+    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
         0.750,
         0.588,
         0.873,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_str) == (
+    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
         0.988,
         0.919,
         0.998,
@@ -710,18 +716,23 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
 def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatch):
     model = _diagnostic_model_with_empty_cells()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group_comparison].raw_data = [19.0, 10.0, 1.0, 81.0]
     for metric in meta_globals.DIAGNOSTIC_METRICS:
         analysis_unit.set_effect_and_ci(
-            metric, group_str, 0.75, 0.50, 0.90, model.get_mult()
+            metric,
+            group_comparison,
+            0.75,
+            0.50,
+            0.90,
+            model.get_confidence_multiplier(),
         )
         analysis_unit.calculate_display_effect_and_ci(
             metric,
-            group_str,
+            group_comparison,
             lambda value: value,
-            conf_level=model.get_global_conf_level(),
-            mult=model.get_mult(),
+            confidence_level=model.get_confidence_level(),
+            confidence_multiplier=model.get_confidence_multiplier(),
         )
     model.dataset.studies[0].include = True
 
@@ -733,15 +744,15 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
 
     assert model.setData(model.index(0, model.RAW_DATA[2]), "") is True
 
-    assert analysis_unit.tx_groups[group_str].raw_data == [19.0, 10.0, "", 81.0]
+    assert analysis_unit.groups[group_comparison].raw_data == [19.0, 10.0, "", 81.0]
     assert model.dataset.studies[0].include is False
     for metric in meta_globals.DIAGNOSTIC_METRICS:
-        assert analysis_unit.get_entered_effect_and_ci(metric, group_str) == (
+        assert analysis_unit.get_entered_effect_and_ci(metric, group_comparison) == (
             None,
             None,
             None,
         )
-        assert analysis_unit.get_display_effect_and_ci(metric, group_str) == (
+        assert analysis_unit.get_display_effect_and_ci(metric, group_comparison) == (
             None,
             None,
             None,
@@ -752,9 +763,9 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[model.current_txs[0]].raw_data = [3.0, 10.0]
-    analysis_unit.tx_groups[model.current_txs[1]].raw_data = [2.0, 10.0]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[model.current_groups[0]].raw_data = [3.0, 10.0]
+    analysis_unit.groups[model.current_groups[1]].raw_data = [2.0, 10.0]
     errors = []
     model.dataError.connect(errors.append)
 
@@ -772,8 +783,10 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     assert model.setData(model.index(0, model.RAW_DATA[0]), "4") is True
 
     assert errors == []
-    assert analysis_unit.tx_groups[model.current_txs[0]].raw_data[0] == 4.0
-    assert analysis_unit.get_effect_and_ci("OR", group_str, model.get_mult()) == (
+    assert analysis_unit.groups[model.current_groups[0]].raw_data[0] == 4.0
+    assert analysis_unit.get_effect_and_ci(
+        "OR", group_comparison, model.get_confidence_multiplier()
+    ) == (
         0.5,
         None,
         None,
@@ -783,9 +796,9 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
 def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model = _continuous_model_with_named_study()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[model.current_txs[0]].raw_data = [10.0, 5.0, 1.0]
-    analysis_unit.tx_groups[model.current_txs[1]].raw_data = [12.0, 4.0, 1.5]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[model.current_groups[0]].raw_data = [10.0, 5.0, 1.0]
+    analysis_unit.groups[model.current_groups[1]].raw_data = [12.0, 4.0, 1.5]
     errors = []
     model.dataError.connect(errors.append)
 
@@ -803,8 +816,10 @@ def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     assert model.setData(model.index(0, model.RAW_DATA[1]), "5.5") is True
 
     assert errors == []
-    assert analysis_unit.tx_groups[model.current_txs[0]].raw_data[1] == 5.5
-    assert analysis_unit.get_effect_and_ci("MD", group_str, model.get_mult()) == (
+    assert analysis_unit.groups[model.current_groups[0]].raw_data[1] == 5.5
+    assert analysis_unit.get_effect_and_ci(
+        "MD", group_comparison, model.get_confidence_multiplier()
+    ) == (
         1.25,
         None,
         None,
@@ -816,10 +831,10 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
 ):
     model = _diagnostic_model_with_empty_cells()
     analysis_unit = model.get_current_analysis_unit_for_study(0)
-    group_str = model.get_cur_group_str()
-    analysis_unit.tx_groups[group_str].raw_data = [19.0, 10.0, 1.0, 81.0]
+    group_comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group_comparison].raw_data = [19.0, 10.0, 1.0, 81.0]
     analysis_unit.set_effect_and_ci(
-        "Sens", group_str, 0.66, 0.50, 0.80, model.get_mult()
+        "Sens", group_comparison, 0.66, 0.50, 0.80, model.get_confidence_multiplier()
     )
     model.dataset.studies[0].include = True
     errors = []
@@ -836,8 +851,8 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
 
     assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is False
 
-    assert analysis_unit.tx_groups[group_str].raw_data == [19.0, 10.0, 1.0, 81.0]
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_str) == (
+    assert analysis_unit.groups[group_comparison].raw_data == [19.0, 10.0, 1.0, 81.0]
+    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
         0.66,
         0.50,
         0.80,

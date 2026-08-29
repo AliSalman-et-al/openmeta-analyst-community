@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Shared publication-oriented text governance for all plot renderers.
-
 rcmetar.plot.text.input.limit <- 80L
 
 rcmetar.limit.plot.input.text <- function(value, limit=rcmetar.plot.text.input.limit) {

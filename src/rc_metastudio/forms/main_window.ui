@@ -95,7 +95,7 @@
              <number>0</number>
             </property>
             <item>
-             <layout class="QHBoxLayout" name="controlbutton_layot">
+             <layout class="QHBoxLayout" name="control_button_layout">
               <property name="spacing">
                <number>0</number>
               </property>
@@ -163,7 +163,7 @@
                 </widget>
                  </item>
                  <item row="1" column="1">
-                <widget class="QLabel" name="nav_lbl">
+                <widget class="QLabel" name="navigation_label">
                  <property name="text">
                   <string/>
                  </property>
@@ -220,7 +220,7 @@
                  </widget>
                 </item>
                 <item row="1" column="1">
-                 <widget class="QLabel" name="cur_time_lbl">
+                 <widget class="QLabel" name="current_follow_up_label">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
@@ -233,7 +233,7 @@
                  </widget>
                 </item>
                 <item row="0" column="1">
-                 <widget class="QLabel" name="cur_outcome_lbl">
+                 <widget class="QLabel" name="current_outcome_label">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                     <horstretch>0</horstretch>
@@ -263,7 +263,7 @@
              </spacer>
             </item>
             <item>
-             <layout class="QHBoxLayout" name="ci_layot"/>
+             <layout class="QHBoxLayout" name="confidence_interval_layout"/>
             </item>
            </layout>
           </widget>
@@ -325,7 +325,7 @@
     <addaction name="action_subgroup_ma"/>
     <addaction name="separator"/>
     <addaction name="action_meta_regression"/>
-    <addaction name="action_change_conf_level"/>
+    <addaction name="action_change_confidence_level"/>
    </widget>
    <widget class="QMenu" name="menuDataset">
     <property name="title">
@@ -392,7 +392,7 @@
    <addaction name="action_loo_ma"/>
    <addaction name="action_subgroup_ma"/>
    <addaction name="action_meta_regression"/>
-   <addaction name="action_change_conf_level"/>
+   <addaction name="action_change_confidence_level"/>
   </widget>
   <action name="action_save">
    <property name="icon">
@@ -568,7 +568,7 @@
     <string>About/Legal</string>
    </property>
   </action>
-  <action name="action_change_conf_level">
+  <action name="action_change_confidence_level">
    <property name="icon">
     <iconset resource="../images/icons.qrc">
      <normaloff>:/icons/actions/confidence-level.svg</normaloff>:/icons/actions/confidence-level.svg</iconset>

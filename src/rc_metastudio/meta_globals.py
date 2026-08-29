@@ -73,10 +73,9 @@ DEFAULT_CONTINUOUS_TWO_ARM = "SMD"
 ONE_ARM_METRICS = BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS
 TWO_ARM_METRICS = BINARY_TWO_ARM_METRICS + CONTINUOUS_TWO_ARM_METRICS
 
-# Diagnostic metrics
 DIAGNOSTIC_METRICS = ["Sens", "Spec", "PLR", "NLR", "DOR"]
 DIAGNOSTIC_LOG_METRICS = ["PLR", "NLR", "DOR"]
-DIAGNOSTIC_METRIC_NAMES = {
+DIAGNOSTIC_METRIC_LABELS = {
     "Sens": "Sensitivity",
     "Spec": "Specificity",
     "PLR": "Positive Likelihood Ratio",
@@ -84,11 +83,10 @@ DIAGNOSTIC_METRIC_NAMES = {
     "DOR": "Diagnostic Odds Ratio",
 }
 
-# Construct dictionary of all the metric names
 ALL_METRIC_NAMES = {}
 ALL_METRIC_NAMES.update(BINARY_METRIC_NAMES)
 ALL_METRIC_NAMES.update(CONTINUOUS_METRIC_NAMES)
-ALL_METRIC_NAMES.update(DIAGNOSTIC_METRIC_NAMES)
+ALL_METRIC_NAMES.update(DIAGNOSTIC_METRIC_LABELS)
 
 # enumeration of data types and dictionaries mapping both ways
 BINARY, CONTINUOUS, DIAGNOSTIC, OTHER = range(4)
@@ -121,10 +119,6 @@ EMPTY_VALS = ("", None)  # these indicate an empty row/cell
 
 BASE_PATH = str(os.path.abspath(os.getcwd()))
 
-# def get_BASE_PATH():
-
-
-# this is a useful function sometimes.
 _Value = TypeVar("_Value")
 
 
@@ -141,11 +135,7 @@ def none_to_str(value: object | None) -> object | str:
     return "" if value is None else value
 
 
-# for diagnostic data -- this dictionary maps
-# the mteric names as they appear in the UI/ure
-# used here to the names used in the model.
-# see get_diagnostic_metrics_dialog_to_run.
-DIAGNOSTIC_METRIC_NAMES = {
+DIAGNOSTIC_METRIC_GROUPS = {
     "sens": ["Sens"],
     "spec": ["Spec"],
     "dor": ["DOR"],
@@ -169,7 +159,7 @@ def equal_close_enough(x, y):
     return abs(x - y) < threshold
 
 
-DEFAULT_CONF_LEVEL = 95.0  # (normal 95% CI)
+DEFAULT_CONFIDENCE_LEVEL = 95.0  # (normal 95% CI)
 CONFIDENCE_LEVEL_MIN = 0.0
 CONFIDENCE_LEVEL_MAX = 100.0
 CONFIDENCE_LEVEL_DISPLAY_MAX = 99.9
@@ -198,9 +188,9 @@ INVALID_CORRECTION_FACTOR_MESSAGE = (
 )
 
 
-def validate_confidence_level(conf_level):
+def validate_confidence_level(confidence_level):
     try:
-        value = float(conf_level)
+        value = float(confidence_level)
     except (TypeError, ValueError):
         raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
 
@@ -305,8 +295,6 @@ def check_plot_bound(bound: str | int | float | None) -> float | bool:
     if bound is None:
         return False
     try:
-        # errrm... this might cause a problem if
-        # bound is 0...
         return float(bound)
     except (TypeError, ValueError):
         return False

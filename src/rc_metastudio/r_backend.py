@@ -26,13 +26,13 @@ def _analysis_unavailable(*_args: object, **_kwargs: object) -> NoReturn:
     )
 
 
-def _get_mult_from_r(conf_level: object) -> float:
-    validate_confidence_level(conf_level)
+def _get_confidence_multiplier_from_r(confidence_level: object) -> float:
+    validate_confidence_level(confidence_level)
     return 1.96
 
 
-def _set_global_conf_level(conf_level: object) -> float:
-    return float(validate_confidence_level(conf_level))
+def _set_confidence_level(confidence_level: object) -> float:
+    return float(validate_confidence_level(confidence_level))
 
 
 def _get_r_library_paths() -> list[object]:
@@ -95,7 +95,7 @@ def _effect_for_study(
     n2: object = None,
     two_arm: object = True,
     metric: object = "OR",
-    conf_level: object = 95,
+    confidence_level: object = 95,
 ) -> None:
     return None
 
@@ -111,7 +111,7 @@ def _continuous_effect_for_study(
     se2: object = None,
     metric: object = "MD",
     two_arm: object = True,
-    conf_level: object = 95.0,
+    confidence_level: object = 95.0,
 ) -> None:
     return None
 
@@ -122,35 +122,35 @@ def _diagnostic_effects(
     fp: object,
     tn: object,
     metrics: object = ("Spec", "Sens"),
-    conf_level: object = 95.0,
+    confidence_level: object = 95.0,
 ) -> dict[object, object]:
     return {}
 
 
-def _impute_bin_data(bin_data_dict: object) -> dict[str, bool]:
+def _impute_binary_data(binary_data: object) -> dict[str, bool]:
     return {"FAIL": True}
 
 
-def _back_calc_cont_data(
+def _back_calculate_continuous_data(
     group1_data: object,
     group2_data: object,
     effect_data: object,
-    conf_level: object,
+    confidence_level: object,
 ) -> dict[str, bool]:
     return {"FAIL": True}
 
 
-def _impute_cont_data(cont_data_dict: object, alpha: object) -> dict[str, bool]:
+def _impute_continuous_data(continuous_data: object, alpha: object) -> dict[str, bool]:
     return {"succeeded": False}
 
 
-def _impute_pre_post_cont_data(
-    cont_data_dict: object, correlation: object, alpha: object
+def _impute_pre_post_continuous_data(
+    continuous_data: object, correlation: object, alpha: object
 ) -> dict[str, bool]:
     return {"succeeded": False}
 
 
-def _impute_diag_data(diag_data_dict: object) -> dict[str, None]:
+def _impute_diagnostic_data(diagnostic_data: object) -> dict[str, None]:
     return {"TP": None, "TN": None, "FP": None, "FN": None}
 
 
@@ -182,8 +182,8 @@ class _StubRBridgeModule(types.ModuleType):
 
     _rcms_stub_backend: bool
     AnalysisBackendUnavailableError: type[AnalysisBackendUnavailableError]
-    get_mult_from_r: _BackendCallable
-    set_global_conf_level: _BackendCallable
+    get_confidence_multiplier_from_r: _BackendCallable
+    set_confidence_level: _BackendCallable
     get_r_library_paths: _BackendCallable
     get_r_version_string: _BackendCallable
     get_r_package_version: _BackendCallable
@@ -199,11 +199,11 @@ class _StubRBridgeModule(types.ModuleType):
     effect_for_study: _BackendCallable
     continuous_effect_for_study: _BackendCallable
     diagnostic_effects_for_study: _BackendCallable
-    impute_bin_data: _BackendCallable
-    impute_cont_data: _BackendCallable
-    impute_pre_post_cont_data: _BackendCallable
-    impute_diag_data: _BackendCallable
-    back_calc_cont_data: _BackendCallable
+    impute_binary_data: _BackendCallable
+    impute_continuous_data: _BackendCallable
+    impute_pre_post_continuous_data: _BackendCallable
+    impute_diagnostic_data: _BackendCallable
+    back_calculate_continuous_data: _BackendCallable
     dataset_to_simple_binary_r_object: _BackendCallable
     dataset_to_simple_continuous_r_object: _BackendCallable
     dataset_to_simple_diagnostic_r_object: _BackendCallable
@@ -212,8 +212,8 @@ class _StubRBridgeModule(types.ModuleType):
     get_params: _BackendCallable
     get_method_description: _BackendCallable
     get_analysis_plot_capabilities: _BackendCallable
-    run_binary_ma: _BackendCallable
-    run_continuous_ma: _BackendCallable
+    run_binary_analysis: _BackendCallable
+    run_continuous_analysis: _BackendCallable
     run_diagnostic_multi: _BackendCallable
     run_workflow_analysis: _BackendCallable
     run_diagnostic_workflow: _BackendCallable
@@ -225,8 +225,8 @@ class _StubRBridgeModule(types.ModuleType):
         super().__init__("rc_metastudio.r_bridge")
         self._rcms_stub_backend = True
         self.AnalysisBackendUnavailableError = AnalysisBackendUnavailableError
-        self.get_mult_from_r = _get_mult_from_r
-        self.set_global_conf_level = _set_global_conf_level
+        self.get_confidence_multiplier_from_r = _get_confidence_multiplier_from_r
+        self.set_confidence_level = _set_confidence_level
         self.get_r_library_paths = _get_r_library_paths
         self.get_r_version_string = _get_r_version_string
         self.get_r_package_version = _get_r_package_version
@@ -242,11 +242,11 @@ class _StubRBridgeModule(types.ModuleType):
         self.effect_for_study = _effect_for_study
         self.continuous_effect_for_study = _continuous_effect_for_study
         self.diagnostic_effects_for_study = _diagnostic_effects
-        self.impute_bin_data = _impute_bin_data
-        self.impute_cont_data = _impute_cont_data
-        self.impute_pre_post_cont_data = _impute_pre_post_cont_data
-        self.impute_diag_data = _impute_diag_data
-        self.back_calc_cont_data = _back_calc_cont_data
+        self.impute_binary_data = _impute_binary_data
+        self.impute_continuous_data = _impute_continuous_data
+        self.impute_pre_post_continuous_data = _impute_pre_post_continuous_data
+        self.impute_diagnostic_data = _impute_diagnostic_data
+        self.back_calculate_continuous_data = _back_calculate_continuous_data
         self.dataset_to_simple_binary_r_object = _analysis_unavailable
         self.dataset_to_simple_continuous_r_object = _analysis_unavailable
         self.dataset_to_simple_diagnostic_r_object = _analysis_unavailable
@@ -255,8 +255,8 @@ class _StubRBridgeModule(types.ModuleType):
         self.get_params = _analysis_unavailable
         self.get_method_description = _analysis_unavailable
         self.get_analysis_plot_capabilities = _get_analysis_plot_capabilities
-        self.run_binary_ma = _analysis_unavailable
-        self.run_continuous_ma = _analysis_unavailable
+        self.run_binary_analysis = _analysis_unavailable
+        self.run_continuous_analysis = _analysis_unavailable
         self.run_diagnostic_multi = _analysis_unavailable
         self.run_workflow_analysis = _analysis_unavailable
         self.run_diagnostic_workflow = _analysis_unavailable

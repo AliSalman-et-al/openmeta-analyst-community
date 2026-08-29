@@ -19,7 +19,6 @@ REPO_ROOT = os.getcwd()
 def test_data_table_return_moves_vertically_from_selected_cells():
     from PyQt6 import QtCore
 
-
     app, window = automation.start_automation()
     try:
         _create_binary_dataset(window)
@@ -43,7 +42,6 @@ def test_data_table_return_moves_vertically_from_selected_cells():
 
 def test_data_table_return_commits_editor_and_moves_down_same_column():
     from PyQt6 import QtCore, QtWidgets
-
 
     app, window = automation.start_automation()
     try:
@@ -69,7 +67,6 @@ def test_data_table_return_commits_editor_and_moves_down_same_column():
 
 def test_data_table_ctrl_a_selects_all_cells_without_running_analysis(monkeypatch):
     from PyQt6 import QtCore
-
 
     app, window = automation.start_automation()
     try:
@@ -177,7 +174,7 @@ def test_main_window_creates_binary_continuous_and_diagnostic_datasets():
             )
 
             assert window.model.get_current_outcome_type() == expected_type
-            assert window.model.current_outcome == name
+            assert window.model.current_outcome_name == name
             assert window.tableView.model() is window.model
             assert window.model.rowCount() > 0
             if data_type != "diagnostic":
@@ -205,7 +202,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         )
         monkeypatch.setattr(
             binary_data_dialog.r_bridge,
-            "get_mult_from_r",
+            "get_confidence_multiplier_from_r",
             lambda confidence: 1.96,
         )
         monkeypatch.setattr(
@@ -230,7 +227,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         )
         monkeypatch.setattr(
             binary_data_dialog.r_bridge,
-            "impute_bin_data",
+            "impute_binary_data",
             lambda data: {"FAIL": True},
         )
         monkeypatch.setattr(
@@ -278,7 +275,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         assert warnings == []
         assert isinstance(opened_dialogs[-1], binary_data_dialog.BinaryDataDialog)
         committed = model.get_current_analysis_unit_for_study(0)
-        assert committed.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+        assert committed.get_raw_data_for_group(model.current_groups[0]) == [7, 22]
 
         def reject_edit():
             dialog = cast(
@@ -301,7 +298,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         table.row_header_clicked(0)
         assert callback_errors == []
         unchanged = model.get_current_analysis_unit_for_study(0)
-        assert unchanged.get_raw_data_for_group(model.current_txs[0]) == [7, 22]
+        assert unchanged.get_raw_data_for_group(model.current_groups[0]) == [7, 22]
 
         saved_path = str(
             tmp_path / ("binary-" + count.replace(",", "c") + "-round-trip.rcms")
@@ -315,7 +312,10 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
         assert window.save_as() is True
         assert window.open(file_path=saved_path) is True
         reopened = window.model.get_current_analysis_unit_for_study(0)
-        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [7, 22]
+        assert reopened.get_raw_data_for_group(window.model.current_groups[0]) == [
+            7,
+            22,
+        ]
     finally:
         _close_without_prompt(app, window)
 
@@ -339,7 +339,9 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge, "get_mult_from_r", lambda _level: 1.96
+            continuous_data_dialog.r_bridge,
+            "get_confidence_multiplier_from_r",
+            lambda _level: 1.96,
         )
         monkeypatch.setattr(
             continuous_data_dialog.r_bridge,
@@ -356,7 +358,9 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             r_payloads.append(dict(payload))
             return {"succeeded": False, "comment": "complete input"}
 
-        monkeypatch.setattr(continuous_data_dialog.r_bridge, "impute_cont_data", impute)
+        monkeypatch.setattr(
+            continuous_data_dialog.r_bridge, "impute_continuous_data", impute
+        )
         monkeypatch.setattr(
             continuous_data_dialog.r_bridge,
             "continuous_effect_for_study",
@@ -379,15 +383,15 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         )
         monkeypatch.setattr(
             continuous_data_dialog.r_bridge,
-            "back_calc_cont_data",
+            "back_calculate_continuous_data",
             lambda *args, **kwargs: {"FAIL": True},
         )
         _create_continuous_dataset(window)
         model = window.model
         table = window.tableView
         unit = model.get_current_analysis_unit_for_study(0)
-        unit.get_raw_data_for_group(model.current_txs[0])[:] = [10, 94, 2]
-        unit.get_raw_data_for_group(model.current_txs[1])[:] = [12, 90, 3]
+        unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
+        unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
         table.undoStack.clear()
         table.undoStack.setClean()
         window.current_data_unsaved = False
@@ -416,7 +420,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         assert callback_errors == []
         assert warnings == []
         committed = model.get_current_analysis_unit_for_study(0)
-        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+        assert committed.get_raw_data_for_group(model.current_groups[0]) == [
             10.0,
             95.5,
             2.0,
@@ -427,7 +431,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
 
         window.undo()
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
-            model.current_txs[0]
+            model.current_groups[0]
         ) == [10, 94, 2]
         assert window.current_data_unsaved is False
         window.redo()
@@ -447,8 +451,8 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         assert warnings[-1] == "N must be a non-negative whole number."
         assert table.undoStack.count() == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_groups(
-            model.current_txs
-        ) == before_invalid.get_raw_data_for_groups(model.current_txs)
+            model.current_groups
+        ) == before_invalid.get_raw_data_for_groups(model.current_groups)
 
         saved_path = str(
             tmp_path / ("continuous-" + decimal.replace(",", "c") + ".rcms")
@@ -462,7 +466,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         assert window.save_as() is True
         assert window.open(file_path=saved_path) is True
         reopened = window.model.get_current_analysis_unit_for_study(0)
-        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+        assert reopened.get_raw_data_for_group(window.model.current_groups[0]) == [
             10.0,
             95.5,
             2.0,
@@ -490,7 +494,9 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda _level: 1.96
+            diagnostic_data_dialog.r_bridge,
+            "get_confidence_multiplier_from_r",
+            lambda _level: 1.96,
         )
         monkeypatch.setattr(
             diagnostic_data_dialog.r_bridge,
@@ -507,7 +513,9 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             r_payloads.append(dict(payload))
             return {"TP": None, "FP": None, "FN": None, "TN": None}
 
-        monkeypatch.setattr(diagnostic_data_dialog.r_bridge, "impute_diag_data", impute)
+        monkeypatch.setattr(
+            diagnostic_data_dialog.r_bridge, "impute_diagnostic_data", impute
+        )
         monkeypatch.setattr(
             diagnostic_data_dialog.r_bridge,
             "diagnostic_effects_for_study",
@@ -536,7 +544,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         model = window.model
         table = window.tableView
         unit = model.get_current_analysis_unit_for_study(0)
-        unit.get_raw_data_for_group(model.current_txs[0])[:] = [12, 3, 4, 21]
+        unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
         table.undoStack.clear()
         table.undoStack.setClean()
         window.current_data_unsaved = False
@@ -557,7 +565,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         QtCore.QTimer.singleShot(0, accept_edit)
         table.row_header_clicked(0)
         committed = model.get_current_analysis_unit_for_study(0)
-        assert committed.get_raw_data_for_group(model.current_txs[0]) == [
+        assert committed.get_raw_data_for_group(model.current_groups[0]) == [
             13.0,
             3.0,
             4.0,
@@ -569,7 +577,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
 
         window.undo()
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
-            model.current_txs[0]
+            model.current_groups[0]
         ) == [12, 3, 4, 21]
         assert window.current_data_unsaved is False
         window.redo()
@@ -587,7 +595,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         assert "whole number" in warnings[-1]
         assert table.undoStack.count() == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
-            model.current_txs[0]
+            model.current_groups[0]
         ) == [13.0, 3.0, 4.0, 21.0]
 
         saved_path = str(tmp_path / ("diagnostic-" + count.replace(",", "c") + ".rcms"))
@@ -600,7 +608,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         assert window.save_as() is True
         assert window.open(file_path=saved_path) is True
         reopened = window.model.get_current_analysis_unit_for_study(0)
-        assert reopened.get_raw_data_for_group(window.model.current_txs[0]) == [
+        assert reopened.get_raw_data_for_group(window.model.current_groups[0]) == [
             13.0,
             3.0,
             4.0,
@@ -629,7 +637,7 @@ def test_new_dataset_preserves_main_window_state(show_method, state_method):
 
         assert getattr(window, state_method)()
         assert window.tableView.model() is window.model
-        assert window.model.current_outcome == "Mortality"
+        assert window.model.current_outcome_name == "Mortality"
     finally:
         _close_without_prompt(app, window)
 
@@ -742,7 +750,7 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         model.add_follow_up_to_current_outcome("week 4")
         model.add_covariate("Dose", "continuous", {"Alpha": 5.5})
         model.set_current_groups(["tx B", "Tx C"])
-        model.set_conf_level(90.0)
+        model.set_confidence_level(90.0)
 
         main_window = sys.modules["rc_metastudio.main_window"]
         critical_messages = []
@@ -768,17 +776,17 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
         ] == [("Alpha", "2020")]
         assert "Readmission" in reopened.get_outcome_names()
-        assert "week 4" in reopened.outcome_names_to_follow_ups["Mortality"].values()
+        assert "week 4" in reopened.follow_ups_by_outcome["Mortality"].values()
         assert "Tx C" in reopened.get_group_names()
         assert [(cov.name, cov.data_type) for cov in reopened.covariates] == [
             ("Dose", 1)
         ]
-        assert reopened.studies[0].covariate_dict["Dose"] == 5.5
-        assert window.model.current_outcome == "Mortality"
+        assert reopened.studies[0].covariate_values["Dose"] == 5.5
+        assert window.model.current_outcome_name == "Mortality"
         assert window.model.get_current_follow_up_name() == "first"
-        assert window.model.current_txs == ["tx B", "Tx C"]
+        assert window.model.current_groups == ["tx B", "Tx C"]
         assert window.model.current_effect == "OR"
-        assert window.model.get_global_conf_level() == 90.0
+        assert window.model.get_confidence_level() == 90.0
         assert window.current_data_unsaved is False
         assert window.tableView.undoStack.isClean()
     finally:
@@ -845,7 +853,6 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
 def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals():
     from PyQt6.QtWidgets import QApplication
 
-
     app, window = automation.start_automation()
     try:
         _create_binary_dataset(window)
@@ -868,14 +875,13 @@ def test_clipboard_preserves_platform_newlines_unicode_blanks_and_comma_decimals
         required(QApplication.clipboard(), "clipboard").setText("1,25\r\n")
         table.paste_from_clipboard(comma_decimal)
 
-        assert model.dataset.studies[0].covariate_dict["Dose"] == 1.25
+        assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
     finally:
         _close_without_prompt(app, window)
 
 
 def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch):
     from PyQt6.QtWidgets import QApplication
-
 
     app, window = automation.start_automation()
     try:
@@ -913,7 +919,6 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
 def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch):
     from PyQt6.QtWidgets import QApplication
 
-
     app, window = automation.start_automation()
     try:
         _create_binary_dataset(window)
@@ -946,7 +951,6 @@ def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch)
 def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypatch):
     from PyQt6.QtCore import QItemSelectionModel
     from PyQt6.QtWidgets import QApplication
-
 
     app, window = automation.start_automation()
     try:
@@ -1006,7 +1010,6 @@ def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypat
 
 def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state():
     from PyQt6.QtCore import Qt
-
 
     app, window = automation.start_automation()
     try:
@@ -1117,15 +1120,15 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
         )
 
         analysis_unit = model.get_current_analysis_unit_for_study(0)
-        group_str = model.get_cur_group_str()
+        group_comparison = model.get_current_group_comparison()
         assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
-        assert analysis_unit.get_entered_effect_and_ci("Sens", group_str) == (
+        assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
             0.750,
             0.588,
             0.873,
         )
-        assert analysis_unit.get_entered_effect_and_ci("PLR", group_str) == (
+        assert analysis_unit.get_entered_effect_and_ci("PLR", group_comparison) == (
             61.5,
             8.8,
             431.0,
@@ -1148,18 +1151,23 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
         table.set_data_in_model(model.index(0, model.NAME), _variant("Lehman"))
         table.set_data_in_model(model.index(1, model.NAME), _variant("Lagasse"))
         analysis_unit = model.get_current_analysis_unit_for_study(1)
-        group_str = model.get_cur_group_str()
-        analysis_unit.tx_groups[group_str].raw_data = [15.0, 11.0, 16.0, 49.0]
+        group_comparison = model.get_current_group_comparison()
+        analysis_unit.groups[group_comparison].raw_data = [15.0, 11.0, 16.0, 49.0]
         for metric in meta_globals.DIAGNOSTIC_METRICS:
             analysis_unit.set_effect_and_ci(
-                metric, group_str, 0.577, 0.385, 0.748, model.get_mult()
+                metric,
+                group_comparison,
+                0.577,
+                0.385,
+                0.748,
+                model.get_confidence_multiplier(),
             )
             analysis_unit.calculate_display_effect_and_ci(
                 metric,
-                group_str,
+                group_comparison,
                 lambda value: value,
-                conf_level=model.get_global_conf_level(),
-                mult=model.get_mult(),
+                confidence_level=model.get_confidence_level(),
+                confidence_multiplier=model.get_confidence_multiplier(),
             )
         model.dataset.studies[1].include = True
 
@@ -1234,7 +1242,7 @@ def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
 
     try:
         _create_binary_dataset(window)
-        state = window.tableView.model().get_stateful_dict()
+        state = window.tableView.model().get_state()
         command = main_window.ImportCsvCommand(
             original_dataset=copy.deepcopy(window.model.dataset),
             old_state_dict=state,
@@ -1367,7 +1375,7 @@ def test_add_outcome_dialog_rejects_blank_and_duplicate_names(monkeypatch):
             main_window.add_new_dialogs, "AddOutcomeDialog", BlankOutcomeDialog
         )
 
-        window.cur_dimension = "outcome"
+        window.current_dimension = "outcome"
         window.add_new()
 
         assert warnings[-1][1:] == ("Warning", "Outcome names cannot be empty.")
@@ -1569,11 +1577,11 @@ def test_add_dialogs_reject_blank_names_for_other_dataset_entities(monkeypatch):
             main_window.add_new_dialogs, "AddCovariateDialog", BlankCovariateDialog
         )
 
-        window.cur_dimension = "group"
+        window.current_dimension = "group"
         window.add_new()
         assert warnings[-1][1:] == ("Warning", "Group names cannot be empty.")
 
-        window.cur_dimension = "follow-up"
+        window.current_dimension = "follow-up"
         window.add_new()
         assert warnings[-1][1:] == ("Warning", "Follow-up names cannot be empty.")
 
@@ -1672,11 +1680,11 @@ def test_main_window_dialog_text_slots_accept_native_pyqt6_line_edit_strings(
 
         window.edit_group_name(window.model.get_current_groups()[0])
         window.add_covariate()
-        window.cur_dimension = "outcome"
+        window.current_dimension = "outcome"
         window.add_new()
-        window.cur_dimension = "group"
+        window.current_dimension = "group"
         window.add_new()
-        window.cur_dimension = "follow-up"
+        window.current_dimension = "follow-up"
         window.add_new()
         window.rename_covariate(window.model.dataset.covariates[0])
 
@@ -1729,7 +1737,7 @@ def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
         window.edit_dataset()
 
         assert window.model.dataset is original_dataset
-        assert window.model.current_outcome is None
+        assert window.model.current_outcome_name is None
     finally:
         _close_without_prompt(app, window)
 
@@ -1749,7 +1757,7 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
         window.edit_dataset()
 
         assert window.model.dataset.get_outcome_names() == []
-        assert window.model.current_outcome is None
+        assert window.model.current_outcome_name is None
         assert window.tableView.undoStack.count() == original_undo_count + 1
     finally:
         _close_without_prompt(app, window)
@@ -1793,18 +1801,18 @@ def test_metric_selection_and_confidence_level_are_preserved_in_model_state():
 
         rr_action = _metric_action(window, "RR")
         rr_action.setChecked(True)
-        window.model.set_conf_level(90.0)
-        window._change_conf_level_label()
-        state = window.model.get_stateful_dict()
+        window.model.set_confidence_level(90.0)
+        window._update_confidence_level_label()
+        state = window.model.get_state()
 
         assert window.model.current_effect == "RR"
-        assert window.model.get_global_conf_level() == 90.0
+        assert window.model.get_confidence_level() == 90.0
         assert window.cl_label.text() == "Confidence Level: 90.0%"
 
         window.set_model(window.model.dataset.copy(), state)
 
         assert window.model.current_effect == "RR"
-        assert window.model.get_global_conf_level() == 90.0
+        assert window.model.get_confidence_level() == 90.0
         assert window.cl_label.text() == "Confidence Level: 90.0%"
         assert _metric_action(window, "RR").isChecked()
     finally:
@@ -1819,7 +1827,7 @@ def test_confidence_level_dialog_rejects_represented_100_percent():
     _app = required(QApplication.instance() or QApplication([]), "application")
     dialog = confidence_level_dialog.ConfidenceLevelDialog(95.0)
     try:
-        spinbox = dialog.conf_level_spinbox
+        spinbox = dialog.confidence_level_spinbox
 
         required(spinbox.lineEdit(), "confidence level edit").setText("100")
         spinbox.interpretText()
@@ -1840,20 +1848,22 @@ def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(
     try:
         calls = []
 
-        def fail_if_called(conf_level):
-            calls.append(conf_level)
+        def fail_if_called(confidence_level):
+            calls.append(confidence_level)
             raise AssertionError("invalid confidence level reached R multiplier")
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge, "get_mult_from_r", fail_if_called
+            dataset_table_model.r_bridge,
+            "get_confidence_multiplier_from_r",
+            fail_if_called,
         )
 
         for invalid_value in (0, 100, math.inf, math.nan, "not-a-number"):
             with pytest.raises(ValueError, match="greater than 0 and less than 100"):
-                window.model.set_conf_level(invalid_value)
+                window.model.set_confidence_level(invalid_value)
 
         assert calls == []
-        assert window.model.get_global_conf_level() == 95.0
+        assert window.model.get_confidence_level() == 95.0
     finally:
         _close_without_prompt(app, window)
 

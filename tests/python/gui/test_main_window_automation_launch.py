@@ -234,7 +234,7 @@ def test_full_app_imports_representative_csv_into_dataset():
         ("Dose", 1),
         ("Region", 4),
     ]
-    assert str(window.model.dataset.studies[1].covariate_dict["Region"]) == "South"
+    assert str(window.model.dataset.studies[1].covariate_values["Region"]) == "South"
 
 
 def test_full_app_import_pads_ragged_csv_rows_into_dataset():
@@ -722,10 +722,12 @@ def test_automation_launch_opens_sample_project_in_real_data_table():
             ["9.0", "27.0", "6.0", "27.0"],
         )
         assert (
-            window.cur_outcome_lbl.text()
+            window.current_outcome_label.text()
             == "<font color='Blue'>clinical failure</font>"
         )
-        assert window.cur_time_lbl.text() == "<font color='Blue'>first</font>"
+        assert (
+            window.current_follow_up_label.text() == "<font color='Blue'>first</font>"
+        )
         _assert_table_view_leaves_spare_width_outside_data_columns(window.tableView)
     finally:
         window.close()
@@ -785,8 +787,8 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
         loaded_model = window.model
         loaded_row_count = loaded_model.rowCount()
         loaded_summary = _dataset_summary(loaded_model.dataset)
-        loaded_outcome = window.cur_outcome_lbl.text()
-        loaded_follow_up = window.cur_time_lbl.text()
+        loaded_outcome = window.current_outcome_label.text()
+        loaded_follow_up = window.current_follow_up_label.text()
         assert loaded_row_count > 0
 
         window.undo()
@@ -794,8 +796,8 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
 
         assert window.model.rowCount() == loaded_row_count
         assert _dataset_summary(window.model.dataset) == loaded_summary
-        assert window.cur_outcome_lbl.text() == loaded_outcome
-        assert window.cur_time_lbl.text() == loaded_follow_up
+        assert window.current_outcome_label.text() == loaded_outcome
+        assert window.current_follow_up_label.text() == loaded_follow_up
         assert window.tableView.undoStack.canRedo() is False
 
         model = window.model
@@ -927,7 +929,7 @@ def test_meantime_sample_project_loads_native_factor_covariate():
     assert ("treatment group", 4) in [
         (cov.name, cov.data_type) for cov in dataset.covariates
     ]
-    values = [study.covariate_dict["treatment group"] for study in dataset.studies]
+    values = [study.covariate_values["treatment group"] for study in dataset.studies]
     present_values = [value for value in values if value is not None]
     assert present_values
     assert all(type(value) is str for value in present_values)
@@ -944,7 +946,7 @@ def test_automation_launch_opens_meantime_project_and_enables_subgroup_analysis(
         assert window.model.rowCount() >= 1
         assert window.action_subgroup_ma.isEnabled()
         values = [
-            study.covariate_dict["treatment group"]
+            study.covariate_values["treatment group"]
             for study in window.model.dataset.studies
         ]
         assert all(type(value) is str for value in values if value is not None)
@@ -1004,7 +1006,7 @@ def test_opened_sample_projects_return_native_table_values_for_pyqt6_rendering()
                 )
                 == "Year"
             )
-            raw_headers = raw_headers_for_groups(model.current_txs)
+            raw_headers = raw_headers_for_groups(model.current_groups)
             assert [
                 model.headerData(
                     column,
@@ -1087,18 +1089,18 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
             ),
         )
         follow_up_name = dataset.get_follow_up_names_for_outcome(
-            window.model.current_outcome
+            window.model.current_outcome_name
         )[0]
 
         models = [
             edit_list_models.TXGroupsModel(
                 dataset=dataset,
-                outcome=window.model.current_outcome,
+                outcome=window.model.current_outcome_name,
                 follow_up=follow_up_name,
             ),
             edit_list_models.OutcomesModel(dataset=dataset),
             edit_list_models.FollowUpsModel(
-                dataset=dataset, outcome=window.model.current_outcome
+                dataset=dataset, outcome=window.model.current_outcome_name
             ),
             edit_list_models.StudiesModel(dataset=dataset),
             edit_list_models.CovariatesModel(dataset=dataset),
@@ -1119,7 +1121,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
 
         group_model = edit_list_models.TXGroupsModel(
             dataset=dataset,
-            outcome=window.model.current_outcome,
+            outcome=window.model.current_outcome_name,
             follow_up=follow_up_name,
         )
         assert group_model.setData(group_model.index(0, 0), "Renamed Group") is True
@@ -1131,7 +1133,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         ]
 
         follow_up_model = edit_list_models.FollowUpsModel(
-            dataset=dataset, outcome=window.model.current_outcome
+            dataset=dataset, outcome=window.model.current_outcome_name
         )
         assert (
             follow_up_model.setData(follow_up_model.index(0, 0), "Renamed Follow Up")
@@ -1289,7 +1291,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         )
         try:
             _assert_table_view_leaves_spare_width_outside_data_columns(
-                dialog.cov_prev_table
+                dialog.covariate_preview_table
             )
         finally:
             dialog.close()
@@ -1312,7 +1314,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
         factor_index = model.index(0, factor_column)
 
         assert model.setData(factor_index, "North") is True
-        stored_value = model.dataset.studies[0].covariate_dict["Region"]
+        stored_value = model.dataset.studies[0].covariate_values["Region"]
         display_value = model.data(factor_index, QtCore.Qt.ItemDataRole.DisplayRole)
 
         assert stored_value == "North"
@@ -1338,9 +1340,16 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
     calls = []
 
     class SpecsDialog(object):
-        def __init__(self, model, meta_f_str=None, parent=None, conf_level=None):
+        def __init__(
+            self, model, analysis_type=None, parent=None, confidence_level=None
+        ):
             calls.append(
-                (meta_f_str, parent, conf_level, model.get_current_outcome_type())
+                (
+                    analysis_type,
+                    parent,
+                    confidence_level,
+                    model.get_current_outcome_type(),
+                )
             )
 
         def show(self):
@@ -1356,8 +1365,8 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
         window.action_loo_ma.trigger()
 
         assert calls == [
-            ("cumulative", window, window.model.get_global_conf_level(), "binary"),
-            ("leave-one-out", window, window.model.get_global_conf_level(), "binary"),
+            ("cumulative", window, window.model.get_confidence_level(), "binary"),
+            ("leave-one-out", window, window.model.get_confidence_level(), "binary"),
         ]
     finally:
         window.close()
@@ -1418,8 +1427,8 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             lambda model, **kwargs: None,
             raising=False,
         )
-        monkeypatch.setattr(r_bridge, "run_binary_ma", run, raising=False)
-        monkeypatch.setattr(r_bridge, "run_continuous_ma", run, raising=False)
+        monkeypatch.setattr(r_bridge, "run_binary_analysis", run, raising=False)
+        monkeypatch.setattr(r_bridge, "run_continuous_analysis", run, raising=False)
 
         try:
             assert window.open(_sample_project_path(name)) is True
@@ -1927,8 +1936,8 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
     shown = []
 
     class MetaRegDialog(object):
-        def __init__(self, model, meta_f_str=None, parent=None, **_kwargs):
-            assert meta_f_str == "meta-regression"
+        def __init__(self, model, analysis_type=None, parent=None, **_kwargs):
+            assert analysis_type == "meta-regression"
             shown.append(("meta-regression", parent, model.get_current_outcome_type()))
 
         def show(self):
@@ -1958,7 +1967,7 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
 
         try:
             assert window.open(_sample_project_path(name)) is True
-            cov_values = {
+            covariate_values = {
                 study.name: index
                 for index, study in enumerate(window.model.dataset.studies)
             }
@@ -1966,7 +1975,7 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
                 study.name: "A" if index % 2 else "B"
                 for index, study in enumerate(window.model.dataset.studies)
             }
-            window.model.add_covariate("dose", "continuous", cov_values)
+            window.model.add_covariate("dose", "continuous", covariate_values)
             window.model.add_covariate("region", "factor", group_values)
             window._enable_action_subgroup_ma()
             window.action_meta_regression.setEnabled(True)
@@ -2006,8 +2015,8 @@ def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypa
 
         assert built == [
             {
-                "meta_f_str": "meta-regression",
-                "conf_level": window.model.get_global_conf_level(),
+                "analysis_type": "meta-regression",
+                "confidence_level": window.model.get_confidence_level(),
             }
         ]
         assert len(shown) == 1
@@ -2092,11 +2101,11 @@ def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
 
     try:
         assert window.open(_sample_project_path("lymph.rcms")) is True
-        cov_values = {
+        covariate_values = {
             study.name: index + 1
             for index, study in enumerate(window.model.dataset.studies)
         }
-        window.model.add_covariate("dose", "continuous", cov_values)
+        window.model.add_covariate("dose", "continuous", covariate_values)
 
         form = meta_regression_dialog.MetaRegressionDialog(window.model, parent=window)
         form.show()
@@ -2209,7 +2218,9 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         lambda *args: warnings.append(args),
     )
     monkeypatch.setattr(
-        window, "meta_subgroup", lambda selected_cov: calls.append(selected_cov)
+        window,
+        "meta_subgroup",
+        lambda selected_covariate: calls.append(selected_covariate),
     )
 
     try:
@@ -2218,7 +2229,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
             window.model, parent=window
         )
 
-        assert form.cov_subgroup_cbo_box.count() == 0
+        assert form.covariate_combo_box.count() == 0
         assert (
             required(
                 form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
@@ -2267,7 +2278,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
                 [study.name for study in studies],
                 metric,
                 kwargs.get("fixed_effects"),
-                kwargs.get("conf_level"),
+                kwargs.get("confidence_level"),
             )
         )
         return {
@@ -2306,7 +2317,7 @@ def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monke
             [study.name for study in window.model.dataset.studies if study.include],
             "OR",
             False,
-            window.model.get_global_conf_level(),
+            window.model.get_confidence_level(),
         )
         assert shown[-2:] == [
             (
@@ -2358,8 +2369,8 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
 
         assert str(form.windowTitle()) == "Select Covariate"
         assert [
-            str(form.cov_subgroup_cbo_box.itemText(index))
-            for index in range(form.cov_subgroup_cbo_box.count())
+            str(form.covariate_combo_box.itemText(index))
+            for index in range(form.covariate_combo_box.count())
         ] == ["region"]
     finally:
         window.current_data_unsaved = False
@@ -4008,7 +4019,7 @@ def test_meta_regression_pre_run_plot_options_use_bubble_parameter_contract():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
     class RegressionPlotDialog(object):
-        meta_f_str = "meta-regression"
+        analysis_type = "meta-regression"
         current_param_vals: dict[str, object]
         style_cbo: QtWidgets.QComboBox
         accent_color: QtWidgets.QLineEdit
@@ -4089,7 +4100,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     covariate = Covariate()
 
     class Dataset(object):
-        def get_values_for_cov(self, name, ids_for_keys=False):
+        def get_covariate_values(self, name, ids_for_keys=False):
             assert name == "latitude"
             assert ids_for_keys is True
             return {1: -10.0, 2: 20.0}
@@ -4107,9 +4118,9 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
             calls.append(("analysis", result))
 
     class Form(QtWidgets.QWidget):
-        meta_f_str = "meta-regression"
+        analysis_type = "meta-regression"
         data_type = "binary"
-        conf_level = 95.0
+        confidence_level = 95.0
         model = Model()
         current_param_vals = {
             "rm.method": "SJ",
@@ -4207,7 +4218,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     assert calls[1][0] == "run"
     assert calls[1][1][1:4] == (studies, [covariate], "OR")
     assert calls[1][2]["fixed_effects"] is True
-    assert calls[1][2]["conf_level"] == 90.0
+    assert calls[1][2]["confidence_level"] == 90.0
     assert calls[1][2]["params"]["rm.method"] == "SJ"
     assert calls[1][2]["params"]["digits"] == 4
     assert calls[1][2]["params"]["bp_style"] == "revman"
@@ -4311,7 +4322,7 @@ def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
         specs = analysis_setup_dialog.AnalysisSetupDialog(
             DiagnosticModel(),
             diagnostic_metrics=["sens", "spec"],
-            conf_level=95.0,
+            confidence_level=95.0,
         )
 
         assert specs.current_method == method_name
@@ -4646,7 +4657,7 @@ def test_main_window_save_as_round_trips_representative_projects(tmp_path, monke
             assert _dataset_summary(reopened) == expected
             if name == "meantime.rcms":
                 values = [
-                    study.covariate_dict["treatment group"]
+                    study.covariate_values["treatment group"]
                     for study in reopened.studies
                 ]
                 assert all(type(value) is str for value in values if value is not None)
@@ -5488,26 +5499,27 @@ def test_stub_backend_exposes_data_entry_imputation_methods():
     r_bridge = sys.modules["rc_metastudio.r_bridge"]
 
     for name in (
-        "impute_bin_data",
-        "impute_cont_data",
-        "impute_pre_post_cont_data",
-        "impute_diag_data",
-        "back_calc_cont_data",
+        "impute_binary_data",
+        "impute_continuous_data",
+        "impute_pre_post_continuous_data",
+        "impute_diagnostic_data",
+        "back_calculate_continuous_data",
     ):
         assert hasattr(r_bridge, name), name
 
-    assert "FAIL" in r_bridge.impute_bin_data({"Ev_A": 1})
-    assert r_bridge.impute_cont_data({"n": 10}, 0.05)["succeeded"] is False
+    assert "FAIL" in r_bridge.impute_binary_data({"Ev_A": 1})
+    assert r_bridge.impute_continuous_data({"n": 10}, 0.05)["succeeded"] is False
     assert (
-        r_bridge.impute_pre_post_cont_data({"n": 10}, 0.5, 0.05)["succeeded"] is False
+        r_bridge.impute_pre_post_continuous_data({"n": 10}, 0.5, 0.05)["succeeded"]
+        is False
     )
-    assert r_bridge.impute_diag_data({"TP": 1}) == {
+    assert r_bridge.impute_diagnostic_data({"TP": 1}) == {
         "TP": None,
         "TN": None,
         "FP": None,
         "FN": None,
     }
-    assert "FAIL" in r_bridge.back_calc_cont_data(
+    assert "FAIL" in r_bridge.back_calculate_continuous_data(
         {"n": 10}, {"n": 12}, {"est": 1.0}, 95.0
     )
 
@@ -5534,10 +5546,10 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         model = window.model
         binary_dialog = binary_data_dialog.BinaryDataDialog(
             copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-            model.current_txs,
-            model.get_cur_group_str(),
+            model.current_groups,
+            model.get_current_group_comparison(),
             model.current_effect,
-            conf_level=model.get_global_conf_level(),
+            confidence_level=model.get_confidence_level(),
             parent=window.tableView,
         )
         binary_dialog.close()
@@ -5546,10 +5558,10 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         model = window.model
         continuous_dialog = continuous_data_dialog.ContinuousDataDialog(
             copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-            model.current_txs,
-            model.get_cur_group_str(),
+            model.current_groups,
+            model.get_current_group_comparison(),
             model.current_effect,
-            conf_level=model.get_global_conf_level(),
+            confidence_level=model.get_confidence_level(),
             parent=window.tableView,
         )
         continuous_dialog.close()
@@ -5558,9 +5570,9 @@ def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
         model = window.model
         diagnostic_dialog = diagnostic_data_dialog.DiagnosticDataDialog(
             copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-            model.current_txs,
-            model.get_cur_group_str(),
-            conf_level=model.get_global_conf_level(),
+            model.current_groups,
+            model.get_current_group_comparison(),
+            confidence_level=model.get_confidence_level(),
             parent=window.tableView,
         )
         diagnostic_dialog.close()
@@ -5610,21 +5622,21 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
     try:
         assert window.open(_sample_project_path("amino.rcms")) is True
         model = window.model
-        cov_values = {
+        covariate_values = {
             study.name: "north" if index % 2 else "south"
             for index, study in enumerate(model.dataset.studies)
         }
-        model.add_covariate("region", "factor", cov_values)
+        model.add_covariate("region", "factor", covariate_values)
         dialogs.extend(
             [
                 meta_regression_dialog.MetaRegressionDialog(model, parent=window),
                 subgroup_analysis_dialog.SubgroupAnalysisDialog(model, parent=window),
                 binary_data_dialog.BinaryDataDialog(
                     copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-                    model.current_txs,
-                    model.get_cur_group_str(),
+                    model.current_groups,
+                    model.get_current_group_comparison(),
                     model.current_effect,
-                    conf_level=model.get_global_conf_level(),
+                    confidence_level=model.get_confidence_level(),
                     parent=window.tableView,
                 ),
             ]
@@ -5635,10 +5647,10 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
         dialogs.append(
             continuous_data_dialog.ContinuousDataDialog(
                 copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-                model.current_txs,
-                model.get_cur_group_str(),
+                model.current_groups,
+                model.get_current_group_comparison(),
                 model.current_effect,
-                conf_level=model.get_global_conf_level(),
+                confidence_level=model.get_confidence_level(),
                 parent=window.tableView,
             )
         )
@@ -5648,9 +5660,9 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
         dialogs.append(
             diagnostic_data_dialog.DiagnosticDataDialog(
                 copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-                model.current_txs,
-                model.get_cur_group_str(),
-                conf_level=model.get_global_conf_level(),
+                model.current_groups,
+                model.get_current_group_comparison(),
+                confidence_level=model.get_confidence_level(),
                 parent=window.tableView,
             )
         )
@@ -5920,12 +5932,7 @@ def test_csv_import_file_selection_enables_finish_button(tmp_path, monkeypatch):
 
 
 def test_table_paint_roles_do_not_raise_across_all_cells():
-    # Regression: real painting queries Qt.BackgroundColorRole/TextAlignmentRole for
-    # every cell. data() sliced RAW_DATA with len()/2 (a float under Python 3), raising
-    # TypeError out of the C++ paint virtual and aborting the GUI (exit 0xC0000409).
-    # Offscreen tests never paint, so only a direct per-cell role sweep catches it.
-    # Calling data()/headerData() in-process turns a paint-time abort into a clean
-    # test failure; the packaged smoke test forces an actual paint pass as well.
+    # Exercise paint roles directly because offscreen tests do not invoke them.
     from PyQt6 import QtCore
 
     paint_roles = [
@@ -5947,17 +5954,13 @@ def test_table_paint_roles_do_not_raise_across_all_cells():
             for column in range(model.columnCount()):
                 index = model.index(row, column)
                 for role in paint_roles:
-                    model.data(index, role)  # must not raise
+                    model.data(index, role)
         for section in range(model.columnCount()):
             for role in paint_roles:
-                model.headerData(
-                    section, QtCore.Qt.Orientation.Horizontal, role
-                )  # must not raise
+                model.headerData(section, QtCore.Qt.Orientation.Horizontal, role)
         for section in range(model.rowCount()):
             for role in paint_roles:
-                model.headerData(
-                    section, QtCore.Qt.Orientation.Vertical, role
-                )  # must not raise
+                model.headerData(section, QtCore.Qt.Orientation.Vertical, role)
     finally:
         window.close()
         app.processEvents()
@@ -5980,7 +5983,5 @@ def _dataset_summary(dataset):
     return {
         "title": dataset.title,
         "studies": [(str(study.name), str(study.year)) for study in dataset.studies],
-        "outcomes": sorted(
-            str(name) for name in dataset.outcome_names_to_follow_ups.keys()
-        ),
+        "outcomes": sorted(str(name) for name in dataset.follow_ups_by_outcome.keys()),
     }

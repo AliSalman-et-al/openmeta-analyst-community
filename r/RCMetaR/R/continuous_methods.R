@@ -1,16 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-####################################
-# RC MetaStudio                #
-# ----                             #
-# continuous_methods.R             #
-# Facade module; wraps methods     #
-# that perform analyses on         # 
-# continuous data in a coherent    #
-# interface.                       #
-####################################
-
 continuous.two.arm.metrics <- c("MD", "SMD")
 continuous.one.arm.metrics <- c("TXMean")
 
@@ -41,8 +31,6 @@ continuous.transform.f <- function(metric.str) {
 }
 
 get.res.for.one.cont.study <- function(cont.data, params){
-  # this method can be called when there is only one study to
-  # get the point estimate and lower/upper bounds.
   y<-NULL
   se<-NULL
   if (length(cont.data@y) == 0 || is.na(cont.data@y)) {
@@ -54,23 +42,18 @@ get.res.for.one.cont.study <- function(cont.data, params){
     y <- cont.data@y[1]
     se <- cont.data@SE[1]
   }
-  # note: conf.level is given as, e.g., 95, rather than .95.
   mult <- get.mult.from.conf.level(params$conf.level)
   ub <- y + mult*se
   lb <- y - mult*se
-  # we make lists to comply with the get.overall method
   res <- list("b"=c(y), "ci.lb"=lb, "ci.ub"=ub, "se"=se)
   res
 }
 
 create.cont.data.array <- function(cont.data, params, res) {
-  # Extracts data from cont.data and puts it into an array for the the first summary display table.
   tx1.name <- "tx A"
   tx2.name <- "tx B"
-  # Group labels default here unless the GUI passes display labels in params.
   digits.str <- paste("%.", params$digits, "f", sep="")
   effect.size.name <- pretty.metric.name(as.character(params$measure))
-  # Caculate confidence intervals
   study.ci.bounds <- calc.ci.bounds(cont.data, params)
   y.disp <- continuous.transform.f(params$measure)$display.scale(cont.data@y)
   lb.disp <- continuous.transform.f(params$measure)$display.scale(study.ci.bounds$lb)
@@ -81,7 +64,6 @@ create.cont.data.array <- function(cont.data, params, res) {
   weights <- res$study.weights
   weights <- sprintf(digits.str, weights)
   weights <- format(weights, justify="right")
-  # Extract the data from cont.data and round
   N.txA <- format(cont.data@N1, justify="right")
   mean.txA <- sprintf(digits.str, cont.data@mean1)
   sd.txA <- sprintf(digits.str, cont.data@sd1)
@@ -108,16 +90,13 @@ create.cont.data.array <- function(cont.data, params, res) {
       effect.size.name, y, "Lower", LL, "Upper", UL, "Weight", weights),
       dim=c(length(cont.data@study.names) + 1, 8))
   }
-  class(raw.data) <- "summary.data" 
+  class(raw.data) <- "summary.data"
   return(raw.data)
 }
 
 write.cont.study.data.to.file <- function(cont.data, params, res, data.outpath) {
-  # create data frame and write to csv
   effect.size.name <- pretty.metric.name(as.character(params$measure))
-  # Caculate confidence intervals
   study.ci.bounds <- calc.ci.bounds(cont.data, params)
-  y.disp <- continuous.transform.f(params$measure)$display.scale(cont.data@y)
   if (params$measure %in% continuous.two.arm.metrics) {
     study.data.df <- data.frame(
       "study.names"=paste(cont.data@study.names, " ", cont.data@years, sep=""),
@@ -126,7 +105,7 @@ write.cont.study.data.to.file <- function(cont.data, params, res, data.outpath) 
       "sd1" = cont.data@sd1,
       "N2" = cont.data@N2,
       "mean2" = cont.data@mean2,
-      "sd2" = cont.data@sd1,
+      "sd2" = cont.data@sd2,
       "Effect.size" = continuous.transform.f(params$measure)$display.scale(cont.data@y),
       "Lower.bound" = continuous.transform.f(params$measure)$display.scale(study.ci.bounds$lb),
       "Upper.bound" = continuous.transform.f(params$measure)$display.scale(study.ci.bounds$ub),
@@ -142,26 +121,19 @@ write.cont.study.data.to.file <- function(cont.data, params, res, data.outpath) 
       "Upper.bound" = continuous.transform.f(params$measure)$display.scale(study.ci.bounds$ub),
       "Weight" = res$study.weights)
   }
-  # Rename effect size column
   names(study.data.df)[names(study.data.df)=="Effect.size"] <- effect.size.name
-  write.csv(study.data.df, file=data.outpath, append=FALSE, row.names=FALSE)
+  write.csv(study.data.df, file=data.outpath, row.names=FALSE)
 }
 
-###############################
-#  continuous fixed effects  #
-###############################
 continuous.fixed <- function(cont.data, params){
-  # assert that the argument is the correct type
   if (!("ContinuousData" %in% class(cont.data))) stop("Continuous data expected.")
-    
+
   results <- NULL
   input.params <- params
   inference.method <- rcmetar.validate.inference.method(params, length(cont.data@y))
 
   if (length(cont.data@study.names) == 1){
-    # handle the case where only one study was passed in
     res <- get.res.for.one.cont.study(cont.data, params)
-    # Package res for use by overall method.
     results <- list("Summary"=res, "res"=res)
   }
   else {
@@ -175,37 +147,24 @@ continuous.fixed <- function(cont.data, params){
       digits=params$digits)
     pure.res <- res
 
-		# add weights
 		res$weights <- weights(res)
 		results <- list("Summary"=res)
-		
-    # Create forest plot and list to display summary of results
+
     metric.name <- pretty.metric.name(as.character(params$measure))
     model.title <- paste("Continuous Fixed-Effect Model\n\nMetric: ", metric.name, sep="")
     summary.disp <- create.summary.disp(cont.data, params, res, model.title)
-    #
-    # generate forest plot
-    #
     forest.path <- paste(params$fp_outpath, sep="")
     plot.data <- create.plot.data.continuous(cont.data, params, res)
     changed.params <- plot.data$changed.params
-		
+
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
-      # list of changed params values
       params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
       changed.params <- c(changed.params, params.changed.in.forest.plot)
       params <- update.changed.plot.params(params, changed.params)
-      # dump the forest plot params to disk; return path to
-      # this .Rdata for later use
       forest.plot.params.path <- save.data(cont.data, res, params, plot.data)
 		}
 
-    # Now we package the results in a dictionary (technically, a named
-    # vector). In particular, there are two fields that must be returned;
-    # a dictionary of images (mapping titles to image paths) and a list of texts
-    # (mapping titles to pretty-printed text). In this case we have only one
-    # of each.
     plot.params.paths <- c("Forest Plot"=forest.plot.params.path)
     images <- c("Forest Plot"=forest.path)
     plot.names <- c("forest plot"="forest_plot")
@@ -221,19 +180,17 @@ continuous.fixed <- function(cont.data, params){
           "res.info"=continuous.fixed.value.info(),
           "Weights"=weights(res))
   }
-	
+
   results[["References"]] <- rcmetar.unique.references(c(
     rcmetar.method.references("rma.uni.fixed"),
     rcmetar.inference.method.references(params)))
-	
+
   results
 }
 
 continuous.fixed.parameters <- function(){
-  # parameters
   params <- list("inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int")
 
-  # default values
   defaults <- list("inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
   var_order <- c("inference.method", "conf.level", "digits")
@@ -255,26 +212,19 @@ continuous.fixed.pretty.names <- function() {
 }
 
 continuous.fixed.overall <- function(results){
-  # this parses out the overall from the computed result
   res <- results$res
 }
 
-###############################
-#  continuous random effects  #
-###############################
 continuous.random <- function(cont.data, params) {
-  # assert that the argument is the correct type
   if (!("ContinuousData" %in% class(cont.data)))
   stop("Continuous data expected.")
 
   results <- NULL
 	input.params <- params
 	inference.method <- rcmetar.validate.inference.method(params, length(cont.data@y))
-	
+
   if (length(cont.data@study.names) == 1) {
-      # handle the case where only one study was passed in
       res <- get.res.for.one.cont.study(cont.data, params)
-       # Package res for use by overall method.
       results <- list("Summary"=res, "res"=res)
   }
   else {
@@ -286,37 +236,26 @@ continuous.random <- function(cont.data, params) {
       level=params$conf.level,
       digits=params$digits)
     pure.res<-res
-        
-		# add weights
+
 		res$weights <- weights(res)
     results <- list("Summary"=res)
 
-    # Create forest plot and list to display summary of results
     metric.name <- pretty.metric.name(as.character(params$measure))
     model.title <- paste("Continuous Random-Effects Model\n\nMetric: ", metric.name, sep="")
     summary.disp <- create.summary.disp(cont.data, params, res, model.title)
 
-    #### Generate forest plot ####
     forest.path <- paste(params$fp_outpath, sep="")
     plot.data <- create.plot.data.continuous(cont.data, params, res)
     changed.params <- plot.data$changed.params
-		
+
 		forest.plot.params.path <- ""
 		if (is.null(params$supress.output) || !params$supress.output) {
-      # list of changed params values
       params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
       changed.params <- c(changed.params, params.changed.in.forest.plot)
       params <- update.changed.plot.params(params, changed.params)
-      # dump the forest plot params to disk; return path to
-      # this .Rdata for later use
       forest.plot.params.path <- save.data(cont.data, res, params, plot.data)
 		}
-		
-    # Now we package the results in a dictionary (technically, a named
-    # vector). In particular, there are two fields that must be returned;
-    # a dictionary of images (mapping titles to image paths) and a list of texts
-    # (mapping titles to pretty-printed text). In this case we have only one
-    # of each.
+
     plot.params.paths <- c("Forest Plot"=forest.plot.params.path)
     images <- c("Forest Plot"=forest.path)
     plot.names <- c("forest plot"="forest_plot")
@@ -332,11 +271,11 @@ continuous.random <- function(cont.data, params) {
       "res.info"=continuous.random.value.info(),
       "Weights"=weights(res))
   }
-	
+
   results[["References"]] <- rcmetar.unique.references(c(
     rcmetar.method.references("rma.uni.random"),
     rcmetar.inference.method.references(params)))
-	
+
   results
 }
 
@@ -350,12 +289,10 @@ continuous.fixed.value.info <- function() {
 
 
 continuous.random.parameters <- function() {
-  # parameters
   rm_method_ls <- rcmetar.random.effects.methods()
 
   params <- list("rm.method"=rm_method_ls, "inference.method"=rcmetar.inference.methods(), "conf.level"="float", "digits"="int")
 
-  # default values
   defaults <- list("rm.method"="DL", "inference.method"="z", "conf.level"=95, "digits"=RCMETAR_DEFAULT_DISPLAY_DIGITS)
 
   var_order <- c("rm.method", "inference.method", "conf.level", "digits")
@@ -363,9 +300,8 @@ continuous.random.parameters <- function() {
 }
 
 continuous.random.pretty.names <- function() {
-	# Keep display names explicit even though rm_method_ls defines the codes.
 	rm_method_names <- rcmetar.random.effects.method.names()
-	
+
   pretty.names <- list(
     "pretty.name"="Continuous Random-Effects",
     "description" = "Performs random-effects meta-analysis.",
@@ -381,7 +317,6 @@ continuous.random.pretty.names <- function() {
 }
 
 continuous.random.overall <- function(results){
-  # this parses out the overall from the computed result
   res <- results$res
 }
 

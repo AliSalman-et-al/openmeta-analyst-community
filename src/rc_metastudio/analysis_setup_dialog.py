@@ -55,7 +55,7 @@ from rc_metastudio.meta_globals import (
     ANALYSIS_POSITIVE_INTEGER_PARAMS,
     CONFIDENCE_LEVEL_DISPLAY_MAX,
     CONTINUOUS,
-    DIAGNOSTIC_METRIC_NAMES,
+    DIAGNOSTIC_METRIC_GROUPS,
     ONE_ARM_METRICS,
     check_plot_bound,
     seems_sane,
@@ -107,9 +107,7 @@ def _normalize_parameter_definition(
     name: str, definition: object, default: object, metadata: object
 ) -> _ParameterDefinition:
     if isinstance(definition, list):
-        return _ParameterDefinition(
-            name, "enum", default, metadata, tuple(definition)
-        )
+        return _ParameterDefinition(name, "enum", default, metadata, tuple(definition))
     if _is_integer_analysis_param(name) or str(definition).lower() == "int":
         kind: ParameterKind = "int"
     elif str(definition).lower() == "string":
@@ -209,12 +207,12 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self,
         model,
         parent=None,
-        meta_f_str=None,
+        analysis_type=None,
         external_params=None,
         diagnostic_metrics=None,
         diagnostic_analysis_details=None,
         fp_specs_only=False,
-        conf_level=None,
+        confidence_level=None,
     ):
 
         super(AnalysisSetupDialog, self).__init__(parent)
@@ -231,16 +229,16 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         if _text_value(self.image_path) == "":
             self.image_path.setText(analysis_output_path("forest.png"))
         self.current_param_vals: dict[str, object] = dict(external_params or {})
-        self.meta_f_str = meta_f_str
-        self.is_meta_regression = meta_f_str == "meta-regression"
+        self.analysis_type = analysis_type
+        self.is_meta_regression = analysis_type == "meta-regression"
         self.model = model
         self._loading_plot_style = False
         self._setup_plot_controls()
         self._load_plot_params()
 
-        if conf_level is None:
+        if confidence_level is None:
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
-        self.conf_level = validate_confidence_level(conf_level)
+        self.confidence_level = validate_confidence_level(confidence_level)
 
         self._accepted_connection = None
         self._set_accepted_handler(
@@ -289,7 +287,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self._combined_diagnostic = False
         self._shared_diagnostic_param_specs = {
             "conf.level": _normalize_parameter_definition(
-                "conf.level", "float", self.conf_level, None
+                "conf.level", "float", self.confidence_level, None
             ),
             "digits": _normalize_parameter_definition("digits", "int", 2, None),
             "adjust": _normalize_parameter_definition("adjust", "float", 0.5, None),
@@ -299,23 +297,15 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         }
         self._shared_diagnostic_widgets = []
 
-        # diagnostic data requires a different UI because multiple
-        # metrics can be selected. we handle this by allowing the
-        # user to specify different methods for different groups
-        # of metrics.
         if self.data_type == "diagnostic":
-            # these are the two 'groups' of metrics (sens/spec & DOR/LR+/-)
-            # these booleans tell us for which of these groups we're getting parameters
             self.sens_spec = any(
                 [m in ("sens", "spec") for m in self.diagnostic_metrics]
             )
-            self.lr_dor = any(
-                [m in ("lr", "dor") for m in self.diagnostic_metrics]
-            )
+            self.lr_dor = any([m in ("lr", "dor") for m in self.diagnostic_metrics])
             self._combined_diagnostic = self.sens_spec and self.lr_dor
             self.setup_diagnostic_ui()
 
-        self.populate_cbo_box()
+        self.populate_parameter_controls()
         if self._combined_diagnostic:
             self._finish_combined_diagnostic_ui()
         adaptive_window.register_adaptive_window(
@@ -391,7 +381,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         self.covs_and_check_boxes = []
         for row, covariate in enumerate(self.model.dataset.covariates):
-            checkbox = QtWidgets.QCheckBox(covariate.name, self.cov_grp_box)
+            checkbox = QtWidgets.QCheckBox(covariate.name, self.covariate_group_box)
             checkbox.setChecked(row == 0)
             checkbox.toggled.connect(
                 app_error_handler.safe_slot(
@@ -464,7 +454,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         )
 
     def _configure_plot_option_groups(self):
-        workflow = self.meta_f_str or "standard"
+        workflow = self.analysis_type or "standard"
         capabilities = r_bridge.get_analysis_plot_capabilities(
             self.data_type, self.current_method, workflow=workflow
         )
@@ -536,7 +526,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 tuple(selected_covariates),
                 request,
                 fixed_effects,
-                self.conf_level,
+                self.confidence_level,
             ),
             "Sorry, there was an error performing the regression.\n%s",
             string_result_is_failure=True,
@@ -616,7 +606,6 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self.color_btn.setStyleSheet("background-color: %s;" % text)
 
     def run_network_analysis(self):
-        # first, let's fire up a progress bar
         bar = progress_dialog.AnalysisProgressDialog(self)
         bar.show()
         try:
@@ -691,7 +680,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
     def analysis_requests(self):
         """Return typed requests represented by the current user configuration."""
         add_plot_params(self)
-        workflow = self.meta_f_str or "standard"
+        workflow = self.analysis_type or "standard"
         if self.data_type != "diagnostic":
             metric = str(self.model.current_effect)
             self.current_param_vals["measure"] = metric
@@ -706,7 +695,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 ),
             )
 
-        self.add_cur_analysis_details()
+        self.add_current_analysis_details()
         method_names, parameter_values = _diagnostic_analysis_requests(self)
         return tuple(
             analysis_adapter.make_analysis_request(
@@ -754,16 +743,12 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
     def _set_parameter_box_title(self, cbo_box, param_box):
         param_box.setTitle(str(cbo_box.currentText()))
 
-    def populate_cbo_box(self, cbo_box=None, param_box=None):
-        # if no combo box is passed in, use the default 'method_cbo_box'
+    def populate_parameter_controls(self, cbo_box=None, param_box=None):
         if cbo_box is None:
             cbo_box = self.method_cbo_box
             param_box = self.parameter_grp_box
 
-        # we first build an R object with the current data. this is to pass off
-        # to the R side to check the feasibility of the methods over the current data.
-        # i.e., we do not display methods that cannot be performed over the
-        # current data.
+        # The backend filters methods against the selected dataset and metric.
         tmp_obj_name = "tmp_obj"
         if self.data_type == "binary":
             r_bridge.dataset_to_simple_binary_r_object(
@@ -784,7 +769,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         # use its representative metric.
         metric = self.model.current_effect
         if self.data_type == "diagnostic":
-            if self.meta_f_str is None:
+            if self.analysis_type is None:
                 metric = "Sens" if self.sens_spec else "DOR"
             else:
                 metric = "Sens"
@@ -794,8 +779,8 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             "data_obj_name": tmp_obj_name,
             "metric": metric,
         }
-        if self.meta_f_str is not None:
-            method_query["workflow"] = self.meta_f_str
+        if self.analysis_type is not None:
+            method_query["workflow"] = self.analysis_type
         self.available_method_d = r_bridge.get_available_methods(**method_query)
         self.available_method_d = normalize_available_method_labels(
             self.available_method_d
@@ -812,7 +797,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 method_function = self.available_method_d.get(biv_method)
                 should_remove_bivariate_method = (
                     metric != "Sens"
-                    or self.meta_f_str is not None
+                    or self.analysis_type is not None
                     or not (
                         "sens" in self.diagnostic_metrics
                         and "spec" in self.diagnostic_metrics
@@ -825,9 +810,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 if biv_method in method_names and should_remove_bivariate_method:
                     method_names.remove(biv_method)
             # Fix for issue # 175
-            if all(
-                metric in self.diagnostic_metrics for metric in ("lr", "dor")
-            ):
+            if all(metric in self.diagnostic_metrics for metric in ("lr", "dor")):
                 peto_method = "Diagnostic Fixed-Effect Peto"
                 if peto_method in method_names:
                     method_names.remove(peto_method)
@@ -878,17 +861,17 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         if not isinstance(parameter_layout, QGridLayout):
             raise TypeError("Analysis parameters require a grid layout")
 
-        cur_grid_row = 0
+        current_grid_row = 0
 
         # add the method description
         method_description = r_bridge.get_method_description(self.current_method)
 
         self.add_method_description(
             parameter_layout,
-            cur_grid_row,
+            current_grid_row,
             "Description: %s" % method_description,
         )
-        cur_grid_row += 1
+        current_grid_row += 1
 
         definitions = [
             _normalize_parameter_definition(
@@ -918,9 +901,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             label = self._parameter_label(spec)
             control = self._create_parameter_control(spec, self.current_param_vals)
             self.current_widgets.extend((label, control))
-            parameter_layout.addWidget(label, cur_grid_row, 0)
-            parameter_layout.addWidget(control, cur_grid_row, 1)
-            cur_grid_row += 1
+            parameter_layout.addWidget(label, current_grid_row, 0)
+            parameter_layout.addWidget(control, current_grid_row, 1)
+            current_grid_row += 1
 
         self._schedule_local_reflow()
 
@@ -1042,14 +1025,14 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             item_data = item_data.value()
         return qt_text.to_native_text(item_data)
 
-    def add_method_description(self, layout, cur_grid_row, text):
+    def add_method_description(self, layout, current_grid_row, text):
         lbl = QLabel(text, self.parameter_grp_box)
         lbl.setWordWrap(True)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
         lbl.setMinimumWidth(0)
         lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.current_widgets.append(lbl)
-        layout.addWidget(lbl, cur_grid_row, 0, 1, 2)
+        layout.addWidget(lbl, current_grid_row, 0, 1, 2)
 
     def _configure_value_control(self, widget):
         adaptive_controls.configure_choice_control(widget)
@@ -1102,16 +1085,8 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 continue
             self.current_defaults[name] = saved_value
 
-        # user selections overwrite the current parameter defaults.
-        # ie., if the user has run this analysis before, the preferences
-        # they selected then are automatically set as the defaults now.
-        # these defaults, if they exist, are stored in the user_preferences
-        # dictionary
-        #         if self.current_method in method_params:
-        #             print "loading default from user preferences!"
-
-        # override conf.level with global conf.level
-        self.current_defaults["conf.level"] = self.conf_level
+        # The application-level confidence setting overrides method defaults.
+        self.current_defaults["conf.level"] = self.confidence_level
 
     def _register_shared_diagnostic_param(self, spec):
         if spec.name not in SHARED_DIAGNOSTIC_PARAMS:
@@ -1169,7 +1144,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             layout.addWidget(control, row, 1)
             self._shared_diagnostic_widgets.extend((label, control))
 
-    def add_cur_analysis_details(self):
+    def add_current_analysis_details(self):
         """This method only applicable for diagnostic data, wherein
         we have multiple metrics. here the parameters/method for
         these metrics are added to a dictionary.
@@ -1224,19 +1199,10 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         return params
 
     def setup_diagnostic_ui(self):
-        # here is where we set the keys of the analysis-details mapping
-        # dictionary to the metrics the user selected
-
-        # the names of the metrics internally are different than those that
-        # are displayed to the user, e.g., the user selects Likelihood Ratio
-        # instead of LR+/LR-. we map from the UI names to the internal names
-        # here
-
-        # lr_dor is, by convention, the 'second screen' shown to the user
         if len(self.diagnostic_analysis_details) == 0:
             metrics_to_run = []
             for m in self.diagnostic_metrics:
-                metrics_to_run.extend(DIAGNOSTIC_METRIC_NAMES[m])
+                metrics_to_run.extend(DIAGNOSTIC_METRIC_GROUPS[m])
 
             self.diagnostic_analysis_details = dict(
                 list(zip(metrics_to_run, [None for m in metrics_to_run]))
@@ -1299,7 +1265,7 @@ def _display_svg_path(output_path):
 
 
 def add_plot_params(specs_form):
-    if getattr(specs_form, "meta_f_str", None) == "meta-regression":
+    if getattr(specs_form, "analysis_type", None) == "meta-regression":
         bubble_outpath = _text_value(specs_form.image_path)
         specs_form.current_param_vals.update(
             {
@@ -1418,9 +1384,7 @@ def _diagnostic_analysis_requests(specs_form):
         for metric in ordered_metrics
         if metric in specs_form.diagnostic_analysis_details
     ]:
-        details = specs_form.diagnostic_analysis_details[
-            diagnostic_metric
-        ]
+        details = specs_form.diagnostic_analysis_details[diagnostic_metric]
         if details is None:
             missing_metrics.append(diagnostic_metric)
             continue

@@ -39,9 +39,9 @@ class AddFollowUpDialog(QDialog, _ui_new_follow_up_dialog.Ui_new_follow_up_dialo
 
 
 class AddOutcomeDialog(QDialog, _ui_new_outcome_dialog.Ui_new_outcome_dialog):
-    def __init__(self, parent=None, is_diag=False):
+    def __init__(self, parent=None, is_diagnostic=False):
         super().__init__(parent)
-        self.is_diag = is_diag
+        self.is_diagnostic = is_diagnostic
 
         self.setupUi(self)
         self._populate_combo_box()
@@ -51,7 +51,7 @@ class AddOutcomeDialog(QDialog, _ui_new_outcome_dialog.Ui_new_outcome_dialog):
         )
 
     def _populate_combo_box(self):
-        if self.is_diag:
+        if self.is_diagnostic:
             self.datatype_cbo_box.addItem("Diagnostic", DIAGNOSTIC)
         else:
             for name, type_id in zip(["Binary", "Continuous"], range(2)):
@@ -67,9 +67,7 @@ class AddStudyDialog(QDialog, _ui_new_study_dialog.Ui_new_study_dialog):
         )
 
 
-class AddCovariateDialog(
-    QDialog, _ui_new_covariate_dialog.Ui_new_covariate_dialog
-):
+class AddCovariateDialog(QDialog, _ui_new_covariate_dialog.Ui_new_covariate_dialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)

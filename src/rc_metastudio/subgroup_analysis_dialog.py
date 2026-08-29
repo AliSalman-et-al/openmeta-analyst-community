@@ -23,7 +23,7 @@ class SubgroupAnalysisDialog(
         self.model = model
         self.setupUi(self)
         self._populate_combo_box()
-        adaptive_controls.configure_choice_control(self.cov_subgroup_cbo_box)
+        adaptive_controls.configure_choice_control(self.covariate_combo_box)
         self._update_ok_button()
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
@@ -39,8 +39,8 @@ class SubgroupAnalysisDialog(
         self.reject()
 
     def get_selected_cov(self):
-        selected_cov = str(self.cov_subgroup_cbo_box.currentText())
-        if not selected_cov:
+        selected_covariate = str(self.covariate_combo_box.currentText())
+        if not selected_covariate:
             QMessageBox.warning(
                 self,
                 "No Covariate Selected",
@@ -51,13 +51,13 @@ class SubgroupAnalysisDialog(
         callback = getattr(parent, "meta_subgroup", None)
         if not callable(callback):
             raise RuntimeError("subgroup configuration has no workflow owner")
-        callback(selected_cov)
+        callback(selected_covariate)
         self.accept()
 
     def _update_ok_button(self):
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
-            ok_button.setEnabled(self.cov_subgroup_cbo_box.count() > 0)
+            ok_button.setEnabled(self.covariate_combo_box.count() > 0)
 
     def _populate_combo_box(self):
         studies = self.model.get_studies(only_if_included=True)
@@ -65,6 +65,6 @@ class SubgroupAnalysisDialog(
         for cov in self.model.dataset.covariates:
             if cov.get_data_type() != FACTOR:
                 continue
-            cov_vals = [study.covariate_dict[cov.name] for study in studies]
-            if None not in cov_vals:
-                self.cov_subgroup_cbo_box.addItem(cov.name)
+            covariate_values = [study.covariate_values[cov.name] for study in studies]
+            if None not in covariate_values:
+                self.covariate_combo_box.addItem(cov.name)

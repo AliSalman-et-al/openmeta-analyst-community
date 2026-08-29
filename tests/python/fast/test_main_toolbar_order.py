@@ -23,7 +23,7 @@ def test_toolbar_analysis_actions_follow_analysis_menu_order():
         "action_loo_ma",
         "action_subgroup_ma",
         "action_meta_regression",
-        "action_change_conf_level",
+        "action_change_confidence_level",
     ]
     assert [
         action for action in _action_names(analysis_menu) if action in analysis_actions
@@ -45,7 +45,7 @@ def test_toolbar_omits_menu_and_shortcut_actions_after_analysis_group():
     assert toolbar is not None
 
     toolbar_actions = _action_names(toolbar)
-    assert toolbar_actions[-1] == "action_change_conf_level"
+    assert toolbar_actions[-1] == "action_change_confidence_level"
     assert not {
         "action_undo",
         "action_redo",

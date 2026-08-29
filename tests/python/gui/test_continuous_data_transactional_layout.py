@@ -113,7 +113,9 @@ def _open_continuous_dialog(
             reject_metric_choice,
         )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "get_mult_from_r", lambda _conf: 1.96
+        continuous_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _conf: 1.96,
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
@@ -134,12 +136,12 @@ def _open_continuous_dialog(
 
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "impute_cont_data",
+        "impute_continuous_data",
         impute,
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "impute_pre_post_cont_data",
+        "impute_pre_post_continuous_data",
         impute_pre_post,
     )
     monkeypatch.setattr(
@@ -158,14 +160,14 @@ def _open_continuous_dialog(
         return back_calc_result or {"FAIL": True}
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "back_calc_cont_data", back_calc
+        continuous_data_dialog.r_bridge, "back_calculate_continuous_data", back_calc
     )
     dialog = continuous_data_dialog.ContinuousDataDialog(
         analysis_unit or FakeContinuousAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         metric,
-        conf_level=95.0,
+        confidence_level=95.0,
     )
     return app, dialog
 
@@ -184,7 +186,7 @@ def test_continuous_back_calculation_choice_opens_only_after_user_action(monkeyp
         assert recorder["metric_choice_exec"] == []
         recorder["back_calc"].clear()
 
-        dialog.enable_back_calculation_btn(engage=True)
+        dialog.update_back_calculation_button(engage=True)
 
         assert recorder["metric_choice_exec"] == ["Population standard deviations"]
         assert recorder["back_calc"] == []
@@ -235,14 +237,14 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
 
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "back_calc_cont_data",
+        "back_calculate_continuous_data",
         assumption_dependent_solver,
     )
     try:
         dialog.metric_parameter = None
-        dialog.enable_back_calculation_btn()
+        dialog.update_back_calculation_button()
 
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
         assert dialog.metric_parameter is None
         assert observed_parameters == expected_parameters
     finally:
@@ -306,7 +308,7 @@ def test_continuous_assumptions_cancel_button_prevents_r_and_state_mutation(
         dialog.undoStack.clear()
         recorder["back_calc"].clear()
 
-        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert recorder["metric_choice_exec"] == ["Population standard deviations"]
@@ -333,14 +335,14 @@ def test_continuous_data_keyboard_and_accessibility_contract(monkeypatch):
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.focusWidget() is dialog.simple_table
         assert ok.isDefault()
-        assert dialog.label_13.buddy() is dialog.effect_cbo_box
-        assert dialog.label_14.buddy() is dialog.effect_txt_box
+        assert dialog.effect_metric_label.buddy() is dialog.effect_combo_box
+        assert dialog.label_14.buddy() is dialog.effect_text_box
         assert dialog.label.buddy() is dialog.correlation_pre_post
         assert dialog.simple_table.accessibleName() == "Continuous group summary data"
 
-        dialog.effect_cbo_box.setFocus()
-        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
-        assert dialog.focusWidget() is dialog.effect_txt_box
+        dialog.effect_combo_box.setFocus()
+        key_click(dialog.effect_combo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_text_box
 
         key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
@@ -421,11 +423,11 @@ def test_continuous_variants_are_transactional_and_screen_bounded(monkeypatch, s
         assert not dialog.content_scroll.isAncestorOf(dialog.buttonBox)
         assert not isinstance(dialog.simple_group, QtWidgets.QGroupBox)
         assert not isinstance(dialog.effect_group, QtWidgets.QGroupBox)
-        assert dialog.label_13.text() == "Effect"
+        assert dialog.effect_metric_label.text() == "Effect"
         assert dialog.label_14.text() == "Est."
         assert [dialog.label_15.text(), dialog.label_2.text()] == ["Lower", "Upper"]
-        assert dialog.label_15.buddy() is dialog.low_txt_box
-        assert dialog.label_2.buddy() is dialog.high_txt_box
+        assert dialog.label_15.buddy() is dialog.lower_text_box
+        assert dialog.label_2.buddy() is dialog.upper_text_box
         assert available.contains(dialog.frameGeometry())
         for table in (
             dialog.simple_table,
@@ -455,15 +457,15 @@ def test_continuous_metric_transition_does_not_resize_visible_root(monkeypatch):
 
         smd_index = next(
             index
-            for index in range(dialog.effect_cbo_box.count())
-            if dialog.effect_cbo_box.itemData(index) == "SMD"
+            for index in range(dialog.effect_combo_box.count())
+            if dialog.effect_combo_box.itemData(index) == "SMD"
         )
-        dialog.effect_cbo_box.setCurrentIndex(smd_index)
+        dialog.effect_combo_box.setCurrentIndex(smd_index)
         app.processEvents()
 
         assert dialog.frameGeometry() == settled
-        assert dialog.effect_cbo_box.currentData() == "SMD"
-        assert dialog.grp_box_pre_post.isVisible()
+        assert dialog.effect_combo_box.currentData() == "SMD"
+        assert dialog.pre_post_group_box.isVisible()
         assert dialog.simple_table.item(0, 1).text() == preserved_value
         assert dialog.buttonBox.isVisible()
     finally:
@@ -486,10 +488,10 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
         if variant == "smd_pre_post":
             smd_index = next(
                 index
-                for index in range(dialog.effect_cbo_box.count())
-                if dialog.effect_cbo_box.itemData(index) == "SMD"
+                for index in range(dialog.effect_combo_box.count())
+                if dialog.effect_combo_box.itemData(index) == "SMD"
             )
-            dialog.effect_cbo_box.setCurrentIndex(smd_index)
+            dialog.effect_combo_box.setCurrentIndex(smd_index)
             dialog.correlation_pre_post.selectAll()
             key_clicks(dialog.correlation_pre_post, "0.5")
             dialog.g1_pre_post_table.setFocus()
@@ -497,7 +499,7 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
             dialog.g1_pre_post_table.setCurrentCell(0, 1)
             dialog.g1_pre_post_table.item(0, 1).setText("95")
             app.processEvents()
-            assert dialog.effect_cbo_box.currentData() == "SMD"
+            assert dialog.effect_combo_box.currentData() == "SMD"
             assert dialog.correlation_pre_post.text() == "0.5"
             assert any(
                 payload[0].get("mean.A") == 95 for payload in recorder["pre_post"]
@@ -508,9 +510,9 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
             app.processEvents()
             assert any(payload[0].get("mean") == 95 for payload in recorder["impute"])
 
-        assert dialog.effect_txt_box.text() == "2.5"
-        assert dialog.low_txt_box.text() == "1.5"
-        assert dialog.high_txt_box.text() == "3.5"
+        assert dialog.effect_text_box.text() == "2.5"
+        assert dialog.lower_text_box.text() == "1.5"
+        assert dialog.upper_text_box.text() == "3.5"
 
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
@@ -552,20 +554,22 @@ def test_continuous_long_values_and_large_font_overflow_inside_content(monkeypat
         assert available.contains(dialog.frameGeometry())
         assert dialog.simple_table.horizontalScrollBar().maximum() > 0
         assert dialog.simple_table.item(0, 1).text() == long_value
-        assert dialog.effect_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
-        assert dialog.effect_cbo_box.toolTip() == dialog.effect_cbo_box.currentText()
+        assert dialog.effect_combo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+        assert (
+            dialog.effect_combo_box.toolTip() == dialog.effect_combo_box.currentText()
+        )
         assert dialog.correlation_pre_post.minimumWidth() >= (
             dialog.correlation_pre_post.fontMetrics().horizontalAdvance("-1.0000")
         )
-        dialog.high_txt_box.setFocus()
+        dialog.upper_text_box.setFocus()
         app.processEvents()
-        mapped = dialog.high_txt_box.mapTo(
+        mapped = dialog.upper_text_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
         assert (
             dialog.content_scroll.viewport()
             .rect()
-            .intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
+            .intersects(QtCore.QRect(mapped, dialog.upper_text_box.size()))
         )
         assert dialog.buttonBox.isVisible()
     finally:
@@ -592,19 +596,19 @@ def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
         app.processEvents()
         smd_index = next(
             index
-            for index in range(dialog.effect_cbo_box.count())
-            if dialog.effect_cbo_box.itemData(index) == "SMD"
+            for index in range(dialog.effect_combo_box.count())
+            if dialog.effect_combo_box.itemData(index) == "SMD"
         )
-        dialog.effect_cbo_box.setCurrentIndex(smd_index)
+        dialog.effect_combo_box.setCurrentIndex(smd_index)
         app.processEvents()
 
-        full_value = dialog.effect_cbo_box.currentText()
+        full_value = dialog.effect_combo_box.currentText()
         assert long_label in full_value
-        assert dialog.effect_cbo_box.toolTip() == full_value
+        assert dialog.effect_combo_box.toolTip() == full_value
         assert available.contains(dialog.frameGeometry())
-        dialog.effect_cbo_box.showPopup()
+        dialog.effect_combo_box.showPopup()
         app.processEvents()
-        view = dialog.effect_cbo_box.view()
+        view = dialog.effect_combo_box.view()
         popup = view.window()
         assert view.isVisible()
         assert available.contains(popup.frameGeometry())
@@ -614,10 +618,10 @@ def test_continuous_long_metric_choice_is_fully_accessible(monkeypatch, size):
             == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
         assert view.horizontalScrollBar().maximum() > 0
-        assert dialog.effect_cbo_box.itemData(
+        assert dialog.effect_combo_box.itemData(
             smd_index, QtCore.Qt.ItemDataRole.ToolTipRole
         ) == (full_value)
-        dialog.effect_cbo_box.hidePopup()
+        dialog.effect_combo_box.hidePopup()
     finally:
         _close(app, dialog)
 
@@ -652,10 +656,10 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         dialog.show()
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
         recorder["back_calc"].clear()
-        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert dialog.metric_parameter is False
@@ -672,9 +676,9 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
         ] == ["120.0", "15.0", "11.0", "110.0", "10.0", "12.0"]
         assert unit.effects["MD"] == (5.0, 4.0, 6.0)
         assert [
-            dialog.effect_txt_box.text(),
-            dialog.low_txt_box.text(),
-            dialog.high_txt_box.text(),
+            dialog.effect_text_box.text(),
+            dialog.lower_text_box.text(),
+            dialog.upper_text_box.text(),
         ] == ["5.0", "4.0", "6.0"]
         assert dialog.frameGeometry() == settled
         assert available.contains(dialog.frameGeometry())
@@ -724,11 +728,11 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         correlation_before = dialog.correlation_pre_post.text()
         metric_parameter_before = dialog.metric_parameter
         button_before = (
-            dialog.back_calc_btn.isEnabled(),
-            dialog.back_calc_btn.text(),
-            dialog.back_calc_btn.isHidden(),
-            dialog.back_calc_btn.isChecked(),
-            dialog.back_calc_btn.isDown(),
+            dialog.back_calculate_button.isEnabled(),
+            dialog.back_calculate_button.text(),
+            dialog.back_calculate_button.isHidden(),
+            dialog.back_calculate_button.isChecked(),
+            dialog.back_calculate_button.isDown(),
         )
         undo_before = (
             dialog.undoStack.count(),
@@ -783,7 +787,7 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
             monkeypatch.setattr(QtGui.QUndoStack, "push", fail_before_push)
 
         with pytest.raises(RuntimeError, match="fault"):
-            dialog.enable_back_calculation_btn(engage=True)
+            dialog.update_back_calculation_button(engage=True)
 
         assert len(recorder["back_calc"]) == 1
         assert [
@@ -799,11 +803,11 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         assert dialog.correlation_pre_post.text() == correlation_before
         assert dialog.metric_parameter is metric_parameter_before
         assert (
-            dialog.back_calc_btn.isEnabled(),
-            dialog.back_calc_btn.text(),
-            dialog.back_calc_btn.isHidden(),
-            dialog.back_calc_btn.isChecked(),
-            dialog.back_calc_btn.isDown(),
+            dialog.back_calculate_button.isEnabled(),
+            dialog.back_calculate_button.text(),
+            dialog.back_calculate_button.isHidden(),
+            dialog.back_calculate_button.isChecked(),
+            dialog.back_calculate_button.isDown(),
         ) == button_before
         assert (
             dialog.undoStack.count(),
@@ -876,7 +880,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
             def injected_push(stack, command):
                 original_push(stack, command)
                 if failure_timing == "ambiguous_after_insert":
-                    dialog.back_calc_btn.setText("ambiguous state")
+                    dialog.back_calculate_button.setText("ambiguous state")
                 elif failure_timing == "clean_after_insert":
                     stack.setClean()
                 raise RuntimeError("post-insertion push anomaly")
@@ -885,7 +889,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
 
         if failure_timing == "before_insert":
             with pytest.raises(RuntimeError, match="pre-insertion"):
-                dialog.enable_back_calculation_btn(engage=True)
+                dialog.update_back_calculation_button(engage=True)
             assert (dialog.undoStack.count(), dialog.undoStack.index()) == (2, 1)
             assert dialog.undoStack.command(0) is first
             assert dialog.undoStack.command(1) is discarded_redo
@@ -903,7 +907,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
                 "Group 2": [None, None, None],
             }
         elif failure_timing == "after_insert":
-            dialog.enable_back_calculation_btn(engage=True)
+            dialog.update_back_calculation_button(engage=True)
             assert (dialog.undoStack.count(), dialog.undoStack.index()) == (2, 2)
             assert dialog.undoStack.command(0) is first
             committed = dialog.undoStack.command(1)
@@ -930,7 +934,7 @@ def test_continuous_back_calculation_undo_publication_has_one_commit_point(
             }
         else:
             with pytest.raises(RuntimeError, match="post-insertion") as caught:
-                dialog.enable_back_calculation_btn(engage=True)
+                dialog.update_back_calculation_button(engage=True)
             assert any(
                 "identity of prior undo commands" in note
                 for note in getattr(caught.value, "__notes__", [])

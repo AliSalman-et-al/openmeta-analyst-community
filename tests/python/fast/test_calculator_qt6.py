@@ -518,7 +518,7 @@ def test_field_edit_command_replays_captured_states_once(qapp):
     refreshes = []
 
     class Owner:
-        def enable_back_calculation_btn(self, engage=False):
+        def update_back_calculation_button(self, engage=False):
             refreshes.append(engage)
 
     def restore_state(*state):
@@ -546,12 +546,14 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
 
     captured = []
 
-    def fake_impute_cont_data(params, alpha):
+    def fake_impute_continuous_data(params, alpha):
         captured.append(params.copy())
         return {"succeeded": False}
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "impute_cont_data", fake_impute_cont_data
+        continuous_data_dialog.r_bridge,
+        "impute_continuous_data",
+        fake_impute_continuous_data,
     )
 
     form = continuous_data_dialog.ContinuousDataDialog.__new__(
@@ -561,8 +563,8 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
     form.simple_table.setHorizontalHeaderLabels(
         ["N", "Mean", "SD", "SE", "Variance", "Lower", "Upper", "P-Value"]
     )
-    form.cur_groups = ["Group 1", "Group 2"]
-    form.conf_level = 95.0
+    form.current_groups = ["Group 1", "Group 2"]
+    form.confidence_level = 95.0
     form.analysis_unit = object()
 
     form.simple_table.setItem(0, 0, QTableWidgetItem("10"))
@@ -596,7 +598,7 @@ def test_row_header_signals_are_restored_when_calculator_opening_raises(
 
     class FakeModel(QtCore.QAbstractTableModel):
         dataset = [object()]
-        current_txs = ["Group 1", "Group 2"]
+        current_groups = ["Group 1", "Group 2"]
         current_effect = "MD"
 
         def rowCount(self, parent=QtCore.QModelIndex()):
@@ -611,13 +613,13 @@ def test_row_header_signals_are_restored_when_calculator_opening_raises(
         def get_current_analysis_unit_for_study(self, study_index):
             return FakeAnalysisUnit()
 
-        def get_cur_group_str(self):
+        def get_current_group_comparison(self):
             return "Group 1-Group 2"
 
         def get_current_outcome_type(self):
             return "continuous"
 
-        def get_global_conf_level(self):
+        def get_confidence_level(self):
             return 95.0
 
     monkeypatch.setattr(
@@ -639,18 +641,21 @@ def test_row_header_signals_are_restored_when_calculator_opening_raises(
 
 class FakeAnalysisUnit:
     def __init__(self):
-        from rc_metastudio.meta_globals import BINARY_ONE_ARM_METRICS, BINARY_TWO_ARM_METRICS
+        from rc_metastudio.meta_globals import (
+            BINARY_ONE_ARM_METRICS,
+            BINARY_TWO_ARM_METRICS,
+        )
 
-        self.effects_dict = {
+        self.effects = {
             metric: {} for metric in BINARY_ONE_ARM_METRICS + BINARY_TWO_ARM_METRICS
         }
         self.raw_data = {"Group 1": [6, 20], "Group 2": [8, 22]}
 
     def get_effect_names(self):
-        return list(self.effects_dict.keys())
+        return list(self.effects.keys())
 
-    def get_effects_dict(self):
-        return self.effects_dict
+    def get_effects(self):
+        return self.effects
 
     def get_raw_data_for_group(self, group):
         return self.raw_data[group]
@@ -661,7 +666,7 @@ class FakeAnalysisUnit:
             values.extend(self.raw_data[group])
         return values
 
-    def get_effect_and_ci(self, metric, group_str, mult):
+    def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return 1.0, 0.5, 2.0
 
     def set_effect_and_ci(self, *args, **kwargs):
@@ -683,7 +688,9 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -691,7 +698,9 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
 
     form = binary_data_dialog.BinaryDataDialog(
@@ -699,7 +708,7 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "OR",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     table = _required(form.raw_data_table)
@@ -715,12 +724,12 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
     ] == ["Group 1", "Group 2", "Total"]
     assert form.raw_data_table.maximumHeight() >= form.raw_data_table.minimumHeight()
     assert [
-        form.effect_cbo_box.itemData(index)
-        for index in range(form.effect_cbo_box.count())
+        form.effect_combo_box.itemData(index)
+        for index in range(form.effect_combo_box.count())
     ] == ["OR", "RD", "RR", "AS", "YUQ", "YUY"]
     assert "Odds Ratio (OR)" in [
-        form.effect_cbo_box.itemText(index)
-        for index in range(form.effect_cbo_box.count())
+        form.effect_combo_box.itemText(index)
+        for index in range(form.effect_combo_box.count())
     ]
 
 
@@ -730,7 +739,9 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -738,7 +749,9 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
 
     form = binary_data_dialog.BinaryDataDialog(
@@ -746,7 +759,7 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "OR",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     table = _required(form.raw_data_table)
@@ -804,7 +817,7 @@ def _assert_effect_ci_fields_fit_signed_precision(qapp, form):
     from rc_metastudio import meta_globals
 
     signed_value = "-0." + ("8" * meta_globals.CALC_NUM_DIGITS)
-    fields = [form.effect_txt_box, form.low_txt_box, form.high_txt_box]
+    fields = [form.effect_text_box, form.lower_text_box, form.upper_text_box]
     for field in fields:
         field.setText(signed_value)
 
@@ -825,7 +838,9 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
     from rc_metastudio import diagnostic_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -833,10 +848,14 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        continuous_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
@@ -845,11 +864,13 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "impute_cont_data",
+        "impute_continuous_data",
         lambda data, alpha: {"succeeded": False, "comment": "stub"},
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
@@ -858,7 +879,7 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
 
@@ -869,7 +890,7 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
                 ["Group 1", "Group 2"],
                 "Group 1-Group 2",
                 "OR",
-                conf_level=95.0,
+                confidence_level=95.0,
             ),
             "-0.8888",
         ),
@@ -879,7 +900,7 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
                 ["Group 1", "Group 2"],
                 "Group 1-Group 2",
                 "ROM",
-                conf_level=95.0,
+                confidence_level=95.0,
             ),
             "-0.8888",
         ),
@@ -888,14 +909,14 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
                 FakeDiagnosticAnalysisUnit(),
                 ["Group 1", "Group 2"],
                 "Group 1-Group 2",
-                conf_level=95.0,
+                confidence_level=95.0,
             ),
             "1.0000",
         ),
     ]
 
     for form, representative in forms_and_representatives:
-        fields = [form.effect_txt_box, form.low_txt_box, form.high_txt_box]
+        fields = [form.effect_text_box, form.lower_text_box, form.upper_text_box]
         for field in fields:
             field.setText(representative)
         form.show()
@@ -923,13 +944,13 @@ def test_continuous_effect_fields_fit_metric_domain_samples(
     )
     unit = FakeContinuousAnalysisUnit()
     fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
-    calculator_routines.helper_set_current_effect(
+    calculator_routines.set_current_effect_from_value(
         unit,
         fields,
         metric,
         "Group 1" if metric == "TX Mean" else "Group 1-Group 2",
         "continuous",
-        mult=1.96,
+        confidence_multiplier=1.96,
     )
     for field in fields.values():
         margins = field.textMargins()
@@ -950,7 +971,9 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -958,7 +981,9 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
 
     form = binary_data_dialog.BinaryDataDialog(
@@ -966,7 +991,7 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "OR",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     form.show()
@@ -990,8 +1015,13 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
     widths = {}
     for metric in ("OR", "RD", "PR", "PLO", "AS"):
         fields = {name: QLineEdit() for name in ("effect", "lower", "upper")}
-        calculator_routines.helper_set_current_effect(
-            FakeAnalysisUnit(), fields, metric, "Group 1-Group 2", "binary", mult=1.96
+        calculator_routines.set_current_effect_from_value(
+            FakeAnalysisUnit(),
+            fields,
+            metric,
+            "Group 1-Group 2",
+            "binary",
+            confidence_multiplier=1.96,
         )
         field = fields["effect"]
         widths[metric] = field.minimumWidth()
@@ -1026,13 +1056,13 @@ def test_binary_effect_fields_follow_metric_display_domains(qapp, monkeypatch):
         name: ratio_field if name == "effect" else QLineEdit()
         for name in ("effect", "lower", "upper")
     }
-    calculator_routines.helper_set_current_effect(
+    calculator_routines.set_current_effect_from_value(
         FakeAnalysisUnit(),
         ratio_fields,
         "OR",
         "Group 1-Group 2",
         "binary",
-        mult=1.96,
+        confidence_multiplier=1.96,
     )
     text_margins = ratio_field.textMargins()
     frame_width = _required(ratio_field.style()).pixelMetric(
@@ -1056,7 +1086,9 @@ def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
         raise AssertionError("raw count edits must not use the consistency checker")
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -1064,7 +1096,9 @@ def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
     monkeypatch.setattr(
         binary_data_dialog.calc_fncs, "ConsistencyChecker", fail_if_constructed
@@ -1075,7 +1109,7 @@ def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "OR",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     assert not hasattr(form, "check_table_consistency")
@@ -1089,7 +1123,9 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
     warnings = []
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -1097,7 +1133,9 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -1120,7 +1158,7 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "OR",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     table = form.raw_data_table
@@ -1145,12 +1183,12 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
 class FakeDiagnosticAnalysisUnit:
     def __init__(self):
         self.raw_data = [1, 2, 3, 4]
-        self.tx_groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
+        self.groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
 
     def get_raw_data_for_group(self, group):
         return self.raw_data
 
-    def get_effect_and_ci(self, metric, group_str, mult):
+    def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return None, None, None
 
     def set_effect_and_ci(self, *args, **kwargs):
@@ -1177,7 +1215,9 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     from rc_metastudio import diagnostic_data_dialog
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
@@ -1186,7 +1226,7 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
 
@@ -1194,7 +1234,7 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
         FakeDiagnosticAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     form.show()
@@ -1216,7 +1256,9 @@ def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
         raise AssertionError("raw count edits must not use the consistency checker")
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
@@ -1225,7 +1267,7 @@ def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
@@ -1236,7 +1278,7 @@ def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
         FakeDiagnosticAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     assert not hasattr(form, "check_table_consistency")
@@ -1250,7 +1292,9 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
     warnings = []
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
@@ -1259,7 +1303,7 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
@@ -1284,7 +1328,7 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
         FakeDiagnosticAnalysisUnit(),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     table = _required(form.two_by_two_table)
@@ -1348,7 +1392,9 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     from rc_metastudio import continuous_data_dialog
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        continuous_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
@@ -1357,7 +1403,7 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "impute_cont_data",
+        "impute_continuous_data",
         lambda data, alpha: {"succeeded": False, "comment": "stub"},
     )
 
@@ -1366,7 +1412,7 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "ROM",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     form.resize(360, form.height())
@@ -1400,7 +1446,9 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
     }
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "get_mult_from_r", lambda conf: 1.96
+        continuous_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
@@ -1409,7 +1457,7 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
     )
     monkeypatch.setattr(
         continuous_data_dialog.r_bridge,
-        "impute_cont_data",
+        "impute_continuous_data",
         lambda data, alpha: {"succeeded": True, "output": long_imputed},
     )
 
@@ -1418,7 +1466,7 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
         "ROM",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
 
     form.show()

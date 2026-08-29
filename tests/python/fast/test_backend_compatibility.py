@@ -56,5 +56,5 @@ def test_r_backend_installs_stub_backend(monkeypatch):
 
     with pytest.raises(r_bridge.AnalysisBackendUnavailableError):
         r_bridge.dataset_to_simple_network(object())
-    assert r_bridge.set_global_conf_level(95) == 95.0
+    assert r_bridge.set_confidence_level(95) == 95.0
     assert legacy_qt4_name not in sys.modules

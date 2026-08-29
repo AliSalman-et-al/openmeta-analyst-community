@@ -72,12 +72,12 @@ def test_result_owner_exception_still_deletes_real_specs_and_progress(
     )
     monkeypatch.setattr(
         backend,
-        "run_binary_ma",
+        "run_binary_analysis",
         lambda *_args, **_kwargs: {"texts": {"Summary": "ok"}, "images": {}},
     )
     owner = Owner()
     form = analysis_setup_dialog.AnalysisSetupDialog(
-        Model(), parent=owner, conf_level=95.0
+        Model(), parent=owner, confidence_level=95.0
     )
 
     with pytest.raises(RuntimeError, match="owner callback failed"):
@@ -121,7 +121,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
             "get_params",
             "get_method_description",
             "dataset_to_simple_binary_r_object",
-            "run_binary_ma",
+            "run_binary_analysis",
             "reset_r_working_directory",
         )
     }
@@ -157,7 +157,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         _set_backend(
             monkeypatch,
             backend,
-            "run_binary_ma",
+            "run_binary_analysis",
             lambda *args, **kwargs: (_ for _ in ()).throw(
                 RuntimeError("simulated R failure")
             ),
@@ -172,7 +172,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
         form.run_ma()
 
@@ -265,8 +265,8 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
-            meta_f_str="leave-one-out",
-            conf_level=window.model.get_global_conf_level(),
+            analysis_type="leave-one-out",
+            confidence_level=window.model.get_confidence_level(),
         )
         form.run_ma()
 
@@ -347,7 +347,7 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
 
         monkeypatch.setattr(
@@ -388,7 +388,7 @@ def test_method_parameters_build_failure_reports_preparation_error(monkeypatch):
         )
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
 
         assert form is None
@@ -414,7 +414,7 @@ def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
         )
 
         form = window._build_analysis_specs_dialog(
-            conf_level=window.model.get_global_conf_level()
+            confidence_level=window.model.get_confidence_level()
         )
 
         assert form is None
@@ -635,7 +635,7 @@ def test_meta_reg_covariate_toggles_refresh_ok_button_without_unexpected_error(
 
     class Study(object):
         def __init__(self):
-            self.covariate_dict = {"Dose": 1.0, "Age": 2.0}
+            self.covariate_values = {"Dose": 1.0, "Age": 2.0}
 
     class Dataset(object):
         covariates = [Covariate("Dose"), Covariate("Age")]

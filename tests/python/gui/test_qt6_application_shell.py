@@ -178,7 +178,7 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
             window.action_meta_regression,
             window.action_subgroup_ma,
             window.action_about_legal,
-            window.action_change_conf_level,
+            window.action_change_confidence_level,
             window.action_import_csv,
         )
         for action in connected_actions:
@@ -490,9 +490,9 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         window.model.dataset.notes = "durable project note"
         window.model.set_current_outcome("LAG positive")
         window.model.set_current_follow_up("first")
-        window.model.current_txs = ["test 1"]
+        window.model.current_groups = ["test 1"]
         window.model.current_effect = "Sens"
-        window.model.set_conf_level(90.0)
+        window.model.set_confidence_level(90.0)
         window.data_dirtied()
         destination = tmp_path / "round-trip.rcms"
         monkeypatch.setattr(
@@ -507,11 +507,11 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         assert window.current_data_unsaved is False
         assert window.open(str(destination)) is True
         assert window.model.dataset.notes == "durable project note"
-        assert window.model.current_outcome == "LAG positive"
+        assert window.model.current_outcome_name == "LAG positive"
         assert window.model.get_current_follow_up_name() == "first"
-        assert window.model.current_txs == ["test 1"]
+        assert window.model.current_groups == ["test 1"]
         assert window.model.current_effect == "Sens"
-        assert window.model.get_global_conf_level() == 90.0
+        assert window.model.get_confidence_level() == 90.0
 
         window.model.dataset.notes = "saved through Save"
         window.data_dirtied()
@@ -580,16 +580,16 @@ def test_structured_project_restores_nondefault_active_selection_without_normali
     monkeypatch.setattr(QtWidgets.QMessageBox, "critical", lambda *_args: None)
     try:
         assert window.open(str(selected)) is True
-        assert window.model.current_outcome == "nephrotoxic"
+        assert window.model.current_outcome_name == "nephrotoxic"
         assert window.model.get_current_follow_up_name() == "second"
-        assert window.model.current_txs == ["tx B", "tx A"]
+        assert window.model.current_groups == ["tx B", "tx A"]
         assert window.model.current_effect == "RR"
-        assert window.model.get_global_conf_level() == 90.0
+        assert window.model.get_confidence_level() == 90.0
         assert window.save() is True
         assert window.open(str(selected)) is True
-        assert window.model.current_outcome == "nephrotoxic"
+        assert window.model.current_outcome_name == "nephrotoxic"
         assert window.model.get_current_follow_up_name() == "second"
-        assert window.model.current_txs == ["tx B", "tx A"]
+        assert window.model.current_groups == ["tx B", "tx A"]
         assert window.model.current_effect == "RR"
     finally:
         _close_shell(app, window)

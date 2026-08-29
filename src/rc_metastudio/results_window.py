@@ -470,7 +470,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self.scene.width(),
             self.y_coord + text.boundingRect().height() + padding,
         )
-        text.setPos(self.position())  #####
+        text.setPos(self.position())
         self.y_coord += text.boundingRect().height()
         return qt_item
 

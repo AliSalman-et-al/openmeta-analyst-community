@@ -1,6 +1,6 @@
 # Maintaining RC MetaStudio
 
-This guide covers the routine work needed to change and verify the application. Keep temporary plans, investigation notes, and issue status in GitHub Issues rather than adding repository documents.
+Use this guide to set up, change, and verify the application. Keep temporary plans, investigation notes, and work status in GitHub Issues.
 
 ## Set up the repository
 
@@ -49,20 +49,14 @@ For Qt source or GUI changes, generate the forms and run the relevant native lan
 .\scripts\verify-qt6.ps1
 ```
 
-This is the canonical Qt verification command. It generates Qt6 modules first,
-then runs Ty across the whole `src/rc_metastudio` application with generated
-modules ahead of source forms on the search path, followed by the GUI and native
-smoke stages. CI can select an individual lane when needed:
+This command generates Qt6 modules, runs Ty, and then runs the GUI and native smoke stages. CI can select one lane:
 
 ```powershell
 .\scripts\verify-qt6.ps1 -Section Core
 .\scripts\verify-qt6.ps1 -Section RemainingSurfaces
 ```
 
-The verifier runs Ty in strict mode over every maintained Python root:
-`src/rc_metastudio`, `scripts`, `tests`, and the bundled RCMetaR QA tools under
-`r/RCMetaR/inst/qa`. Generated Qt modules are created before the check so GUI
-imports are verified rather than excluded.
+Ty checks `src/rc_metastudio`, `scripts`, `tests`, and `r/RCMetaR/inst/qa`. Generated Qt modules take precedence over the editable `.ui` sources during the check.
 
 ## Work with generated Qt code
 

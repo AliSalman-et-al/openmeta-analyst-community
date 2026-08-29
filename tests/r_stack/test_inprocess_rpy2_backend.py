@@ -1,30 +1,7 @@
-"""Regression tests for the in-process rpy2 backend porting layer.
+"""Exercise Unicode, R NULL, vector parameters, and text decoding through rpy2.
 
-When the maintained build runs the real (in-process) rpy2 backend, five
-Python-3 / rpy2-3.x incompatibilities each broke the Python<->R boundary and
-made analyses dead-end:
-
-1. Dead latin-1 sanitizers and R-source construction paths stripped or rejected
-   non-Latin-1 user text before it reached R.
-
-2. rpy2 >= 3.x represents R's NULL as a ``NULLType`` whose ``str()`` is an
-   object repr, not the literal ``"NULL"``. NULL detection done via
-   ``str(x) == "NULL"`` silently misfired (e.g. treating a list with NULL
-   names as a named list), raising ``'NULLType' object is not iterable``.
-
-3. Subgroup forest plots can compute vector-valued plot parameters such as
-   ``fp_xticks``. Assigning those vectors directly into the one-row R params
-   data frame emitted the "replacement element ... rows to replace 1 rows"
-   warning and left saved plot params in an inconsistent shape.
-
-4. rpy2 asks R to translate CHARSXP values through the native Windows codepage
-   when the Python encoding is cp1252. R's native translation maps ``τ`` to
-   ASCII ``t`` while preserving ``²``, so the heterogeneity label ``τ²``
-   reached Python and the results window as ``t²``.
-
-Because importing the real ``r_bridge`` initialises embedded R, this runs in a
-subprocess and skips when the in-process backend (R/rpy2) is unavailable, so it
-exercises the fixes locally without disturbing the stub-backed tests.
+The real bridge initializes embedded R, so this test runs in a subprocess and
+skips when the in-process R stack is unavailable.
 """
 
 import os
@@ -85,7 +62,7 @@ _DRIVER = textwrap.dedent(
             "subgroup",
             ["diagnostic.random"],
             [{"measure": "Sens"}],
-            diag_data_name="workflow_data",
+            diagnostic_data_name="workflow_data",
         )
     except r_bridge.DiagnosticExecutionError as exc:
         assert "workflow execution failed" in str(exc)
@@ -112,15 +89,12 @@ _DRIVER = textwrap.dedent(
         raise AssertionError("invalid network data type was accepted")
     assert bool(ro.r("identical")(ro.globalenv["treatments"], sentinel)[0])
 
-    # Fix 1: non-Latin-1 user text must remain valid text at the R boundary.
     assert not hasattr(r_bridge, "_sanitize_for_R")
 
-    # Fix 2: NULL detection works against rpy2's NULLType.
     assert r_bridge._r_is_null(ro.r("list()").names) is True
     assert r_bridge._r_is_null(ro.r("c(a=1)").names) is False
 
-    # Fix 4: R character scalars must reach Python as UTF-8 instead of first
-    # passing through cp1252/native translation, which maps τ² to t².
+    # Native translation maps τ² to t² on Windows, so decode R text as UTF-8.
     from rpy2.rinterface_lib import conversion, openrlib
 
     tau_squared = chr(0x03C4) + chr(0x00B2)
@@ -130,8 +104,6 @@ _DRIVER = textwrap.dedent(
     )
     assert conversion._rchar_to_str(rchar, "cp1252") == tau_squared
 
-    # End-to-end through the core porting fixes: get_params parses a real method's
-    # partly NULL-named parameter structure.
     params, defaults, var_order, pretty = r_bridge.get_params("binary.random")
     assert isinstance(defaults, dict)
     assert "conf.level" in defaults or "rm.method" in defaults
@@ -153,7 +125,7 @@ _DRIVER = textwrap.dedent(
             self.covariates = covariates
             self._values = values
 
-        def get_values_for_cov(self, covariate, ids_for_keys=False):
+        def get_covariate_values(self, covariate, ids_for_keys=False):
             assert ids_for_keys is True
             return self._values[covariate]
 
@@ -193,7 +165,7 @@ _DRIVER = textwrap.dedent(
         def included_studies_have_raw_data(self):
             return True
 
-        def get_cur_raw_data(self, **kwargs):
+        def get_current_raw_data(self, **kwargs):
             return self._raw_data
 
         def included_studies_have_point_estimates(self, effect=None):
@@ -217,7 +189,7 @@ _DRIVER = textwrap.dedent(
             'alpha "quoted" \\\\ café τ'
         ]
 
-    quoted_values_str, quoted_values = r_bridge.cov_to_str(
+    quoted_values_str, quoted_values = r_bridge.covariate_to_r_expression(
         FakeCovariate("region", FACTOR),
         [1, 2],
         FakeDataset(
@@ -230,7 +202,7 @@ _DRIVER = textwrap.dedent(
             },
         ),
         named_list=False,
-        return_cov_vals=True,
+        return_covariate_values=True,
     )
     assert quoted_values == ["'control \\\\u03c4'", "'O\\\\'Brien \\\\\\\\ north'"]
     assert list(ro.r(quoted_values_str)) == ["control τ", "O'Brien \\\\ north"]
@@ -257,7 +229,7 @@ _DRIVER = textwrap.dedent(
     analysis_dir = tempfile.mkdtemp(prefix="rcmetastudio-display-contract-")
     forest_path = os.path.join(analysis_dir, "forest.png")
     forest_display_path = os.path.join(analysis_dir, "forest.display.svg")
-    continuous_result = r_bridge.run_continuous_ma(
+    continuous_result = r_bridge.run_continuous_analysis(
         "continuous.random",
         {
             "conf.level": 95.0,
@@ -283,7 +255,7 @@ _DRIVER = textwrap.dedent(
             "create.plot": True,
             "write.to.file": False,
         },
-        cont_data_name="issue146_continuous",
+        continuous_data_name="issue146_continuous",
     )
     assert continuous_result["images"]["Forest Plot"] == forest_path
     assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
@@ -368,7 +340,7 @@ _DRIVER = textwrap.dedent(
         def __init__(self, covariate):
             self.covariate = covariate
 
-        def get_values_for_cov(self, covariate, ids_for_keys=False):
+        def get_covariate_values(self, covariate, ids_for_keys=False):
             assert ids_for_keys is True
             assert covariate == self.covariate.name
             return {1: 1.0, 2: 2.0, 3: 3.0}
@@ -409,7 +381,9 @@ _DRIVER = textwrap.dedent(
         def included_studies_have_raw_data(self):
             return False
 
-        def get_cur_raw_data(self, only_if_included=True, only_these_studies=None):
+        def get_current_raw_data(
+            self, only_if_included=True, only_these_studies=None
+        ):
             assert only_if_included is True
             values = {
                 1: [10, 5, 4, 10],
@@ -463,7 +437,7 @@ _DRIVER = textwrap.dedent(
     ):
         assert len(ro.r(expression)) == 3
 
-    invalid_conf_level_checks = ro.r('''
+    invalid_confidence_level_checks = ro.r('''
       c(
         inherits(try(rcmetar.set.global.conf.level(100), silent=TRUE), "try-error"),
         inherits(try(rcmetar.get.mult.from.conf.level(100), silent=TRUE), "try-error"),
@@ -471,7 +445,7 @@ _DRIVER = textwrap.dedent(
         inherits(try(rcmetar.get.mult.from.conf.level(Inf), silent=TRUE), "try-error")
       )
     ''')
-    assert all(bool(value) for value in invalid_conf_level_checks)
+    assert all(bool(value) for value in invalid_confidence_level_checks)
 
     from rc_metastudio import golden_analysis
 
@@ -1038,7 +1012,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT))
 
 
-def test_inprocess_rpy2_backend_python3_porting_fixes():
+def test_inprocess_rpy2_backend_contract():
     # Force the real in-process backend: the surrounding test suite sets
     # RCMS_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
     # env and require the real rpy2 path instead.

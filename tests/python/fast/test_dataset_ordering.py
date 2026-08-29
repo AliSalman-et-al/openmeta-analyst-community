@@ -39,7 +39,7 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
             group_names=["tx A", "tx B", "tx C", "tx D"],
         )
         dataset.add_study(study)
-        dataset.outcome_names_to_follow_ups["Mortality"] = {
+        dataset.follow_ups_by_outcome["Mortality"] = {
             0: "baseline",
             1: "week 4",
             2: "week 8",
@@ -47,7 +47,9 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
 
         print(json.dumps({
             "all_groups": dataset.get_group_names(),
-            "fu_groups": dataset.get_group_names_for_outcome_fu("Mortality", "week 4"),
+            "fu_groups": dataset.get_group_names_for_outcome_follow_up(
+                "Mortality", "week 4"
+            ),
             "follow_ups": dataset.get_follow_up_names(),
             "network_nodes": dataset.get_network("Mortality", "week 4")[0],
         }))
@@ -89,12 +91,12 @@ def _sortable_dataset_model():
     dataset.add_outcome(analysis_dataset.Outcome("Mortality", meta_globals.BINARY))
     dataset.add_covariate(
         analysis_dataset.Covariate("Dose", "continuous"),
-        cov_values={"Gamma": 30, "Alpha": 10, "Beta": 20},
+        covariate_values={"Gamma": 30, "Alpha": 10, "Beta": 20},
     )
 
     raw_events_by_name = {"Gamma": 3, "Alpha": 1, "Beta": 2}
     effects_by_name = {"Gamma": 0.3, "Alpha": 0.1, "Beta": 0.2}
-    group_str = "-".join(meta_globals.DEFAULT_GROUP_NAMES)
+    group_comparison = "-".join(meta_globals.DEFAULT_GROUP_NAMES)
     for study in dataset.studies:
         analysis_unit = study.get_analysis_unit("Mortality", "first")
         analysis_unit.set_raw_data_for_groups(
@@ -103,19 +105,19 @@ def _sortable_dataset_model():
         )
         analysis_unit.set_effect_and_ci(
             "OR",
-            group_str,
+            group_comparison,
             effects_by_name[study.name],
             effects_by_name[study.name] - 0.01,
             effects_by_name[study.name] + 0.01,
-            mult=1.96,
+            confidence_multiplier=1.96,
         )
 
     model = dataset_table_model.DatasetTableModel(
         dataset=dataset, add_blank_study=False
     )
-    model.current_outcome = "Mortality"
+    model.current_outcome_name = "Mortality"
     model.current_effect = "OR"
-    model.current_txs = meta_globals.DEFAULT_GROUP_NAMES
+    model.current_groups = meta_globals.DEFAULT_GROUP_NAMES
     model.update_column_indices()
     return model
 
@@ -124,7 +126,18 @@ def _study_names(model):
     return [study.name for study in model.dataset.studies]
 
 
-def test_dataset_model_sort_studies_uses_python3_key_sort(monkeypatch):
+def test_follow_up_navigation_handles_removed_middle_index():
+    model = _sortable_dataset_model()
+    model.dataset.add_follow_up_to_outcome("Mortality", "week 4")
+    model.dataset.add_follow_up_to_outcome("Mortality", "week 8")
+    model.dataset.remove_follow_up_from_outcome("week 4", "Mortality")
+    model.set_current_follow_up_index(0)
+
+    assert model.get_next_follow_up() == (2, "week 8")
+    assert model.get_previous_follow_up() == (2, "week 8")
+
+
+def test_dataset_model_sort_studies_uses_key_function(monkeypatch):
     model = _sortable_dataset_model()
     monkeypatch.setattr(
         r_bridge, "binary_convert_scale", lambda value, *args, **kwargs: value

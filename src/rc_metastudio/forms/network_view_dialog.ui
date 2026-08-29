@@ -20,16 +20,16 @@
      <property name="frameShadow"><enum>QFrame::Raised</enum></property>
      <layout class="QFormLayout" name="formLayout">
       <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
-      <item row="0" column="0"><widget class="QLabel" name="label_3"><property name="text"><string>Outcome:</string></property><property name="buddy"><cstring>outcome_cbo_box</cstring></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel" name="label_3"><property name="text"><string>Outcome:</string></property><property name="buddy"><cstring>outcome_combo_box</cstring></property></widget></item>
       <item row="0" column="1">
-       <widget class="QComboBox" name="outcome_cbo_box">
+       <widget class="QComboBox" name="outcome_combo_box">
         <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
         <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToContents</enum></property>
        </widget>
       </item>
-      <item row="1" column="0"><widget class="QLabel" name="label_4"><property name="text"><string>Follow-up:</string></property><property name="buddy"><cstring>follow_up_cbo_box</cstring></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel" name="label_4"><property name="text"><string>Follow-up:</string></property><property name="buddy"><cstring>follow_up_combo_box</cstring></property></widget></item>
       <item row="1" column="1">
-       <widget class="QComboBox" name="follow_up_cbo_box">
+       <widget class="QComboBox" name="follow_up_combo_box">
         <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
         <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToContents</enum></property>
        </widget>
@@ -39,7 +39,7 @@
    </item>
   </layout>
  </widget>
- <tabstops><tabstop>network_view_dialoger</tabstop><tabstop>outcome_cbo_box</tabstop><tabstop>follow_up_cbo_box</tabstop></tabstops>
+ <tabstops><tabstop>network_view_dialoger</tabstop><tabstop>outcome_combo_box</tabstop><tabstop>follow_up_combo_box</tabstop></tabstops>
  <resources/>
  <connections/>
 </ui>

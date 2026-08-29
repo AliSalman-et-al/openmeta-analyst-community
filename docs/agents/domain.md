@@ -1,13 +1,16 @@
-# Domain documentation
+# Domain vocabulary
 
-Read domain documentation before changing a modeled concept or proposing a new term.
+Use these terms in code, tests, documentation, and issues. Keep external field names unchanged when an R function or the versioned project schema owns them.
 
-1. Read `CONTEXT-MAP.md` when it exists.
-2. Follow its links to the relevant `CONTEXT.md` files.
-3. Read system decisions in `docs/adr/` and context decisions in nearby `docs/adr/` directories.
+- **Project**: the portable document saved as an `.rcms` archive. A project contains an analysis dataset and the application state needed to reopen it.
+- **Analysis dataset**: the in-memory collection of studies, outcomes, follow-ups, groups, and covariates.
+- **Study**: one included or excluded research record. A study stores metadata, covariate values, and analysis units.
+- **Outcome**: a measured result with a binary, continuous, diagnostic, or other data type.
+- **Follow-up**: the time point for an outcome. Do not use `time point` as a second name in new APIs.
+- **Group**: one arm within an analysis unit, including control or diagnostic groups.
+- **Analysis unit**: one study outcome at one follow-up. It owns the raw group data and calculated effects for that combination.
+- **Covariate**: a study-level continuous or categorical value used by subgroup analysis or meta-regression.
+- **Metric**: the statistical measure selected for an analysis, such as odds ratio or standardized mean difference.
+- **Effect**: an estimate and its uncertainty for one metric and group comparison.
 
-Missing files do not block work. Continue with the vocabulary established in the code, user interface, schemas, and tests.
-
-Use glossary terms exactly in code, tests, issues, and design notes. If a needed concept has no established name, resolve the terminology before spreading a new synonym.
-
-Call out any proposed change that conflicts with an accepted architecture decision record.
+Use full domain words in Python names. For example, use `confidence_level`, `covariate`, and `diagnostic_data`. Preserve schema keys such as `conf.level` only at the R boundary.

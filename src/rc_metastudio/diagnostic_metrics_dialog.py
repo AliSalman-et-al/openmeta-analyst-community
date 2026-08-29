@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QWidget
 from rc_metastudio import app_error_handler
 from rc_metastudio import analysis_setup_dialog
 from rc_metastudio import adaptive_window
-from rc_metastudio.meta_globals import DIAGNOSTIC_METRIC_NAMES
+from rc_metastudio.meta_globals import DIAGNOSTIC_METRIC_GROUPS
 
 if TYPE_CHECKING:
     import ui_diagnostic_metrics_dialog as _ui_diagnostic_metrics_dialog
@@ -21,7 +21,7 @@ class DiagnosticMetricsDialog(
 ):
     SELECTABLE_METRICS = ["sens", "spec", "dor", "lr"]
 
-    def __init__(self, model, parent=None, meta_f_str=None, external_params=None):
+    def __init__(self, model, parent=None, analysis_type=None, external_params=None):
         super(DiagnosticMetricsDialog, self).__init__(parent)
         self.setupUi(self)
         self._configure_focus_revelation()
@@ -31,7 +31,7 @@ class DiagnosticMetricsDialog(
         self.model = model
         self.owner = parent
         self.external_params = external_params
-        self.meta_f_str = meta_f_str
+        self.analysis_type = analysis_type
         self.btn_ok.pressed.connect(app_error_handler.safe_slot(self.ok, parent=self))
         self._configure_metric_checkboxes()
         for metric in self.SELECTABLE_METRICS:
@@ -77,19 +77,19 @@ class DiagnosticMetricsDialog(
         builder = getattr(parent, "_build_analysis_specs_dialog", None)
         if builder is not None:
             form = builder(
-                meta_f_str=self.meta_f_str,
+                analysis_type=self.analysis_type,
                 external_params=self.external_params,
                 diagnostic_metrics=selected_metrics,
-                conf_level=self.model.get_global_conf_level(),
+                confidence_level=self.model.get_confidence_level(),
             )
         else:
             form = analysis_setup_dialog.AnalysisSetupDialog(
                 self.model,
                 parent=parent,
-                meta_f_str=self.meta_f_str,
+                analysis_type=self.analysis_type,
                 external_params=self.external_params,
                 diagnostic_metrics=selected_metrics,
-                conf_level=self.model.get_global_conf_level(),
+                confidence_level=self.model.get_confidence_level(),
             )
         if form is None:
             return
@@ -138,7 +138,7 @@ class DiagnosticMetricsDialog(
     def _entered_estimates_available_for_metric(self, metric):
         return all(
             self.model.included_studies_have_point_estimates(effect=effect)
-            for effect in DIAGNOSTIC_METRIC_NAMES[metric]
+            for effect in DIAGNOSTIC_METRIC_GROUPS[metric]
         )
 
     def _refresh_ok_enabled(self):

@@ -10,7 +10,7 @@ if str(SRC) not in sys.path:
 from rc_metastudio.two_way_dict import TwoWayDict
 
 
-def test_two_way_dict_uses_python3_dict_views_and_reverse_lookup():
+def test_two_way_dict_supports_dict_views_and_reverse_lookup():
     mapping = TwoWayDict({"a": 1, "b": 2})
 
     assert "a" in mapping
@@ -20,7 +20,7 @@ def test_two_way_dict_uses_python3_dict_views_and_reverse_lookup():
     assert mapping.reversed_items() == [(1, "a"), (2, "b")]
 
 
-def test_two_way_dict_replaces_existing_reverse_mapping_under_python3():
+def test_two_way_dict_replaces_existing_reverse_mapping():
     mapping = TwoWayDict({"a": 1, "b": 2})
 
     mapping["c"] = 2

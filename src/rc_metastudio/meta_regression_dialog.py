@@ -18,12 +18,12 @@ from rc_metastudio import analysis_adapter
 if TYPE_CHECKING:
     import ui_meta_regression_dialog as _ui_meta_regression_dialog
 else:
-    from rc_metastudio.forms import ui_meta_regression_dialog as _ui_meta_regression_dialog
+    from rc_metastudio.forms import (
+        ui_meta_regression_dialog as _ui_meta_regression_dialog,
+    )
 
 
-class MetaRegressionDialog(
-    QDialog, _ui_meta_regression_dialog.Ui_MetaRegressionDialog
-):
+class MetaRegressionDialog(QDialog, _ui_meta_regression_dialog.Ui_MetaRegressionDialog):
     def __init__(self, model, parent=None):
         super(MetaRegressionDialog, self).__init__(parent)
         self.model = model
@@ -109,7 +109,7 @@ class MetaRegressionDialog(
                 tuple(selected_covariates),
                 request,
                 fixed_effects,
-                self.model.get_global_conf_level(),
+                self.model.get_confidence_level(),
             )
         except Exception as error:
             QMessageBox.critical(
@@ -150,4 +150,4 @@ class MetaRegressionDialog(
             chk_box_layout.addWidget(chk_box)
             self.covs_and_check_boxes.append((cov, chk_box))
 
-            self.cov_grp_box.setLayout(chk_box_layout)
+            self.covariate_group_box.setLayout(chk_box_layout)

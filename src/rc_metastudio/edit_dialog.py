@@ -56,13 +56,13 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
         self.outcome_list.setModel(self.outcomes_model)
         try:
             index_of_outcome_to_select = self.outcomes_model.outcome_list.index(
-                owner.model.current_outcome
+                owner.model.current_outcome_name
             )
             outcome_index = self.outcomes_model.createIndex(
                 index_of_outcome_to_select, 0
             )
             self.outcome_list.setCurrentIndex(outcome_index)
-            self.selected_outcome = owner.model.current_outcome
+            self.selected_outcome = owner.model.current_outcome_name
             self.remove_outcome_btn.setEnabled(True)
         except (IndexError, KeyError, ValueError):
             # no outcomes.
@@ -244,7 +244,7 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
     def remove_group(self):
         index = self.group_list.currentIndex()
         selected_group = self.groups_model.group_list[index.row()]
-        self.groups_model.dataset.delete_group(selected_group)
+        self.groups_model.dataset.remove_group(selected_group)
         self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
         )
@@ -255,7 +255,9 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
         self.remove_group_btn.setEnabled(True)
 
     def add_outcome(self):
-        form = add_new_dialogs.AddOutcomeDialog(self, is_diag=self.dataset.is_diag)
+        form = add_new_dialogs.AddOutcomeDialog(
+            self, is_diagnostic=self.dataset.is_diagnostic
+        )
         form.outcome_name_le.setFocus()
         if form.exec():
             # then the user clicked ok and has added a new outcome.
@@ -277,7 +279,7 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
             )
 
             self.outcomes_model.refresh_outcome_list()
-            self.outcomes_model.current_outcome = new_outcome_name
+            self.outcomes_model.current_outcome_name = new_outcome_name
 
     def get_selected_outcome(self):
         index = self.outcome_list.currentIndex()
@@ -300,7 +302,7 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
         self.selected_outcome = self.get_selected_outcome()
         # update the follow-ups list as appropriate
         if self.selected_outcome is not None:
-            self.follow_ups_model.current_outcome = self.selected_outcome
+            self.follow_ups_model.current_outcome_name = self.selected_outcome
             self.follow_ups_model.refresh_follow_up_list()
             self.selected_follow_up = self.get_selected_follow_up()
             self.groups_model.refresh_group_list(
@@ -315,7 +317,7 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
 
     def outcome_selected(self, index):
         self.selected_outcome = self.get_selected_outcome()
-        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.current_outcome_name = self.selected_outcome
         self.follow_ups_model.refresh_follow_up_list()
         self.groups_model.refresh_group_list(
             self.selected_outcome, self.selected_follow_up
@@ -336,7 +338,7 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             self.follow_ups_model.dataset.add_follow_up(follow_up_lbl)
-            self.follow_ups_model.current_outcome = self.selected_outcome
+            self.follow_ups_model.current_outcome_name = self.selected_outcome
             self.follow_ups_model.refresh_follow_up_list()
 
     def get_selected_follow_up(self):
@@ -365,19 +367,21 @@ class EditDialog(QDialog, _ui_edit_dialog.Ui_edit_dialog):
                 QMessageBox.warning(self, "Warning", str(exc))
                 return
             new_covariate_type = str(form.datatype_cbo_box.currentText())
-            cov_obj = analysis_dataset.Covariate(new_covariate_name, new_covariate_type)
-            self.covariates_model.dataset.add_covariate(cov_obj)
+            covariate = analysis_dataset.Covariate(
+                new_covariate_name, new_covariate_type
+            )
+            self.covariates_model.dataset.add_covariate(covariate)
             self.covariates_model.update_covariates_list()
 
     def remove_covariate(self):
-        cov_obj = self.get_selected_covariate()
-        self.covariates_model.dataset.remove_covariate(cov_obj)
+        covariate = self.get_selected_covariate()
+        self.covariates_model.dataset.remove_covariate(covariate)
         self.covariates_model.update_covariates_list()
 
     def remove_follow_up(self):
         self.selected_follow_up = self.get_selected_follow_up()
         self.follow_ups_model.dataset.remove_follow_up(self.selected_follow_up)
-        self.follow_ups_model.current_outcome = self.selected_outcome
+        self.follow_ups_model.current_outcome_name = self.selected_outcome
         self.follow_ups_model.refresh_follow_up_list()
 
     def follow_up_selected(self, index):

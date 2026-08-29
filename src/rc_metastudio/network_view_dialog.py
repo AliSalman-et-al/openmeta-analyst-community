@@ -29,8 +29,8 @@ class NetworkViewDialog(QDialog, _ui_network_view_dialog.Ui_NetworkViewDialog):
 
         self.model = model
         self.dataset = model.dataset
-        self.cur_outcome = model.current_outcome
-        self.cur_follow_up = model.get_current_follow_up_name()
+        self.current_outcome_name = model.current_outcome_name
+        self.current_follow_up = model.get_current_follow_up_name()
         self._viewport_fit_pending = False
         self._network_source_pixmap = QPixmap()
         self._network_pixmap_item = None
@@ -38,40 +38,40 @@ class NetworkViewDialog(QDialog, _ui_network_view_dialog.Ui_NetworkViewDialog):
         self.scene = QGraphicsScene(self)
         self.network_view_dialoger.setScene(self.scene)
         self._viewport().installEventFilter(self)
-        self.populate_cbo_boxes()
+        self.populate_selection_controls()
         self.setup_signals()
-        self.graph_network(self.cur_outcome, self.cur_follow_up)
+        self.graph_network(self.current_outcome_name, self.current_follow_up)
 
     def setup_signals(self):
-        self.outcome_cbo_box.currentTextChanged.connect(
+        self.outcome_combo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(self.outcome_changed, parent=self)
         )
-        self.follow_up_cbo_box.currentTextChanged.connect(
+        self.follow_up_combo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(self.follow_up_changed, parent=self)
         )
 
     def outcome_changed(self, new_outcome):
-        self.cur_outcome = str(new_outcome)
-        self.outcome_cbo_box.setToolTip(self.cur_outcome)
-        self.graph_network(self.cur_outcome, self.cur_follow_up)
+        self.current_outcome_name = str(new_outcome)
+        self.outcome_combo_box.setToolTip(self.current_outcome_name)
+        self.graph_network(self.current_outcome_name, self.current_follow_up)
 
     def follow_up_changed(self, new_follow_up):
-        self.cur_follow_up = str(new_follow_up)
-        self.follow_up_cbo_box.setToolTip(self.cur_follow_up)
-        self.graph_network(self.cur_outcome, self.cur_follow_up)
+        self.current_follow_up = str(new_follow_up)
+        self.follow_up_combo_box.setToolTip(self.current_follow_up)
+        self.graph_network(self.current_outcome_name, self.current_follow_up)
 
-    def populate_cbo_boxes(self):
-        self.outcome_cbo_box.addItems(self.dataset.get_outcome_names())
-        self.follow_up_cbo_box.addItems(self.dataset.get_follow_up_names())
+    def populate_selection_controls(self):
+        self.outcome_combo_box.addItems(self.dataset.get_outcome_names())
+        self.follow_up_combo_box.addItems(self.dataset.get_follow_up_names())
 
-        self.outcome_cbo_box.setCurrentIndex(
-            self.outcome_cbo_box.findText(self.cur_outcome)
+        self.outcome_combo_box.setCurrentIndex(
+            self.outcome_combo_box.findText(self.current_outcome_name)
         )
-        self.follow_up_cbo_box.setCurrentIndex(
-            self.follow_up_cbo_box.findText(self.cur_follow_up)
+        self.follow_up_combo_box.setCurrentIndex(
+            self.follow_up_combo_box.findText(self.current_follow_up)
         )
-        self._expose_full_selector_values(self.outcome_cbo_box)
-        self._expose_full_selector_values(self.follow_up_cbo_box)
+        self._expose_full_selector_values(self.outcome_combo_box)
+        self._expose_full_selector_values(self.follow_up_combo_box)
 
     @staticmethod
     def _expose_full_selector_values(combo_box):

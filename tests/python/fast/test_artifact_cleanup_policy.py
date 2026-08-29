@@ -148,14 +148,14 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         lambda _model, **_kwargs: None,
     )
 
-    def fake_run_binary_ma(_method, params):
+    def fake_run_binary_analysis(_method, params):
         captured_params.append(params)
         return {"texts": {}, "images": {}}
 
     monkeypatch.setattr(
         analysis_adapter.r_bridge,
-        "run_binary_ma",
-        fake_run_binary_ma,
+        "run_binary_analysis",
+        fake_run_binary_analysis,
     )
 
     bundle = golden_analysis.curated_golden_bundles(root_dir=ROOT)[0]

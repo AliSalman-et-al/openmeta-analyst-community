@@ -73,6 +73,8 @@ def _run_automation_smoke(callback):
     except BaseException as exc:
         _write_automation_smoke_log("".join(traceback.format_exception(exc)))
         raise SystemExit(1) from exc
+
+
 def dispatch(startup_argv: list[str]) -> int:
     """Dispatch one supported automation command after startup arguments resolve."""
     smoke_log = _argument_value(startup_argv, "--automation-smoke-log")
@@ -104,7 +106,10 @@ def dispatch(startup_argv: list[str]) -> int:
         return _run_automation_smoke(
             lambda: start_automation_smoke(sample_path, require_native_window=True)
         )
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-package-surface-smoke"
+    ):
         if len(startup_argv) != 4:
             raise SystemExit(
                 "--automation-package-surface-smoke requires an evidence path and scale."
@@ -113,7 +118,10 @@ def dispatch(startup_argv: list[str]) -> int:
         return _run_automation_smoke(
             lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
         )
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-package-runtime-probe"
+    ):
         if len(startup_argv) != 3:
             raise SystemExit(
                 "--automation-package-runtime-probe requires an output path."
@@ -130,7 +138,10 @@ def dispatch(startup_argv: list[str]) -> int:
                 "and project path."
             )
         return start_startup_wizard_smoke(startup_argv[2], startup_argv[3])
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-adaptive-layout-evidence":
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1] == "--automation-adaptive-layout-evidence"
+    ):
         if len(startup_argv) < 3:
             raise SystemExit(
                 "--automation-adaptive-layout-evidence requires an output directory."
@@ -145,6 +156,8 @@ def dispatch(startup_argv: list[str]) -> int:
             lambda: start_adaptive_layout_evidence(output_dir, sample_path)
         )
     raise SystemExit("Unknown automation command: %s" % startup_argv[1])
+
+
 def start_automation(phase_callback=None):
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
@@ -1793,7 +1806,7 @@ def _assert_standard_binary_summary_is_formatted(meta):
     specs = main_window.analysis_setup_dialog.AnalysisSetupDialog(
         meta.model,
         parent=meta,
-        conf_level=meta.model.get_global_conf_level(),
+        confidence_level=meta.model.get_confidence_level(),
     )
     try:
         if specs.available_method_d is None:

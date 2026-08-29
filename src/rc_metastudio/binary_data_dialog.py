@@ -57,10 +57,10 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
     def __init__(
         self,
         analysis_unit,
-        cur_txs,
-        cur_group_str,
-        cur_effect,
-        conf_level=None,
+        current_groups,
+        group_comparison,
+        current_effect,
+        confidence_level=None,
         parent=None,
     ):
         super(BinaryDataDialog, self).__init__(parent)
@@ -71,28 +71,34 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
 
-        if conf_level is None:
+        if confidence_level is None:
             raise ValueError("Confidence level must be specified")
-        self.global_conf_level = conf_level
-        self.mult = r_bridge.get_mult_from_r(self.global_conf_level)
+        self.confidence_level = confidence_level
+        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+            self.confidence_level
+        )
         self.current_item_data: int | None = None
 
         self._setup_signals_and_slots()
 
         self.analysis_unit = analysis_unit
-        self.cur_groups = cur_txs
-        self.group_str = cur_group_str
-        self.cur_effect = cur_effect
+        self.current_groups = current_groups
+        self.group_comparison = group_comparison
+        self.current_effect = current_effect
         self.entry_widgets = [
             self.raw_data_table,
-            self.low_txt_box,
-            self.high_txt_box,
-            self.effect_txt_box,
+            self.lower_text_box,
+            self.upper_text_box,
+            self.effect_text_box,
         ]
-        self.text_boxes = [self.low_txt_box, self.high_txt_box, self.effect_txt_box]
+        self.text_boxes = [
+            self.lower_text_box,
+            self.upper_text_box,
+            self.effect_text_box,
+        ]
 
         self.ci_label.setText(
-            "{0:.1f}% Confidence Interval".format(self.global_conf_level)
+            "{0:.1f}% Confidence Interval".format(self.confidence_level)
         )
         self.initialize_form()  # initialize all cell to empty items
         self.setup_back_calculation_feedback()
@@ -103,7 +109,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         self.set_current_effect()  # fill in current effect data in line edits
         self._update_data_table()  # fill in 2x2
         self._fit_raw_data_columns_for_first_display()
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
         self.raw_data_table.setCurrentCell(0, 0)
         self.raw_data_table.setFocus()
         required(
@@ -199,7 +205,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         for txt_box in self.text_boxes:
             txt_box.setText("")
 
-    def enable_back_calculation_btn(self, engage=False):
+    def update_back_calculation_button(self, engage=False):
         # For undo/redo
         old_analysis_unit, old_table = self._save_analysis_unit_and_table_state(
             table=self.raw_data_table,
@@ -210,27 +216,29 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         def build_back_calc_args_dict():
 
             d = {}
-            d["metric"] = str(self.cur_effect)
+            d["metric"] = str(self.current_effect)
 
             est, lower, upper = self.analysis_unit.get_effect_and_ci(
-                self.cur_effect, self.group_str, self.mult
+                self.current_effect, self.group_comparison, self.confidence_multiplier
             )
 
             def conv_to_disp_scale(x):
                 return r_bridge.binary_convert_scale(
-                    x, self.cur_effect, convert_to="display.scale"
+                    x, self.current_effect, convert_to="display.scale"
                 )
 
-            d_est, d_lower, d_upper = [
+            display_estimate, display_lower, display_upper = [
                 conv_to_disp_scale(x) for x in [est, lower, upper]
             ]
             for i, r_key in enumerate(["estimate", "lower", "upper"]):
                 try:
-                    d[r_key] = float([d_est, d_lower, d_upper][i])
+                    d[r_key] = float(
+                        [display_estimate, display_lower, display_upper][i]
+                    )
                 except (TypeError, ValueError):
                     d[r_key] = None
 
-            d["conf.level"] = self.global_conf_level
+            d["conf.level"] = self.confidence_level
 
             d["Ev_A"] = float(self._get_int(0, 0)) if not self._is_empty(0, 0) else None
             d["N_A"] = float(self._get_int(0, 2)) if not self._is_empty(0, 2) else None
@@ -296,27 +304,27 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
         # Makes no sense to show the button on a form where the back
         # calculation is not implemented
-        if self.cur_effect not in ["OR", "RR", "RD"]:
-            self.back_calc_btn.setVisible(False)
+        if self.current_effect not in ["OR", "RR", "RD"]:
+            self.back_calculate_button.setVisible(False)
             self._request_content_refit()
             return None
         else:
-            self.back_calc_btn.setVisible(True)
+            self.back_calculate_button.setVisible(True)
             self._request_content_refit()
 
         bin_data = build_back_calc_args_dict()
 
-        imputed = r_bridge.impute_bin_data(bin_data.copy())
+        imputed = r_bridge.impute_binary_data(bin_data.copy())
 
         # Leave if nothing was imputed
         if "FAIL" in imputed:
-            self.back_calc_btn.setEnabled(False)
+            self.back_calculate_button.setEnabled(False)
             return None
 
         if new_data(bin_data, imputed):
-            self.back_calc_btn.setEnabled(True)
+            self.back_calculate_button.setEnabled(True)
         else:
-            self.back_calc_btn.setEnabled(False)
+            self.back_calculate_button.setEnabled(False)
 
         if not engage:
             return None
@@ -439,31 +447,30 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             )
         )
 
-        self.effect_cbo_box.currentTextChanged.connect(
+        self.effect_combo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self.effect_changed(), parent=self
             )
         )
-        self.clear_Btn.clicked.connect(
+        self.clear_button.clicked.connect(
             app_error_handler.safe_slot(self.clear_form, parent=self)
         )
-        self.back_calc_btn.clicked.connect(
+        self.back_calculate_button.clicked.connect(
             app_error_handler.safe_slot(
-                lambda: self.enable_back_calculation_btn(engage=True), parent=self
+                lambda: self.update_back_calculation_button(engage=True), parent=self
             )
         )
 
-        self.effect_txt_box.editingFinished.connect(
+        self.effect_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("est"), parent=self)
         )
-        self.low_txt_box.editingFinished.connect(
+        self.lower_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("lower"), parent=self)
         )
-        self.high_txt_box.editingFinished.connect(
+        self.upper_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("upper"), parent=self)
         )
 
-        # Add undo/redo actions
         undo = QAction(self)
         redo = QAction(self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -479,35 +486,37 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def _populate_effect_data(self):
         available_effects = set(
-            str(effect) for effect in self.analysis_unit.effects_dict.keys()
+            str(effect) for effect in self.analysis_unit.effects.keys()
         )
         metric_family = (
             BINARY_ONE_ARM_METRICS
-            if self.cur_effect in BINARY_ONE_ARM_METRICS
+            if self.current_effect in BINARY_ONE_ARM_METRICS
             else BINARY_TWO_ARM_METRICS
         )
         q_effects = [effect for effect in metric_family if effect in available_effects]
-        if self.cur_effect not in q_effects:
-            q_effects.append(str(self.cur_effect))
-        with QSignalBlocker(self.effect_cbo_box):
-            self.effect_cbo_box.clear()
+        if self.current_effect not in q_effects:
+            q_effects.append(str(self.current_effect))
+        with QSignalBlocker(self.effect_combo_box):
+            self.effect_combo_box.clear()
             for effect in q_effects:
-                self.effect_cbo_box.addItem(
+                self.effect_combo_box.addItem(
                     self._effect_display_label(effect), userData=effect
                 )
             # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-            self.effect_cbo_box.setMinimumWidth(0)
+            self.effect_combo_box.setMinimumWidth(0)
             # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-            self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-            self.effect_cbo_box.setSizePolicy(
+            self.effect_combo_box.setMaximumWidth(QWIDGETSIZE_MAX)
+            self.effect_combo_box.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
             )
-            self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
+            self.effect_combo_box.setCurrentIndex(
+                q_effects.index(str(self.current_effect))
+            )
         self._update_effect_choice_accessibility()
         self._request_content_refit()
 
     def _update_effect_choice_accessibility(self):
-        combo = self.effect_cbo_box
+        combo = self.effect_combo_box
         if combo.count() == 0:
             return
         full_text = combo.currentText()
@@ -531,35 +540,37 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         return "%s (%s)" % (BINARY_METRIC_NAMES.get(effect, effect), effect)
 
     def _selected_effect(self):
-        effect = self.effect_cbo_box.currentData()
+        effect = self.effect_combo_box.currentData()
         if effect is None:
-            effect = self.effect_cbo_box.currentText()
+            effect = self.effect_combo_box.currentText()
         return str(effect)
 
     def set_current_effect(self):
         """Populate fields from a meta-analysis unit."""
         txt_boxes = dict(
-            effect=self.effect_txt_box, lower=self.low_txt_box, upper=self.high_txt_box
+            effect=self.effect_text_box,
+            lower=self.lower_text_box,
+            upper=self.upper_text_box,
         )
-        calc_fncs.helper_set_current_effect(
+        calc_fncs.set_current_effect_from_value(
             analysis_unit=self.analysis_unit,
             txt_boxes=txt_boxes,
-            current_effect=self.cur_effect,
-            group_str=self.group_str,
+            current_effect=self.current_effect,
+            group_comparison=self.group_comparison,
             data_type="binary",
-            mult=self.mult,
+            confidence_multiplier=self.confidence_multiplier,
         )
 
         self.change_row_color_according_to_metric()
 
     def change_row_color_according_to_metric(self):
         # Change color of bottom rows of table according one or two-arm metric
-        curr_effect_is_one_arm = self.cur_effect in BINARY_ONE_ARM_METRICS
+        current_effect_is_one_arm = self.current_effect in BINARY_ONE_ARM_METRICS
         for row in (1, 2):
             for col in range(3):
                 item = self.raw_data_table.item(row, col)
                 item = required(item, f"binary table cell ({row}, {col})")
-                if curr_effect_is_one_arm:
+                if current_effect_is_one_arm:
                     item.setBackground(QBrush(QColor(Qt.GlobalColor.gray)))
                 else:
                     text = item.text()
@@ -570,13 +581,13 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def effect_changed(self):
         """Called when a new effect is selected in the combo box"""
-        self.cur_effect = self._selected_effect()
-        self.group_str = self.get_cur_group_str()
+        self.current_effect = self._selected_effect()
+        self.group_comparison = self.get_current_group_comparison()
 
-        self.try_to_update_cur_outcome()
+        self.update_effect_from_raw_data()
         self.set_current_effect()
 
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
         self._update_effect_choice_accessibility()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
@@ -586,15 +597,15 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             calc_fncs.evaluate,
             new_text=new_text,
             analysis_unit=self.analysis_unit,
-            curr_effect=self.cur_effect,
-            group_str=self.group_str,
+            current_effect=self.current_effect,
+            group_comparison=self.group_comparison,
             conv_to_disp_scale=partial(
                 r_bridge.binary_convert_scale,
-                metric_name=self.cur_effect,
+                metric_name=self.current_effect,
                 convert_to="display.scale",
             ),
             parent=self,
-            mult=self.mult,
+            confidence_multiplier=self.confidence_multiplier,
         )
 
         with ExitStack() as signal_blockers:
@@ -611,13 +622,13 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                 return False, False
         return True, display_scale_val
 
-    def _get_txt_from_val_str(self, val_str):
-        if val_str == "est":
-            return str(self.effect_txt_box.text())
-        elif val_str == "lower":
-            return str(self.low_txt_box.text())
-        elif val_str == "upper":
-            return str(self.high_txt_box.text())
+    def _text_from_value(self, value):
+        if value == "est":
+            return str(self.effect_text_box.text())
+        elif value == "lower":
+            return str(self.lower_text_box.text())
+        elif value == "upper":
+            return str(self.upper_text_box.text())
         return None  # Unknown value key.
 
     def val_changed(self, val_str):
@@ -628,7 +639,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             use_old_value=False,
         )
 
-        new_text = self._get_txt_from_val_str(val_str)
+        new_text = self._text_from_value(val_str)
 
         no_errors, display_scale_val = self._text_box_value_is_between_bounds(
             val_str, new_text
@@ -639,11 +650,11 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                 for widget in self.entry_widgets:
                     signal_blockers.enter_context(QSignalBlocker(widget))
                 if val_str == "est":
-                    self.effect_txt_box.setFocus()
+                    self.effect_text_box.setFocus()
                 elif val_str == "lower":
-                    self.low_txt_box.setFocus()
+                    self.lower_text_box.setFocus()
                 elif val_str == "upper":
-                    self.high_txt_box.setFocus()
+                    self.upper_text_box.setFocus()
             return
 
         # If we got to this point it means everything is ok so far
@@ -656,21 +667,21 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calc_scale_val = r_bridge.binary_convert_scale(
-            display_scale_val, self.cur_effect, convert_to="calc.scale"
+        calculation_scale_value = r_bridge.binary_convert_scale(
+            display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
         if val_str == "est":
             self.analysis_unit.set_effect(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
         elif val_str == "lower":
             self.analysis_unit.set_lower(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
         elif val_str == "upper":
             self.analysis_unit.set_upper(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
 
         new_analysis_unit, new_table = self._save_analysis_unit_and_table_state(
@@ -690,7 +701,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
     def _update_raw_data(self):
         """Sets events and non-events from stored events and arm totals."""
 
-        for row, group in enumerate(self.cur_groups):
+        for row, group in enumerate(self.current_groups):
             events, total = self.analysis_unit.get_raw_data_for_group(group)
             no_events = None
             if events not in EMPTY_VALS and total not in EMPTY_VALS:
@@ -707,7 +718,9 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             total = self._get_int(row, 2)
             if events not in EMPTY_VALS and no_events not in EMPTY_VALS:
                 total = events + no_events
-            raw_data = self.analysis_unit.get_raw_data_for_group(self.cur_groups[row])
+            raw_data = self.analysis_unit.get_raw_data_for_group(
+                self.current_groups[row]
+            )
             raw_data[0] = events
             raw_data[1] = total
 
@@ -736,7 +749,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         self._update_raw_data()
         self.set_current_effect()
         self._update_data_table()
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
 
     def restore_table(self, old_table):
         old_table = tabular_data.normalize_rows(old_table)
@@ -764,12 +777,10 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         old_value=None,
         use_old_value=True,
     ):
-        # Make backup of table info...
         old_table = calc_fncs.save_table_data(table)
         if use_old_value:
-            old_table[row][col] = old_value  # ...from BEFORE the cell changed
+            old_table[row][col] = old_value
 
-        # Make backup copy of analysis_unit
         old_analysis_unit = copy.deepcopy(analysis_unit)
         return old_analysis_unit, old_table
 
@@ -817,7 +828,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
         try:
             self._update_analysis_unit()  # table widget --> analysis_unit
-            self.try_to_update_cur_outcome()  # update metric in analysis_unit and in table
+            self.update_effect_from_raw_data()  # update metric in analysis_unit and in table
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
             QMessageBox.warning(self, "Warning", msg)
@@ -840,7 +851,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             new_state=(new_analysis_unit, new_table),
         )
 
-    def _get_table_vals(self):
+    def _get_table_values(self):
         """Package table from 2x2 table in to a dictionary"""
         vals_d = {}
         vals_d["c11"] = self._get_int(0, 0)
@@ -895,7 +906,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
     def _update_data_table(self):
         """Fill in 2x2 table from other entries in the table"""
         with QSignalBlocker(self.raw_data_table):
-            params = self._get_table_vals()
+            params = self._get_table_values()
             computed_params = calc_fncs.compute_2x2_table_from_inner_counts(params)
             for total_name in ("r1sum", "r2sum"):
                 if computed_params[total_name] in EMPTY_VALS:
@@ -932,24 +943,24 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
     def _is_blank(self, x):
         return x is None or x == ""
 
-    def try_to_update_cur_outcome(self):
-        e1, n1, e2, n2 = self.analysis_unit.get_raw_data_for_groups(self.cur_groups)
+    def update_effect_from_raw_data(self):
+        e1, n1, e2, n2 = self.analysis_unit.get_raw_data_for_groups(self.current_groups)
 
         two_arm_raw_data_ok = not any([self._is_blank(x) for x in [e1, n1, e2, n2]])
         one_arm_raw_data_ok = not any([self._is_blank(x) for x in [e1, n1]])
-        curr_effect_is_one_arm = self.cur_effect in BINARY_ONE_ARM_METRICS
-        curr_effect_is_two_arm = self.cur_effect in BINARY_TWO_ARM_METRICS
+        current_effect_is_one_arm = self.current_effect in BINARY_ONE_ARM_METRICS
+        current_effect_is_two_arm = self.current_effect in BINARY_TWO_ARM_METRICS
 
         # Leave current effects untouched when raw data are incomplete.
-        if two_arm_raw_data_ok or (curr_effect_is_one_arm and one_arm_raw_data_ok):
-            if curr_effect_is_two_arm:
+        if two_arm_raw_data_ok or (current_effect_is_one_arm and one_arm_raw_data_ok):
+            if current_effect_is_two_arm:
                 est_and_ci_d = r_bridge.effect_for_study(
                     e1,
                     n1,
                     e2,
                     n2,
-                    metric=self.cur_effect,
-                    conf_level=self.global_conf_level,
+                    metric=self.current_effect,
+                    confidence_level=self.confidence_level,
                 )
             else:
                 # binary, one-arm
@@ -957,17 +968,22 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                     e1,
                     n1,
                     two_arm=False,
-                    metric=self.cur_effect,
-                    conf_level=self.global_conf_level,
+                    metric=self.current_effect,
+                    confidence_level=self.confidence_level,
                 )
 
             est, low, high = r_bridge.effect_triplet(
                 est_and_ci_d,
                 "calc_scale",
-                metric=self.cur_effect,
+                metric=self.current_effect,
             )
             self.analysis_unit.set_effect_and_ci(
-                self.cur_effect, self.group_str, est, low, high, mult=self.mult
+                self.current_effect,
+                self.group_comparison,
+                est,
+                low,
+                high,
+                confidence_multiplier=self.confidence_multiplier,
             )
             self.set_current_effect()
 
@@ -996,14 +1012,19 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
         for metric in BINARY_ONE_ARM_METRICS + BINARY_TWO_ARM_METRICS:
             if (
-                self.cur_effect in BINARY_TWO_ARM_METRICS
+                self.current_effect in BINARY_TWO_ARM_METRICS
                 and metric in BINARY_TWO_ARM_METRICS
             ) or (
-                self.cur_effect in BINARY_ONE_ARM_METRICS
+                self.current_effect in BINARY_ONE_ARM_METRICS
                 and metric in BINARY_ONE_ARM_METRICS
             ):
                 self.analysis_unit.set_effect_and_ci(
-                    metric, self.group_str, None, None, None, mult=self.mult
+                    metric,
+                    self.group_comparison,
+                    None,
+                    None,
+                    None,
+                    confidence_multiplier=self.confidence_multiplier,
                 )
         # clear line edits
         self.set_current_effect()
@@ -1023,14 +1044,13 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             new_state=(new_analysis_unit, new_table),
         )
 
-    def get_cur_group_str(self):
-        # Inspired from get_cur_group_str of dataset_table_model
+    def get_current_group_comparison(self):
 
-        if self.cur_effect in BINARY_ONE_ARM_METRICS:
-            group_str = self.cur_groups[0]
+        if self.current_effect in BINARY_ONE_ARM_METRICS:
+            group_comparison = self.current_groups[0]
         else:
-            group_str = "-".join(self.cur_groups)
-        return group_str
+            group_comparison = "-".join(self.current_groups)
+        return group_comparison
 
     def undo(self):
         self.undoStack.undo()

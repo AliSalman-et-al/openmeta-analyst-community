@@ -207,7 +207,9 @@ def _run_main() -> int:
     )
 
     _install_backend_stub(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda _level: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _level: 1.96,
     )
     setattr(
         binary_data_dialog.r_bridge,
@@ -215,7 +217,9 @@ def _run_main() -> int:
         lambda value, *args, **kwargs: value,
     )
     _install_backend_stub(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda _data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda _data: {"FAIL": True},
     )
     _install_backend_stub(
         binary_data_dialog.r_bridge,
@@ -234,7 +238,7 @@ def _run_main() -> int:
     )
     _install_backend_stub(
         continuous_data_dialog.r_bridge,
-        "impute_cont_data",
+        "impute_continuous_data",
         lambda _data, _alpha: {
             "succeeded": False,
             "comment": "complete input",
@@ -252,7 +256,7 @@ def _run_main() -> int:
     )
     _install_backend_stub(
         continuous_data_dialog.r_bridge,
-        "back_calc_cont_data",
+        "back_calculate_continuous_data",
         lambda *_args, **_kwargs: {"FAIL": True},
     )
     setattr(
@@ -262,7 +266,7 @@ def _run_main() -> int:
     )
     _install_backend_stub(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     _install_backend_stub(
@@ -326,14 +330,14 @@ def _run_main() -> int:
             table_view = window.tableView
             unit = model.get_current_analysis_unit_for_study(0)
             if data_type == "binary":
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [6, 20]
-                unit.get_raw_data_for_group(model.current_txs[1])[:] = [8, 22]
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [6, 20]
+                unit.get_raw_data_for_group(model.current_groups[1])[:] = [8, 22]
             elif data_type == "continuous":
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [10, 94, 2]
-                unit.get_raw_data_for_group(model.current_txs[1])[:] = [12, 90, 3]
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
+                unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
             else:
-                unit.get_raw_data_for_group(model.current_txs[0])[:] = [12, 3, 4, 21]
-            before = list(unit.get_raw_data_for_group(model.current_txs[0]))
+                unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
+            before = list(unit.get_raw_data_for_group(model.current_groups[0]))
             table_view.undoStack.clear()
             table_view.undoStack.setClean()
             window.current_data_unsaved = False
@@ -467,7 +471,7 @@ def _run_main() -> int:
                 raise RuntimeError("native %s calculator was not exercised" % data_type)
 
             after = model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
-                model.current_txs[0]
+                model.current_groups[0]
             )
             if data_type == "binary" and after != [7, 21]:
                 raise RuntimeError("binary accepted edit did not reach the model")

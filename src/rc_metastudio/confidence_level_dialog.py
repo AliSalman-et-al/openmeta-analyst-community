@@ -6,8 +6,12 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QDialog
 
-from rc_metastudio.meta_globals import DEFAULT_CONF_LEVEL, CONFIDENCE_LEVEL_DISPLAY_MAX
+from rc_metastudio.meta_globals import (
+    DEFAULT_CONFIDENCE_LEVEL,
+    CONFIDENCE_LEVEL_DISPLAY_MAX,
+)
 from rc_metastudio import adaptive_window
+
 if TYPE_CHECKING:
     import ui_confidence_level_dialog as _ui_confidence_level_dialog
 else:
@@ -21,11 +25,11 @@ class ConfidenceLevelDialog(
 ):
     """Dialog for changing confidence level"""
 
-    def __init__(self, previous_value=DEFAULT_CONF_LEVEL, parent=None):
+    def __init__(self, previous_value=DEFAULT_CONFIDENCE_LEVEL, parent=None):
         super(ConfidenceLevelDialog, self).__init__(parent)
         self.setupUi(self)
-        self.conf_level_spinbox.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
-        self.conf_level_spinbox.setValue(previous_value)
+        self.confidence_level_spinbox.setRange(50, CONFIDENCE_LEVEL_DISPLAY_MAX)
+        self.confidence_level_spinbox.setValue(previous_value)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         self._layout_controller = adaptive_window.register_adaptive_window(
@@ -37,4 +41,4 @@ class ConfidenceLevelDialog(
         self._layout_controller.request_content_refit()
 
     def get_value(self):
-        return self.conf_level_spinbox.value()
+        return self.confidence_level_spinbox.value()

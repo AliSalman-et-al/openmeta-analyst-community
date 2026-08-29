@@ -377,7 +377,7 @@ def test_confidence_level_is_a_compact_transactional_dialog(qapp):
         )
         assert not dialog.findChildren(QtWidgets.QScrollArea)
         assert available.contains(dialog.frameGeometry())
-        assert dialog.conf_level_spinbox.value() == 95.0
+        assert dialog.confidence_level_spinbox.value() == 95.0
     finally:
         dialog.close()
         parent.close()
@@ -390,7 +390,7 @@ def test_confidence_level_handles_representative_long_text_and_enlarged_font(qap
     font = QtGui.QFont(qapp.font())
     font.setPointSize(max(18, font.pointSize() + 8))
     dialog.setFont(font)
-    dialog.conf_level_label.setText(
+    dialog.confidence_level_label.setText(
         "Global Confidence Level Used to Calculate Confidence Intervals "
         "for All Outcomes:"
     )
@@ -402,8 +402,8 @@ def test_confidence_level_handles_representative_long_text_and_enlarged_font(qap
         handle = required(dialog.windowHandle(), "dialog window handle")
         available = required(handle.screen(), "dialog screen").availableGeometry()
         assert available.contains(dialog.frameGeometry())
-        assert dialog.conf_level_label.wordWrap()
-        assert dialog.conf_level_label.height() >= dialog.fontMetrics().height()
+        assert dialog.confidence_level_label.wordWrap()
+        assert dialog.confidence_level_label.height() >= dialog.fontMetrics().height()
         assert dialog.button_box.isVisible()
         assert dialog.button_box.geometry().bottom() <= dialog.rect().bottom()
     finally:

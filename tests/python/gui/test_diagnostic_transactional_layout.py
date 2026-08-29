@@ -31,7 +31,7 @@ class FakeDiagnosticAnalysisUnit:
     def __init__(self, raw_data=None, effects=None):
         self.raw_data = list(raw_data or [12, 3, 4, 21])
         self.effects = dict(effects or {})
-        self.tx_groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
+        self.groups = {"Group 1-Group 2": FakeDiagnosticGroup(self.raw_data)}
 
     def get_raw_data_for_group(self, _group):
         return self.raw_data
@@ -69,7 +69,7 @@ class FakeDiagnosticModel:
     def included_studies_have_point_estimates(self, effect):
         return effect in self.entered_effects
 
-    def get_global_conf_level(self):
+    def get_confidence_level(self):
         return 95.0
 
 
@@ -87,7 +87,9 @@ def _open_data_dialog(
         lambda _window: QtCore.QRect(available),
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge, "get_mult_from_r", lambda _conf: 1.96
+        diagnostic_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _conf: 1.96,
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
@@ -96,7 +98,7 @@ def _open_data_dialog(
     )
     monkeypatch.setattr(
         diagnostic_data_dialog.r_bridge,
-        "impute_diag_data",
+        "impute_diagnostic_data",
         lambda _data: imputed or {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
@@ -115,7 +117,7 @@ def _open_data_dialog(
         FakeDiagnosticAnalysisUnit(raw_data=raw_data, effects=effects),
         ["Group 1", "Group 2"],
         "Group 1-Group 2",
-        conf_level=95.0,
+        confidence_level=95.0,
     )
     return app, dialog
 
@@ -173,16 +175,16 @@ def test_diagnostic_data_keyboard_and_accessibility_contract(monkeypatch):
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.focusWidget() is dialog.two_by_two_table
         assert ok.isDefault()
-        assert dialog.prevalence_lbl.buddy() is dialog.prevalence_txt_box
-        assert dialog.label_13.buddy() is dialog.effect_cbo_box
-        assert dialog.label_14.buddy() is dialog.effect_txt_box
+        assert dialog.prevalence_lbl.buddy() is dialog.prevalence_text_box
+        assert dialog.effect_metric_label.buddy() is dialog.effect_combo_box
+        assert dialog.label_14.buddy() is dialog.effect_text_box
         assert dialog.two_by_two_table.accessibleName() == (
             "Diagnostic two by two counts"
         )
 
-        dialog.effect_cbo_box.setFocus()
-        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
-        assert dialog.focusWidget() is dialog.effect_txt_box
+        dialog.effect_combo_box.setFocus()
+        key_click(dialog.effect_combo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_text_box
 
         key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
@@ -242,21 +244,21 @@ def test_entered_effect_switching_is_semantically_sized_and_geometry_stable(
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
 
-        spec_index = dialog.effect_cbo_box.findText("Spec")
-        dialog.effect_cbo_box.setCurrentIndex(spec_index)
+        spec_index = dialog.effect_combo_box.findText("Spec")
+        dialog.effect_combo_box.setCurrentIndex(spec_index)
         app.processEvents()
 
-        assert dialog.cur_effect == "Spec"
+        assert dialog.current_effect == "Spec"
         assert [
-            dialog.effect_txt_box.text(),
-            dialog.low_txt_box.text(),
-            dialog.high_txt_box.text(),
+            dialog.effect_text_box.text(),
+            dialog.lower_text_box.text(),
+            dialog.upper_text_box.text(),
         ] == ["0.8", "0.7", "0.9"]
         for field in (
-            dialog.prevalence_txt_box,
-            dialog.effect_txt_box,
-            dialog.low_txt_box,
-            dialog.high_txt_box,
+            dialog.prevalence_text_box,
+            dialog.effect_text_box,
+            dialog.lower_text_box,
+            dialog.upper_text_box,
         ):
             required = field.fontMetrics().horizontalAdvance("1.0000")
             assert field.minimumWidth() >= required
@@ -279,10 +281,10 @@ def test_back_calculation_updates_counts_without_root_growth(monkeypatch):
         dialog.show()
         app.processEvents()
         settled = QtCore.QRect(dialog.frameGeometry())
-        assert dialog.back_calc_Btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
         QtWidgets.QApplication.processEvents()
-        dialog.back_calc_Btn.click()
+        dialog.back_calculate_button.click()
         app.processEvents()
 
         assert dialog.analysis_unit.raw_data == [12.0, 3.0, 4.0, 21.0]
@@ -334,15 +336,15 @@ def test_large_font_count_overflow_and_focus_stay_inside_content(monkeypatch):
         assert (
             table.viewport().rect().intersects(table.visualItemRect(table.item(0, 0)))
         )
-        dialog.high_txt_box.setFocus()
+        dialog.upper_text_box.setFocus()
         app.processEvents()
-        mapped = dialog.high_txt_box.mapTo(
+        mapped = dialog.upper_text_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
         assert (
             dialog.content_scroll.viewport()
             .rect()
-            .intersects(QtCore.QRect(mapped, dialog.high_txt_box.size()))
+            .intersects(QtCore.QRect(mapped, dialog.upper_text_box.size()))
         )
         assert dialog.buttonBox.isVisible()
     finally:
@@ -465,8 +467,8 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
         assert ok.isEnabled()
         assert ok.isVisible()
         assert AVAILABLE.contains(dialog.frameGeometry())
-        spec_index = dialog.effect_cbo_box.findText("Spec")
-        dialog.effect_cbo_box.setCurrentIndex(spec_index)
+        spec_index = dialog.effect_combo_box.findText("Spec")
+        dialog.effect_combo_box.setCurrentIndex(spec_index)
         app.processEvents()
         assert ok.isEnabled()
     finally:
@@ -478,8 +480,8 @@ def test_invalid_count_guidance_wraps_and_remains_reachable(monkeypatch):
 @pytest.mark.parametrize(
     ("field_name", "invalid_value", "guidance", "restored"),
     [
-        ("effect_txt_box", "not numeric", "must be numeric", "0.75"),
-        ("low_txt_box", "0.95", "lower CI must be less", "0.6"),
+        ("effect_text_box", "not numeric", "must be numeric", "0.75"),
+        ("lower_text_box", "0.95", "lower CI must be less", "0.6"),
     ],
     ids=["effect", "interval"],
 )

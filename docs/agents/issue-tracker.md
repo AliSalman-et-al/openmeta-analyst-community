@@ -1,6 +1,6 @@
 # GitHub issue workflow
 
-GitHub Issues is the source of truth for issues and product requirements. Run `gh` from this repository so it resolves the remote automatically.
+GitHub Issues owns product requirements and work status. Run `gh` from the repository root so it selects the correct remote.
 
 ## Common commands
 
@@ -12,6 +12,6 @@ GitHub Issues is the source of truth for issues and product requirements. Run `g
 - Remove a label: `gh issue edit <number> --remove-label "..."`
 - Close: `gh issue close <number> --comment "..."`
 
-Use `--body-file <path>` for a multiline issue body. Add `--label` and `--state` filters when listing issues for a specific task.
+Use `--body-file <path>` for multiline text. Filter issue lists by `--label` or `--state` when the task names either one.
 
-When an instruction says to publish to the issue tracker, create a GitHub issue. When it says to fetch a ticket, run `gh issue view <number> --comments`.
+Create an issue only when the task asks you to publish one. To fetch a ticket, include its comments.

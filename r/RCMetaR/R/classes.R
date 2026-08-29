@@ -1,61 +1,31 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-####################################
-#                                  #
-# RC MetaStudio                #
-# ----                             #
-# classes.R                        #
-# contains RCMetaR data class      #
-# definitions.                     #
-#                                  #    
-# (note that classes in R are      #
-#   basically structs)             #
-####################################
-
-#
-# This is the base class for RCMetaR study-data containers.
-setClass("OMData", representation(study.names="character", notes="character", 
+setClass("OMData", representation(study.names="character", notes="character",
          years="integer", covariates="list"))
 
-####
-# BinaryData type
-#
-setClass("BinaryData", 
+setClass("BinaryData",
                representation(g1O1="numeric", g1O2="numeric", g2O1="numeric", g2O2="numeric",
                y="numeric", SE="numeric",
-               g1.name="character", g2.name="character"), 
+               g1.name="character", g2.name="character"),
                contains="OMData")
-        
 
-####
-# DiagnosticData type
-#       
-setClass("DiagnosticData", 
-               representation(TP="numeric", FN="numeric", TN="numeric", FP="numeric", 
-               y="numeric", SE="numeric", g1.name="character"), 
+
+setClass("DiagnosticData",
+               representation(TP="numeric", FN="numeric", TN="numeric", FP="numeric",
+               y="numeric", SE="numeric", g1.name="character"),
                contains="OMData")
-               
-####
-# ContinuousData type
-#       
-setClass("ContinuousData", 
+
+setClass("ContinuousData",
                representation(N1="numeric", mean1="numeric", sd1="numeric",
                N2="numeric", mean2="numeric", sd2="numeric",
                y="numeric", SE="numeric",
-               g1.name="character", g2.name="character"), 
+               g1.name="character", g2.name="character"),
                contains="OMData")
-               
-               
-#
-# The specificiation class contains parameters, etc., for the method to be run
-#
-setClass("AnalysisSpecification", 
+
+setClass("AnalysisSpecification",
                 representation(parameters="data.frame"))
 
-#
-# The covariate class contains covariate values.
-#
 setClass("CovariateValues", representation(cov.name="character", cov.vals="vector", cov.type="character", ref.var="character"))
 
 get.subset <- function(omdata, indices, make.unique.names=FALSE) {

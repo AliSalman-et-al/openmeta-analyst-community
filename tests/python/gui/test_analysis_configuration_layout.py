@@ -164,7 +164,7 @@ def test_method_dialog_wording_is_scoped_to_its_analysis_family(
     dialog = analysis_setup_dialog.AnalysisSetupDialog(
         _AnalysisModel(data_type),
         diagnostic_metrics=diagnostic_metrics,
-        conf_level=95.0,
+        confidence_level=95.0,
     )
     try:
         assert dialog.windowTitle() == expected_title
@@ -201,9 +201,9 @@ def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
         ):
             dialog = analysis_setup_dialog.AnalysisSetupDialog(
                 _AnalysisModel(data_type, covariates),
-                meta_f_str=workflow,
+                analysis_type=workflow,
                 diagnostic_metrics=diagnostic_metrics,
-                conf_level=95.0,
+                confidence_level=95.0,
             )
             dialogs.append(dialog)
             font = QtGui.QFont(dialog.font())
@@ -326,7 +326,7 @@ def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatc
     )
 
     dialog = analysis_setup_dialog.AnalysisSetupDialog(
-        _AnalysisModel("binary"), conf_level=95.0
+        _AnalysisModel("binary"), confidence_level=95.0
     )
     try:
         dialog.show()
@@ -368,13 +368,13 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         def get_data_type(self):
             return FACTOR
 
-    study = SimpleNamespace(covariate_dict={long_name: "north"}, id=1)
+    study = SimpleNamespace(covariate_values={long_name: "north"}, id=1)
 
     class Model(object):
         current_effect = "OR"
         dataset = SimpleNamespace(
             covariates=[Covariate()],
-            get_values_for_cov=lambda *_args, **_kwargs: {1: "north"},
+            get_covariate_values=lambda *_args, **_kwargs: {1: "north"},
         )
 
         def get_current_outcome_type(self):
@@ -408,14 +408,16 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             adaptive_window.adaptive_window_state(regression).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert regression.content_scroll_area.isAncestorOf(regression.cov_grp_box)
+        assert regression.content_scroll_area.isAncestorOf(
+            regression.covariate_group_box
+        )
         assert not regression.content_scroll_area.isAncestorOf(regression.buttonBox)
         assert (
             adaptive_window.adaptive_window_state(subgroup).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert subgroup.cov_subgroup_cbo_box.currentText() == long_name
-        choice = subgroup.cov_subgroup_cbo_box
+        assert subgroup.covariate_combo_box.currentText() == long_name
+        choice = subgroup.covariate_combo_box
         subgroup.move(available.right() - 20, available.top() + 40)
         choice_view = cast(
             QtWidgets.QAbstractItemView, required(choice.view(), "choice view")
@@ -446,7 +448,7 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
             adaptive_window.adaptive_window_state(covariate_type).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
         )
-        assert covariate_type.cov_prev_table.verticalScrollMode() == (
+        assert covariate_type.covariate_preview_table.verticalScrollMode() == (
             QtWidgets.QAbstractItemView.ScrollMode.ScrollPerItem
         )
         assert covariate_type.buttonBox.isVisible()
@@ -570,7 +572,7 @@ app = app_error_handler.get_or_create_application([])
 dialog = QtWidgets.QDialog()
 ui = Ui_SubgroupAnalysisDialog()
 ui.setupUi(dialog)
-combo = ui.cov_subgroup_cbo_box
+combo = ui.covariate_combo_box
 assert isinstance(combo, adaptive_controls.AdaptiveComboBox)
 combo.addItem("short")
 controller = adaptive_controls.configure_choice_control(combo)
@@ -655,7 +657,7 @@ def test_method_parameters_default_and_cancel_keyboard_actions(qapp, monkeypatch
 
     def make_dialog():
         dialog = analysis_setup_dialog.AnalysisSetupDialog(
-            _AnalysisModel("binary"), conf_level=95.0
+            _AnalysisModel("binary"), confidence_level=95.0
         )
         dialog.buttonBox.accepted.disconnect()
         dialog.buttonBox.accepted.connect(dialog.accept)
@@ -713,14 +715,14 @@ app = app_error_handler.get_or_create_application([])
 observed = []
 backend_calls = []
 execution_data_calls = []
-backend.run_binary_ma = lambda method, params: backend_calls.append(
+backend.run_binary_analysis = lambda method, params: backend_calls.append(
     [method, params["conf.level"]]
 ) or {"texts": {}}
 for locale, text in (
     (QtCore.QLocale(QtCore.QLocale.Language.English), "90.5"),
     (QtCore.QLocale(QtCore.QLocale.Language.German), "90,5"),
 ):
-    dialog = analysis_setup_dialog.AnalysisSetupDialog(Model(), conf_level=95.0)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(Model(), confidence_level=95.0)
     confidence_inputs = dialog.parameter_grp_box.findChildren(
         QtWidgets.QDoubleSpinBox
     )
@@ -746,9 +748,7 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(ROOT / "src")]
-    )
+    environment["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src")])
     completed = subprocess.run(
         [sys.executable, "-c", script],
         cwd=ROOT,
@@ -773,9 +773,9 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
 
 def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
     cases = [
-        ("binary", "standard", "run_binary_ma"),
+        ("binary", "standard", "run_binary_analysis"),
         ("binary", "cumulative", "run_workflow_analysis"),
-        ("continuous", "standard", "run_continuous_ma"),
+        ("continuous", "standard", "run_continuous_analysis"),
         ("continuous", "leave-one-out", "run_workflow_analysis"),
         ("diagnostic", "standard", "run_diagnostic_multi"),
         ("diagnostic", "subgroup", "run_diagnostic_workflow"),

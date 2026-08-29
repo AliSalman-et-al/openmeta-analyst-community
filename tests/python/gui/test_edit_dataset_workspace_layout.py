@@ -36,7 +36,7 @@ class _DatasetParent(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.model = types.SimpleNamespace(
-            current_outcome="Outcome",
+            current_outcome_name="Outcome",
             get_current_follow_up_name=lambda: "first",
         )
 

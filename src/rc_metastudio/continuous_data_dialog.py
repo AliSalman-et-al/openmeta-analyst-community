@@ -49,7 +49,9 @@ else:
     from rc_metastudio.forms import (
         ui_continuous_back_calculation_dialog as _ui_continuous_back_calculation_dialog,
     )
-    from rc_metastudio.forms import ui_continuous_data_dialog as _ui_continuous_data_dialog
+    from rc_metastudio.forms import (
+        ui_continuous_data_dialog as _ui_continuous_data_dialog,
+    )
 
 CONTINUOUS_IMPUTATION_FIELD_NAMES = {
     "n": "n",
@@ -95,16 +97,14 @@ def is_list(x):
         return False
 
 
-class ContinuousDataDialog(
-    QDialog, _ui_continuous_data_dialog.Ui_ContinuousDataDialog
-):
+class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousDataDialog):
     def __init__(
         self,
         analysis_unit,
-        cur_txs,
-        cur_group_str,
-        cur_effect,
-        conf_level=None,
+        current_groups,
+        group_comparison,
+        current_effect,
+        confidence_level=None,
         parent=None,
     ):
         super(ContinuousDataDialog, self).__init__(parent)
@@ -117,39 +117,42 @@ class ContinuousDataDialog(
         )
         self.setup_signals_and_slots()
 
-        if conf_level is None:
+        if confidence_level is None:
             QMessageBox.critical(
                 self, "Insufficient Arguments", "Confidence interval must be specified"
             )
             raise ValueError("Confidence interval must be specified")
-        self.conf_level = conf_level
-        self.mult = r_bridge.get_mult_from_r(self.conf_level)
+        self.confidence_level = confidence_level
+        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+            self.confidence_level
+        )
 
         self.analysis_unit = analysis_unit
-        self.cur_groups = cur_txs
-        self.cur_effect = cur_effect
-        self.group_str = cur_group_str
+        self.current_groups = current_groups
+        self.current_effect = current_effect
+        self.group_comparison = group_comparison
         self.metric_parameter = None
         self.entry_widgets = [
             self.simple_table,
             self.g1_pre_post_table,
             self.g2_pre_post_table,
-            self.effect_txt_box,
-            self.low_txt_box,
-            self.high_txt_box,
+            self.effect_text_box,
+            self.lower_text_box,
+            self.upper_text_box,
             self.correlation_pre_post,
         ]
         self.text_boxes = [
-            self.low_txt_box,
-            self.high_txt_box,
-            self.effect_txt_box,
+            self.lower_text_box,
+            self.upper_text_box,
+            self.effect_text_box,
             self.correlation_pre_post,
         ]
-        self.ci_label.setText("{0:.1f}% Confidence Interval".format(self.conf_level))
+        self.ci_label.setText(
+            "{0:.1f}% Confidence Interval".format(self.confidence_level)
+        )
         self.current_item_data = {}
 
-        # Set the table headers to reflect the group names
-        groups_names = [str(group_name) for group_name in self.cur_groups]
+        groups_names = [str(group_name) for group_name in self.current_groups]
         self.simple_table.setVerticalHeaderLabels(groups_names)
 
         self.tables = [
@@ -157,8 +160,8 @@ class ContinuousDataDialog(
             self.g1_pre_post_table,
             self.g2_pre_post_table,
         ]
-        self.grp_1_lbl.setText(str(self.cur_groups[0]))
-        self.grp_2_lbl.setText(str(self.cur_groups[1]))
+        self.group_one_label.setText(str(self.current_groups[0]))
+        self.group_two_label.setText(str(self.current_groups[1]))
 
         self.setup_clear_button_palettes()  # Color for clear_button_pallette
         self.initialize_form()  # initialize cells to empty items
@@ -168,11 +171,11 @@ class ContinuousDataDialog(
         self._populate_effect_data()
         self.set_current_effect()
         self.impute_data()
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
 
         # Hide pre-post for SMD until it is implemented
-        if self.cur_effect not in ["MD", "SMD"]:
-            self.grp_box_pre_post.setVisible(False)
+        if self.current_effect not in ["MD", "SMD"]:
+            self.pre_post_group_box.setVisible(False)
 
         self.current_correlation = self._get_correlation_str()
         self.simple_table.setCurrentCell(0, 0)
@@ -216,16 +219,16 @@ class ContinuousDataDialog(
 
     def _configure_semantic_fields(self):
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-        self.effect_cbo_box.setMinimumWidth(0)
+        self.effect_combo_box.setMinimumWidth(0)
         # layout-audit: allow=content-overflow-control; reason=required content may consume available layout width
-        self.effect_cbo_box.setMaximumWidth(QWIDGETSIZE_MAX)
-        self.effect_cbo_box.setSizePolicy(
+        self.effect_combo_box.setMaximumWidth(QWIDGETSIZE_MAX)
+        self.effect_combo_box.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        effect_view = QTreeView(self.effect_cbo_box)
+        effect_view = QTreeView(self.effect_combo_box)
         effect_view.setHeaderHidden(True)
         effect_view.setRootIsDecorated(False)
-        self.effect_cbo_box.setView(effect_view)
+        self.effect_combo_box.setView(effect_view)
         effect_view.setTextElideMode(Qt.TextElideMode.ElideNone)
         effect_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._effect_popup = required(effect_view.window(), "continuous metric popup")
@@ -296,7 +299,7 @@ class ContinuousDataDialog(
         self._request_initial_content_refit()
 
     def _update_effect_choice_accessibility(self):
-        combo = self.effect_cbo_box
+        combo = self.effect_combo_box
         if combo.count() == 0:
             return
         full_text = combo.currentText()
@@ -311,7 +314,7 @@ class ContinuousDataDialog(
     def _bound_effect_popup_to_screen(self):
         """Keep the native metric popup local to the dialog's owning screen."""
         try:
-            combo = self.effect_cbo_box
+            combo = self.effect_combo_box
             view = combo.view()
             if not isinstance(view, QTreeView):
                 raise RuntimeError("Continuous metric combo requires a tree view")
@@ -319,7 +322,7 @@ class ContinuousDataDialog(
             popup = required(popup, "continuous metric popup")
             available = adaptive_window.available_geometry_for_window(self)
             content_width = view.columnWidth(0) + 2 * required(
-                self.effect_cbo_box.style(), "continuous metric combo style"
+                self.effect_combo_box.style(), "continuous metric combo style"
             ).pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth)
             popup_width = min(available.width(), max(combo.width(), content_width))
             popup_height = min(available.height(), popup.height())
@@ -415,27 +418,27 @@ class ContinuousDataDialog(
             )
         )
 
-        self.effect_cbo_box.currentTextChanged.connect(
+        self.effect_combo_box.currentTextChanged.connect(
             app_error_handler.safe_slot(
                 lambda _text: self.effect_changed(), parent=self
             )
         )
-        self.clear_Btn.clicked.connect(
+        self.clear_button.clicked.connect(
             app_error_handler.safe_slot(self.clear_form, parent=self)
         )
-        self.back_calc_btn.clicked.connect(
+        self.back_calculate_button.clicked.connect(
             app_error_handler.safe_slot(
-                lambda: self.enable_back_calculation_btn(engage=True), parent=self
+                lambda: self.update_back_calculation_button(engage=True), parent=self
             )
         )
 
-        self.effect_txt_box.editingFinished.connect(
+        self.effect_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("est"), parent=self)
         )
-        self.low_txt_box.editingFinished.connect(
+        self.lower_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("lower"), parent=self)
         )
-        self.high_txt_box.editingFinished.connect(
+        self.upper_text_box.editingFinished.connect(
             app_error_handler.safe_slot(lambda: self.val_changed("upper"), parent=self)
         )
         self.correlation_pre_post.editingFinished.connect(
@@ -444,7 +447,6 @@ class ContinuousDataDialog(
             )
         )
 
-        # Add undo/redo actions
         undo = QAction(self)
         redo = QAction(self)
         undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -464,39 +466,41 @@ class ContinuousDataDialog(
         )
         metric_family = (
             CONTINUOUS_ONE_ARM_METRICS
-            if self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
+            if self.current_effect in CONTINUOUS_ONE_ARM_METRICS
             else CONTINUOUS_TWO_ARM_METRICS
         )
         q_effects = [effect for effect in metric_family if effect in available_effects]
-        if self.cur_effect not in q_effects:
-            q_effects.append(str(self.cur_effect))
-        with QSignalBlocker(self.effect_cbo_box):
-            self.effect_cbo_box.clear()
+        if self.current_effect not in q_effects:
+            q_effects.append(str(self.current_effect))
+        with QSignalBlocker(self.effect_combo_box):
+            self.effect_combo_box.clear()
             for effect in q_effects:
-                self.effect_cbo_box.addItem(
+                self.effect_combo_box.addItem(
                     self._effect_display_label(effect), userData=effect
                 )
-            self.effect_cbo_box.setCurrentIndex(q_effects.index(str(self.cur_effect)))
+            self.effect_combo_box.setCurrentIndex(
+                q_effects.index(str(self.current_effect))
+            )
         self._update_effect_choice_accessibility()
 
     def effect_changed(self):
-        self.cur_effect = self._selected_effect()
+        self.current_effect = self._selected_effect()
 
         # hide pre-post for SMD
-        if self.cur_effect not in ["MD", "SMD"]:
-            self.grp_box_pre_post.setVisible(False)
+        if self.current_effect not in ["MD", "SMD"]:
+            self.pre_post_group_box.setVisible(False)
         else:
-            self.grp_box_pre_post.setVisible(True)
+            self.pre_post_group_box.setVisible(True)
         self._update_effect_choice_accessibility()
         self._content_layout_changed()
 
-        self.group_str = self.get_cur_group_str()
+        self.group_comparison = self.get_current_group_comparison()
 
-        self.try_to_update_cur_outcome()
+        self.update_effect_from_raw_data()
         self.set_current_effect()
 
         self.metric_parameter = None
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
         display_scale_val = ""
@@ -505,15 +509,15 @@ class ContinuousDataDialog(
             calc_fncs.evaluate,
             new_text=new_text,
             analysis_unit=self.analysis_unit,
-            curr_effect=self.cur_effect,
-            group_str=self.group_str,
+            current_effect=self.current_effect,
+            group_comparison=self.group_comparison,
             conv_to_disp_scale=partial(
                 r_bridge.continuous_convert_scale,
-                metric_name=self.cur_effect,
+                metric_name=self.current_effect,
                 convert_to="display.scale",
             ),
             parent=self,
-            mult=self.mult,
+            confidence_multiplier=self.confidence_multiplier,
         )
 
         with ExitStack() as signal_blockers:
@@ -537,14 +541,14 @@ class ContinuousDataDialog(
                 return False, False
         return True, display_scale_val
 
-    def _get_txt_from_val_str(self, val_str):
-        if val_str == "est":
-            return str(self.effect_txt_box.text())
-        elif val_str == "lower":
-            return str(self.low_txt_box.text())
-        elif val_str == "upper":
-            return str(self.high_txt_box.text())
-        elif val_str == "correlation_pre_post":
+    def _text_from_value(self, value):
+        if value == "est":
+            return str(self.effect_text_box.text())
+        elif value == "lower":
+            return str(self.lower_text_box.text())
+        elif value == "upper":
+            return str(self.upper_text_box.text())
+        elif value == "correlation_pre_post":
             return str(self.correlation_pre_post.text())
         return None  # Unknown value key.
 
@@ -557,7 +561,7 @@ class ContinuousDataDialog(
         )
         old_correlation = self.current_correlation
 
-        new_text = self._get_txt_from_val_str(val_str)
+        new_text = self._text_from_value(val_str)
 
         no_errors, display_scale_val = self._text_box_value_is_between_bounds(
             val_str, new_text
@@ -570,16 +574,15 @@ class ContinuousDataDialog(
                 for widget in self.entry_widgets:
                     signal_blockers.enter_context(QSignalBlocker(widget))
                 if val_str == "est":
-                    self.effect_txt_box.setFocus()
+                    self.effect_text_box.setFocus()
                 elif val_str == "lower":
-                    self.low_txt_box.setFocus()
+                    self.lower_text_box.setFocus()
                 elif val_str == "upper":
-                    self.high_txt_box.setFocus()
+                    self.upper_text_box.setFocus()
                 elif val_str == "correlation_pre_post":
                     self.correlation_pre_post.setFocus()
             return
 
-        # If we got to this point it means everything is ok so far
         try:
             if display_scale_val not in EMPTY_VALS:
                 display_scale_val = float(display_scale_val)
@@ -589,21 +592,21 @@ class ContinuousDataDialog(
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calc_scale_val = r_bridge.continuous_convert_scale(
-            display_scale_val, self.cur_effect, convert_to="calc.scale"
+        calculation_scale_value = r_bridge.continuous_convert_scale(
+            display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
         if val_str == "est":
             self.analysis_unit.set_effect(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
         elif val_str == "lower":
             self.analysis_unit.set_lower(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
         elif val_str == "upper":
             self.analysis_unit.set_upper(
-                self.cur_effect, self.group_str, calc_scale_val
+                self.current_effect, self.group_comparison, calculation_scale_value
             )
         elif val_str == "correlation_pre_post":
             # Recompute the estimates
@@ -631,51 +634,57 @@ class ContinuousDataDialog(
 
     def setup_clear_button_palettes(self):
         # Color for clear_button_pallette
-        self.orig_palette = self.clear_Btn.palette()
+        self.orig_palette = self.clear_button.palette()
         self.pushme_palette = QPalette()
         self.pushme_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.red)
-        self.set_clear_btn_color()
+        self.update_clear_button_color()
 
-    def set_clear_btn_color(self):
+    def update_clear_button_color(self):
         if calc_fncs._input_fields_disabled(
             self.simple_table,
-            [self.effect_txt_box, self.low_txt_box, self.high_txt_box],
+            [self.effect_text_box, self.lower_text_box, self.upper_text_box],
         ):
-            self.clear_Btn.setPalette(self.pushme_palette)
+            self.clear_button.setPalette(self.pushme_palette)
         else:
-            self.clear_Btn.setPalette(self.orig_palette)
+            self.clear_button.setPalette(self.orig_palette)
 
     def set_current_effect(self):
         txt_boxes = dict(
-            effect=self.effect_txt_box, lower=self.low_txt_box, upper=self.high_txt_box
+            effect=self.effect_text_box,
+            lower=self.lower_text_box,
+            upper=self.upper_text_box,
         )
-        calc_fncs.helper_set_current_effect(
+        calc_fncs.set_current_effect_from_value(
             analysis_unit=self.analysis_unit,
             txt_boxes=txt_boxes,
-            current_effect=self.cur_effect,
-            group_str=self.group_str,
+            current_effect=self.current_effect,
+            group_comparison=self.group_comparison,
             data_type="continuous",
-            mult=self.mult,
+            confidence_multiplier=self.confidence_multiplier,
         )
 
         self.change_row_color_according_to_metric()
 
     def change_row_color_according_to_metric(self):
         """Expose only the data rows that participate in the selected metric."""
-        curr_effect_is_one_arm = self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
-        self.simple_table.setRowHidden(1, curr_effect_is_one_arm)
+        current_effect_is_one_arm = self.current_effect in CONTINUOUS_ONE_ARM_METRICS
+        self.simple_table.setRowHidden(1, current_effect_is_one_arm)
 
     def update_raw_data(self):
         """Updates table widget with data from analysis_unit"""
         with QSignalBlocker(self.simple_table):
-            for row_index, group_name in enumerate(self.cur_groups):
-                grp_raw_data = self.analysis_unit.get_raw_data_for_group(group_name)
-                for col in range(len(grp_raw_data)):
-                    self._set_val(row_index, col, grp_raw_data[col], self.simple_table)
+            for row_index, group_name in enumerate(self.current_groups):
+                group_raw_data = self.analysis_unit.get_raw_data_for_group(group_name)
+                for col in range(len(group_raw_data)):
+                    self._set_val(
+                        row_index, col, group_raw_data[col], self.simple_table
+                    )
                 # Insert standard errors when available.
                 se_col = 3
                 se = self.analysis_unit.get_se(
-                    self.cur_effect, self.group_str, self.mult
+                    self.current_effect,
+                    self.group_comparison,
+                    self.confidence_multiplier,
                 )
                 self._set_val(row_index, se_col, se, self.simple_table)
         self.impute_data()
@@ -746,7 +755,7 @@ class ContinuousDataDialog(
 
         try:
             self._copy_raw_data_from_table_to_analysis_unit()  # table --> analysis_unit
-            self.try_to_update_cur_outcome()
+            self.update_effect_from_raw_data()
         except Exception as e:
             msg = "Could not compute study effects from the edited raw data: %s" % e
             QMessageBox.warning(self, "Warning", msg)
@@ -814,12 +823,12 @@ class ContinuousDataDialog(
         return row_filled
 
     def _copy_raw_data_from_table_to_analysis_unit(self):
-        for row_index, group_name in enumerate(self.cur_groups):
-            grp_raw_data = self.analysis_unit.get_raw_data_for_group(group_name)
-            for col_index in range(len(grp_raw_data)):
-                cur_val = self._get_float(row_index, col_index)
+        for row_index, group_name in enumerate(self.current_groups):
+            group_raw_data = self.analysis_unit.get_raw_data_for_group(group_name)
+            for col_index in range(len(group_raw_data)):
+                current_value = self._get_float(row_index, col_index)
                 self.analysis_unit.get_raw_data_for_group(group_name)[col_index] = (
-                    cur_val
+                    current_value
                 )
 
     def restore_analysis_unit(self, old_analysis_unit):
@@ -830,7 +839,7 @@ class ContinuousDataDialog(
         self.update_raw_data()
         self.set_current_effect()
         self.impute_data()
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
 
     def restore_tables(self, old_tables_data):
         """Assumes old tables data given in follow order:
@@ -872,13 +881,11 @@ class ContinuousDataDialog(
         old_value=None,
         use_old_value=True,
     ):
-        # Make backup of tables info...
         old_tables_data = self.save_tables_data()
         if use_old_value:
             # From before most recently changed cell changed
             old_tables_data[self._get_index_of_table(table)][row][col] = old_value
 
-        # Make backup copy of analysis_unit
         old_analysis_unit = copy.deepcopy(analysis_unit)
         return old_analysis_unit, old_tables_data
 
@@ -890,27 +897,20 @@ class ContinuousDataDialog(
         return index
 
     def impute_data(self):
-        """Compute what we can for each study from what has been given in the table"""
+        """Fill derivable study fields from the entered values."""
         var_names = self.get_column_header_strs()
-        for row_index, group_name in enumerate(self.cur_groups):
-            # assemble the fields in a dictionary; pass off to r_bridge
-            cur_dict = {}
+        for row_index, group_name in enumerate(self.current_groups):
+            current_values = {}
             for var_index, var_name in enumerate(var_names):
                 var_value = self._get_float(row_index, var_index)
                 if var_value is not None:
-                    cur_dict[self._imputation_field_name(var_name)] = var_value
+                    current_values[self._imputation_field_name(var_name)] = var_value
 
-            # now pass off what we have for this study to the
-            # imputation routine
-            alpha = self.conf_level_to_alpha()
-            results_from_r = r_bridge.impute_cont_data(cur_dict, alpha)
+            alpha = self.confidence_level_to_alpha()
+            results_from_r = r_bridge.impute_continuous_data(current_values, alpha)
 
             if results_from_r["succeeded"]:
                 computed_vals = results_from_r["output"]
-                # and then iterate over the columns again,
-                # populating the table with any available
-                # computed fields
-
                 for var_index, var_name in enumerate(var_names):
                     self._set_val(
                         row_index,
@@ -920,19 +920,14 @@ class ContinuousDataDialog(
                 self._copy_raw_data_from_table_to_analysis_unit()
         self._fit_tables_to_contents()
 
-    def conf_level_to_alpha(self):
-        alpha = 1 - self.conf_level / 100.0
+    def confidence_level_to_alpha(self):
+        alpha = 1 - self.confidence_level / 100.0
         return alpha
 
     def _imputation_field_name(self, visible_header):
         return continuous_imputation_field_name(visible_header)
 
     def impute_pre_post_data(self, table, group_index, row=None, col=None):
-        """The row index corresponds to the group that will be
-        affected by the data edits. E.g., a row index of 0 will result
-        in the data for the first group (row 0 in the simple_table)
-        being modified.
-        """
         old_analysis_unit = old_tables_data = old_correlation = None
         if not (row, col) == (
             None,
@@ -965,26 +960,22 @@ class ContinuousDataDialog(
                 )
                 return None
 
-        group_name = self.cur_groups[group_index]
+        group_name = self.current_groups[group_index]
         var_names = self.get_column_header_strs_pre_post()
         params_dict = {}
-        # A, B correspond to pre, post
         for a_b_index, a_b_name in enumerate(["A", "B"]):
-            # assemble the fields in a dictionary; pass off to r_bridge
             for var_index, var_name in enumerate(var_names):
                 var_value = self._get_float(a_b_index, var_index, table)
                 if var_value is not None:
                     params_dict[
                         "%s.%s" % (self._imputation_field_name(var_name), a_b_name)
                     ] = var_value
-        params_dict["metric"] = "'%s'" % self.cur_effect
+        params_dict["metric"] = "'%s'" % self.current_effect
 
-        # now pass off what we have for this study to the
-        # imputation routine
-        results_from_r = r_bridge.impute_pre_post_cont_data(
+        results_from_r = r_bridge.impute_pre_post_continuous_data(
             params_dict,
             calc_fncs.numeric_value(self.correlation_pre_post.text()),
-            self.conf_level_to_alpha(),
+            self.confidence_level_to_alpha(),
         )
 
         if not results_from_r["succeeded"]:
@@ -999,7 +990,6 @@ class ContinuousDataDialog(
             self._fit_tables_to_contents()
             return None
 
-        # first update the simple table
         computed_vals = results_from_r["output"]
 
         for var_index, var_name in enumerate(self.get_column_header_strs()):
@@ -1007,14 +997,13 @@ class ContinuousDataDialog(
             val = computed_vals[field_name]
             self._set_val(group_index, var_index, val)
 
-            # update the raw data for N, mean and SD fields (this is all that is actually stored)
             if var_index < 3:
                 self.analysis_unit.get_raw_data_for_group(group_name)[var_index] = (
                     computed_vals[field_name]
-                )  #
+                )
 
         try:
-            self.try_to_update_cur_outcome()
+            self.update_effect_from_raw_data()
         except Exception as e:
             if (
                 old_analysis_unit is not None
@@ -1040,7 +1029,7 @@ class ContinuousDataDialog(
             self._set_val(1, var_index, post_val, table)
 
         self._copy_raw_data_from_table_to_analysis_unit()
-        self.set_clear_btn_color()
+        self.update_clear_button_color()
         self._fit_tables_to_contents()
 
         # function was invoked as a result of user interaction, not
@@ -1124,25 +1113,24 @@ class ContinuousDataDialog(
         except ValueError:
             return None
 
-    def no_val(self, x):
+    def _is_empty_value(self, x):
         return x is None or x == ""
 
-    def try_to_update_cur_outcome(self):
+    def update_effect_from_raw_data(self):
         n1, m1, sd1, n2, m2, sd2 = self.analysis_unit.get_raw_data_for_groups(
-            self.cur_groups
+            self.current_groups
         )
         se1, se2 = self._get_float(0, 3), self._get_float(1, 3)
 
-        # here we check whether or not we have sufficient data to compute an outcome
         if (
-            not any([self.no_val(x) for x in [n1, m1, sd1, n2, m2, sd2]])
-            or not any([self.no_val(x) for x in [m1, se1, m2, se2]])
-            and self.cur_effect == "MD"
-            or not any([self.no_val(x) for x in [n1, m1, sd1]])
-            and self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
+            not any([self._is_empty_value(x) for x in [n1, m1, sd1, n2, m2, sd2]])
+            or not any([self._is_empty_value(x) for x in [m1, se1, m2, se2]])
+            and self.current_effect == "MD"
+            or not any([self._is_empty_value(x) for x in [n1, m1, sd1]])
+            and self.current_effect in CONTINUOUS_ONE_ARM_METRICS
         ):
             est_and_ci_d = None
-            if self.cur_effect in CONTINUOUS_TWO_ARM_METRICS:
+            if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
                 est_and_ci_d = r_bridge.continuous_effect_for_study(
                     n1,
                     m1,
@@ -1152,8 +1140,8 @@ class ContinuousDataDialog(
                     m2=m2,
                     sd2=sd2,
                     se2=se2,
-                    metric=self.cur_effect,
-                    conf_level=self.conf_level,
+                    metric=self.current_effect,
+                    confidence_level=self.confidence_level,
                 )
             else:
                 # continuous, one-arm metric
@@ -1162,17 +1150,22 @@ class ContinuousDataDialog(
                     m1,
                     sd1,
                     two_arm=False,
-                    metric=self.cur_effect,
-                    conf_level=self.conf_level,
+                    metric=self.current_effect,
+                    confidence_level=self.confidence_level,
                 )
 
             est, low, high = r_bridge.effect_triplet(
                 est_and_ci_d,
                 "calc_scale",
-                metric=self.cur_effect,
+                metric=self.current_effect,
             )
             self.analysis_unit.set_effect_and_ci(
-                self.cur_effect, self.group_str, est, low, high, mult=self.mult
+                self.current_effect,
+                self.group_comparison,
+                est,
+                low,
+                high,
+                confidence_multiplier=self.confidence_multiplier,
             )
             self.set_current_effect()
 
@@ -1183,11 +1176,11 @@ class ContinuousDataDialog(
             "correlation": self.correlation_pre_post.text(),
             "metric_parameter": self.metric_parameter,
             "button": {
-                "enabled": self.back_calc_btn.isEnabled(),
-                "text": self.back_calc_btn.text(),
-                "hidden": self.back_calc_btn.isHidden(),
-                "checked": self.back_calc_btn.isChecked(),
-                "down": self.back_calc_btn.isDown(),
+                "enabled": self.back_calculate_button.isEnabled(),
+                "text": self.back_calculate_button.text(),
+                "hidden": self.back_calculate_button.isHidden(),
+                "checked": self.back_calculate_button.isChecked(),
+                "down": self.back_calculate_button.isDown(),
             },
         }
 
@@ -1214,15 +1207,15 @@ class ContinuousDataDialog(
             self.correlation_pre_post.blockSignals(blocked)
         self.metric_parameter = state["metric_parameter"]
         button = state["button"]
-        blocked = self.back_calc_btn.blockSignals(True)
+        blocked = self.back_calculate_button.blockSignals(True)
         try:
-            self.back_calc_btn.setText(button["text"])
-            self.back_calc_btn.setEnabled(button["enabled"])
-            self.back_calc_btn.setVisible(not button["hidden"])
-            self.back_calc_btn.setChecked(button["checked"])
-            self.back_calc_btn.setDown(button["down"])
+            self.back_calculate_button.setText(button["text"])
+            self.back_calculate_button.setEnabled(button["enabled"])
+            self.back_calculate_button.setVisible(not button["hidden"])
+            self.back_calculate_button.setChecked(button["checked"])
+            self.back_calculate_button.setDown(button["down"])
         finally:
-            self.back_calc_btn.blockSignals(blocked)
+            self.back_calculate_button.blockSignals(blocked)
 
     def _restore_back_calculation_undo_state(self, count, index, clean, commands):
         if self.undoStack.index() != index:
@@ -1302,9 +1295,9 @@ class ContinuousDataDialog(
                 return
             raise
 
-    def enable_back_calculation_btn(self, engage=False):
+    def update_back_calculation_button(self, engage=False):
         if not engage:
-            return self._enable_back_calculation_btn_impl(engage=False)
+            return self._update_back_calculation_button(engage=False)
 
         state = self._capture_back_calculation_state()
         undo_state = (
@@ -1317,7 +1310,7 @@ class ContinuousDataDialog(
             ),
         )
         try:
-            return self._enable_back_calculation_btn_impl(
+            return self._update_back_calculation_button(
                 engage=True, transaction_state=state
             )
         except _BackCalculationCancelled:
@@ -1344,7 +1337,7 @@ class ContinuousDataDialog(
                 error.add_note("Rollback error: %s" % rollback_error)
             raise
 
-    def _enable_back_calculation_btn_impl(self, engage=False, transaction_state=None):
+    def _update_back_calculation_button(self, engage=False, transaction_state=None):
         # For undo/redo
         old_analysis_unit, old_tables_data = self._save_analysis_unit_and_table_states(
             tables=[self.simple_table, self.g1_pre_post_table, self.g2_pre_post_table],
@@ -1355,9 +1348,9 @@ class ContinuousDataDialog(
         if (
             engage
             and self.metric_parameter is None
-            and self.cur_effect in ["MD", "SMD"]
+            and self.current_effect in ["MD", "SMD"]
         ):
-            if self.cur_effect == "MD":
+            if self.current_effect == "MD":
                 info = (
                     "Back-calculation depends on the relationship between the "
                     "two population standard deviations.\n\n"
@@ -1370,7 +1363,7 @@ class ContinuousDataDialog(
                 if not dialog.exec():
                     raise _BackCalculationCancelled()
                 self.metric_parameter = True if dialog.get_choice() == 0 else False
-            elif self.cur_effect == "SMD":
+            elif self.current_effect == "SMD":
                 info = (
                     "Which standardized mean difference should RC MetaStudio use "
                     "for back-calculation?"
@@ -1402,13 +1395,13 @@ class ContinuousDataDialog(
             group2_data = dict(tmp[1])
 
             tmp = self.analysis_unit.get_effect_and_ci(
-                self.cur_effect, self.group_str, self.mult
+                self.current_effect, self.group_comparison, self.confidence_multiplier
             )
             effect_data = {
                 "est": tmp[0],
                 "low": tmp[1],
                 "high": tmp[2],
-                "metric": self.cur_effect,
+                "metric": self.current_effect,
                 "met.param": self.metric_parameter,
             }
 
@@ -1447,15 +1440,15 @@ class ContinuousDataDialog(
                 changed = False
             return changed
 
-        if self.cur_effect not in ["MD", "SMD"]:
-            was_hidden = self.back_calc_btn.isHidden()
-            self.back_calc_btn.setVisible(False)
+        if self.current_effect not in ["MD", "SMD"]:
+            was_hidden = self.back_calculate_button.isHidden()
+            self.back_calculate_button.setVisible(False)
             if not was_hidden:
                 self._content_layout_changed()
             return None
         else:
-            was_hidden = self.back_calc_btn.isHidden()
-            self.back_calc_btn.setVisible(True)
+            was_hidden = self.back_calculate_button.isHidden()
+            self.back_calculate_button.setVisible(True)
             if was_hidden:
                 self._content_layout_changed()
 
@@ -1468,36 +1461,36 @@ class ContinuousDataDialog(
             for candidate in (True, False):
                 candidate_effect_data = dict(effect_data)
                 candidate_effect_data["met.param"] = candidate
-                candidate_imputed = r_bridge.back_calc_cont_data(
+                candidate_imputed = r_bridge.back_calculate_continuous_data(
                     group1_data,
                     group2_data,
                     candidate_effect_data,
-                    self.conf_level,
+                    self.confidence_level,
                 )
                 if "FAIL" not in candidate_imputed and new_data(
                     group1_data, group2_data, candidate_imputed
                 ):
-                    self.back_calc_btn.setEnabled(True)
-                    self.set_clear_btn_color()
+                    self.back_calculate_button.setEnabled(True)
+                    self.update_clear_button_color()
                     return None
-            self.back_calc_btn.setEnabled(False)
-            self.set_clear_btn_color()
+            self.back_calculate_button.setEnabled(False)
+            self.update_clear_button_color()
             return None
 
-        imputed = r_bridge.back_calc_cont_data(
-            group1_data, group2_data, effect_data, self.conf_level
+        imputed = r_bridge.back_calculate_continuous_data(
+            group1_data, group2_data, effect_data, self.confidence_level
         )
 
         # Leave if there was a failure
         if "FAIL" in imputed:
-            self.back_calc_btn.setEnabled(False)
+            self.back_calculate_button.setEnabled(False)
             return None
 
         if new_data(group1_data, group2_data, imputed):
-            self.back_calc_btn.setEnabled(True)
+            self.back_calculate_button.setEnabled(True)
         else:
-            self.back_calc_btn.setEnabled(False)
-        self.set_clear_btn_color()
+            self.back_calculate_button.setEnabled(False)
+        self.update_clear_button_color()
 
         if not engage:
             return None
@@ -1544,7 +1537,7 @@ class ContinuousDataDialog(
             "sd": imputed["sd2"],
             "mean": imputed["mean2"],
         }
-        for row in range(len(self.cur_groups)):
+        for row in range(len(self.current_groups)):
             for var_index, var_name in enumerate(var_names):
                 field_name = self._imputation_field_name(var_name)
                 if field_name not in ["n", "sd", "mean"]:
@@ -1559,7 +1552,7 @@ class ContinuousDataDialog(
 
         # The committed result has filled every value exposed by this
         # back-calculation, so no second R probe is needed to refresh the button.
-        self.back_calc_btn.setEnabled(False)
+        self.back_calculate_button.setEnabled(False)
         new_state = self._capture_back_calculation_state()
 
         command = calc_fncs.make_field_edit_command(
@@ -1590,7 +1583,7 @@ class ContinuousDataDialog(
                 signal_blockers.enter_context(QSignalBlocker(widget))
             # reset tables
             for table in self.tables:
-                for row_index in range(len(self.cur_groups)):
+                for row_index in range(len(self.current_groups)):
                     for var_index in range(table.columnCount()):
                         self._set_val(row_index, var_index, "", table=table)
 
@@ -1598,14 +1591,19 @@ class ContinuousDataDialog(
 
         for metric in CONTINUOUS_ONE_ARM_METRICS + CONTINUOUS_TWO_ARM_METRICS:
             if (
-                self.cur_effect in CONTINUOUS_TWO_ARM_METRICS
+                self.current_effect in CONTINUOUS_TWO_ARM_METRICS
                 and metric in CONTINUOUS_TWO_ARM_METRICS
             ) or (
-                self.cur_effect in CONTINUOUS_ONE_ARM_METRICS
+                self.current_effect in CONTINUOUS_ONE_ARM_METRICS
                 and metric in CONTINUOUS_ONE_ARM_METRICS
             ):
                 self.analysis_unit.set_effect_and_ci(
-                    metric, self.group_str, None, None, None, mult=self.mult
+                    metric,
+                    self.group_comparison,
+                    None,
+                    None,
+                    None,
+                    confidence_multiplier=self.confidence_multiplier,
                 )
         # clear line edits
         self.set_current_effect()
@@ -1615,7 +1613,7 @@ class ContinuousDataDialog(
             self.correlation_pre_post.setText("0.0")
 
         # For undo/redo
-        self.enable_back_calculation_btn()
+        self.update_back_calculation_button()
         new_analysis_unit, new_tables_data = self._save_analysis_unit_and_table_states(
             tables=[self.simple_table, self.g1_pre_post_table, self.g2_pre_post_table],
             analysis_unit=self.analysis_unit,
@@ -1639,19 +1637,18 @@ class ContinuousDataDialog(
         return "%s (%s)" % (CONTINUOUS_METRIC_NAMES.get(effect, effect), effect)
 
     def _selected_effect(self):
-        effect = self.effect_cbo_box.currentData()
+        effect = self.effect_combo_box.currentData()
         if effect is None:
-            effect = self.effect_cbo_box.currentText()
+            effect = self.effect_combo_box.currentText()
         return str(effect)
 
-    def get_cur_group_str(self):
-        # Inspired from get_cur_group_str of dataset_table_model
+    def get_current_group_comparison(self):
 
-        if self.cur_effect in CONTINUOUS_ONE_ARM_METRICS:
-            group_str = self.cur_groups[0]
+        if self.current_effect in CONTINUOUS_ONE_ARM_METRICS:
+            group_comparison = self.current_groups[0]
         else:
-            group_str = "-".join(self.cur_groups)
-        return group_str
+            group_comparison = "-".join(self.current_groups)
+        return group_comparison
 
     def undo(self):
         self.undoStack.undo()

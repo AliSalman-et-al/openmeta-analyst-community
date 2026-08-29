@@ -37,7 +37,7 @@ _FAMILY_METRICS: Mapping[AnalysisFamily, frozenset[str]] = {
 class CovariateDataset(Protocol):
     """Dataset operation required by covariate-qualified study selection."""
 
-    def get_values_for_cov(
+    def get_covariate_values(
         self, covariate: str, ids_for_keys: bool = False
     ) -> Mapping[int, object]: ...
 
@@ -106,7 +106,7 @@ def select_studies_for_covariates(
 ) -> StudySelectionResult:
     """Select included studies with complete values for selected covariates."""
     covariate_values = {
-        covariate.name: model.dataset.get_values_for_cov(
+        covariate.name: model.dataset.get_covariate_values(
             covariate.name, ids_for_keys=True
         )
         for covariate in selected_covariates
@@ -242,7 +242,7 @@ def execute_meta_regression_request(
     selected_covariates: Sequence[analysis_dataset.Covariate],
     request: AnalysisRequest,
     fixed_effects: bool,
-    default_conf_level: object,
+    default_confidence_level: object,
 ) -> AnalysisResult:
     """Convert the dataset and execute one frozen meta-regression request."""
     conversion_kwargs = {
@@ -271,7 +271,7 @@ def execute_meta_regression_request(
             list(selected_covariates),
             request.metric,
             fixed_effects=fixed_effects,
-            conf_level=parameters.get("conf.level", default_conf_level),
+            confidence_level=parameters.get("conf.level", default_confidence_level),
             params=parameters,
         )
     )
@@ -286,14 +286,14 @@ def _run_diagnostic_backend(workflow, method_names, parameter_values):
 def _run_binary_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
-        return r_bridge.run_binary_ma(request.method, parameters)
+        return r_bridge.run_binary_analysis(request.method, parameters)
     return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
 
 
 def _run_continuous_request(request):
     parameters = request.parameter_values()
     if request.workflow == "standard":
-        return r_bridge.run_continuous_ma(request.method, parameters)
+        return r_bridge.run_continuous_analysis(request.method, parameters)
     return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
 
 

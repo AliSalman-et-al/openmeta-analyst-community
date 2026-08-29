@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from rc_metastudio import analysis_dataset
+from rc_metastudio import analysis_unit
 from rc_metastudio import two_way_dict
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
@@ -33,13 +34,13 @@ class RuntimeProject:
 class ProjectStateModel(Protocol):
     """Workspace fields that are durable in a project archive."""
 
-    current_outcome: str | None
-    current_txs: list[str]
+    current_outcome_name: str | None
+    current_groups: list[str]
     current_effect: str | None
 
     def get_current_follow_up_name(self) -> str | None: ...
 
-    def get_global_conf_level(self) -> float: ...
+    def get_confidence_level(self) -> float: ...
 
 
 def _portable_value(value: object) -> JsonValue:
@@ -95,7 +96,7 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
         follow_ups = [
             value
             for _, value in sorted(
-                dataset.outcome_names_to_follow_ups[name].items(),
+                dataset.follow_ups_by_outcome[name].items(),
                 key=lambda pair: pair[0],
             )
             if value is not None
@@ -116,9 +117,9 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
     studies: list[JsonValue] = []
     for study in dataset.studies:
         units: list[JsonValue] = []
-        for outcome_name in sorted(study.outcomes_to_follow_ups):
+        for outcome_name in sorted(study.analysis_units_by_outcome):
             for follow_up, unit in sorted(
-                study.outcomes_to_follow_ups[outcome_name].items(),
+                study.analysis_units_by_outcome[outcome_name].items(),
                 key=lambda pair: (pair[0] is not None, str(pair[0])),
             ):
                 units.append(
@@ -131,9 +132,9 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                                 "name": str(name),
                                 "raw_data": _portable_value(group.raw_data),
                             }
-                            for name, group in sorted(unit.tx_groups.items())
+                            for name, group in sorted(unit.groups.items())
                         ],
-                        "entered_effects": _entered_effects(unit.effects_dict),
+                        "entered_effects": _entered_effects(unit.effects),
                     }
                 )
         studies.append(
@@ -144,8 +145,8 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                 "include": bool(study.include),
                 "manually_excluded": bool(getattr(study, "manually_excluded", False)),
                 "notes": str(study.notes),
-                "sample_size": study.N,
-                "covariates": _portable_value(study.covariate_dict),
+                "sample_size": study.sample_size,
+                "covariates": _portable_value(study.covariate_values),
                 "analysis_units": units,
             }
         )
@@ -157,7 +158,7 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
             "title": str(dataset.title or ""),
             "summary": _portable_value(dataset.summary),
             "notes": str(dataset.notes),
-            "is_diagnostic": bool(dataset.is_diag),
+            "is_diagnostic": bool(dataset.is_diagnostic),
             "analysis_family": family,
             "outcomes": outcomes,
             "covariates": [
@@ -177,11 +178,11 @@ def model_to_state(model: ProjectStateModel) -> JsonObject:
     """Capture only durable, project-scoped working state."""
     return {
         "schema_version": 1,
-        "active_outcome": model.current_outcome,
+        "active_outcome": model.current_outcome_name,
         "active_follow_up": model.get_current_follow_up_name(),
-        "active_groups": list(model.current_txs or []),
+        "active_groups": list(model.current_groups or []),
         "active_effect": model.current_effect,
-        "confidence_level": float(model.get_global_conf_level()),
+        "confidence_level": float(model.get_confidence_level()),
     }
 
 
@@ -238,7 +239,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
     source = _object(project["dataset"], "dataset")
     dataset = analysis_dataset.Dataset(
         title=_text(source["title"], "dataset title"),
-        is_diag=_boolean(source["is_diagnostic"], "diagnostic flag"),
+        is_diagnostic=_boolean(source["is_diagnostic"], "diagnostic flag"),
         summary=copy.deepcopy(source["summary"]),
     )
     dataset.notes = _text(source["notes"], "dataset notes")
@@ -253,7 +254,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         )
         for item in outcome_items
     }
-    dataset.outcome_names_to_follow_ups = {}
+    dataset.follow_ups_by_outcome = {}
     for item in outcome_items:
         outcome_name = _text(item["name"], "outcome name")
         mapping = two_way_dict.TwoWayDict()
@@ -261,7 +262,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             _array(item["follow_ups"], "outcome follow-ups")
         ):
             mapping[index] = _optional_text(follow_up, "follow-up")
-        dataset.outcome_names_to_follow_ups[outcome_name] = mapping
+        dataset.follow_ups_by_outcome[outcome_name] = mapping
 
     covariate_items = [
         _object(item, "covariate")
@@ -288,12 +289,12 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             _optional_integer(item["year"], "study year"),
             include=_boolean(item["include"], "study inclusion"),
         )
-        study.N = copy.deepcopy(item["sample_size"])
+        study.sample_size = copy.deepcopy(item["sample_size"])
         study.notes = _text(item["notes"], "study notes")
         study.manually_excluded = _boolean(
             item["manually_excluded"], "manual exclusion"
         )
-        study.covariate_dict = copy.deepcopy(
+        study.covariate_values = copy.deepcopy(
             _object(item["covariates"], "study covariates")
         )
         study.outcomes = [outcomes[name] for name in outcomes]
@@ -312,26 +313,28 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 copy.deepcopy(_array(group["raw_data"], "group raw data"))
                 for group in group_items
             ]
-            unit = analysis_dataset.MetaAnalysisUnit(
+            unit = analysis_unit.AnalysisUnit(
                 outcome, raw_data=raw_data, group_names=group_names
             )
             for group_data in group_items:
                 group_name = _text(group_data["name"], "analysis group name")
-                unit.tx_groups[group_name].id = _integer(
+                unit.groups[group_name].id = _integer(
                     group_data["id"], "analysis group id"
                 )
             entered_effects = _object(unit_data["entered_effects"], "entered effects")
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")
                 for comparison, values_value in comparisons.items():
-                    if comparison not in unit.effects_dict[metric]:
+                    if comparison not in unit.effects[metric]:
                         raise ProjectAdapterError(
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
                     values = _object(values_value, "effect values")
-                    unit.effects_dict[metric][comparison].update(copy.deepcopy(values))
+                    unit.effects[metric][comparison].update(copy.deepcopy(values))
             follow_up = _optional_text(unit_data["follow_up"], "unit follow-up")
-            study.outcomes_to_follow_ups.setdefault(outcome_name, {})[follow_up] = unit
+            study.analysis_units_by_outcome.setdefault(outcome_name, {})[follow_up] = (
+                unit
+            )
         dataset.studies.append(study)
     return dataset
 
@@ -349,32 +352,32 @@ def state_to_model_state(
     effect = _optional_text(state["active_effect"], "active effect")
     if outcome is None and dataset.get_outcome_names():
         outcome = dataset.get_outcome_names()[0]
-        follow_up_mapping = dataset.outcome_names_to_follow_ups[outcome]
+        follow_up_mapping = dataset.follow_ups_by_outcome[outcome]
         if follow_up_mapping:
             time_key = min(follow_up_mapping)
             follow_up = follow_up_mapping[time_key]
         first_unit = None
         for study in dataset.studies:
-            first_unit = study.outcomes_to_follow_ups.get(outcome, {}).get(follow_up)
+            first_unit = study.analysis_units_by_outcome.get(outcome, {}).get(follow_up)
             if first_unit is not None:
                 break
-        available_groups = list(first_unit.tx_groups) if first_unit is not None else []
-        groups = available_groups[:1] if dataset.is_diag else available_groups[:2]
+        available_groups = list(first_unit.groups) if first_unit is not None else []
+        groups = available_groups[:1] if dataset.is_diagnostic else available_groups[:2]
         summary = dataset.summary if isinstance(dataset.summary, dict) else {}
         effect_value = summary.get("effect")
         effect = effect_value if isinstance(effect_value, str) else None
-        if effect is None and not dataset.is_diag:
+        if effect is None and not dataset.is_diagnostic:
             effect = "OR" if dataset.get_outcome_type(outcome) == 0 else "SMD"
     time_point = None
     if outcome is not None and follow_up is not None:
-        time_point = dataset.outcome_names_to_follow_ups[outcome].get_key(follow_up)
+        time_point = dataset.follow_ups_by_outcome[outcome].get_key(follow_up)
     return {
-        "current_outcome": outcome,
-        "current_time_point": time_point,
-        "current_txs": groups,
+        "current_outcome_name": outcome,
+        "current_follow_up_index": time_point,
+        "current_groups": groups,
         "current_effect": effect,
         "study_auto_added": False,
-        "conf_level": _number(state["confidence_level"], "confidence level"),
+        "confidence_level": _number(state["confidence_level"], "confidence level"),
     }
 
 

@@ -58,7 +58,7 @@ class MainWindowProtocol(Protocol):
     def edit_group_name(self, group: str) -> None: ...
     def rename_covariate(self, covariate) -> None: ...
     def delete_covariate(self, covariate) -> None: ...
-    def change_cov_type(self, covariate) -> None: ...
+    def change_covariate_type(self, covariate) -> None: ...
     def keyPressEvent(self, event: QKeyEvent | None) -> None: ...
     def metric_selected(self, metric: str, menu: QMenu) -> None: ...
     def enable_menu_options_that_require_dataset(self) -> None: ...
@@ -286,19 +286,19 @@ class DatasetTableView(QtWidgets.QTableView):
             context_menu.addAction(action_sort)
 
         elif column_clicked in raw_data_columns and not data_type == "diagnostic":
-            corresponding_tx_group = self.model().current_txs[0]
+            corresponding_group = self.model().current_groups[0]
             if data_type == "binary":
                 if column_clicked in raw_data_columns[2:]:
-                    corresponding_tx_group = self.model().current_txs[1]
+                    corresponding_group = self.model().current_groups[1]
             elif data_type == "continuous":
                 if column_clicked in raw_data_columns[3:]:
-                    corresponding_tx_group = self.model().current_txs[1]
+                    corresponding_group = self.model().current_groups[1]
 
             # renaming
-            action_rename = QAction("Rename Group %s" % corresponding_tx_group, self)
+            action_rename = QAction("Rename Group %s" % corresponding_group, self)
             _connect_action(
                 action_rename,
-                lambda: self._main_gui().edit_group_name(corresponding_tx_group),
+                lambda: self._main_gui().edit_group_name(corresponding_group),
             )
             context_menu.addAction(action_rename)
             # sorting
@@ -325,7 +325,7 @@ class DatasetTableView(QtWidgets.QTableView):
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
             context_menu.addAction(action_sort)
         elif column_clicked in covariate_columns:
-            cov = self.model().get_cov(column_clicked)
+            cov = self.model().get_covariate_for_column(column_clicked)
 
             action_sort = QAction("Sort Studies by %s" % cov.name, self)
             _connect_action(action_sort, lambda: self.sort_by_col(column_clicked))
@@ -348,7 +348,7 @@ class DatasetTableView(QtWidgets.QTableView):
                 "Create a %s Copy of %s" % (convert_to_str, cov.name), self
             )
             _connect_action(
-                action_change, lambda: self._main_gui().change_cov_type(cov)
+                action_change, lambda: self._main_gui().change_covariate_type(cov)
             )
             context_menu.addAction(action_change)
 
@@ -400,9 +400,6 @@ class DatasetTableView(QtWidgets.QTableView):
             else:
                 QTableView.keyPressEvent(self, event)
         else:
-            # This is a call to the default keyPressEvent function,
-            # which preserves table navigation behavior for keys we do not
-            # handle explicitly.
             QTableView.keyPressEvent(self, event)
 
     def _is_return_key(self, event):
@@ -499,74 +496,74 @@ class DatasetTableView(QtWidgets.QTableView):
                 self.model().get_current_analysis_unit_for_study(study_index)
             )
             old_analysis_unit = copy.deepcopy(analysis_unit)
-            cur_txs = self.model().current_txs
-            cur_effect = self.model().current_effect
-            cur_group_str = self.model().get_cur_group_str()
+            current_groups = self.model().current_groups
+            current_effect = self.model().current_effect
+            group_comparison = self.model().get_current_group_comparison()
             data_type = self.model().get_current_outcome_type()
 
             # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
                 cur_raw_data_dict = {}
-                for group in cur_txs:
+                for group in current_groups:
                     cur_raw_data_dict[group] = list(
                         analysis_unit.get_raw_data_for_group(group)
                     )
 
                 form = binary_data_dialog.BinaryDataDialog(
                     analysis_unit,
-                    cur_txs,
-                    cur_group_str,
-                    cur_effect,
-                    conf_level=self.model().get_global_conf_level(),
+                    current_groups,
+                    group_comparison,
+                    current_effect,
+                    confidence_level=self.model().get_confidence_level(),
                     parent=self,
                 )
                 if form.exec():
                     # push the edit even
-                    ma_edit = EditMetaAnalysisUnitCommand(
+                    analysis_edit = EditAnalysisUnitCommand(
                         self, study_index, analysis_unit, old_analysis_unit
                     )
-                    self.undoStack.push(ma_edit)
+                    self.undoStack.push(analysis_edit)
             elif data_type == "continuous":
                 cur_raw_data_dict = {}
-                for group_name in cur_txs:
+                for group_name in current_groups:
                     cur_raw_data_dict[group_name] = list(
                         analysis_unit.get_raw_data_for_group(group_name)
                     )
 
                 form = continuous_data_dialog.ContinuousDataDialog(
                     analysis_unit,
-                    cur_txs,
-                    cur_group_str,
-                    cur_effect,
-                    conf_level=self.model().get_global_conf_level(),
+                    current_groups,
+                    group_comparison,
+                    current_effect,
+                    confidence_level=self.model().get_confidence_level(),
                     parent=self,
                 )
                 if form.exec():
                     # update the model; push this event onto the stack
-                    ma_edit = EditMetaAnalysisUnitCommand(
+                    analysis_edit = EditAnalysisUnitCommand(
                         self, study_index, analysis_unit, old_analysis_unit
                     )
-                    self.undoStack.push(ma_edit)
+                    self.undoStack.push(analysis_edit)
             else:
                 # then this is diagnostic data
                 cur_raw_data_dict = {}
-                for group in cur_txs:
+                for group in current_groups:
                     cur_raw_data_dict[group] = list(
                         analysis_unit.get_raw_data_for_group(group)
                     )
 
                 form = diagnostic_data_dialog.DiagnosticDataDialog(
                     analysis_unit,
-                    cur_txs,
-                    cur_group_str,
-                    conf_level=self.model().get_global_conf_level(),
+                    current_groups,
+                    group_comparison,
+                    confidence_level=self.model().get_confidence_level(),
                     parent=self,
                 )
                 if form.exec():
-                    ma_edit = EditMetaAnalysisUnitCommand(
+                    analysis_edit = EditAnalysisUnitCommand(
                         self, study_index, analysis_unit, old_analysis_unit
                     )
-                    self.undoStack.push(ma_edit)
+                    self.undoStack.push(analysis_edit)
         finally:
             del signal_blocker
 
@@ -725,7 +722,7 @@ class DatasetTableView(QtWidgets.QTableView):
         candidate = type(model)(
             dataset=copy.deepcopy(model.dataset), add_blank_study=False
         )
-        candidate.set_state(copy.deepcopy(model.get_stateful_dict()))
+        candidate.set_state(copy.deepcopy(model.get_state()))
         for row_offset, row in enumerate(content):
             for column_offset, value in enumerate(row):
                 index = candidate.index(
@@ -750,8 +747,8 @@ class DatasetTableView(QtWidgets.QTableView):
         for row in range(upper_left_index.row(), lower_right_index.row() + 1):
             current_row = []
             for col in range(upper_left_index.column(), lower_right_index.column() + 1):
-                cur_index = self.model().createIndex(row, col)
-                cur_data = self.model().data(cur_index)
+                current_index = self.model().createIndex(row, col)
+                cur_data = self.model().data(current_index)
                 if cur_data is not None:
                     cur_str = _to_text(cur_data)
                     current_row.append(cur_str)
@@ -790,7 +787,7 @@ class DatasetTableView(QtWidgets.QTableView):
         # temporarily disable sorting to prevent automatic sorting of pasted data.
         # (note: this is consistent with Excel's approach.)
         original_dataset = copy.deepcopy(self.model().dataset)
-        original_state_dict = copy.deepcopy(self.model().get_stateful_dict())
+        original_state_dict = copy.deepcopy(self.model().get_state())
         original_model = self.model()
         original_unsaved = (
             self._main_gui().current_data_unsaved if self.main_gui is not None else None
@@ -998,7 +995,6 @@ class CellEditCommand(QUndoCommand):
         self.row, self.col = index.row(), index.column()
         self.dataset_table_view = dataset_table_view
         self.added_study = added_study
-        self.something_else = added_study
         self.selection = [
             (selected.row(), selected.column())
             for selected in dataset_table_view.selectionModel().selectedIndexes()
@@ -1013,21 +1009,9 @@ class CellEditCommand(QUndoCommand):
 
         if self.first_call:
             self.first_call = False
-            # the self.added_study should be true if and only if
-            # the event being done *caused* a study to be added.
-            # in this case, we'll need to remove the added study
-            # on the undo() call
-
-            # note: previously (10/14/11) there was a call here to set the
-            # model's study_auto_added field to None. I don't know why it was
-            # here, and removed it.
-            #     > self.dataset_table_view.model().study_auto_added = None
         else:
             model = self.dataset_table_view.model()
-            # here we block signals from the model. this is
-            # to prevent memory access problems on the c
-            # side of things, when the model emits
-            # the data edited signal.
+            # Qt views may dereference transient model indexes during dataEdited.
             signal_blocker = QSignalBlocker(model)
             try:
                 edit_ok = self._apply_content(model, index, self.new_content)
@@ -1039,28 +1023,21 @@ class CellEditCommand(QUndoCommand):
                 self.dataset_table_view._report_model_data_error(
                     self.dataset_table_view._model_data_error_message()
                 )
-            # make the view reflect the update
             self.dataset_table_view.model().reset_model()
 
         self.dataset_table_view._enable_analysis_menus_if_appropriate()
         self.dataset_table_view.synchronize_column_widths()
 
-        # let everyone know that the data is dirty
         self.dataset_table_view.dataDirtied.emit()
         self._restore_selection()
 
     def undo(self):
-        # in this case, the original editing action
-        # had the effect of appending a row to the spreadsheet.
-        # here we remove it.
         if self.added_study is not None:
             self.dataset_table_view.model().remove_study(self.added_study)
 
         index = self._get_index()
         model = self.dataset_table_view.model()
 
-        # as in the redo method, we block signals before
-        # editing the model data
         with QSignalBlocker(model):
             edit_ok = self._apply_content(
                 model, index, self.original_content, allow_empty_names=True
@@ -1071,8 +1048,6 @@ class CellEditCommand(QUndoCommand):
             )
         self.dataset_table_view.model().reset_model()
 
-        # here is where we check if there are enough studies to actually
-        # perform an analysis.
         self.dataset_table_view._enable_analysis_menus_if_appropriate()
         self.dataset_table_view.synchronize_column_widths()
         self.dataset_table_view.dataDirtied.emit()
@@ -1137,7 +1112,7 @@ class PasteCommand(QUndoCommand):
         # rollback boundary.
         self.original_dataset = copy.deepcopy(self.dataset_table_view.model().dataset)
         self.original_state_dict = copy.deepcopy(
-            self.dataset_table_view.model().get_stateful_dict()
+            self.dataset_table_view.model().get_state()
         )
         self.original_unsaved = self.dataset_table_view.main_gui.current_data_unsaved
 
@@ -1209,7 +1184,7 @@ class PasteCommand(QUndoCommand):
         )
 
 
-class EditMetaAnalysisUnitCommand(QUndoCommand):
+class EditAnalysisUnitCommand(QUndoCommand):
     def __init__(
         self,
         table_view,
@@ -1218,7 +1193,7 @@ class EditMetaAnalysisUnitCommand(QUndoCommand):
         old_analysis_unit,
         description="Analysis unit edit",
     ):
-        super(EditMetaAnalysisUnitCommand, self).__init__(description)
+        super().__init__(description)
         self.model = table_view.model()
         self.old_analysis_unit = old_analysis_unit
         self.new_analysis_unit = new_analysis_unit

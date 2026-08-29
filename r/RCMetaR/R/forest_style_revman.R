@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# RevMan Forest Style templates for the metafor-backed forest renderer.
-
 rcmetar.revman.format.number <- function(values, digits) {
     rcmetar.format.metafor.numeric(values, digits)
 }

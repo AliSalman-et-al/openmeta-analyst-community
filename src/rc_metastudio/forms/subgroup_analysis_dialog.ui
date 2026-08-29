@@ -15,9 +15,9 @@
     <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
     <item row="0" column="0"><widget class="QLabel" name="label">
      <property name="text"><string>Covariate for subgroups:</string></property>
-     <property name="buddy"><cstring>cov_subgroup_cbo_box</cstring></property>
+     <property name="buddy"><cstring>covariate_combo_box</cstring></property>
     </widget></item>
-    <item row="0" column="1"><widget class="AdaptiveComboBox" name="cov_subgroup_cbo_box"/></item>
+    <item row="0" column="1"><widget class="AdaptiveComboBox" name="covariate_combo_box"/></item>
    </layout></item>
    <item><widget class="QDialogButtonBox" name="buttonBox">
    <property name="orientation">

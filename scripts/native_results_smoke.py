@@ -494,7 +494,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         raise RuntimeError("failed to create Network View smoke artifact")
 
     class Model:
-        current_outcome = "Mortality"
+        current_outcome_name = "Mortality"
         dataset = type(
             "Dataset",
             (),
@@ -569,9 +569,9 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             "device_pixel_ratio": float(results.devicePixelRatioF()),
             "navigation": navigation,
             "network": {
-                "follow_up": network.follow_up_cbo_box.currentText(),
+                "follow_up": network.follow_up_combo_box.currentText(),
                 "item_count": len(network.scene.items()),
-                "outcome": network.outcome_cbo_box.currentText(),
+                "outcome": network.outcome_combo_box.currentText(),
             },
             "plot_artifact": svg.name,
             "plot_artifact_sha256": _sha256(svg),

@@ -11,7 +11,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QUndoCommand, QUndoStack
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
-from rc_metastudio.meta_globals import CALC_NUM_DIGITS, EMPTY_VALS, ERROR_COLOR, OK_COLOR
+from rc_metastudio.meta_globals import (
+    CALC_NUM_DIGITS,
+    EMPTY_VALS,
+    ERROR_COLOR,
+    OK_COLOR,
+)
 from rc_metastudio import r_bridge
 from rc_metastudio import qt_text
 from rc_metastudio.runtime_types import required
@@ -206,13 +211,11 @@ class ConsistencyChecker:
                 value = self._get_int(row, col)
                 if value not in EMPTY_VALS:
                     if value < 0:
-                        # Color item
                         self.table.blockSignals(True)
                         set_table_item_text_color(
                             self.table.item(row, col), ERROR_COLOR
                         )
                         self.table.blockSignals(False)
-                        # Set flag
                         self.inconsistent = True
                         all_positive = False
         return all_positive
@@ -221,7 +224,6 @@ class ConsistencyChecker:
         self.table.blockSignals(True)
         for row in range(3):
             for col in range(3):
-                # print "setting row: %s, col: %s" % (row, col)
                 item = self.table.item(row, col)
                 if item is not None:
                     set_table_item_text_color(item, color)
@@ -251,9 +253,7 @@ class ConsistencyChecker:
 
 
 def enable_txt_box_input(*args):
-    """Enables text boxes if they are empty, disables them otherwise
-    Input is textbox(es)
-    """
+    """Enable empty text boxes and disable populated text boxes."""
     for text_box in args:
         text_box.blockSignals(True)
 
@@ -364,15 +364,17 @@ def diagnostic_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     return (precision, "9999." + ("9" * digits))
 
 
-def helper_set_current_effect(
-    analysis_unit, txt_boxes, current_effect, group_str, data_type, mult=None
+def set_current_effect_from_value(
+    analysis_unit,
+    txt_boxes,
+    current_effect,
+    group_comparison,
+    data_type,
+    confidence_multiplier=None,
 ):
-    """Populate calculator fields from a meta-analysis unit.
-    I noticed all 3 set_current_effect functions in the 3 calculators are
-    nearly identical so it makes sense to share the similiar parts
-    """
-    if mult is None:
-        raise ValueError("mult must be specified")
+    """Populate calculator fields from an analysis unit."""
+    if confidence_multiplier is None:
+        raise ValueError("confidence multiplier must be specified")
 
     if data_type == "binary":
 
@@ -399,11 +401,14 @@ def helper_set_current_effect(
     ]
 
     (est, lower, upper) = analysis_unit.get_effect_and_ci(
-        current_effect, group_str, mult
+        current_effect, group_comparison, confidence_multiplier
     )
-    (d_est, d_lower, d_upper) = [conv_to_disp_scale(x) for x in (est, lower, upper)]
+    (display_estimate, display_lower, display_upper) = [
+        conv_to_disp_scale(x) for x in (est, lower, upper)
+    ]
     for val, txt_box in zip(
-        (d_est, d_lower, d_upper), [effect_tbox, lower_tbox, upper_tbox]
+        (display_estimate, display_lower, display_upper),
+        [effect_tbox, lower_tbox, upper_tbox],
     ):
         txt_box.blockSignals(True)
         if val is not None:
@@ -442,7 +447,7 @@ def save_table_data(table):
 
 
 class CalculatorCommandOwner(Protocol):
-    def enable_back_calculation_btn(self, engage: bool = False) -> None: ...
+    def update_back_calculation_button(self, engage: bool = False) -> None: ...
 
 
 EditState: TypeAlias = tuple[object, ...]
@@ -475,7 +480,7 @@ class FieldEditCommand(QUndoCommand):
         if self.just_created:
             self.just_created = False
             if self.refresh_on_initial_redo:
-                self.owner.enable_back_calculation_btn()
+                self.owner.update_back_calculation_button()
         else:
             self.restore_state(*self.new_state)
 
@@ -573,28 +578,31 @@ def _txt_boxes_disabled(text_boxes):
 def evaluate(
     new_text,
     analysis_unit,
-    curr_effect,
-    group_str,
+    current_effect,
+    group_comparison,
     conv_to_disp_scale,
     ci_param=None,
     parent=None,
     opt_cmp_fn=None,
     opt_cmp_msg=None,
-    mult=None,
+    confidence_multiplier=None,
 ):
     """opt_cmp_fn i.e. 'Optional Compare Function' should return True when the
     desired condition is met and False otherwise. It is a function of new_text:
     opt_cmp_fn(new_text)
     """
-    if mult is None:
-        raise ValueError("mult must be specified")
+    if confidence_multiplier is None:
+        raise ValueError("confidence multiplier must be specified")
 
     est, lower, upper = analysis_unit.get_effect_and_ci(
-        curr_effect, group_str, mult
+        current_effect, group_comparison, confidence_multiplier
     )  # calc scale
-    d_est, d_lower, d_upper = [conv_to_disp_scale(x) for x in (est, lower, upper)]
-    is_between_bounds = partial(between_bounds, est=d_est, low=d_lower, high=d_upper)
-    # Make sure entered value is numeric and between the appropriate bounds
+    display_estimate, display_lower, display_upper = [
+        conv_to_disp_scale(x) for x in (est, lower, upper)
+    ]
+    is_between_bounds = partial(
+        between_bounds, est=display_estimate, low=display_lower, high=display_upper
+    )
     try:
         parsed_value = numeric_value(new_text)
     except ValueError:

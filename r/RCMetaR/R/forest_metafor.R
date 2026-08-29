@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Default metafor-backed forest renderer and shared bundle builders.
-
 rcmetar.forest.study.header.label <- function(header) {
     if (is.null(header) || length(header) == 0 ||
             as.character(header) %in% c("[default]", "Studies", "Author(s) and Year")) {

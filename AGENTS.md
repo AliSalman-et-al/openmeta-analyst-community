@@ -16,9 +16,9 @@ Keep the implementation as simple as the product allows. Remove accidental compl
 
 ## Repository references
 
-- GitHub issue workflow: `docs/agents/issue-tracker.md`
-- Triage label mapping: `docs/agents/triage-labels.md`
-- Domain vocabulary and decisions: `docs/agents/domain.md`
-- Setup and verification: `docs/maintaining.md`
-- Project file contract: `docs/project-format.md`
-- Release process: `docs/release.md`
+- For GitHub issue work, read `docs/agents/issue-tracker.md`.
+- Before assigning issue labels, read `docs/agents/triage-labels.md`.
+- Before naming or changing a modeled concept, read `docs/agents/domain.md`.
+- For setup and verification commands, read `docs/maintaining.md`.
+- Before changing `.rcms` persistence, read `docs/project-format.md`.
+- For builds, release candidates, promotion, or withdrawal, read `docs/release.md`.

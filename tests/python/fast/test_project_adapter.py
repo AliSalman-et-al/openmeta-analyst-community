@@ -7,7 +7,6 @@ import pytest
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
-
 from rc_metastudio import project_adapter
 
 
@@ -93,7 +92,7 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
     )
     assert rebuilt_units == expected_units
     assert list(
-        dataset.studies[0].outcomes_to_follow_ups["Outcome"]["first"].tx_groups
+        dataset.studies[0].analysis_units_by_outcome["Outcome"]["first"].groups
     ) == [
         "Tx 1",
         "Tx 2",
@@ -119,11 +118,11 @@ def test_document_to_runtime_project_reconstructs_state_and_selection() -> None:
     assert isinstance(runtime_project, project_adapter.RuntimeProject)
     assert runtime_project.dataset.get_outcome_names() == ["Outcome"]
     assert runtime_project.model_state == {
-        "current_outcome": "Outcome",
-        "current_time_point": 0,
-        "current_txs": ["Tx 1", "Tx 2"],
+        "current_outcome_name": "Outcome",
+        "current_follow_up_index": 0,
+        "current_groups": ["Tx 1", "Tx 2"],
         "current_effect": "OR",
         "study_auto_added": False,
-        "conf_level": 95.0,
+        "confidence_level": 95.0,
     }
     assert runtime_project.restored_selection is True

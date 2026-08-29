@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Style-neutral measurement and planning for metafor-backed forest renderers.
-
 rcmetar.forest.layout.preflight <- function(bundle, style=bundle$fp_style, size.policy="export") {
     style <- if (is.null(style) || length(style) == 0) "default" else as.character(style[[1]])
     if (identical(style, "revman") &&

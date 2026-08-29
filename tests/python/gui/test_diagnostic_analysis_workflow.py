@@ -149,7 +149,7 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
 
         # Minimal working-backend stub so construction reaches the diagnostic UI
         # setup (and the previously-broken translate() call) without real R.
-        # populate_cbo_box builds the R data object for feasibility checks, so
+        # Parameter controls build the R data object for feasibility checks, so
         # that entry point has to be stubbed too.
         _set_backend(
             monkeypatch,
@@ -182,7 +182,7 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
 
         # The method dialog must open with the selected diagnostic metrics.
@@ -333,7 +333,7 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
 
         form.run_ma()
@@ -437,7 +437,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
         form.diagnostic_analysis_details = {
             "Sens": ("diagnostic.hsroc", {"conf.level": 95.0}),
@@ -575,7 +575,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
         assert preparation_errors == [], "".join(
             __import__("traceback").format_exception(preparation_errors[0])
@@ -587,7 +587,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             {"conf.level": 90.0, "digits": 4, "adjust": 0.25, "to": "all"}
         )
         form.lr_dor_panel.params["rm.method"] = "REML"
-        form.add_cur_analysis_details()
+        form.add_current_analysis_details()
 
         assert form.windowTitle() == "Method & Parameters"
         assert (
@@ -601,12 +601,8 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             "Likelihood Ratios and Diagnostic Odds Ratio"
         )
         assert not any(button.text() == "next >" for button in form.buttonBox.buttons())
-        sens_method, sens_params = form.diagnostic_analysis_details[
-            "Sens"
-        ]
-        dor_method, dor_params = form.diagnostic_analysis_details[
-            "DOR"
-        ]
+        sens_method, sens_params = form.diagnostic_analysis_details["Sens"]
+        dor_method, dor_params = form.diagnostic_analysis_details["DOR"]
         assert sens_method == "diagnostic.hsroc"
         assert sens_params == {"num.iters": 5000}
         assert dor_method == "diagnostic.random"
@@ -796,7 +792,7 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec", "lr", "dor"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
         requests = form.analysis_requests()
 
@@ -901,7 +897,7 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
         built_metrics[:] = []
 
@@ -1119,7 +1115,7 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
 
         method_names = [
@@ -1190,7 +1186,7 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
 
         form = window._build_analysis_specs_dialog(
             diagnostic_metrics=["sens", "spec"],
-            conf_level=window.model.get_global_conf_level(),
+            confidence_level=window.model.get_confidence_level(),
         )
         form.show()
         app.processEvents()

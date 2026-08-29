@@ -1,17 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-####################################
-#                                  #
-# RC MetaStudio                #
-# ----                             #
-# utilities.R                      #
-#                                  #
-# Utilities for pretty-printing    #
-# results.                         #
-####################################
-
-
 rcmetar.summary.label <- function(value) {
   normalized <- trimws(as.character(value))
   compact <- tolower(gsub("[._-]+", " ", normalized))
@@ -65,15 +54,6 @@ rcmetar.summary.column.justification <- function(table.data, col.index) {
 
 print.summary.display <- function(x, ...) {
   summary.disp <- x
-  #
-  # Prints a summary results
-  # summary.disp is a list containing the following named items
-  # - model.title - a string that appears at the top of the summary.
-  # - table.titles - a vector of titles for the results tables
-  #   Setting a table title to NA prevents the table from being printed.
-  # - arrays - a list of arrays, of the same length as table.titles,
-  #   which are pretty-printed by print.summary.data 
-  #
   cat(summary.disp$model.title)
   arrays <- summary.disp$arrays
   count = 1
@@ -108,7 +88,6 @@ print.summary.display <- function(x, ...) {
 
 print.summary.data <- function(x, ...) {
   table.data <- x
-  # Prints an array table.data.
   num.rows <- length(table.data[,1])
   num.cols <- length(table.data[1,])
   col.spacing <- "  "
@@ -274,7 +253,6 @@ if (!exists("get.mult.from.conf.level", mode="function")) {
 }
 
 pad.with.spaces <- function(entry, begin.num, end.num) {
-  # Adds spaces to beginning and end of entry
   repeat.string.begin <- ""
   if (begin.num > 0) {
     repeat.string.begin <- create.repeat.string(" ", begin.num)
@@ -288,14 +266,13 @@ pad.with.spaces <- function(entry, begin.num, end.num) {
 }
 
 create.repeat.string <- function(symbol, num.repeats) {
-  # creates a string in which symbol is repeated num.repeats times
   repeat.string <- NULL
   for (count in 1:num.repeats) {
     repeat.string <- paste(repeat.string, symbol, sep="")
   }
   repeat.string
 }
- 
+
 RCMETAR_DEFAULT_DISPLAY_DIGITS <- 2L
 RCMETAR_MINIMUM_P_VALUE_DIGITS <- 3L
 
@@ -358,24 +335,22 @@ format.p.value.display <- function(value, digits) {
 }
 
 g.round.display.zval <- function(x, digits) {
-  # just for use in # create.subgroup.display for rounding the (single) zvals
   if (display.value.is.missing(x)) {
     return("")
   }
   digits.str <- paste("%.", digits, "f", sep="")
   x.disp <- c()
-  
+
   x.disp[x < 0 && abs(x) < 10^(-digits)] <- paste(">","-",10^(-digits)," & <0",sep="")
   x.disp[x < 0 && abs(x) >= 10^(-digits)] <- sprintf(digits.str, x[x < 0 && abs(x)>=10^(-digits)])
-  
+
   x.disp[x>0 && x < 10^(-digits)] <- paste("< ", 10^(-digits), sep="")
   x.disp[x>0 && x >= 10^(-digits)] <- sprintf(digits.str, x[x>0 && x>=10^(-digits)])
   x.disp
 }
-  
+
 
 create.summary.disp <- function(om.data, params, res, model.title) {
-  # create tables for diplaying summary of ma results
   result.digits <- display.digits(params)
   se.digits <- display.digits(params, minimum=3L)
   digits.str <- paste("%.", result.digits, "f", sep="")
@@ -386,21 +361,17 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   degf <- res$k - 1
   I2 <- format.percent.display(res$I2, "%.1f")
   QLabel =  paste("Q(df=", degf, ")", sep="")
-  # Set n, the vector of numbers of studies, for PFT metric.
   if (params$measure=="PFT" && length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
-    n <- om.data@g1O1 + om.data@g1O2  # Number of subjects - needed for Freeman-Tukey double arcsine trans.
+    n <- om.data@g1O1 + om.data@g1O2
   }
   else {
-    n <- NULL # don't need n except for PFT (freeman-tukey)
+    n <- NULL
   }
   QE <- format.numeric.display(res$QE, digits.str)
   QEp <- format.p.value.display(res$QEp, params$digits)
   pVal <- format.p.value.display(res$pval, params$digits)
 
   res.title <- "Model Results"
-  #y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, list(ni=n)))
-  #lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.lb, list(ni=n)))
-  #ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.ub, list(ni=n)))
   y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, ni=n))
   lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.lb, ni=n))
   ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.ub, ni=n))
@@ -410,16 +381,15 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     het.col.labels <- c(QLabel, "Het. p-value")
     het.col.vals <-  c(QE, QEp)
     het.array <- rbind(het.col.labels, het.col.vals)
-  } else {  
+  } else {
     het.col.labels <- c("\u03c4\u00b2", QLabel, "Het. p-value", "I\u00b2")
     het.col.vals <-  c(tau2, QE, QEp, I2)
     het.array <- rbind(het.col.labels, het.col.vals)
   }
   class(het.array) <- "summary.data"
   het.title <- "Heterogeneity"
-   
+
   if (scale.str == "log" || scale.str == "logit" || scale.str == "arcsine") {
-    # display and calculation scales are different - create two tables for results
     res.col.labels <- c("Estimate", "Lower bound", "Upper bound","p-value")
     res.col.vals <- c(y.disp, lb.disp, ub.disp, pVal)
     res.array <- rbind(res.col.labels, res.col.vals)
@@ -438,7 +408,6 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     table.titles <- c(res.title, het.title)
     notes <- c(calc.note)
   } else {
-    # display and calculation scales are the same - create one table for results
     col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
     col.vals <- c(y.disp, lb.disp, ub.disp, se, pVal)
     res.array <- rbind(col.labels, col.vals)
@@ -446,21 +415,8 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     table.titles <- c(res.title, het.title)
     notes <- NULL
   }
-  
-  #if (transform.name == "binary.transform.f") {
-    # Add raw data title and array 
-    # raw.data.array <- create.binary.data.array(om.data, params, res)
-    # table.titles <- c(" Study Data", table.titles)
-    # raw.data.list <- list("arr0"=raw.data.array)
-    # arrays <- c(raw.data.list, arrays)
-  #} else if (transform.name == "continuous.transform.f") {
-    #raw.data.array <- create.cont.data.array(om.data, params, res)
-    #table.titles <- c(" Study Data", table.titles)
-    #raw.data.list <- list("arr0"=raw.data.array)
-    #arrays <- c(raw.data.list, arrays)
-  #}
-  # Above code can be re-enabled when write.x.study.data.to.file is fixed.
-  
+
+
   summary.disp <- list(
     "model.title" = model.title,
     "table.titles" = table.titles,
@@ -471,51 +427,33 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   summary.disp
 }
 
-# save.plot.data intentionally persists only plot data; save.data stores the
-# broader analysis payload.
 save.plot.data <- function(plot.data, out.path=NULL) {
-  # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
-    # Use the current system time as a unique-enough default filename.
     out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
-  ### save plot data *only*
   save(plot.data, file=paste(out.path, ".plotdata", sep=""))
   out.path
 }
 
-# Save plot data, parameters, and model results for editable forest plots.
 save.plot.data.and.params <- function(data, params, res, level, out.path=NULL) {
-  # saves plot data to the RC MetaStudio scratch directory
   if (is.null(out.path)){
-    # Use the current system time as a unique-enough default filename.
     out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
-  
-  ### save plot data
+
   save(data, file=paste(out.path, ".data", sep=""))
-  
-  ### save params
+
   save(params, file=paste(out.path, ".params", sep=""))
-  
-  ### save res
+
   save(res, file=paste(out.path, ".res", sep=""))
-  
-  ### save level
+
   save(level, file=paste(out.path, ".level", sep=""))
-  
+
   out.path
 }
 
 
 save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
-  # this saves *all* the data for certain types of plots, in contrast
-  # to the above method (save.plot.data), which saves only the plot.data
-  # object.
-  #
-  # save the data, result and plot parameters to a tmp file on disk
   if (is.null(out.path)){
-    # by default, we use thecurrent system time as a 'unique enough' filename
     out.path <- rcmetar.scratch.path(as.character(as.numeric(Sys.time())))
   }
 
@@ -527,7 +465,7 @@ save.data <- function(om.data, res, params, plot.data, out.path=NULL) {
     }
   }
   save(res, file=paste(out.path, ".res", sep=""))
-  
+
   save(plot.data, file=paste(out.path, ".plotdata", sep=""))
   save(params, file=paste(out.path, ".params", sep=""))
   out.path
@@ -905,21 +843,18 @@ adjusted_means_display <- function(res, params, display.data) {
 }
 
 create.overall.display <- function(res, study.names, params, model.title, data.type) {
-  # create tables for diplaying summary of meta-methods (cumulative and leave-one-out) results.
   if (data.type == "continuous") {
     transform.name <- "continuous.transform.f"
   } else if (data.type == "diagnostic") {
     transform.name <- "diagnostic.transform.f"
-  }  else {  
+  }  else {
     transform.name <- "binary.transform.f"
   }
   scale.str <- get.scale(params)
   overall.array <- array(dim=c(length(study.names) + 1, 6))
-    #QLabel =  paste("Q(df = ", degf, ")", sep="")
-  
+
   overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
-  
-  # unpack the data
+
   for (count in 1:length(res)) {
     y <- res[[count]]$b
     lb <- res[[count]]$ci.lb
@@ -931,7 +866,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
     lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n=NULL))
     ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n=NULL))
     se.disp <- sprintf(se.digits.str, se)
-    
+
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     overall.array[count+1,] <- c(study.names[count], y.disp, lb.disp, ub.disp, se.disp, pVal)
   }
@@ -945,31 +880,27 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
 }
 
 create.subgroup.display <- function(res, study.names, params, model.title, data.type) {
-  # create table for diplaying summary of overall ma results
   if (data.type == "continuous") {
     transform.name <- "continuous.transform.f"
   } else if (data.type == "diagnostic") {
     transform.name <- "diagnostic.transform.f"
-  }  else {  
+  }  else {
     transform.name <- "binary.transform.f"
   }
   scale.str <- "standard"
   if (metric.is.log.scale(params$measure)){
-    scale.str <- "log" 
+    scale.str <- "log"
   } else if (metric.is.logit.scale(params$measure)) {
     scale.str <- "logit"
   }
   subgroup.array <- array(dim=c(length(study.names) + 1, 8))
   het.array <- array(dim=c(length(study.names) + 1, 4))
-  #QLabel =  paste("Q(df = ", degf, ")", sep="")
 
-  # hmm....
   n <- length(study.names)
 
   subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value", "z-value")
   het.array[1,] <- c("Studies", "Q (df)",
                "Het. p-value", "I\u00b2")
-  # unpack the data
   for (count in 1:length(study.names)) {
     num.studies <- res[[count]]$k
     y <- res[[count]]$b
@@ -994,18 +925,15 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
     zVal <- g.round.display.zval(res[[count]]$zval, digits=params$digits)
 
-    # Single-study subgroup results may omit num.studies; treat that case as
-    # one study for display formatting.
     if (is.null(num.studies))
       num.studies <- 1
-     
+
     subgroup.array[count+1,] <- c(study.names[count], num.studies, y.disp, lb.disp, ub.disp, se.disp, pVal, zVal)
     het.array[count+1,] <- c(study.names[count], QE, QEp, I2)
   }
 
   table.titles <- c("Model Results", "Heterogeneity")
   arrays <- list(arr1=subgroup.array, arr2=het.array)
-  #}
   subgroup.disp <- list("model.title" = model.title, "table.titles" = table.titles, "arrays" = arrays,
              "MAResults" = res )
   class(subgroup.disp) <- "summary.display"
@@ -1014,45 +942,41 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
 
 
 results.short.list <- function(res) {
-  # extracts res$b, res$ci.lb, and res$ci.ub from res
   res.short <- list("b"=res$b[1], "ci.lb"=res$ci.lb, "ci.ub"=res$ci.ub)
 }
 
 calc.ci.bounds <- function(om.data, params, ...) {
-  #  Calulate confidence interval bounds using normal approximation.
   y <- om.data@y
   se <- om.data@SE
   mult <- get.mult.from.conf.level(params$conf.level)
   lb <- y - mult*om.data@SE
   ub <- y + mult*om.data@SE
   extra.args <- list(...)
-  # Check that bounds are in the range of the transformation and truncate if necessary.
   if (params$measure=="PR") {
-    for (i in 1:length(lb)) {  
+    for (i in 1:length(lb)) {
       lb[i] <- max(lb[i], 0)
       ub[i] <- min(ub[i], 1)
     }
   }
   if (params$measure=="PAS") {
-    for (i in 1:length(lb)) {  
+    for (i in 1:length(lb)) {
       lb[i] <- max(lb[i], asin(0))
       ub[i] <- min(ub[i], asin(1))
     }
   }
   if (params$measure=="PFT") {
     n <- extra.args[['ni']]
-    for (i in 1:length(lb)) {  
+    for (i in 1:length(lb)) {
       lb[i] <- max(lb[i], transf.pft(0, n[i]))
       ub[i] <- min(ub[i], transf.pft(1, n[i]))
     }
-  } 
+  }
 
   study.ci.bounds <- list(lb=lb, ub=ub)
 }
 
 write.results.to.file <- function(om.data, params, res, outpath) {
-  # write results to file
-  transform.name <- get.transform.name(om.data) 
+  transform.name <- get.transform.name(om.data)
   results.df <- data.frame("Summary.estimate" = eval(call(transform.name, params$measure))$display.scale(res$b, n),
                "Lower.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.lb, n),
                "Upper.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.ub, n),
@@ -1060,8 +984,7 @@ write.results.to.file <- function(om.data, params, res, outpath) {
   write.csv(results.df, file=outpath, row.names=FALSE)
 }
 
-get.transform.name <- function(om.data) { 
-  # Get transform name for converting between display and calculation scales 
+get.transform.name <- function(om.data) {
   if ("ContinuousData" %in% class(om.data)) {
     transform.name <-"continuous.transform.f"
     data.type <- "continuous"
@@ -1076,9 +999,8 @@ get.transform.name <- function(om.data) {
 }
 
 get.scale <- function(params) {
-  # Get the transformation scale
   if (metric.is.log.scale(params$measure)){
-    scale <- "log" 
+    scale <- "log"
   } else if (metric.is.logit.scale(params$measure)) {
     scale <- "logit"
   } else if (metric.is.arcsine.scale(params$measure)) {
@@ -1090,12 +1012,12 @@ get.scale <- function(params) {
 }
 
 metric.is.log.scale <- function(metric){
-  metric %in% c(binary.log.metrics, diagnostic.log.metrics)  
+  metric %in% c(binary.log.metrics, diagnostic.log.metrics)
 }
 
 metric.is.logit.scale <- function(metric) {
   metric %in% c(binary.logit.metrics, diagnostic.logit.metrics)
-}  
+}
 
 metric.is.arcsine.scale <- function(metric) {
   metric %in% c(binary.arcsine.metrics)
@@ -1132,18 +1054,14 @@ freeman_tukey <- function(x,n) {
 }
 
 invfreeman_tukey <- function(x, n) {
-   # n is either a 
    if (length(x)==1) {
      y <- transf.ipft.hm(xi=x, targs=list(ni=n))
    } else {
      y <- transf.ipft(x, n)
    }
-    
+
    y
-   # See "The Inverse of the Freeman-Tukey Double Arcsine Transformations,"
-   # The American Statistician, Nov. 1978, Vol. 32, No. 4.
-   
-   #p <- 0.5 * (1 - sign(cos(2*x)) * (1 - (sin(2*x) + (sin(2*x) - 1/sin(2*x)) / n)^2)^0.5)
+
 }
 
 
@@ -1174,7 +1092,6 @@ rma.uni.value.info <- function() {
     X    = list(type="matrix", description='the model matrix of the model'),
     fit.stats= list(type="data.frame", description='a list with the log-likelihood, deviance, AIC, BIC, and AICc values under the unrestricted and restricted likelihood.'),
 
-    # not part of rma.uni output
     weights = list(type="vector", description="weights in % given to the observed effects")
   )
 }
@@ -1185,13 +1102,13 @@ cumul.rma.uni.value.info <- function() {
     se     = list(type="vector", description='standard errors of the coefficients. NA if transf is used to transform the coefficients.'),
     zval   = list(type="vector", description='test statistics of the coefficients.'),
     pval   = list(type="vector", description='p-values for the test statistics.'),
-    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),                        
+    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),
     ci.ub  = list(type="vector", description='upper bounds of the confidence intervals for the coefficients.'),
     QE     = list(type="vector", description='test statistics for the tests of heterogeneity.'),
     QEp    = list(type="vector", description='p-values for the tests of heterogeneity.'),
     tau2   = list(type="vector", description='estimated amounts of (residual) heterogeneity (only for random-effects models).'),
     I2     = list(type="vector", description='values of I2 .'),
-    H2     = list(type="vector", description='values of H2 .')    
+    H2     = list(type="vector", description='values of H2 .')
     )
 }
 
@@ -1201,7 +1118,7 @@ cumul.rma.mh.value.info <- function () {
     se     = list(type="vector", description='standard errors of the coefficients. NA if transf is used to transform the coefficients.'),
     zval   = list(type="vector", description='test statistics of the coefficients.'),
     pval   = list(type="vector", description='p-values for the test statistics.'),
-    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),                        
+    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),
     ci.ub  = list(type="vector", description='upper bounds of the confidence intervals for the coefficients.'),
     QE     = list(type="vector", description='test statistics for the tests of heterogeneity.'),
     QEp    = list(type="vector", description='p-values for the tests of heterogeneity.')
@@ -1214,13 +1131,13 @@ loo.rma.uni.value.info <- function () {
     se     = list(type="vector", description='standard errors of the coefficients. NA if transf is used to transform the coefficients.'),
     zval   = list(type="vector", description='test statistics of the coefficients.'),
     pval   = list(type="vector", description='p-values for the test statistics.'),
-    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),                        
+    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),
     ci.ub  = list(type="vector", description='upper bounds of the confidence intervals for the coefficients.'),
     Q    = list(type="vector", description='test statistics for the tests of heterogeneity.'),
     Qp     = list(type="vector", description='p-values for the tests of heterogeneity.'),
     tau2   = list(type="vector", description='estimated amounts of (residual) heterogeneity (only for random-effects models).'),
     I2     = list(type="vector", description='values of I2 .'),
-    H2     = list(type="vector", description='values of H2 .')  
+    H2     = list(type="vector", description='values of H2 .')
     )
 }
 
@@ -1230,7 +1147,7 @@ loo.rma.mh.value.info <- function () {
     se     = list(type="vector", description='standard errors of the coefficients. NA if transf is used to transform the coefficients.'),
     zval   = list(type="vector", description='test statistics of the coefficients.'),
     pval   = list(type="vector", description='p-values for the test statistics.'),
-    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),                        
+    ci.lb  = list(type="vector", description='lower bounds of the confidence intervals for the coefficients.'),
     ci.ub  = list(type="vector", description='upper bounds of the confidence intervals for the coefficients.'),
     Q    = list(type="vector", description='test statistics for the tests of heterogeneity.'),
     Qp     = list(type="vector", description='p-values for the tests of heterogeneity.')

@@ -197,38 +197,40 @@ def reset_r_working_directory():
 
 
 @serialized_r_call
-def impute_diag_data(diag_data_dict):
-    diag_data_dict = normalize_confidence_level_params(diag_data_dict)
+def impute_diagnostic_data(diagnostic_data):
+    diagnostic_data = normalize_confidence_level_params(diagnostic_data)
 
     # rpy2 cannot convert None values in this parameter mapping.
-    for param, val in list(diag_data_dict.items()):
+    for param, val in list(diagnostic_data.items()):
         if val is None:
-            diag_data_dict.pop(param)
+            diagnostic_data.pop(param)
 
-    dataf = _r_function("data.frame")(**diag_data_dict)
+    dataf = _r_function("data.frame")(**diagnostic_data)
     two_by_two = execute_r_function("rcmetar.impute.diagnostic", dataf)
 
-    imputed_2x2 = RParseTools.rlist_to_pydict(two_by_two)
+    imputed_2x2 = named_r_list_to_dict(two_by_two)
 
     return imputed_2x2
 
 
 @serialized_r_call
-def impute_bin_data(bin_data_dict):
-    bin_data_dict = normalize_confidence_level_params(bin_data_dict)
-    remove_entries_with_value(None, bin_data_dict)
+def impute_binary_data(binary_data):
+    binary_data = normalize_confidence_level_params(binary_data)
+    remove_entries_with_value(None, binary_data)
 
-    dataf = _r_function("data.frame")(**bin_data_dict)
+    dataf = _r_function("data.frame")(**binary_data)
     two_by_two = execute_r_function("rcmetar.impute.binary", dataf)
 
-    res_as_dict = RParseTools.recursioner(two_by_two)
+    res_as_dict = r_object_to_python(two_by_two)
 
     return res_as_dict
 
 
 @serialized_r_call
-def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
-    conf_level = validate_confidence_level(conf_level)
+def back_calculate_continuous_data(
+    group1_data, group2_data, effect_data, confidence_level
+):
+    confidence_level = validate_confidence_level(confidence_level)
     remove_entries_with_value(None, group1_data)
     remove_entries_with_value(None, group2_data)
     remove_entries_with_value(None, effect_data)
@@ -242,10 +244,10 @@ def back_calc_cont_data(group1_data, group2_data, effect_data, conf_level):
         dataf_grp1,
         dataf_grp2,
         dataf_effect,
-        conf_level,
+        confidence_level,
     )
 
-    res_as_dict = RParseTools.recursioner(r_res)
+    res_as_dict = r_object_to_python(r_res)
 
     return res_as_dict
 
@@ -257,155 +259,101 @@ def remove_entries_with_value(value_to_remove, values):
             values.pop(parameter)
 
 
-class RParseTools:
-    """a set of tools to help parse data structures returned from rpy2"""
-
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def rlist_to_pydict(named_r_list):
-        """Parse named R list into a python dictionary."""
-        # Only parses one level, is not recursive.'''
-
-        keys = named_r_list.names
-        if _r_is_null(keys):
-            raise ValueError("No names found in alleged named R list")
-
-        data = RParseTools.r_iterable_to_list(named_r_list)
-        d = dict(list(zip(keys, data)))
-
-        return d
-
-    @staticmethod
-    def recursioner(data):
-        """named_r_list --> python dictionary
-        not named r_list --> python list
-               singleton_r_list ---> python scalar
-        """
-        if RParseTools.haskeys(data):  # can be converted to dictionary
-            d = RParseTools.rlist_to_pydict(data)
-            for k, v in list(d.items()):
-                d[k] = RParseTools.recursioner(v)
-            return d
-        elif RParseTools._is_listable(data):  # can be converted to list
-            values = RParseTools.r_iterable_to_list(data)
-            for index, value in enumerate(values):
-                values[index] = RParseTools.recursioner(value)
-            return values
-        else:  # is a scalar
-            return RParseTools._convert_r_na_to_none(data)  # convert NA to None
-
-    @staticmethod
-    def r_iterable_to_list(r_iterable):
-        """Converts an r_iterable (i.e. list or vector) to a python list.
-        Will convert singleton elements to scalars in the list but not the list
-        itself if it is singleton.
-        """
-
-        def filter_list_element(x):
-            """If x is a singleton list, converts x to a scalar"""
-            if RParseTools._is_listable(x) and len(x) == 1:
-                return RParseTools._singleton_list_to_scalar(x)
-            else:
-                return x
-
-        python_list = list(r_iterable)
-        python_list = [filter_list_element(x) for x in python_list]
-        return python_list
-
-    @staticmethod
-    def _singleton_list_to_scalar(singleton_list):
-        """Takes in a singleton R list and returns a scalar value and converts 'NA'
-        to None
-        """
-        if len(singleton_list) > 1:
-            raise ValueError(
-                "Expected a singleton list but this list has more than one entry"
-            )
-
-        # special case of a factor ve
-        if isinstance(singleton_list, rpy2.robjects.vectors.FactorVector):
-            return execute_r_function("as.character", singleton_list)[0]
-
-        scalar = singleton_list[0]
-        return RParseTools._convert_r_na_to_none(scalar)
-
-    @staticmethod
-    def _convert_r_na_to_none(scalar):
-        if str(scalar) == "NA":
-            return None
-        else:
-            return scalar
-
-    @staticmethod
-    def _is_listable(element, exclude_strings=True):
-        try:
-            list(element)
-        except TypeError:
-            return False
-
-        # don't want to treat strings as lists even though they are iterable
-        if exclude_strings and isinstance(element, str):
-            return False
-
-        return True
-
-    @staticmethod
-    def haskeys(r_object):
-        if not hasattr(r_object, "names"):
-            return False
-
-        return not _r_is_null(r_object.names)
+def named_r_list_to_dict(named_r_list):
+    keys = named_r_list.names
+    if _r_is_null(keys):
+        raise ValueError("R list has no names")
+    return dict(zip(keys, r_iterable_to_list(named_r_list)))
 
 
-# This helper derives display-scale values from available study data.
+def r_object_to_python(data):
+    if _has_r_names(data):
+        return {
+            key: r_object_to_python(value)
+            for key, value in named_r_list_to_dict(data).items()
+        }
+    if _is_r_iterable(data):
+        return [r_object_to_python(value) for value in r_iterable_to_list(data)]
+    return _r_na_to_none(data)
+
+
+def r_iterable_to_list(r_iterable):
+    return [
+        _r_singleton_to_scalar(value)
+        if _is_r_iterable(value) and len(value) == 1
+        else value
+        for value in r_iterable
+    ]
+
+
+def _r_singleton_to_scalar(singleton):
+    if len(singleton) != 1:
+        raise ValueError("expected an R sequence with one element")
+    if isinstance(singleton, rpy2.robjects.vectors.FactorVector):
+        return execute_r_function("as.character", singleton)[0]
+    return _r_na_to_none(singleton[0])
+
+
+def _r_na_to_none(value):
+    return None if str(value) == "NA" else value
+
+
+def _is_r_iterable(value, exclude_strings=True):
+    if exclude_strings and isinstance(value, str):
+        return False
+    try:
+        iter(value)
+    except TypeError:
+        return False
+    return True
+
+
+def _has_r_names(value):
+    return hasattr(value, "names") and not _r_is_null(value.names)
+
+
 @serialized_r_call
-def impute_cont_data(cont_data_dict, alpha):
-
-    # first check that we have some data;
-    # if not, there's no sense in trying to
-    # impute anything
-    if len(list(cont_data_dict.items())) == 0:
+def impute_continuous_data(continuous_data, alpha):
+    if not continuous_data:
         return {"succeeded": False}
 
-    dataf = _r_function("data.frame")(**cont_data_dict)
+    dataf = _r_function("data.frame")(**continuous_data)
     c_data = execute_r_function("rcmetar.impute.continuous.study", dataf, alpha=alpha)
 
-    results = RParseTools.recursioner(c_data)
-
-    return results
+    return r_object_to_python(c_data)
 
 
 @serialized_r_call
-def impute_pre_post_cont_data(cont_data_dict, correlation, alpha):
-    if len(list(cont_data_dict.items())) == 0:
+def impute_pre_post_continuous_data(continuous_data, correlation, alpha):
+    if len(list(continuous_data.items())) == 0:
         return {"succeeded": False}
 
-    dataf = _r_function("data.frame")(**cont_data_dict)
+    dataf = _r_function("data.frame")(**continuous_data)
     c_data = execute_r_function(
         "rcmetar.impute.continuous.prepost",
         dataf,
         correlation=correlation,
         alpha=alpha,
     )
-    pythonized_data = RParseTools.recursioner(c_data)
+    pythonized_data = r_object_to_python(c_data)
 
     return pythonized_data
 
 
 @serialized_r_call
-def get_mult_from_r(confidence_level):
+def get_confidence_multiplier_from_r(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
-    mult = execute_r_function("rcmetar.get.mult.from.conf.level", confidence_level)
-    multiplier = float(mult[0])
+    confidence_multiplier = execute_r_function(
+        "rcmetar.get.mult.from.conf.level", confidence_level
+    )
+    multiplier = float(confidence_multiplier[0])
     if not math.isfinite(multiplier):
         raise ValueError(INVALID_CONFIDENCE_LEVEL_MESSAGE)
     return multiplier
 
 
 @serialized_r_call
-def set_global_conf_level(confidence_level):
+def set_confidence_level(confidence_level):
     confidence_level = validate_confidence_level(confidence_level)
     new_level = execute_r_function(
         "rcmetar.set.global.conf.level", float(confidence_level)
@@ -428,13 +376,13 @@ def get_params(method_name):
     if "var_order" in param_d:
         order_vars = list(param_d["var_order"])
 
-    pretty_names_and_descriptions = RParseTools.recursioner(
+    pretty_names_and_descriptions = r_object_to_python(
         param_d.get("pretty.names", _r_function("list")())
     )
 
     return (
-        RParseTools.recursioner(param_d["parameters"]),
-        RParseTools.recursioner(param_d["defaults"]),
+        r_object_to_python(param_d["parameters"]),
+        r_object_to_python(param_d["defaults"]),
         order_vars,
         pretty_names_and_descriptions,
     )
@@ -459,7 +407,7 @@ def get_available_methods(
             "workflow": str(workflow),
         },
     )
-    return normalize_available_method_labels(RParseTools.recursioner(methods))
+    return normalize_available_method_labels(r_object_to_python(methods))
 
 
 @serialized_r_call
@@ -475,7 +423,7 @@ def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
         str(method_name),
         workflow=str(_normalize_rcmetar_workflow(workflow)),
     )
-    return RParseTools.recursioner(capabilities)
+    return r_object_to_python(capabilities)
 
 
 def _analysis_output_path(filename):
@@ -541,7 +489,7 @@ def dataset_to_simple_continuous_r_object(
     if (
         table_model.current_effect not in ONE_ARM_METRICS
     ) and table_model.included_studies_have_raw_data():
-        raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
+        raw_data = table_model.get_current_raw_data(only_these_studies=study_ids)
         data_kwargs.update(
             {
                 "N1": _r_numeric_vector(_get_col(raw_data, 0)),
@@ -589,7 +537,7 @@ def dataset_to_simple_binary_r_object(
     # first try and construct an object with raw data
     if include_raw_data and table_model.included_studies_have_raw_data():
         # now figure out the raw data
-        raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
+        raw_data = table_model.get_current_raw_data(only_these_studies=study_ids)
 
         g1_events = _get_col(raw_data, 0)
 
@@ -646,11 +594,13 @@ def dataset_to_simple_network(
         # we will exclude studies later on if they do not have full raw_data
         studies = table_model.get_studies(only_if_included=False)
 
-    group_names = table_model.dataset.get_group_names_for_outcome_fu(outcome, follow_up)
+    group_names = table_model.dataset.get_group_names_for_outcome_follow_up(
+        outcome, follow_up
+    )
     groups_to_include = []
     for group in group_names:
         for study in studies:
-            analysis_unit = study.outcomes_to_follow_ups[outcome][follow_up]
+            analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
             raw_data = analysis_unit.get_raw_data_for_group(group)
             if not _data_blank_or_none(*raw_data):
                 groups_to_include.append(group)
@@ -668,7 +618,6 @@ def dataset_to_simple_network(
         }
     )
 
-    # Make 'data' data_frame in R
     if data_type == BINARY:
         data = {"study": [], "treatment": [], "responders": [], "sampleSize": []}
     else:
@@ -682,7 +631,7 @@ def dataset_to_simple_network(
 
     for study in studies:
         # analysis_unit = table_model.get_analysis_unit(study=study, outcome=outcome, follow_up=follow_up):
-        analysis_unit = study.outcomes_to_follow_ups[outcome][follow_up]
+        analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
 
         for treatment_id, group_name in zip(
             treatments["id"], treatments["description"]
@@ -780,7 +729,7 @@ def dataset_to_simple_diagnostic_r_object(
     )
 
     # first try and construct an object with raw data
-    raw_data = table_model.get_cur_raw_data(only_these_studies=study_ids)
+    raw_data = table_model.get_current_raw_data(only_these_studies=study_ids)
     has_raw_data = len(raw_data) == len(studies) and all(
         not any(value in EMPTY_VALS for value in row) for row in raw_data
     )
@@ -850,34 +799,36 @@ def _r_numeric_vector(values):
     return ro.FloatVector(converted)
 
 
-def _r_covariate_list(dataset, study_ids, cov_list=None):
-    if cov_list is None:
-        cov_list = dataset.covariates
-    covariates = [_r_covariate_values(cov, study_ids, dataset) for cov in cov_list]
+def _r_covariate_list(dataset, study_ids, covariates=None):
+    if covariates is None:
+        covariates = dataset.covariates
+    covariates = [_r_covariate_values(cov, study_ids, dataset) for cov in covariates]
     return execute_r_function("list", *covariates)
 
 
 def _r_covariate_values(cov, study_ids, dataset):
     values = _cov_values_for_studies(cov, study_ids, dataset)
-    cov_type = TYPE_TO_STR_DICT[cov.data_type]
+    covariate_type = TYPE_TO_STR_DICT[cov.data_type]
     if cov.data_type == CONTINUOUS:
-        cov_vals = _r_numeric_vector(values)
+        covariate_values = _r_numeric_vector(values)
     else:
-        cov_vals = _r_character_vector(values)
+        covariate_values = _r_character_vector(values)
     return execute_r_function(
         "rcmetar.create.covariate.values",
         **{
             "cov.name": str(cov.name),
-            "cov.vals": cov_vals,
-            "cov.type": cov_type,
+            "cov.vals": covariate_values,
+            "cov.type": covariate_type,
             "ref.var": _cov_ref_value(values),
         },
     )
 
 
 def _cov_values_for_studies(cov, study_ids, dataset):
-    cov_value_d = dataset.get_values_for_cov(cov.name, ids_for_keys=True)
-    return [cov_value_d.get(study_id) for study_id in study_ids]
+    covariate_values_by_study = dataset.get_covariate_values(
+        cov.name, ids_for_keys=True
+    )
+    return [covariate_values_by_study.get(study_id) for study_id in study_ids]
 
 
 def _cov_ref_value(values):
@@ -907,54 +858,62 @@ def _r_source_string_literal(value):
     return "'%s'" % text
 
 
-def cov_to_str(cov, study_ids, dataset, named_list=True, return_cov_vals=False):
+def covariate_to_r_expression(
+    cov, study_ids, dataset, named_list=True, return_covariate_values=False
+):
     """The string is constructed so that the covariate
     values are in the same order as the 'study_names'
     list.
     """
-    cov_str = None
+    covariate_expression = None
     if named_list:
-        cov_str = "%s=c(" % cov.name
+        covariate_expression = "%s=c(" % cov.name
     else:
-        cov_str = "c("
+        covariate_expression = "c("
 
-    cov_value_d = dataset.get_values_for_cov(cov.name, ids_for_keys=True)
+    covariate_values_by_study = dataset.get_covariate_values(
+        cov.name, ids_for_keys=True
+    )
 
     # get the study ids in the same order as the names
-    cov_values = []
+    covariate_values = []
 
     for study_id in study_ids:
         if cov.data_type == CONTINUOUS:
-            if study_id in cov_value_d:
-                cov_values.append("%s" % cov_value_d[study_id])
+            if study_id in covariate_values_by_study:
+                covariate_values.append("%s" % covariate_values_by_study[study_id])
             else:
-                cov_values.append("NA")
+                covariate_values.append("NA")
         else:
-            if study_id in cov_value_d:
+            if study_id in covariate_values_by_study:
                 # factor; note the string.
-                cov_values.append(_r_source_string_literal(cov_value_d[study_id]))
+                covariate_values.append(
+                    _r_source_string_literal(covariate_values_by_study[study_id])
+                )
             else:
-                cov_values.append("NA")
-    cov_str += ",".join(cov_values) + ")"
+                covariate_values.append("NA")
+    covariate_expression += ",".join(covariate_values) + ")"
 
-    if return_cov_vals:
-        return (cov_str, cov_values)
-    return cov_str
+    if return_covariate_values:
+        return (covariate_expression, covariate_values)
+    return covariate_expression
 
 
 @serialized_r_call
-def run_continuous_ma(
-    function_name, params, res_name="result", cont_data_name="tmp_obj"
+def run_continuous_analysis(
+    function_name, params, res_name="result", continuous_data_name="tmp_obj"
 ):
     return _run_rcmetar_core_analysis(
-        cont_data_name, function_name, params, res_name=res_name
+        continuous_data_name, function_name, params, res_name=res_name
     )
 
 
 @serialized_r_call
-def run_binary_ma(function_name, params, res_name="result", bin_data_name="tmp_obj"):
+def run_binary_analysis(
+    function_name, params, res_name="result", binary_data_name="tmp_obj"
+):
     return _run_rcmetar_core_analysis(
-        bin_data_name, function_name, params, res_name=res_name
+        binary_data_name, function_name, params, res_name=res_name
     )
 
 
@@ -1059,13 +1018,13 @@ def _run_rcmetar_core_analysis(
 
 @serialized_r_call
 def run_diagnostic_multi(
-    function_names, list_of_params, res_name="result", diag_data_name="tmp_obj"
+    function_names, list_of_params, res_name="result", diagnostic_data_name="tmp_obj"
 ):
     list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
     try:
         result = execute_r_function(
             "rcmetar.run.diagnostic.analyses",
-            _r_object_from_symbol(diag_data_name),
+            _r_object_from_symbol(diagnostic_data_name),
             _r_character_vector(function_names),
             execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
             workflow="standard",
@@ -1093,7 +1052,7 @@ def load_vars_for_plot(params_path, return_params_dict=False):
 
     if return_params_dict:
         r_object = execute_r_string("params")
-        params_dict = RParseTools.recursioner(r_object)
+        params_dict = r_object_to_python(r_object)
         return params_dict
     return True
 
@@ -1206,27 +1165,23 @@ def parse_out_results(result):
         # Diagnostic analyses may return several plot parameter objects, so keep
         # this branch broad enough to preserve all named plot metadata.
         if text_n == "images":
-            image_path_d = {} if _r_is_null(text) else RParseTools.recursioner(text)
+            image_path_d = {} if _r_is_null(text) else r_object_to_python(text)
         elif text_n == "display_images":
-            display_image_path_d = (
-                {} if _r_is_null(text) else RParseTools.recursioner(text)
-            )
+            display_image_path_d = {} if _r_is_null(text) else r_object_to_python(text)
         elif text_n == "image_order":
             image_order = None if _r_is_null(text) else list(text)
         elif text_n == "plot_names":
             if _r_is_null(text):
                 image_var_name_d = {}
             else:
-                image_var_name_d = RParseTools.recursioner(text)
+                image_var_name_d = r_object_to_python(text)
         elif text_n == "plot_params_paths":
             if _r_is_null(text):
                 image_params_paths_d = {}
             else:
-                image_params_paths_d = RParseTools.recursioner(text)
+                image_params_paths_d = r_object_to_python(text)
         elif text_n == "plot_capabilities":
-            plot_capability_d = (
-                {} if _r_is_null(text) else RParseTools.recursioner(text)
-            )
+            plot_capability_d = {} if _r_is_null(text) else r_object_to_python(text)
         elif text_n == "References":
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
@@ -1331,7 +1286,7 @@ def _format_table_summary(section_name, r_object, title=None, study_names=None):
 
 
 def _is_named_table_summary(r_object):
-    if not RParseTools.haskeys(r_object):
+    if not _has_r_names(r_object):
         return False
 
     for item in list(r_object):
@@ -1342,7 +1297,7 @@ def _is_named_table_summary(r_object):
 
 
 def _is_named_text_summary(r_object):
-    if not RParseTools.haskeys(r_object):
+    if not _has_r_names(r_object):
         return False
 
     has_named_text = False
@@ -1630,19 +1585,19 @@ def make_weights_str(results):
 def run_meta_regression(
     dataset,
     study_names,
-    cov_list,
+    covariates,
     metric_name,
     data_name="tmp_obj",
     results_name="results_obj",
     fixed_effects=False,
-    conf_level=None,
+    confidence_level=None,
     params=None,
 ):
 
-    conf_level = validate_confidence_level(conf_level)
+    confidence_level = validate_confidence_level(confidence_level)
 
     params = dict(params or {})
-    params["conf.level"] = conf_level
+    params["conf.level"] = confidence_level
     params.setdefault("digits", 2)
     params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
     params["measure"] = metric_name
@@ -1661,7 +1616,7 @@ def run_diagnostic_workflow(
     function_names,
     list_of_params,
     res_name="result",
-    diag_data_name="tmp_obj",
+    diagnostic_data_name="tmp_obj",
 ):
     # list of parameter objects
     list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
@@ -1670,7 +1625,7 @@ def run_diagnostic_workflow(
     try:
         result = execute_r_function(
             "rcmetar.run.diagnostic.analyses",
-            _r_object_from_symbol(diag_data_name),
+            _r_object_from_symbol(diagnostic_data_name),
             _r_character_vector(function_names),
             execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
             workflow=workflow,
@@ -1705,9 +1660,9 @@ def _get_col(m, i):
 
 @serialized_r_call
 def diagnostic_effects_for_study(
-    tp, fn, fp, tn, metrics=("Spec", "Sens"), conf_level=95.0
+    tp, fn, fp, tn, metrics=("Spec", "Sens"), confidence_level=95.0
 ):
-    conf_level = validate_confidence_level(conf_level)
+    confidence_level = validate_confidence_level(confidence_level)
     r_res = execute_r_function(
         "rcmetar.diagnostic.study.effects",
         tp,
@@ -1715,10 +1670,10 @@ def diagnostic_effects_for_study(
         fp,
         tn,
         metrics=_r_character_vector(metrics),
-        **{"conf.level": conf_level},
+        **{"conf.level": confidence_level},
     )
     return normalize_diagnostic_effects(
-        RParseTools.recursioner(r_res),
+        r_object_to_python(r_res),
         require_triplets=True,
     )
 
@@ -1735,9 +1690,9 @@ def continuous_effect_for_study(
     se2=None,
     metric="MD",
     two_arm=True,
-    conf_level=95.0,
+    confidence_level=95.0,
 ):
-    conf_level = validate_confidence_level(conf_level)
+    confidence_level = validate_confidence_level(confidence_level)
     r_res = execute_r_function(
         "rcmetar.continuous.study.effect",
         n1=_r_null_if_none(n1),
@@ -1749,30 +1704,34 @@ def continuous_effect_for_study(
         sd2=_r_null_if_none(sd2),
         se2=_r_null_if_none(se2),
         metric=str(metric),
-        **{"two.arm": bool(two_arm), "conf.level": conf_level},
+        **{"two.arm": bool(two_arm), "conf.level": confidence_level},
     )
     return normalize_effect_result(
-        RParseTools.recursioner(r_res),
+        r_object_to_python(r_res),
         metric=metric,
     )
 
 
 @serialized_r_call
 def effect_for_study(
-    e1, n1, e2=None, n2=None, two_arm=True, metric="OR", conf_level=95
+    e1, n1, e2=None, n2=None, two_arm=True, metric="OR", confidence_level=95
 ):
     """Compute an estimate and confidence interval for binary study data."""
-    conf_level = validate_confidence_level(conf_level)
+    confidence_level = validate_confidence_level(confidence_level)
     r_res = execute_r_function(
         "rcmetar.binary.study.effect",
         e1=_r_null_if_none(e1),
         n1=_r_null_if_none(n1),
         e2=_r_null_if_none(e2),
         n2=_r_null_if_none(n2),
-        **{"two.arm": bool(two_arm), "metric": str(metric), "conf.level": conf_level},
+        **{
+            "two.arm": bool(two_arm),
+            "metric": str(metric),
+            "conf.level": confidence_level,
+        },
     )
     return normalize_effect_result(
-        RParseTools.recursioner(r_res),
+        r_object_to_python(r_res),
         metric=metric,
     )
 

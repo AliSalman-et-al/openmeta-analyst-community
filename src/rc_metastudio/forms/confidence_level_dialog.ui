@@ -23,7 +23,7 @@
       <enum>QFormLayout::WrapLongRows</enum>
      </property>
      <item row="0" column="0">
-      <widget class="QLabel" name="conf_level_label">
+      <widget class="QLabel" name="confidence_level_label">
        <property name="text">
         <string>Global Confidence Level:</string>
        </property>
@@ -33,7 +33,7 @@
       </widget>
      </item>
      <item row="0" column="1">
-      <widget class="QDoubleSpinBox" name="conf_level_spinbox">
+      <widget class="QDoubleSpinBox" name="confidence_level_spinbox">
        <property name="decimals">
         <number>1</number>
        </property>

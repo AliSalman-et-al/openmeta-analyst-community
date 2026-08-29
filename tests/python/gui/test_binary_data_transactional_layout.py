@@ -32,7 +32,9 @@ def _open_binary_dialog(monkeypatch):
         lambda _window: QtCore.QRect(AVAILABLE),
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "get_mult_from_r", lambda _level: 1.96
+        binary_data_dialog.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _level: 1.96,
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -40,7 +42,9 @@ def _open_binary_dialog(monkeypatch):
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda _data: {"FAIL": True}
+        binary_data_dialog.r_bridge,
+        "impute_binary_data",
+        lambda _data: {"FAIL": True},
     )
     monkeypatch.setattr(
         binary_data_dialog.r_bridge,
@@ -56,10 +60,10 @@ def _open_binary_dialog(monkeypatch):
     model = window.model
     dialog = binary_data_dialog.BinaryDataDialog(
         copy.deepcopy(model.get_current_analysis_unit_for_study(0)),
-        model.current_txs,
-        model.get_cur_group_str(),
+        model.current_groups,
+        model.get_current_group_comparison(),
         model.current_effect,
-        conf_level=model.get_global_conf_level(),
+        confidence_level=model.get_confidence_level(),
         parent=window.tableView,
     )
     return app, window, dialog
@@ -108,14 +112,14 @@ def test_binary_data_keyboard_and_accessibility_contract(monkeypatch):
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.focusWidget() is dialog.raw_data_table
         assert ok.isDefault()
-        assert dialog.label_17.buddy() is dialog.effect_cbo_box
-        assert dialog.est_lbl.buddy() is dialog.effect_txt_box
+        assert dialog.effect_metric_label.buddy() is dialog.effect_combo_box
+        assert dialog.est_lbl.buddy() is dialog.effect_text_box
         assert dialog.raw_data_table.accessibleName() == "Binary study counts"
-        assert dialog.effect_txt_box.accessibleDescription()
+        assert dialog.effect_text_box.accessibleDescription()
 
-        dialog.effect_cbo_box.setFocus()
-        key_click(dialog.effect_cbo_box, QtCore.Qt.Key.Key_Tab)
-        assert dialog.focusWidget() is dialog.effect_txt_box
+        dialog.effect_combo_box.setFocus()
+        key_click(dialog.effect_combo_box, QtCore.Qt.Key.Key_Tab)
+        assert dialog.focusWidget() is dialog.effect_text_box
 
         key_click(dialog, QtCore.Qt.Key.Key_Escape)
         assert dialog.result() == QtWidgets.QDialog.DialogCode.Rejected
@@ -138,10 +142,10 @@ def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypat
     app, window, dialog = _open_binary_dialog(monkeypatch)
     try:
         longest_index = max(
-            range(dialog.effect_cbo_box.count()),
-            key=lambda index: len(dialog.effect_cbo_box.itemText(index)),
+            range(dialog.effect_combo_box.count()),
+            key=lambda index: len(dialog.effect_combo_box.itemText(index)),
         )
-        dialog.effect_cbo_box.setCurrentIndex(longest_index)
+        dialog.effect_combo_box.setCurrentIndex(longest_index)
         dialog.show()
         app.processEvents()
 
@@ -150,23 +154,23 @@ def test_binary_data_is_screen_bounded_with_large_font_and_long_metric(monkeypat
         assert available.contains(frame)
         assert frame.width() <= int(available.width() * 0.9) + 2
         assert frame.height() <= int(available.height() * 0.9) + 2
-        assert dialog.effect_cbo_box.sizePolicy().horizontalPolicy() in (
+        assert dialog.effect_combo_box.sizePolicy().horizontalPolicy() in (
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.MinimumExpanding,
         )
-        assert dialog.effect_cbo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
-        full_metric = dialog.effect_cbo_box.currentText()
-        assert dialog.effect_cbo_box.toolTip() == full_metric
-        assert dialog.effect_cbo_box.view().minimumWidth() >= (
-            dialog.effect_cbo_box.fontMetrics().horizontalAdvance(full_metric)
+        assert dialog.effect_combo_box.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
+        full_metric = dialog.effect_combo_box.currentText()
+        assert dialog.effect_combo_box.toolTip() == full_metric
+        assert dialog.effect_combo_box.view().minimumWidth() >= (
+            dialog.effect_combo_box.fontMetrics().horizontalAdvance(full_metric)
         )
-        dialog.effect_cbo_box.showPopup()
+        dialog.effect_combo_box.showPopup()
         app.processEvents()
-        assert dialog.effect_cbo_box.view().isVisible()
-        assert dialog.effect_cbo_box.view().width() >= (
-            dialog.effect_cbo_box.fontMetrics().horizontalAdvance(full_metric)
+        assert dialog.effect_combo_box.view().isVisible()
+        assert dialog.effect_combo_box.view().width() >= (
+            dialog.effect_combo_box.fontMetrics().horizontalAdvance(full_metric)
         )
-        dialog.effect_cbo_box.hidePopup()
+        dialog.effect_combo_box.hidePopup()
     finally:
         app.setFont(old_font)
         _close(app, window, dialog)
@@ -286,7 +290,9 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             }
         }
 
-    monkeypatch.setattr(binary_data_dialog.r_bridge, "impute_bin_data", back_calculate)
+    monkeypatch.setattr(
+        binary_data_dialog.r_bridge, "impute_binary_data", back_calculate
+    )
     try:
         dialog.clear_form()
         for row in (0, 1):
@@ -295,9 +301,9 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             total_item.setText("100")
 
         for widget, value in (
-            (dialog.effect_txt_box, "2"),
-            (dialog.low_txt_box, "1.2"),
-            (dialog.high_txt_box, "3.3"),
+            (dialog.effect_text_box, "2"),
+            (dialog.lower_text_box, "1.2"),
+            (dialog.upper_text_box, "3.3"),
         ):
             widget.setText(value)
             widget.editingFinished.emit()
@@ -305,8 +311,8 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
 
         assert observed[-1]["N_A"] == 100
         assert observed[-1]["N_B"] == 100
-        assert dialog.back_calc_btn.isEnabled()
-        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.back_calculate_button.isEnabled()
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == [
             None,
             100,
             None,
@@ -317,12 +323,12 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.text() == "100"
             assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
-        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
-        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == [
             10,
             100,
             5,
@@ -355,7 +361,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda _d: imputed
+        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def cancel_choice(chooser):
@@ -378,23 +384,21 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
     try:
         dialog.clear_form()
         dialog.undoStack.clear()
-        dialog.enable_back_calculation_btn()
+        dialog.update_back_calculation_button()
         table_before = _binary_table_snapshot(dialog)
         model_before = copy.deepcopy(dialog.analysis_unit)
         dirty_before = window.current_data_unsaved
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
-        assert dialog.back_calc_btn.isEnabled()
+        assert dialog.back_calculate_button.isEnabled()
 
-        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert _binary_table_snapshot(dialog) == table_before
-        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == (
-            model_before.get_raw_data_for_groups(dialog.cur_groups)
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == (
+            model_before.get_raw_data_for_groups(dialog.current_groups)
         )
-        assert (
-            dialog.analysis_unit.get_effects_dict() == model_before.get_effects_dict()
-        )
+        assert dialog.analysis_unit.effects == model_before.effects
         assert dialog.undoStack.count() == 0
         assert window.current_data_unsaved is dirty_before
         assert dialog.result() == 0
@@ -412,7 +416,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_bin_data", lambda _d: imputed
+        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def accept_second_choice(chooser):
@@ -434,12 +438,12 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
     try:
         dialog.clear_form()
         dialog.undoStack.clear()
-        dialog.enable_back_calculation_btn()
-        mouse_click(dialog.back_calc_btn, QtCore.Qt.MouseButton.LeftButton)
+        dialog.update_back_calculation_button()
+        mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
 
         assert _binary_table_snapshot(dialog)[:6] == ["4", "10", "14", "5", "11", "16"]
-        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.cur_groups) == [
+        assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == [
             4,
             14,
             5,
@@ -459,15 +463,15 @@ def test_binary_data_focus_reveals_offscreen_controls_without_moving_actions(
         dialog.resize(dialog.width(), 260)
         app.processEvents()
         footer_before = dialog.buttonBox.geometry()
-        dialog.high_txt_box.setFocus()
+        dialog.upper_text_box.setFocus()
         app.processEvents()
 
         viewport_rect = dialog.content_scroll.viewport().rect()
-        mapped = dialog.high_txt_box.mapTo(
+        mapped = dialog.upper_text_box.mapTo(
             dialog.content_scroll.viewport(), QtCore.QPoint()
         )
         assert viewport_rect.intersects(
-            QtCore.QRect(mapped, dialog.high_txt_box.size())
+            QtCore.QRect(mapped, dialog.upper_text_box.size())
         )
         assert dialog.buttonBox.isVisible()
         assert dialog.buttonBox.geometry() == footer_before
@@ -567,21 +571,21 @@ def test_binary_calculator_refits_are_local_and_coalesced(monkeypatch):
             for column in range(2)
         ]
         indices_by_metric = {
-            dialog.effect_cbo_box.itemData(index): index
-            for index in range(dialog.effect_cbo_box.count())
+            dialog.effect_combo_box.itemData(index): index
+            for index in range(dialog.effect_combo_box.count())
         }
         applied = []
         dialog._layout_controller.refitApplied.connect(lambda: applied.append(True))
 
         for metric in ("RD", "RR", "AS"):
             index = indices_by_metric[metric]
-            dialog.effect_cbo_box.setCurrentIndex(index)
+            dialog.effect_combo_box.setCurrentIndex(index)
         assert applied == []
 
         app.processEvents()
         assert len(applied) == 1
-        assert dialog.effect_cbo_box.currentData() == "AS"
-        assert not dialog.back_calc_btn.isVisible()
+        assert dialog.effect_combo_box.currentData() == "AS"
+        assert not dialog.back_calculate_button.isVisible()
         assert AVAILABLE.contains(dialog.frameGeometry())
         assert [
             dialog.raw_data_table.item(row, column).text()
@@ -592,9 +596,9 @@ def test_binary_calculator_refits_are_local_and_coalesced(monkeypatch):
         widths = {
             field.width()
             for field in (
-                dialog.effect_txt_box,
-                dialog.low_txt_box,
-                dialog.high_txt_box,
+                dialog.effect_text_box,
+                dialog.lower_text_box,
+                dialog.upper_text_box,
             )
         }
         assert len(widths) == 1

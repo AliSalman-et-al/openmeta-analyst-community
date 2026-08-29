@@ -117,19 +117,11 @@ class WelcomePage(MainWizardPage, _ui_welcome_page.Ui_WizardPage):
 
     def _setup_open_recent_btn(self):
         if len(self.recent_datasets) > 0:
-            # then add a drop-down to the 'open recent'
-            # button with the recent datasets.
             qm = QMenu()
-            for dataset in self.recent_datasets[
-                ::-1
-            ]:  # most recent dataset is last in list
+            for dataset in reversed(self.recent_datasets):
                 action_item = QAction(dataset, qm)
                 qm.addAction(action_item)
-                # I wanted to handle this with lambdas, but the method would
-                # inexplicably always be invoked with the last dataset as the
-                # argument. Instead, I've opted to use the .sender method to
-                # retrieve the action_item, i.e., dataset, selected (see
-                # the dataset_selected routine).
+                # Bind each action now to avoid late-binding the final dataset.
                 action_item.triggered[bool].connect(
                     app_error_handler.safe_slot(
                         lambda _checked=False, action_item=action_item: (

@@ -23,7 +23,7 @@ LONG_FOLLOW_UP = "Twenty-four months after randomization"
 
 class _NetworkModel:
     def __init__(self):
-        self.current_outcome = LONG_OUTCOME
+        self.current_outcome_name = LONG_OUTCOME
         self.dataset = SimpleNamespace(
             get_outcome_names=lambda: [LONG_OUTCOME, "Readmission"],
             get_follow_up_names=lambda: [LONG_FOLLOW_UP, "first"],
@@ -182,11 +182,11 @@ def test_network_selectors_keep_content_and_refresh_only_the_graph(
         qapp.processEvents()
         original_frame = QtCore.QRect(dialog.frameGeometry())
 
-        assert dialog.outcome_cbo_box.currentText() == LONG_OUTCOME
-        assert dialog.follow_up_cbo_box.currentText() == LONG_FOLLOW_UP
+        assert dialog.outcome_combo_box.currentText() == LONG_OUTCOME
+        assert dialog.follow_up_combo_box.currentText() == LONG_FOLLOW_UP
         assert [
-            dialog.outcome_cbo_box.itemText(index)
-            for index in range(dialog.outcome_cbo_box.count())
+            dialog.outcome_combo_box.itemText(index)
+            for index in range(dialog.outcome_combo_box.count())
         ] == [LONG_OUTCOME, "Readmission"]
 
         graph_calls = []
@@ -195,7 +195,7 @@ def test_network_selectors_keep_content_and_refresh_only_the_graph(
             "graph_network",
             lambda outcome, follow_up: graph_calls.append((outcome, follow_up)),
         )
-        dialog.outcome_cbo_box.setCurrentText("Readmission")
+        dialog.outcome_combo_box.setCurrentText("Readmission")
         qapp.processEvents()
 
         assert graph_calls == [("Readmission", LONG_FOLLOW_UP)]
@@ -232,7 +232,7 @@ def test_network_selectors_are_usable_with_large_font_on_constrained_screen(
         assert dialog.frame.width() <= dialog.contentsRect().width()
         assert dialog.frame.height() == dialog.frame.sizeHint().height()
         assert dialog.network_view_dialoger.viewport().height() > 0
-        for combo in (dialog.outcome_cbo_box, dialog.follow_up_cbo_box):
+        for combo in (dialog.outcome_combo_box, dialog.follow_up_combo_box):
             assert combo.width() >= dialog.frame.contentsRect().width() * 0.65
             assert combo.toolTip() == combo.currentText()
             for index in range(combo.count()):

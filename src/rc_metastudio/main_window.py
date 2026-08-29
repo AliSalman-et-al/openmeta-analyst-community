@@ -60,7 +60,6 @@ from rc_metastudio.settings import (
 )
 from rc_metastudio.runtime_types import required
 
-# additional forms
 from rc_metastudio import add_new_dialogs
 from rc_metastudio import results_window, analysis_setup_dialog
 from rc_metastudio import diagnostic_metrics_dialog
@@ -160,10 +159,10 @@ def _connect_action(action, callback):
     )
 
 
-def _format_confidence_level_status(conf_level):
-    if conf_level is None:
+def _format_confidence_level_status(confidence_level):
+    if confidence_level is None:
         return "Confidence Level: not set"
-    return "Confidence Level: {:.1%}".format(float(conf_level) / 100.0)
+    return "Confidence Level: {:.1%}".format(float(confidence_level) / 100.0)
 
 
 class ElidingStatusLabel(QLabel):
@@ -235,10 +234,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     tableView: dataset_table_view.DatasetTableView
 
     def __init__(self, parent=None):
-        # We follow the advice given by Mark Summerfield in his Python QT book:
-        # Namely, we use multiple inheritance to gain access to the ui. We take
-        # this approach throughout the application.
-        super(MainWindow, self).__init__(parent)
+        super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setupUi(self)
         qt_layout.configure_analysis_menu(self.menuAnalysis)
@@ -274,30 +270,20 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.tableView.restore_column_widths(load_main_column_widths())
 
         self.cl_label = ElidingStatusLabel(
-            _format_confidence_level_status(meta_globals.DEFAULT_CONF_LEVEL)
+            _format_confidence_level_status(meta_globals.DEFAULT_CONFIDENCE_LEVEL)
         )
         self.cl_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
 
-        # Command-line dataset loading can be added here if headless startup
-        # needs to open a project directly in the GUI.
         self.new_dataset()
 
-        # flag maintaining whether the current dataset
-        # has been saved
         self.current_data_unsaved = False
 
         self.tableView.setModel(self.model)
-        # attach a delegate for editing
         self.tableView.setItemDelegate(dataset_table_view.StudyDelegate(self.tableView))
 
-        # the nav_lbl text corresponds to the currently selected
-        # 'dimension', e.g., outcome or treatment. New points
-        # can then be added to this dimension, or it can be traveled
-        # along using the horizontal nav arrows (the vertical arrows
-        # navigate along the *dimensions*)
         self.dimensions = ["outcome", "follow-up", "group"]
-        self.cur_dimension_index = 0
+        self.current_dimension_index = 0
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
@@ -309,10 +295,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.tableView.main_gui = cast(dataset_table_view.MainWindowProtocol, self)
         self.tableView.synchronize_column_widths()
 
-        self.out_path = None  # path to output file
-        self.metric_menu_is_set_for = None  # BINARY, CONTINUOUS, or DIAGNOSTIC
+        self.out_path = None
+        self.metric_menu_is_set_for = None
 
-        # by default, disable meta-regression (until we have covariates)
         self.action_meta_regression.setEnabled(False)
 
         load_settings()
@@ -372,7 +357,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if not self._confirm_close():
             event.ignore()
             return
-        self._disconnections()
+        self._disconnect_model_signals()
         save_main_window_placement(self, self.tableView.column_width_state())
         save_settings()
         event.accept()
@@ -412,8 +397,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             "out_path": self.out_path,
             "dirty": self.current_data_unsaved,
             "dataset_label": self.dataset_file_lbl.text(),
-            "outcome_label": self.cur_outcome_lbl.text(),
-            "follow_up_label": self.cur_time_lbl.text(),
+            "outcome_label": self.current_outcome_label.text(),
+            "follow_up_label": self.current_follow_up_label.text(),
             "confidence_label": self.cl_label.text(),
             "metric_menu_type": self.metric_menu_is_set_for,
             "metric_menu": self._capture_metric_menu_state(),
@@ -502,11 +487,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         )
         guarded(
             "restore outcome label",
-            lambda: self.cur_outcome_lbl.setText(previous["outcome_label"]),
+            lambda: self.current_outcome_label.setText(previous["outcome_label"]),
         )
         guarded(
             "restore follow-up label",
-            lambda: self.cur_time_lbl.setText(previous["follow_up_label"]),
+            lambda: self.current_follow_up_label.setText(previous["follow_up_label"]),
         )
         guarded(
             "restore Confidence Level label",
@@ -614,15 +599,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self._handle_wizard_results(wizard_data)
 
     def new_dataset(
-        self, name=DEFAULT_DATASET_NAME, is_diag=False, use_undo_framework=True
+        self, name=DEFAULT_DATASET_NAME, is_diagnostic=False, use_undo_framework=True
     ):
 
-        data_model = analysis_dataset.Dataset(title=name, is_diag=is_diag)
+        data_model = analysis_dataset.Dataset(title=name, is_diagnostic=is_diagnostic)
         existing_model = getattr(self, "model", None)
         if existing_model is not None:
             if use_undo_framework:
                 original_dataset = copy.deepcopy(existing_model.dataset)
-                old_state_dict = self.tableView.model().get_stateful_dict()
+                old_state_dict = self.tableView.model().get_state()
 
                 def undo_f():
                     return self.set_model(original_dataset, old_state_dict)
@@ -636,9 +621,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self.set_model(data_model)
         else:
             self.model = dataset_table_model.DatasetTableModel(dataset=data_model)
-            # no dataset; disable saving, editing, etc.
             self.disable_menu_options_that_require_dataset()
-        # set the out_path to None; this (new) dataset is unsaved.
         self.out_path = None
 
     def _notify_user_that_data_is_unsaved(self):
@@ -697,17 +680,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             return
         if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             if event.key() == QtCore.Qt.Key.Key_S:
-                # ctrl + s = save
                 self.save()
             elif event.key() == QtCore.Qt.Key.Key_O:
-                # ctrl + o = open
                 self.open()
 
-    def _disconnections(self):
-        """Disconnects model-related signs/slots. this should be called prior to swapping
-        in a new model, e.g., when a dataset is loaded, to tear down the relevant connections.
-        _setup_connections (with menu_actiosn set to False) should subsequently be invoked.
-        """
+    def _disconnect_model_signals(self):
+        """Disconnect signals owned by the current dataset model."""
         for connection in self._model_signal_connections:
             connection.disconnect()
         self._model_signal_connections = []
@@ -726,9 +704,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def populate_open_recent_menu(self):
         recent_datasets = get_setting("recent_files")
-        recent_datasets.reverse()  # most-recent first
-        # qt designer inexplicably forcing the _2. not sure why;
-        # gave up struggling with it. grr.
+        recent_datasets.reverse()
         self.action_open_recent_2.clear()
         for dataset in recent_datasets:
             action_item = QAction(str(dataset), self.action_open_recent_2)
@@ -741,13 +717,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.open(file_path=dataset_path)
 
     def _change_global_ci(self):
-        prev_conf_level = self.model.get_global_conf_level()
+        previous_confidence_level = self.model.get_confidence_level()
 
-        dialog = confidence_level_dialog.ConfidenceLevelDialog(prev_conf_level, self)
+        dialog = confidence_level_dialog.ConfidenceLevelDialog(
+            previous_confidence_level, self
+        )
         if dialog.exec():
-            new_conf_level = dialog.get_value()
+            new_confidence_level = dialog.get_value()
             change_cl_command = ChangeConfidenceLevelCommand(
-                prev_conf_level, new_conf_level, mainform=self
+                previous_confidence_level, new_confidence_level, mainform=self
             )
             self.tableView.undoStack.push(change_cl_command)
 
@@ -771,11 +749,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             )
         )
 
-        # this is not ideal, but I couldn't get the rowsInserted methods working.
-        # is emitted when a model refresh was called but the edit focus should be set back to
-        # where it was before this refresh (refresh clears the current editor).
-        # this index is the QModelIndex. this is used, e.g., when a new study is added.
-        # Restore focus after model refreshes that clear the current editor.
+        # Model resets clear the active editor, so restore its index explicitly.
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
                 model.editFocusRequested, self.set_edit_focus, parent=self
@@ -789,11 +763,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             )
         )
 
-        # this listens to the model regarding errors in data entry --
-        # such data will be rejected (e.g., strings for counts, or whatever),
-        # and this hook allows the model to pass along error messages to the
-        # user. the data checking happens in analysis_dataset (specifically, in the
-        # setData method)
         self._model_signal_connections.append(
             app_error_handler.connect_safely(
                 model.dataError, self.data_error, parent=self
@@ -847,18 +816,18 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             _connect_action(self.action_subgroup_ma, self.meta_subgroup_get_cov)
 
             _connect_action(self.action_about_legal, self.show_about_legal)
-            _connect_action(self.action_change_conf_level, self._change_global_ci)
+            _connect_action(self.action_change_confidence_level, self._change_global_ci)
             _connect_action(self.action_import_csv, self._import_csv)
 
-    def _change_conf_level_label(self):
-        conf_level = self.model.get_global_conf_level()
-        self.cl_label.setText(_format_confidence_level_status(conf_level))
+    def _update_confidence_level_label(self):
+        confidence_level = self.model.get_confidence_level()
+        self.cl_label.setText(_format_confidence_level_status(confidence_level))
 
     def go(self):
         form = None
         if self.model.get_current_outcome_type() != "diagnostic":
             form = self._build_analysis_specs_dialog(
-                conf_level=self.model.get_global_conf_level()
+                confidence_level=self.model.get_confidence_level()
             )
         else:
             form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
@@ -870,8 +839,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def meta_reg(self):
         form = self._build_analysis_specs_dialog(
-            meta_f_str="meta-regression",
-            conf_level=self.model.get_global_conf_level(),
+            analysis_type="meta-regression",
+            confidence_level=self.model.get_confidence_level(),
         )
         if form is None:
             return
@@ -895,11 +864,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         form = None
         if self.model.get_current_outcome_type() != "diagnostic":
             form = self._build_analysis_specs_dialog(
-                meta_f_str="cumulative", conf_level=self.model.get_global_conf_level()
+                analysis_type="cumulative",
+                confidence_level=self.model.get_confidence_level(),
             )
         else:
             form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
-                self.model, meta_f_str="cumulative", parent=self
+                self.model, analysis_type="cumulative", parent=self
             )
 
         if form is None:
@@ -910,12 +880,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         form = None
         if self.model.get_current_outcome_type() != "diagnostic":
             form = self._build_analysis_specs_dialog(
-                meta_f_str="leave-one-out",
-                conf_level=self.model.get_global_conf_level(),
+                analysis_type="leave-one-out",
+                confidence_level=self.model.get_confidence_level(),
             )
         else:
             form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
-                self.model, meta_f_str="leave-one-out", parent=self
+                self.model, analysis_type="leave-one-out", parent=self
             )
 
         if form is None:
@@ -925,20 +895,20 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     def show_about_legal(self):
         return about_legal_dialog.AboutLegalDialog(self).exec()
 
-    def meta_subgroup(self, selected_cov):
+    def meta_subgroup(self, selected_covariate):
         form = None
         if self.model.get_current_outcome_type() != "diagnostic":
             form = self._build_analysis_specs_dialog(
-                meta_f_str="subgroup",
-                external_params={"cov_name": selected_cov},
-                conf_level=self.model.get_global_conf_level(),
+                analysis_type="subgroup",
+                external_params={"cov_name": selected_covariate},
+                confidence_level=self.model.get_confidence_level(),
             )
         else:
             form = diagnostic_metrics_dialog.DiagnosticMetricsDialog(
                 self.model,
-                meta_f_str="subgroup",
+                analysis_type="subgroup",
                 parent=self,
-                external_params={"cov_name": selected_cov},
+                external_params={"cov_name": selected_covariate},
             )
 
         if form is None:
@@ -947,16 +917,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _build_analysis_specs_dialog(
         self,
-        meta_f_str=None,
+        analysis_type=None,
         external_params=None,
         diagnostic_metrics=None,
-        conf_level=None,
+        confidence_level=None,
     ):
         try:
             kwargs = {
-                "meta_f_str": meta_f_str,
+                "analysis_type": analysis_type,
                 "parent": self,
-                "conf_level": conf_level,
+                "confidence_level": confidence_level,
             }
             if external_params is not None:
                 kwargs["external_params"] = external_params
@@ -996,40 +966,44 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.tableView.undoStack.redo()
 
     def edit_dataset(self):
-        cur_dataset = copy.deepcopy(self.model.dataset)
-        edit_window = edit_dialog.EditDialog(cur_dataset, parent=self)
+        current_dataset = copy.deepcopy(self.model.dataset)
+        edit_window = edit_dialog.EditDialog(current_dataset, parent=self)
 
         if edit_window.exec():
             # if we edited the current dataset when there was no
             # outcome yet, then we want to default to an outcome
             # that was added.
 
-            old_state_dict = self.tableView.model().get_stateful_dict()
+            old_state_dict = self.tableView.model().get_state()
             new_state_dict = copy.deepcopy(old_state_dict)
 
             # update the new state dict to reflect the currently selected
             # outcomes, etc.
             outcome_model = edit_window.outcomes_model
             edited_outcomes = outcome_model.outcome_list
-            if outcome_model.current_outcome is not None:
-                new_state_dict["current_outcome"] = outcome_model.current_outcome
-            elif old_state_dict["current_outcome"] in edited_outcomes:
-                new_state_dict["current_outcome"] = old_state_dict["current_outcome"]
+            if outcome_model.current_outcome_name is not None:
+                new_state_dict["current_outcome_name"] = (
+                    outcome_model.current_outcome_name
+                )
+            elif old_state_dict["current_outcome_name"] in edited_outcomes:
+                new_state_dict["current_outcome_name"] = old_state_dict[
+                    "current_outcome_name"
+                ]
             elif edited_outcomes:
                 # If the current outcome was removed, select the first remaining one.
-                new_state_dict["current_outcome"] = edited_outcomes[0]
+                new_state_dict["current_outcome_name"] = edited_outcomes[0]
             else:
-                new_state_dict["current_outcome"] = None
+                new_state_dict["current_outcome_name"] = None
 
-            new_state_dict["current_time_point"] = max(
+            new_state_dict["current_follow_up_index"] = max(
                 edit_window.follow_up_list.currentIndex().row(), 0
             )
-            grp_list = edit_window.groups_model.group_list
+            group_names = edit_window.groups_model.group_list
 
-            if len(grp_list) >= 2:
-                new_state_dict["current_txs"] = grp_list[:2]
+            if len(group_names) >= 2:
+                new_state_dict["current_groups"] = group_names[:2]
             else:
-                new_state_dict["current_txs"] = meta_globals.DEFAULT_GROUP_NAMES
+                new_state_dict["current_groups"] = meta_globals.DEFAULT_GROUP_NAMES
             modified_dataset = edit_window.dataset
 
             def redo_f():
@@ -1136,13 +1110,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         return metric_action
 
     def deselect_all_metrics(self):
-        # de-selects all metrics
-        # it doesn't appear that there is a more
-        # straight forward way of doing this,
-        # unfortunately.
         data_type = self.tableView.model().get_current_outcome_type(get_str=False)
         if data_type in (meta_globals.BINARY, meta_globals.CONTINUOUS):
-            # then there are sub-menus (one-group, two-group)
             for menu_action in self.menuMetric.actions():
                 sub_menu = menu_action.menu()
                 if sub_menu is None:
@@ -1153,10 +1122,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                     action.blockSignals(False)
 
     def metric_selected(self, metric_name, menu):
-        # first deselect the previous metric
         self.deselect_all_metrics()
 
-        # now select the newly chosen one.
         for action in menu.actions():
             action_data = _qt_item_text(action.data())
             if action_data == metric_name:
@@ -1232,38 +1199,40 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self._make_add_covariate_command(new_covariate_name, new_covariate_type)
             )
 
-    def _make_add_covariate_command(self, cov_name, cov_type):
+    def _make_add_covariate_command(self, covariate_name, covariate_type):
         state = {"stable_id": None}
 
         def redo():
             covariate = self._add_new_covariate(
-                cov_name, cov_type, stable_id=state["stable_id"]
+                covariate_name, covariate_type, stable_id=state["stable_id"]
             )
             state["stable_id"] = covariate.stable_id
 
         def undo():
-            self._undo_add_new_covariate(cov_name)
+            self._undo_add_new_covariate(covariate_name)
 
         return meta_globals.CallbackCommand(
-            redo, undo, description="Add covariate %s" % cov_name
+            redo, undo, description="Add covariate %s" % covariate_name
         )
 
-    def _add_new_covariate(self, cov_name, cov_type, stable_id=None):
-        covariate = self.model.add_covariate(cov_name, cov_type, stable_id=stable_id)
+    def _add_new_covariate(self, covariate_name, covariate_type, stable_id=None):
+        covariate = self.model.add_covariate(
+            covariate_name, covariate_type, stable_id=stable_id
+        )
         self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
         return covariate
 
-    def _undo_add_new_covariate(self, cov_name):
-        self.model.remove_covariate(cov_name)
+    def _undo_add_new_covariate(self, covariate_name):
+        self.model.remove_covariate(covariate_name)
         self.tableView.synchronize_column_widths()
         self._refresh_advanced_analysis_actions()
 
     def add_new(self, startup_outcome: main_wizard.DatasetInfo | None = None) -> None:
         redo_f, undo_f = None, None
-        if self.cur_dimension == "outcome" and not startup_outcome:
+        if self.current_dimension == "outcome" and not startup_outcome:
             form = add_new_dialogs.AddOutcomeDialog(
-                parent=self, is_diag=self.model.is_diag()
+                parent=self, is_diagnostic=self.model.is_diagnostic()
             )
             form.outcome_name_le.setFocus()
             if form.exec():
@@ -1284,12 +1253,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 def redo_f():
                     return self._add_new_outcome(new_outcome_name, new_outcome_type)
 
-                prev_outcome = str(self.model.current_outcome)
+                previous_outcome = str(self.model.current_outcome_name)
 
                 def undo_f():
-                    return self._undo_add_new_outcome(new_outcome_name, prev_outcome)
+                    return self._undo_add_new_outcome(
+                        new_outcome_name, previous_outcome
+                    )
         elif (
-            self.cur_dimension == "outcome" and startup_outcome
+            self.current_dimension == "outcome" and startup_outcome
         ):  # For dealing with outcomes from the startup form
             new_outcome_name = qt_text.to_native_text(startup_outcome["name"])
             new_outcome_type = str(startup_outcome["data_type"])
@@ -1300,11 +1271,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                     new_outcome_name, new_outcome_type, new_outcome_subtype
                 )
 
-            prev_outcome = str(self.model.current_outcome)
+            previous_outcome = str(self.model.current_outcome_name)
 
             def undo_f():
-                return self._undo_add_new_outcome(new_outcome_name, prev_outcome)
-        elif self.cur_dimension == "group":
+                return self._undo_add_new_outcome(new_outcome_name, previous_outcome)
+        elif self.current_dimension == "group":
             form = add_new_dialogs.AddGroupDialog(self)
             form.group_name_le.setFocus()
             if form.exec():
@@ -1315,13 +1286,13 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 except ValueError as exc:
                     QMessageBox.warning(self, "Warning", str(exc))
                     return
-                cur_groups = list(self.model.get_current_groups())
+                current_groups = list(self.model.get_current_groups())
 
                 def redo_f():
                     return self._add_new_group(new_group_name)
 
                 def undo_f():
-                    return self._undo_add_new_group(new_group_name, cur_groups)
+                    return self._undo_add_new_group(new_group_name, current_groups)
         else:
             # then the dimension is follow-up
             form = add_new_dialogs.AddFollowUpDialog(self)
@@ -1330,7 +1301,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 try:
                     follow_up_lbl = dataset_table_model.validate_new_follow_up_name(
                         self.model.dataset,
-                        self.model.current_outcome,
+                        self.model.current_outcome_name,
                         form.follow_up_name_le.text(),
                     )
                 except ValueError as exc:
@@ -1353,11 +1324,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _add_new_group(self, new_group_name):
         self.model.add_new_group(new_group_name)
-        cur_groups = list(self.model.get_current_groups())
-        cur_groups[1] = new_group_name
-        self.model.set_current_groups(cur_groups)
+        current_groups = list(self.model.get_current_groups())
+        current_groups[1] = new_group_name
+        self.model.set_current_groups(current_groups)
         # Refresh the displayed group columns after renaming.
-        self.display_groups(cur_groups)
+        self.display_groups(current_groups)
 
     def _undo_add_new_group(self, added_group, previously_displayed_groups):
         self.model.remove_group(added_group)
@@ -1378,7 +1349,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _undo_add_follow_up_for_cur_outcome(self, prev_follow_up, follow_up_to_del):
         self.model.remove_follow_up_from_outcome(
-            follow_up_to_del, str(self.model.current_outcome)
+            follow_up_to_del, str(self.model.current_outcome_name)
         )
         self.display_follow_up(
             self.model.get_t_point_for_follow_up_name(prev_follow_up)
@@ -1389,8 +1360,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         # if there is only one point (e.g., outcome). otherwise you end
         # up enqueueing a bunch of pointless undo/redos.
         redo_f, undo_f = None, None
-        if self.cur_dimension == "outcome":
-            old_outcome = self.model.current_outcome
+        if self.current_dimension == "outcome":
+            old_outcome = self.model.current_outcome_name
             # Preserve the current groups because the next outcome can select
             # different defaults and undo must restore the original view.
             previous_groups = self.model.get_current_groups()
@@ -1407,7 +1378,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                     follow_up_name=previous_follow_up,
                     group_names=previous_groups,
                 )
-        elif self.cur_dimension == "group":
+        elif self.current_dimension == "group":
             previous_groups = self.model.get_current_groups()
             new_groups = self.model.next_groups()
 
@@ -1416,8 +1387,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
             def undo_f():
                 return self.display_groups(previous_groups)
-        elif self.cur_dimension == "follow-up":
-            old_follow_up_t_point = self.model.current_time_point
+        elif self.current_dimension == "follow-up":
+            old_follow_up_t_point = self.model.current_follow_up_index
             next_follow_up_t_point = self.model.get_next_follow_up()[0]
 
             def redo_f():
@@ -1432,26 +1403,26 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def previous(self):
         redo_f, undo_f = None, None
-        if self.cur_dimension == "outcome":
-            old_outcome = self.model.current_outcome
-            next_outcome = self.model.get_prev_outcome_name()
+        if self.current_dimension == "outcome":
+            old_outcome = self.model.current_outcome_name
+            next_outcome = self.model.get_previous_outcome_name()
 
             def redo_f():
                 return self.display_outcome(next_outcome)
 
             def undo_f():
                 return self.display_outcome(old_outcome)
-        elif self.cur_dimension == "group":
-            cur_groups = self.model.get_current_groups()
+        elif self.current_dimension == "group":
+            current_groups = self.model.get_current_groups()
             prev_groups = self.model.get_previous_groups()
 
             def redo_f():
                 return self.display_groups(prev_groups)
 
             def undo_f():
-                return self.display_groups(cur_groups)
-        elif self.cur_dimension == "follow-up":
-            old_follow_up_t_point = self.model.current_time_point
+                return self.display_groups(current_groups)
+        elif self.current_dimension == "follow-up":
+            old_follow_up_t_point = self.model.current_follow_up_index
             previous_follow_up_t_point = self.model.get_previous_follow_up()[0]
 
             def redo_f():
@@ -1471,22 +1442,22 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         this method, then 'next()', the next method will step forward in the
         dimension made active here.
         """
-        if self.cur_dimension_index == len(self.dimensions) - 1:
-            self.cur_dimension_index = 0
+        if self.current_dimension_index == len(self.dimensions) - 1:
+            self.current_dimension_index = 0
         else:
-            self.cur_dimension_index += 1
+            self.current_dimension_index += 1
         self.update_dimension()
 
     def previous_dimension(self):
-        if self.cur_dimension_index == 0:
-            self.cur_dimension_index = len(self.dimensions) - 1
+        if self.current_dimension_index == 0:
+            self.current_dimension_index = len(self.dimensions) - 1
         else:
-            self.cur_dimension_index -= 1
+            self.current_dimension_index -= 1
         self.update_dimension()
 
     def update_dimension(self):
-        self.cur_dimension = self.dimensions[self.cur_dimension_index]
-        self.nav_lbl.setText(self.cur_dimension)
+        self.current_dimension = self.dimensions[self.current_dimension_index]
+        self.navigation_label.setText(self.current_dimension)
 
     def display_groups(self, groups):
         self.model.set_current_groups(groups)
@@ -1495,22 +1466,18 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.tableView.synchronize_column_widths()
 
     def display_outcome(self, outcome_name, group_names=None, follow_up_name=None):
-        # We need to update which groups & follow-ups are current
-        # Avoid displaying a group or follow-up that
-        # do not belong to the outcome_name.
+        # Never retain a group or follow-up that belongs to another outcome.
         self.model.set_current_outcome(outcome_name)
         self.populate_metrics_menu()
 
-        # first ascertain if the currently displayed follow up is
-        # available for this outcome
         if follow_up_name is not None:
             self.model.set_current_follow_up(follow_up_name)
         else:
             # If a follow up isn't explicitly passed in, attempt to use
             # the current follow up. If this does not exist for the outcome
             # to be displayed, then display a different follow up.
-            cur_follow_up = self.model.get_current_follow_up_name()
-            if not self.model.outcome_has_follow_up(outcome_name, cur_follow_up):
+            current_follow_up = self.model.get_current_follow_up_name()
+            if not self.model.outcome_has_follow_up(outcome_name, current_follow_up):
                 # then the outcome does not have this follow up and we have to
                 # step on to the next one.
                 next_follow_up = self.model.get_next_follow_up()[1]
@@ -1523,32 +1490,34 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             # then no group names were explicitly passed in; ascertain
             # that the outcome/fu contains the current groups; if not,
             # set them to something else.
-            cur_groups = self.model.get_current_groups()
+            current_groups = self.model.get_current_groups()
             if not all(
                 [
-                    self.model.outcome_fu_has_group(
+                    self.model.outcome_follow_up_has_group(
                         outcome_name, self.model.get_current_follow_up_name(), group
                     )
-                    for group in cur_groups
+                    for group in current_groups
                 ]
             ):
                 self.model.set_current_groups(self.model.next_groups())
 
-        self.cur_outcome_lbl.setText("<font color='Blue'>%s</font>" % outcome_name)
-        self.cur_time_lbl.setText(
+        self.current_outcome_label.setText(
+            "<font color='Blue'>%s</font>" % outcome_name
+        )
+        self.current_follow_up_label.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
     def display_follow_up(self, time_point):
-        self.model.current_time_point = time_point
+        self.model.current_follow_up_index = time_point
         self.update_follow_up_label()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
     def update_follow_up_label(self):
-        self.cur_time_lbl.setText(
+        self.current_follow_up_label.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
 
@@ -1630,15 +1599,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         delete_command = meta_globals.CallbackCommand(redo_f, undo_f)
         self.tableView.undoStack.push(delete_command)
 
-    def change_cov_type(self, covariate):
-        cur_dataset = copy.deepcopy(self.model.dataset)
+    def change_covariate_type(self, covariate):
+        current_dataset = copy.deepcopy(self.model.dataset)
         # keep the current study order, because we're going to sort the studies
         # on the change_cov_form but we want to revert to the ordering
         # they came in with when we're done.
         original_study_order = [study.name for study in self.model.dataset.studies]
 
         change_type_form = covariate_type_dialog.CovariateTypeDialog(
-            cur_dataset, covariate, parent=self
+            current_dataset, covariate, parent=self
         )
 
         if change_type_form.exec():
@@ -1649,12 +1618,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                     modified_dataset.cmp_studies(
                         compare_by="ordered_list",
                         ordered_list=original_study_order,
-                        mult=self.model.get_mult(),
+                        confidence_multiplier=self.model.get_confidence_multiplier(),
                     )
                 )
             )
 
-            old_state_dict = self.tableView.model().get_stateful_dict()
+            old_state_dict = self.tableView.model().get_state()
             new_state_dict = copy.deepcopy(old_state_dict)
 
             def redo_f():
@@ -1678,7 +1647,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             # the field names are also poorly named, in this case. here we mean the
             # **covariate name**, of course.
             try:
-                existing_covariates = list(self.model.dataset.get_cov_names())
+                existing_covariates = list(self.model.dataset.get_covariate_names())
                 if orig_cov_name in existing_covariates:
                     existing_covariates.remove(orig_cov_name)
                 new_cov = name_validation.validate_unique_name(
@@ -1701,14 +1670,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.tableView.undoStack.push(rename_cov_command)
 
     def delete_covariate(self, covariate):
-        cov_vals_d = self.model.dataset.get_values_for_cov(covariate.name)
+        covariate_values_by_study = self.model.dataset.get_covariate_values(
+            covariate.name
+        )
         stable_id = getattr(covariate, "stable_id", None)
 
         def undo_f():
             self.model.add_covariate(
                 covariate.name,
                 meta_globals.COV_INTS_TO_STRS[covariate.data_type],
-                cov_values=cov_vals_d,
+                covariate_values=covariate_values_by_study,
                 stable_id=stable_id,
             )
             self._refresh_advanced_analysis_actions()
@@ -1748,7 +1719,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             dataset=data_model, add_blank_study=add_blank_study
         )
 
-        self._disconnections()
+        self._disconnect_model_signals()
         if len(data_model) >= 2:
             self.enable_menu_options_that_require_dataset()
         else:
@@ -1778,13 +1749,17 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         """Call me when the model is changed."""
         if preserve_selection:
             group_names = self.model.dataset.get_group_names()
-            if self.model.current_txs:
-                self.model.tx_index_a = group_names.index(self.model.current_txs[0])
-                if len(self.model.current_txs) > 1:
-                    self.model.tx_index_b = group_names.index(self.model.current_txs[1])
+            if self.model.current_groups:
+                self.model.group_index_a = group_names.index(
+                    self.model.current_groups[0]
+                )
+                if len(self.model.current_groups) > 1:
+                    self.model.group_index_b = group_names.index(
+                        self.model.current_groups[1]
+                    )
                 else:
-                    self.model.tx_index_b = self.model.tx_index_a
-            self.model.previous_txs = list(self.model.current_txs)
+                    self.model.group_index_b = self.model.group_index_a
+            self.model.previous_groups = list(self.model.current_groups)
         else:
             self.model.update_current_group_names()
             self.model.update_current_outcome()
@@ -1792,38 +1767,32 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if (
             recalculate_outcomes
-            and self.model.current_outcome is not None
-            and not self.model.is_diag()
+            and self.model.current_outcome_name is not None
+            and not self.model.is_diagnostic()
         ):
             self.model.try_to_update_outcomes()
 
-        # This is kind of subtle. We have to reconnect
-        # our signals and slots when the underlying model
-        # changes, because otherwise the antiquated/replaced
-        # model (which was connected to the slots of interest)
-        # remains, which is useless. However, we do not
-        # reconnect the menu_action options; this will cause those
-        # methods to be called x times! (x being the number of times
-        # _setup_connections is invoked)
+        # The retired model remains connected to its slots, so reconnect the
+        # view but not menu actions, which would otherwise accumulate handlers.
         self._setup_connections(menu_actions=False)
         self.tableView.synchronize_column_widths()
         self.update_outcome_lbl()
         self.update_follow_up_label()
 
-        # adding check to ascertain that the menu
-        # isn't already ready for the current kind of data
-        cur_data_type = self.tableView.model().get_current_outcome_type(get_str=False)
-        if self.metric_menu_is_set_for != cur_data_type:
+        current_data_type = self.tableView.model().get_current_outcome_type(
+            get_str=False
+        )
+        if self.metric_menu_is_set_for != current_data_type:
             self.populate_metrics_menu(
                 metric_to_check=self.tableView.model().current_effect
             )
 
         self.model.reset_model()
-        self._change_conf_level_label()
+        self._update_confidence_level_label()
 
     def update_outcome_lbl(self):
-        self.cur_outcome_lbl.setText(
-            "<font color='Blue'>%s</font>" % self.model.current_outcome
+        self.current_outcome_label.setText(
+            "<font color='Blue'>%s</font>" % self.model.current_outcome_name
         )
 
     def quit(self):
@@ -1901,14 +1870,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         return True
 
     def _make_new_dataset_and_setup_spreadsheet(self, dataset_info):
-        is_diag = dataset_info["data_type"] == "diagnostic"
-        self.new_dataset(is_diag=is_diag)
+        is_diagnostic = dataset_info["data_type"] == "diagnostic"
+        self.new_dataset(is_diagnostic=is_diagnostic)
         self.model.dataset.summary = copy.deepcopy(dataset_info)
 
-        tmp = self.cur_dimension
-        self.cur_dimension = "outcome"
+        tmp = self.current_dimension
+        self.current_dimension = "outcome"
         self.add_new(dataset_info)  # add the outcome
-        self.cur_dimension = tmp
+        self.current_dimension = tmp
 
         if dataset_info["data_type"] in ["binary", "continuous"]:
             self.model.current_effect = dataset_info["effect"]  # set current effect
@@ -1931,12 +1900,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
             # Back-up original dataset
             original_dataset = copy.deepcopy(self.model.dataset)
-            old_state_dict = self.tableView.model().get_stateful_dict()
+            old_state_dict = self.tableView.model().get_state()
 
             self._make_new_dataset_and_setup_spreadsheet(dataset_info)
 
             new_dataset = copy.deepcopy(self.model.dataset)
-            new_state_dict = self.tableView.model().get_stateful_dict()
+            new_state_dict = self.tableView.model().get_state()
 
             imported_data = csv_data["data"]
             # Note: may want at some point to access the headers provided in the CSV;
@@ -1993,7 +1962,7 @@ class ImportCsvCommand(QUndoCommand):
         else:  # this a first run
             self._import_data_into_new_dataset()
             self.new_dataset = copy.deepcopy(self.main_form.model.dataset)
-            self.new_state_dict = self.main_form.tableView.model().get_stateful_dict()
+            self.new_state_dict = self.main_form.tableView.model().get_state()
             self.new_dataset_has_imported_data = True
 
     def undo(self):
@@ -2004,16 +1973,14 @@ class ImportCsvCommand(QUndoCommand):
     def _import_data_into_new_dataset(self):
         self.main_form.set_model(self.new_dataset, self.new_state_dict)
 
-        # Set data in model:
         num_rows = len(self.imported_data)
         if num_rows == 0:
             return
         num_cols = len(self.imported_data[0])
 
-        # Handle covariates
         if self.covariate_names != []:
-            for name, cov_type in zip(self.covariate_names, self.covariate_types):
-                self.main_form._add_new_covariate(name, cov_type)
+            for name, covariate_type in zip(self.covariate_names, self.covariate_types):
+                self.main_form._add_new_covariate(name, covariate_type)
 
         # Copy data into table
         import_progress = ImportProgressDialog(
@@ -2053,12 +2020,14 @@ class ChangeConfidenceLevelCommand(QUndoCommand):
         self.mainform = mainform
 
     def redo(self):
-        self._set_conf_level(self.new_cl)
+        self._set_confidence_level(self.new_cl)
 
     def undo(self):
-        self._set_conf_level(self.old_cl)
+        self._set_confidence_level(self.old_cl)
 
-    def _set_conf_level(self, conf_level):
-        self.mainform.model.set_conf_level(conf_level)
-        self.mainform.cl_label.setText(_format_confidence_level_status(conf_level))
+    def _set_confidence_level(self, confidence_level):
+        self.mainform.model.set_confidence_level(confidence_level)
+        self.mainform.cl_label.setText(
+            _format_confidence_level_status(confidence_level)
+        )
         self.mainform.model.reset_model()

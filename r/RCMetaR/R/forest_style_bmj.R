@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# BMJ Forest Style templates for the metafor-backed forest renderer.
-
 rcmetar.bmj.format.weight <- function(weights, n) {
     if (is.null(weights) || length(weights) == 0 || !any(is.finite(weights))) {
         weights <- rep(100 / max(n, 1), n)

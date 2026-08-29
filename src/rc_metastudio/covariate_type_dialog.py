@@ -15,7 +15,9 @@ from rc_metastudio import qt_text
 if TYPE_CHECKING:
     import ui_covariate_type_dialog as _ui_covariate_type_dialog
 else:
-    from rc_metastudio.forms import ui_covariate_type_dialog as _ui_covariate_type_dialog
+    from rc_metastudio.forms import (
+        ui_covariate_type_dialog as _ui_covariate_type_dialog,
+    )
 
 
 def _to_native_text(value):
@@ -40,10 +42,10 @@ class CovariateTypeDialog(QDialog, _ui_covariate_type_dialog.Ui_CovariateTypeDia
         self.cov_model.dataError.connect(
             app_error_handler.safe_slot(self.data_error, parent=self)
         )
-        self.cov_prev_table.setModel(self.cov_model)
-        self.cov_prev_table.setTabKeyNavigation(False)
-        self.cov_prev_table.resizeColumnsToContents()
-        qt_layout.configure_spreadsheet_table_view(self.cov_prev_table)
+        self.covariate_preview_table.setModel(self.cov_model)
+        self.covariate_preview_table.setTabKeyNavigation(False)
+        self.covariate_preview_table.resizeColumnsToContents()
+        qt_layout.configure_spreadsheet_table_view(self.covariate_preview_table)
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
@@ -71,9 +73,9 @@ class CovariateTypeModel(QAbstractTableModel):
         )
 
         self.update_included_studies()
-        self.add_cov_with_new_type()
+        self.add_covariate_with_new_type()
 
-        self.refresh_cov_values()
+        self.refresh_covariate_values()
 
         self.STUDY_COL, self.ORIG_VAL, self.NEW_VAL = list(range(3))
 
@@ -85,7 +87,7 @@ class CovariateTypeModel(QAbstractTableModel):
         self.dataError.emit(msg)
         return False
 
-    def add_cov_with_new_type(self):
+    def add_covariate_with_new_type(self):
         new_name = self.covariate.name
         if self.new_data_type == CONTINUOUS:
             new_name += " (continuous)"
@@ -95,25 +97,27 @@ class CovariateTypeModel(QAbstractTableModel):
         guessed_vals = self.guess_at_values()  # try and infer sensible values
         self.new_covariate = Covariate(new_name, COV_INTS_TO_STRS[self.new_data_type])
 
-        self.dataset.add_covariate(self.new_covariate, cov_values=guessed_vals)
+        self.dataset.add_covariate(self.new_covariate, covariate_values=guessed_vals)
         self.reset_model()
 
     def guess_at_values(self):
-        cov_d = self.dataset.get_values_for_cov(self.covariate)  # original values
-        guessed_vals_d = self.vals_to_new_vals(cov_d)
+        covariate_values = self.dataset.get_covariate_values(
+            self.covariate
+        )  # original values
+        guessed_vals_d = self.vals_to_new_vals(covariate_values)
 
         studies_to_guessed_vals = {}
         for study in self.included_studies:
-            if study.name in cov_d:
-                orig_val = cov_d[study.name]
+            if study.name in covariate_values:
+                orig_val = covariate_values[study.name]
                 studies_to_guessed_vals[study.name] = guessed_vals_d[orig_val]
             else:
                 studies_to_guessed_vals[study.name] = None
 
         return studies_to_guessed_vals
 
-    def vals_to_new_vals(self, cov_d):
-        unique_values = list(dict.fromkeys(cov_d.values()))
+    def vals_to_new_vals(self, covariate_values):
+        unique_values = list(dict.fromkeys(covariate_values.values()))
         unique_values.sort()
         mapping = {}
         for i, val in enumerate(unique_values):
@@ -139,19 +143,19 @@ class CovariateTypeModel(QAbstractTableModel):
 
         return alpha_str
 
-    def refresh_cov_values(self):
+    def refresh_covariate_values(self):
         self.dataset.studies.sort(
             key=cmp_to_key(self.dataset.cmp_studies(compare_by=self.covariate.name))
         )
 
         self.update_included_studies()
-        cov_d = self.dataset.get_values_for_cov(self.covariate)
-        new_cov_d = self.dataset.get_values_for_cov(self.new_covariate)
+        covariate_values = self.dataset.get_covariate_values(self.covariate)
+        new_cov_d = self.dataset.get_covariate_values(self.new_covariate)
 
         self.orig_cov_list, self.new_cov_list = [], []
         for study in self.included_studies:
-            if study.name in cov_d:
-                self.orig_cov_list.append(cov_d[study.name])
+            if study.name in covariate_values:
+                self.orig_cov_list.append(covariate_values[study.name])
                 self.new_cov_list.append(new_cov_d[study.name])
             else:
                 self.orig_cov_list.append(None)
@@ -205,7 +209,7 @@ class CovariateTypeModel(QAbstractTableModel):
             if column == self.NEW_VAL:
                 # then a (new) covariate value has been edited.
                 study = self.included_studies[index.row()]  # associated study
-                cov_name = self.new_covariate.name
+                covariate_name = self.new_covariate.name
                 new_value = None
                 if self.new_covariate.data_type == FACTOR:
                     new_value = _to_native_text(value)
@@ -219,8 +223,8 @@ class CovariateTypeModel(QAbstractTableModel):
                             return self.reject_edit(
                                 "Covariate values for continuous covariates need to be numeric."
                             )
-                study.covariate_dict[cov_name] = new_value
-                self.refresh_cov_values()
+                study.covariate_values[covariate_name] = new_value
+                self.refresh_covariate_values()
                 return True
         return self.reject_edit("Cannot edit that cell.")
 
