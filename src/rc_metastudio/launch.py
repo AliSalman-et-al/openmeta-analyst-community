@@ -124,6 +124,14 @@ def _startup_project_path(argv):
     return None
 
 
+def _strip_macos_process_serial_argument(argv):
+    """Remove the token LaunchServices inserts before application arguments."""
+    args = list(argv or [])
+    if len(args) > 1 and args[1].startswith("-psn_"):
+        return [args[0], *args[2:]]
+    return args
+
+
 def _argument_value(argv, option):
     args = list(argv or [])
     if option not in args:
@@ -135,14 +143,16 @@ def _argument_value(argv, option):
 
 
 def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
-    resolved = list(sys.argv if argv is None else argv)
+    resolved = _strip_macos_process_serial_argument(
+        sys.argv if argv is None else argv
+    )
     is_frozen = getattr(sys, "frozen", False) if frozen is None else frozen
     if not is_frozen:
         return resolved
 
     if native_argv is None:
         native_argv = _native_windows_command_line_argv()
-    native_argv = list(native_argv or [])
+    native_argv = _strip_macos_process_serial_argument(native_argv)
 
     if (
         _startup_project_path(resolved) is None
@@ -208,7 +218,11 @@ def start():
     pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
     if pid_path:
         Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
-    if len(startup_argv) > 1 and startup_argv[1].startswith("--automation-"):
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1].startswith("--automation-")
+        and startup_argv[1] != "--automation-startup-project-smoke"
+    ):
         from rc_metastudio import automation
 
         return automation.dispatch(startup_argv)

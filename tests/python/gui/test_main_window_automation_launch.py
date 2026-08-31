@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import sys
@@ -845,11 +846,33 @@ def test_frozen_startup_argv_keeps_existing_project_argument():
     assert launch._startup_project_path(argv) == sample_project
 
 
-def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
+def test_launchservices_process_serial_argument_is_removed_before_dispatch():
+    from rc_metastudio import launch
+
+    argv = [
+        "RCMetaStudio.app",
+        "-psn_0_123456",
+        "--automation-startup-project-smoke",
+        "--automation-startup-completion-marker",
+        "/tmp/launchservices-completion.json",
+        "sample_projects/amino.rcms",
+    ]
+
+    assert launch._resolve_startup_argv(argv=argv, frozen=False) == [
+        "RCMetaStudio.app",
+        "--automation-startup-project-smoke",
+        "--automation-startup-completion-marker",
+        "/tmp/launchservices-completion.json",
+        "sample_projects/amino.rcms",
+    ]
+
+
+def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_path):
     from rc_metastudio import automation
     from rc_metastudio import launch
 
     sample_project = _sample_project_path("amino.rcms")
+    completion_marker = tmp_path / "launchservices-completion.json"
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     opened = []
     started = []
@@ -895,7 +918,15 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
             pass
 
     monkeypatch.setattr(
-        launch, "_resolve_startup_argv", lambda: ["RCMetaStudio.exe", sample_project]
+        launch,
+        "_resolve_startup_argv",
+        lambda: [
+            "RCMetaStudio.app",
+            "--automation-startup-project-smoke",
+            "--automation-startup-completion-marker",
+            str(completion_marker),
+            sample_project,
+        ],
     )
     monkeypatch.setattr(
         launch,
@@ -907,13 +938,19 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch):
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
     monkeypatch.setattr(launch, "create_startup_splash", lambda: Splash(object()))
     monkeypatch.setattr(launch, "load_R_libraries", lambda app, splash: None)
+    monkeypatch.setattr(
+        automation,
+        "dispatch",
+        lambda *_: pytest.fail("startup project smoke must not dispatch"),
+    )
     monkeypatch.setattr(automation, "_force_table_paint", lambda app, meta: None)
-    monkeypatch.setenv("RCMS_STARTUP_PROJECT_SMOKE", "1")
 
     assert launch.start() == 0
     assert opened == [sample_project]
     assert started == []
     assert closed == [True]
+    marker = json.loads(completion_marker.read_text(encoding="utf-8"))
+    assert marker["project"] == "amino.rcms"
     os.chdir(REPO_ROOT)
 
 

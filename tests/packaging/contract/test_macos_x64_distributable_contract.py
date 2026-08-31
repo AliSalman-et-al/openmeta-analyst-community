@@ -345,6 +345,31 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     )
 
 
+def test_macos_launchservices_smoke_passes_marker_and_pid_through_open_args():
+    build = text("scripts/build-macos-package.sh")
+    start = build.index(
+        'step "Opening the converted sample through the normal LaunchServices app entry point"'
+    )
+    end = build.index(
+        'inspect_macos_deployment.py" finalize-smoke',
+        start,
+    )
+    launchservices = build[start:end]
+
+    assert 'open -W -n "$app_bundle" --args' in launchservices
+    assert launchservices.index("--args") < launchservices.index(
+        "--automation-startup-project-smoke"
+    )
+    assert (
+        '--automation-startup-completion-marker "$launchservices_marker_path"'
+        in launchservices
+    )
+    assert '--automation-pid-file "$launchservices_pid_path"' in launchservices
+    assert '--automation-smoke-log "$smoke_log_path"' in launchservices
+    assert '"$sample_path"' in launchservices
+    assert '--owned-pid-file "$launchservices_pid_path"' in launchservices
+
+
 def test_direct_provenance_uses_named_cli_and_rejects_missing_named_inputs(tmp_path):
     build = text("scripts/build-macos-package.sh")
     assert 'scripts/build_macos_direct_provenance.py"' in build
