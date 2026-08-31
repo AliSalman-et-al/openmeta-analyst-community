@@ -9,7 +9,6 @@ import textwrap
 
 from ._r_driver_support import run_python_driver
 
-
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
@@ -417,14 +416,23 @@ _DRIVER = textwrap.dedent(
         metric="Sens",
         parameters={"conf.level": 95.0, "measure": "Sens"},
     )
-    diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
-        filtered_model,
-        selected.studies,
-        (filtered_model.covariate,),
-        diagnostic_meta_request,
-        False,
-        95.0,
-    )
+    previous_cwd = os.getcwd()
+    previous_scratch_dir = os.environ.pop("RCMS_ANALYSIS_SCRATCH_DIR", None)
+    try:
+        with tempfile.TemporaryDirectory(prefix="rcmetar-meta-regression-") as isolated_cwd:
+            os.chdir(isolated_cwd)
+            diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
+                filtered_model,
+                selected.studies,
+                (filtered_model.covariate,),
+                diagnostic_meta_request,
+                False,
+                95.0,
+            )
+    finally:
+        os.chdir(previous_cwd)
+        if previous_scratch_dir is not None:
+            os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
     assert "Summary" in diagnostic_meta_result["texts"]
     for expression in (
         "tmp_obj@y",

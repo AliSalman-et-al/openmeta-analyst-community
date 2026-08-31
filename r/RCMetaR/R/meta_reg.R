@@ -318,7 +318,7 @@ g.meta.regression <- function(
 	if (is.single.numeric.covariate(mods) && !disable.plots) {
 		betas <- res$b
 		fitted.line <- list(intercept=betas[1], slope=betas[2])
-		plot.path <- "./r_tmp/reg.png"
+		plot.path <- rcmetar.scratch.path("reg.png")
 	    cov.name <- mods[['numeric']][[1]]
 		cov.vals <- data[[cov.name]]
 		plot.data <- g.create.plot.data.reg(data, cov.name, cov.vals, measure, level, fitted.line, res=res, digits=digits)
@@ -676,7 +676,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
        if (display.data$n.cont.covs==1 & length(display.data$factor.n.levels)==0) {
             betas <- res$b
             fitted.line <- list(intercept=betas[1], slope=betas[2])
-            plot.path <- "./r_tmp/reg.png"
+            plot.path <- rcmetar.scratch.path("reg.png")
             if (!is.null(params$bp_outpath) && length(params$bp_outpath) > 0 &&
                     !is.na(params$bp_outpath[1]) && nzchar(as.character(params$bp_outpath[1]))) {
                 plot.path <- as.character(params$bp_outpath[1])
@@ -874,7 +874,7 @@ binary.fixed.meta.regression <- function(reg.data, params){
     if (length(cov.names)==1) {
         betas <- res$b
         fitted.line <- list(intercept=betas[1], slope=betas[2])
-        plot.path <- "./r_tmp/reg.png"
+        plot.path <- rcmetar.scratch.path("reg.png")
         plot.data <- create.plot.data.reg(reg.data, params, fitted.line, selected.cov=cov.name, res=res)
         meta.regression.plot(plot.data, outpath=plot.path)
         images <- c("Regression Plot"=plot.path)
@@ -899,7 +899,7 @@ random.meta.regression <- function(reg.data, params, cov.name){
     betas <- res$b
     fitted.line <- list(intercept=betas[1], slope=betas[2])
     if (is.null(params$rp_outpath)) {
-        plot.path <- "./r_tmp/reg.png"
+        plot.path <- rcmetar.scratch.path("reg.png")
     }
     else {
         plot.path <- params$rp_outpath
