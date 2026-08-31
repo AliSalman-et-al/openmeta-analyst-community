@@ -613,7 +613,7 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
   expect_gt(file.info(edited)$size, 0)
   custom <- rcmetar.run.small.study.effects(data, list(
     data.type="diagnostic", metric="DOR", funnels="deeks", tests=character(),
-    
+
     `funnel.xlab`="Edited ESS axis", `funnel.ylab`="Edited log DOR axis"
   ))
   custom.path <- custom$plot_params_paths[["Deeks Effective-Sample-Size Funnel Plot"]]

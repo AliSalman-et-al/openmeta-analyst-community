@@ -11,7 +11,7 @@ RC MetaStudio starts a fresh maintained-product changelog. Historical release hi
 - Added a guided Publication Bias and small-study-effects workflow with package-native eligibility checks, readable results, dynamic statistical-paper references, and per-run regeneration.
 - Added ordinary, contour-enhanced, Deeks, and trim-and-fill funnel artifacts, with partial plot failures preserved beside successful outputs.
 - Added Default (metafor), RevMan, and BMJ-inspired visual styles, plus expanded Edit Plot controls for funnel artifacts.
-- Added method-specific Egger, Begg, Harbord, Peters, Pustejovsky, Ruecker, and Deeks behavior.
+- Added method-specific Egger, Begg, Harbord, Peters, Pustejovsky–Rodgers, Rücker, and Deeks behavior.
 
 ### Changed
 
