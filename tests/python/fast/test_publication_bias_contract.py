@@ -119,7 +119,7 @@ def test_request_has_explicit_frozen_plot_test_sensitivity_and_pool_specs():
     assert request.to_mapping()["tests"] == ["classical-egger"]
     assert request.to_mapping()["pooled.display.model"] == "common"
     with pytest.raises(AttributeError):
-        request.metric = "SMD"
+        request.__setattr__("metric", "SMD")
 
 
 def test_dialog_keeps_test_selection_inside_authoritative_eligibility():

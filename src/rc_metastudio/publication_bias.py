@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, TypeVar
 
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 
@@ -207,12 +207,30 @@ class PooledDisplaySpec:
 
 
 AnalysisFamily: TypeAlias = Literal["binary", "continuous", "diagnostic"]
+_MappingKey = TypeVar("_MappingKey")
 
 
 def _text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
     return value.strip()
+
+
+def _string_key_mapping(
+    value: Mapping[_MappingKey, object], field_name: str
+) -> dict[str, object]:
+    """Validate and normalize mappings crossing the untyped R boundary."""
+    return {_text(key, f"{field_name} key"): item for key, item in value.items()}
+
+
+def _float(value: object, field_name: str) -> float:
+    """Convert the scalar values accepted by R's serialized report."""
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise ValueError(f"{field_name} must be numeric")
+    try:
+        return float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{field_name} must be numeric") from error
 
 
 def _test_method(value: str | TestMethod) -> TestMethod:
@@ -462,7 +480,10 @@ class EligibilityMethod:
             raise ValueError(
                 "eligibility method is missing fields: " + ", ".join(missing)
             )
-        method = _test_method(value["method"]).value
+        method_value = value["method"]
+        if not isinstance(method_value, str):
+            raise ValueError("eligibility method must be text")
+        method = _test_method(method_value).value
         reason = _text(value["reason"], "eligibility reason") if value["reason"] else ""
         count = value["usable.studies"]
         if not isinstance(count, (int, float)) or isinstance(count, bool) or int(count) != count:
@@ -527,7 +548,9 @@ class EligibilityReport:
         if isinstance(method_values, (str, bytes)) or not isinstance(method_values, Sequence):
             raise ValueError("eligibility methods must be a sequence")
         methods = tuple(
-            EligibilityMethod.from_mapping(item)
+            EligibilityMethod.from_mapping(
+                _string_key_mapping(item, "eligibility method")
+            )
             for item in method_values
             if isinstance(item, Mapping)
         )
@@ -538,14 +561,16 @@ class EligibilityReport:
         if not isinstance(precision, (list, tuple)) or len(precision) not in (0, 2):
             raise ValueError("eligibility precision.range must have zero or two values")
         if len(precision) == 2:
-            try:
-                precision_range = (float(precision[0]), float(precision[1]))
-            except (TypeError, ValueError) as error:
-                raise ValueError("eligibility precision.range must be numeric") from error
+            precision_range = (
+                _float(precision[0], "eligibility precision.range"),
+                _float(precision[1], "eligibility precision.range"),
+            )
         versions = value["package.versions"]
         if not isinstance(versions, Mapping):
             raise ValueError("eligibility package.versions must be a mapping")
-        package_versions = _frozen_mapping(versions)
+        package_versions = _frozen_mapping(
+            _string_key_mapping(versions, "eligibility package.versions")
+        )
         if not isinstance(value["data.type"], str) or not isinstance(value["metric"], str):
             raise ValueError("eligibility data.type and metric must be text")
         count = value["usable.studies"]
@@ -576,7 +601,9 @@ class EligibilityReport:
 def parse_eligibility_report(value: object) -> EligibilityReport:
     if not isinstance(value, Mapping):
         raise TypeError("small-study effects eligibility report must be a mapping")
-    return EligibilityReport.from_mapping(value)
+    return EligibilityReport.from_mapping(
+        _string_key_mapping(value, "eligibility report")
+    )
 
 
 def execute_small_study_effects(model: object, request: SmallStudyEffectsRequest) -> AnalysisResult:

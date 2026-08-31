@@ -141,6 +141,8 @@ def test_funnel_editor_apply_then_ok_does_not_regenerate_twice(qapp):
     try:
         apply_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Apply)
         ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        assert apply_button is not None
+        assert ok_button is not None
         apply_button.click()
         assert len(applied) == 1
         ok_button.click()
@@ -156,7 +158,9 @@ def test_funnel_editor_ok_commits_new_change_and_closes(qapp):
     dialog.applied.connect(lambda: (applied.append(True), dialog.mark_commit_succeeded()))
     try:
         dialog.point_size_spin.setValue(2.0)
-        dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).click()
+        ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        assert ok_button is not None
+        ok_button.click()
         assert len(applied) == 1
         assert dialog.result() == QDialog.DialogCode.Accepted
     finally:
@@ -171,7 +175,9 @@ def test_funnel_editor_ok_commits_combo_only_change(qapp):
     )
     try:
         dialog.label_policy_combo.setCurrentText("All")
-        dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).click()
+        ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        assert ok_button is not None
+        ok_button.click()
         assert len(applied) == 1
         assert applied[0]["funnel.label.policy"] == "all"
         assert dialog.result() == QDialog.DialogCode.Accepted
@@ -184,7 +190,9 @@ def test_funnel_editor_failed_commit_stays_dirty_and_open(qapp):
     dialog.applied.connect(dialog.mark_commit_failed)
     try:
         dialog.point_size_spin.setValue(2.0)
-        dialog.button_box.button(QDialogButtonBox.StandardButton.Ok).click()
+        ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        assert ok_button is not None
+        ok_button.click()
         assert dialog._dirty
         assert dialog.result() == 0
     finally:
@@ -216,6 +224,7 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     def regenerate(_params_path, output_path=None):
         regenerate_count[0] += 1
         if regenerate_count[0] == 1:
+            assert output_path is not None
             Path(output_path).write_bytes(b"first good image")
             return output_path
         raise RuntimeError("render failed")

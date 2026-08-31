@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QWidget
@@ -16,12 +17,17 @@ class _Model:
         self._data_type = data_type
         self.current_effect = metric
         self._confidence_level = confidence_level
+        self.dataset: object | None = None
 
     def get_current_outcome_type(self):
         return self._data_type
 
     def get_confidence_level(self):
         return self._confidence_level
+
+
+class _Owner(QWidget):
+    analysis: Callable[[object], None]
 
 
 def _method(method, available, role="none", reason=""):
@@ -260,7 +266,7 @@ def test_successful_run_delivers_results_and_closes_dialog(qapp, monkeypatch):
         lambda *args, **kwargs: report,
     )
     delivered = []
-    owner = QWidget()
+    owner = _Owner()
     owner.analysis = delivered.append
     monkeypatch.setattr(
         publication_bias_dialog,
