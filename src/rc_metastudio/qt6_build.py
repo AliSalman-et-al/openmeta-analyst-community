@@ -59,6 +59,9 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/meta_regression_dialog.ui"): Path(
         "rc_metastudio/forms/ui_meta_regression_dialog.py"
     ),
+    Path("src/rc_metastudio/forms/publication_bias_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_publication_bias_dialog.py"
+    ),
     Path("src/rc_metastudio/forms/subgroup_analysis_dialog.ui"): Path(
         "rc_metastudio/forms/ui_subgroup_analysis_dialog.py"
     ),
@@ -79,6 +82,9 @@ CANONICAL_FORMS = {
     ),
     Path("src/rc_metastudio/forms/edit_plot_dialog.ui"): Path(
         "rc_metastudio/forms/ui_edit_plot_dialog.py"
+    ),
+    Path("src/rc_metastudio/forms/funnel_plot_editor_dialog.ui"): Path(
+        "rc_metastudio/forms/ui_funnel_plot_editor_dialog.py"
     ),
     Path("src/rc_metastudio/forms/analysis_setup_dialog.ui"): Path(
         "rc_metastudio/forms/ui_analysis_setup_dialog.py"

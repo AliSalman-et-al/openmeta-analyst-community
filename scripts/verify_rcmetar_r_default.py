@@ -139,7 +139,8 @@ def direct_archive_versions(root: Path) -> dict[str, str]:
     return {
         dependency["name"]: dependency["installed_version"]
         for dependency in manifest["direct_RCMetaR_dependencies"]
-        if dependency.get("source") == "cran-archive"
+        if dependency.get("source") in {"cran", "cran-archive"}
+        and dependency.get("installed_version") not in {None, "latest-compatible"}
     }
 
 

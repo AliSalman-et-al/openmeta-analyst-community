@@ -15,7 +15,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 _DRIVER = textwrap.dedent(
     """
-    import os, sys, tempfile
+    import locale, os, sys, tempfile
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     os.environ.setdefault(
@@ -93,9 +93,11 @@ _DRIVER = textwrap.dedent(
 
     assert r_bridge._r_is_null(ro.r("list()").names) is True
     assert r_bridge._r_is_null(ro.r("c(a=1)").names) is False
-
     # Native translation maps τ² to t² on Windows, so decode R text as UTF-8.
-    from rpy2.rinterface_lib import conversion, openrlib
+    from rpy2.rinterface_lib import callbacks, conversion, openrlib
+
+    if sys.platform == "win32":
+        assert callbacks._CCHAR_ENCODING == locale.getpreferredencoding(False)
 
     tau_squared = chr(0x03C4) + chr(0x00B2)
     rchar = openrlib.rlib.Rf_mkCharCE(
@@ -460,6 +462,35 @@ _DRIVER = textwrap.dedent(
     # Hard-exit so embedded-R finalizers don't run: rpy2/R teardown can
     # segfault on interpreter shutdown on Windows, which would turn a passing
     # check into a spurious non-zero exit.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT))
+
+
+_NULL_RESULT_DRIVER = textwrap.dedent(
+    """
+    import os, sys
+    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
+    from rc_metastudio import r_backend
+    r_backend.install_r_backend()
+    try:
+        from rc_metastudio import r_bridge
+    except Exception as exc:
+        sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
+        sys.exit(42)
+
+    assert r_bridge.r_object_to_python(r_bridge.ro.r("NULL")) is None
+    null_section_result = r_bridge.ro.r(
+        "list(Warning='kept', `Trim-and-fill data`=NULL, References='refs')"
+    )
+    parsed_null_section = r_bridge.parse_out_results(null_section_result)
+    assert "Trim-and-fill data" not in parsed_null_section["texts"]
+    assert parsed_null_section["texts"]["Warning"] == "kept"
+    sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(0)
@@ -1031,6 +1062,12 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     run_python_driver(_RCHAR_UTF8_DRIVER, env=env)
+
+
+def test_r_null_result_sections_are_omitted_before_formatting():
+    env = dict(os.environ)
+    env.pop("RCMS_STUB_BACKEND", None)
+    run_python_driver(_NULL_RESULT_DRIVER, env=env)
 
 
 def test_RCMetaR_summary_capture_uses_formatted_print_methods():

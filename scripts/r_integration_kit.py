@@ -422,7 +422,7 @@ def copy_source_payload(
 def copy_license_inventory(runtime: Path, library: Path, destination: Path) -> None:
     """Retain redistributable license texts beside immutable source evidence."""
     destination.mkdir()
-    candidates = ("COPYING", "COPYING.LIB", "LICENSE", "LICENCE")
+    candidates = ("COPYRIGHTS", "COPYING", "COPYING.LIB", "LICENSE", "LICENCE")
     for runtime_root in (runtime, runtime / "Resources"):
         for name in candidates:
             source = runtime_root / name

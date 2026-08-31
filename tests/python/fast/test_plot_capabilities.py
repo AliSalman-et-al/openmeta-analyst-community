@@ -1,7 +1,7 @@
 import pytest
 
-from rc_metastudio.analysis_results import parse_analysis_result
 from rc_metastudio import plot_capabilities
+from rc_metastudio.analysis_results import parse_analysis_result
 
 
 def descriptor(**overrides):
@@ -106,6 +106,7 @@ def test_option_groups_are_keyed_by_explicit_plot_kind():
     assert "columns" not in plot_capabilities.option_groups("leave_one_out_forest")
     assert "columns" not in plot_capabilities.option_groups("subgroup_forest")
     assert "regression" in plot_capabilities.option_groups("regression")
+    assert "funnel" in plot_capabilities.option_groups("trimfill_funnel")
 
 
 def test_regenerator_is_resolved_from_a_safe_registry():
@@ -127,3 +128,18 @@ def test_editable_plot_kind_requires_a_compatible_regenerator():
                 },
             }
         )
+
+
+def test_trimfill_funnel_has_an_explicit_editable_capability():
+    capabilities = plot_capabilities.validate_result(
+        {
+            "images": {"Trim-and-fill left": "trimfill.png"},
+            "image_params_paths": {"Trim-and-fill left": "trimfill-data"},
+            "plot_capabilities": {
+                "Trim-and-fill left": descriptor(
+                    plot_kind="trimfill_funnel", regenerator="funnel"
+                )
+            },
+        }
+    )
+    assert capabilities["Trim-and-fill left"]["plot_kind"] == "trimfill_funnel"

@@ -16,10 +16,14 @@ PlotKind = Literal[
     "regression",
     "roc",
     "sroc",
+    "funnel",
+    "contour_funnel",
+    "deeks_funnel",
+    "trimfill_funnel",
     "other",
 ]
 PlotComposition = Literal["single"]
-PlotRegenerator = Literal["forest", "regression", "none"]
+PlotRegenerator = Literal["forest", "regression", "funnel", "none"]
 
 
 class PlotCapability(TypedDict):

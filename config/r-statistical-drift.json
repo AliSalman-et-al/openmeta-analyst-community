@@ -2,9 +2,9 @@
   "manifest": "RCMetaR-statistical-drift",
   "schema_version": 1,
   "target_runtime": {
-    "r": "4.6.0",
+    "r": "4.6.1",
     "rpy2": "3.6.7",
-    "cran_policy": "latest-compatible"
+    "cran_policy": "dated-native-binary-only"
   },
   "reviewed_drift_required_fields": [
     "id",

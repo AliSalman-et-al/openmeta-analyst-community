@@ -207,6 +207,8 @@ RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.save.plot.data",
     "rcmetar.set.global.conf.level",
     "rcmetar.validate.analysis.request",
+    "rcmetar.run.small.study.effects",
+    "rcmetar.regenerate.small.study.funnel",
 }
 
 
@@ -239,7 +241,7 @@ def test_RCMetaR_r_manifests_validate():
     assert policy["repository"] == "https://packagemanager.posit.co/cran/2026-07-16"
     assert policy["normal_install_type"] == "binary"
     assert policy["source_fallback"] is False
-    assert len(policy["required_normal_packages"]) == 54
+    assert len(policy["required_normal_packages"]) == 57
     assert policy["source_exceptions"] == [
         {
             "name": "HSROC",
@@ -252,6 +254,39 @@ def test_RCMetaR_r_manifests_validate():
             "dependencies_install": False,
         }
     ]
+
+
+def test_meta_is_pinned_directly_and_transitive_statistics_packages_stay_in_closure():
+    manifest = json.loads((REPO_ROOT / DEPENDENCY_MANIFEST).read_text(encoding="utf-8"))
+    direct = {item["name"]: item for item in manifest["direct_RCMetaR_dependencies"]}
+    app = {item["name"]: item for item in manifest["app_r_bundle_dependencies"]}
+    policy = manifest["binary_package_policy"]
+    assert direct["meta"]["source"] == "cran"
+    assert direct["meta"]["installed_version"] == "8.5-0"
+    assert policy["repository"].endswith("/2026-07-16")
+    assert policy["source_fallback"] is False
+    assert {"meta", "metabook", "CompQuadForm"} <= set(
+        policy["required_normal_packages"]
+    )
+    assert [item["name"] for item in policy["source_exceptions"]] == ["HSROC"]
+    for package in ("metabook", "CompQuadForm"):
+        assert package not in direct
+        assert app[package]["source"] == "cran"
+
+
+def test_manifest_rejects_wrong_meta_pin(tmp_path):
+    root = copy_manifest_config(tmp_path)
+    manifest_path = root / DEPENDENCY_MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    next(item for item in manifest["direct_RCMetaR_dependencies"] if item["name"] == "meta")[
+        "installed_version"
+    ] = "8.5.0"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = run_validator(root)
+
+    assert result.returncode == 1
+    assert "direct meta runtime must be pinned to 8.5-0" in result.stderr
 
 
 def test_direct_and_app_bundle_dependencies_must_stay_separate(tmp_path):
@@ -718,6 +753,7 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "graphics",
         "HSROC",
         "lme4",
+        "meta",
         "methods",
         "metafor",
         "pdftools",

@@ -40,6 +40,10 @@ PLOT_OPTION_GROUPS = {
     "regression": frozenset(("style", "appearance", "axis", "regression")),
     "roc": frozenset(),
     "sroc": frozenset(),
+    "funnel": frozenset(("funnel", "axis")),
+    "contour_funnel": frozenset(("funnel", "axis")),
+    "deeks_funnel": frozenset(("funnel", "axis")),
+    "trimfill_funnel": frozenset(("funnel", "axis")),
     "other": frozenset(),
 }
 
@@ -53,6 +57,10 @@ REGENERATORS: dict[str, _Regenerator] = {
     "regression": {
         "function": "generate_reg_plot",
         "plot_kinds": frozenset(("regression",)),
+    },
+    "funnel": {
+        "function": "generate_small_study_effects_funnel",
+        "plot_kinds": frozenset(("funnel", "contour_funnel", "deeks_funnel", "trimfill_funnel")),
     },
     "none": {
         "function": None,
@@ -192,6 +200,14 @@ def _plot_kind(value: object, title: str) -> PlotKind:
         return "roc"
     if value == "sroc":
         return "sroc"
+    if value == "funnel":
+        return "funnel"
+    if value == "contour_funnel":
+        return "contour_funnel"
+    if value == "deeks_funnel":
+        return "deeks_funnel"
+    if value == "trimfill_funnel":
+        return "trimfill_funnel"
     if value == "other":
         return "other"
     raise ValueError("Unknown plot_kind for %s: %s" % (title, value))
@@ -208,6 +224,8 @@ def _regenerator(value: object, title: str) -> PlotRegenerator:
         return "forest"
     if value == "regression":
         return "regression"
+    if value == "funnel":
+        return "funnel"
     if value == "none":
         return "none"
     raise ValueError("Unknown plot regenerator for %s: %s" % (title, value))

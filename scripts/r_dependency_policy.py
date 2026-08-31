@@ -118,12 +118,12 @@ def load_policy(manifest_path: Path) -> dict:
     normal_packages = policy.get("required_normal_packages")
     if (
         not isinstance(normal_packages, list)
-        or len(normal_packages) != 54
-        or len(set(normal_packages)) != 54
+        or len(normal_packages) != 57
+        or len(set(normal_packages)) != 57
         or not all(isinstance(name, str) and name for name in normal_packages)
     ):
         raise PolicyError(
-            "required_normal_packages must contain 54 unique package names"
+            "required_normal_packages must contain 57 unique package names"
         )
     if not declared_normal_packages <= set(normal_packages):
         raise PolicyError(
@@ -148,6 +148,29 @@ def load_policy(manifest_path: Path) -> dict:
         )
     if direct_hsroc[0].get("installed_version") != HSROC["version"]:
         raise PolicyError("HSROC manifest version does not match the source exception")
+
+    direct_meta = [
+        record
+        for record in manifest.get("direct_RCMetaR_dependencies", [])
+        if isinstance(record, dict) and record.get("name") == "meta"
+    ]
+    if len(direct_meta) != 1 or direct_meta[0].get("source") != "cran":
+        raise PolicyError("meta 8.5-0 must be the direct RCMetaR CRAN runtime root")
+    if direct_meta[0].get("installed_version") != "8.5-0":
+        raise PolicyError("direct RCMetaR meta runtime must be pinned to 8.5-0")
+    for package in ("metabook", "CompQuadForm"):
+        direct = [
+            record
+            for record in manifest.get("direct_RCMetaR_dependencies", [])
+            if isinstance(record, dict) and record.get("name") == package
+        ]
+        closure = [
+            record
+            for record in manifest.get("app_r_bundle_dependencies", [])
+            if isinstance(record, dict) and record.get("name") == package
+        ]
+        if direct or len(closure) != 1 or closure[0].get("source") != "cran":
+            raise PolicyError(f"{package} must remain transitive app closure only")
 
     return {
         "repository": policy["repository"],

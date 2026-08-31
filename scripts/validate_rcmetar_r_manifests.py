@@ -214,6 +214,37 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
             + ", ".join(sorted(overlap))
         )
 
+    meta_records = [
+        dependency for dependency in direct_dependencies
+        if isinstance(dependency, dict) and dependency.get("name") == "meta"
+    ]
+    if len(meta_records) != 1:
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: meta must be the sole direct pinned runtime root"
+        )
+    meta = meta_records[0]
+    if (
+        meta.get("source") != "cran"
+        or meta.get("installed_version") != "8.5-0"
+        or "runtime" not in meta.get("scope", [])
+    ):
+        raise ValidationError(
+            f"{DEPENDENCY_MANIFEST}: direct meta runtime must be pinned to 8.5-0"
+        )
+    for package in ("metabook", "CompQuadForm"):
+        direct_matches = [
+            dependency for dependency in direct_dependencies
+            if isinstance(dependency, dict) and dependency.get("name") == package
+        ]
+        app_matches = [
+            dependency for dependency in app_dependencies
+            if isinstance(dependency, dict) and dependency.get("name") == package
+        ]
+        if direct_matches or len(app_matches) != 1 or app_matches[0].get("source") != "cran":
+            raise ValidationError(
+                f"{DEPENDENCY_MANIFEST}: {package} must be transitive app closure only"
+            )
+
     return direct_names
 
 

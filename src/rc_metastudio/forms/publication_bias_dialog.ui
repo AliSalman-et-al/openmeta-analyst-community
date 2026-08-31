@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PublicationBiasDialog</class>
+ <widget class="QDialog" name="PublicationBiasDialog">
+  <property name="windowTitle"><string>Method &amp; Parameters</string></property>
+  <property name="modal"><bool>true</bool></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item><widget class="QLabel" name="context_label"><property name="text"><string>Current analysis</string></property></widget></item>
+   <item>
+    <widget class="QTabWidget" name="tabs">
+     <property name="currentIndex"><number>0</number></property>
+     <widget class="QWidget" name="methods_tab">
+      <attribute name="title"><string>Method</string></attribute>
+      <layout class="QVBoxLayout" name="methods_layout">
+       <item>
+        <widget class="QScrollArea" name="methods_scroll">
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="methods_scroll_content">
+          <layout class="QVBoxLayout" name="methods_scroll_layout">
+           <item>
+            <widget class="QGroupBox" name="automatic_test_group">
+             <property name="title"><string>Small-study effects tests</string></property>
+             <layout class="QVBoxLayout" name="automatic_test_layout">
+              <item><widget class="QLabel" name="automatic_test_label"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Tests are selected automatically for the current effect measure.</string></property></widget></item>
+             </layout>
+           </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="plot_selection_group">
+             <property name="title"><string>Funnel plot methods</string></property>
+             <layout class="QVBoxLayout" name="plot_selection_layout">
+              <item><widget class="QCheckBox" name="ordinary_funnel_check"><property name="text"><string>Funnel plot</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item><widget class="QCheckBox" name="contour_funnel_check"><property name="text"><string>Contour-enhanced funnel plot</string></property></widget></item>
+              <item><widget class="QCheckBox" name="deeks_funnel_check"><property name="text"><string>Deeks funnel plot</string></property></widget></item>
+              <item>
+               <layout class="QFormLayout" name="plot_method_options_layout">
+                <item row="0" column="0"><widget class="QLabel" name="sampling_confidence_label"><property name="text"><string>Confidence level:</string></property></widget></item>
+                <item row="0" column="1"><widget class="QComboBox" name="sampling_confidence_combo"><item><property name="text"><string>90</string></property></item><item><property name="text"><string>95</string></property></item><item><property name="text"><string>99</string></property></item></widget></item>
+                <item row="1" column="0" colspan="2"><widget class="QCheckBox" name="include_tau2_check"><property name="text"><string>Include τ² in pseudo-confidence region</string></property></widget></item>
+                <item row="2" column="0"><widget class="QLabel" name="contour_levels_label"><property name="text"><string>Contour levels:</string></property></widget></item>
+                <item row="2" column="1"><widget class="QLineEdit" name="contour_levels_edit"><property name="placeholderText"><string>90, 95, 99</string></property></widget></item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="correction_group">
+             <property name="title"><string>Continuity correction</string></property>
+             <layout class="QVBoxLayout" name="correction_layout">
+              <item><widget class="QComboBox" name="correction_policy_combo"/></item>
+              <item><widget class="QLabel" name="correction_reason_label"><property name="wordWrap"><bool>true</bool></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="sensitivity_group">
+             <property name="title"><string>Sensitivity analyses</string></property>
+             <layout class="QVBoxLayout" name="sensitivity_layout">
+              <item><widget class="QCheckBox" name="trim_fill_check"><property name="text"><string>Trim-and-fill</string></property></widget></item>
+              <item>
+               <widget class="QGroupBox" name="trim_fill_group">
+                <property name="title"><string>Trim-and-fill parameters</string></property>
+                <layout class="QFormLayout" name="trim_fill_layout">
+                 <item row="0" column="0"><widget class="QLabel" name="trim_fill_estimator_label"><property name="text"><string>Estimator:</string></property></widget></item>
+                 <item row="0" column="1"><widget class="QComboBox" name="trim_fill_estimator_combo"><item><property name="text"><string>L0</string></property></item><item><property name="text"><string>R0</string></property></item></widget></item>
+                 <item row="1" column="0"><widget class="QLabel" name="trim_fill_side_label"><property name="text"><string>Side:</string></property></widget></item>
+                 <item row="1" column="1"><widget class="QComboBox" name="trim_fill_side_combo"><item><property name="text"><string>auto</string></property></item><item><property name="text"><string>left</string></property></item><item><property name="text"><string>right</string></property></item></widget></item>
+                 <item row="2" column="0"><widget class="QLabel" name="trim_fill_model_label"><property name="text"><string>Model:</string></property></widget></item>
+                 <item row="2" column="1"><widget class="QComboBox" name="trim_fill_model_combo"><item><property name="text"><string>random</string></property></item><item><property name="text"><string>common</string></property></item></widget></item>
+                </layout>
+               </widget>
+              </item>
+              <item><widget class="QCheckBox" name="extrapolation_check"><property name="text"><string>Infinite-precision estimate</string></property></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer name="methods_spacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="plots_tab">
+      <attribute name="title"><string>Plots</string></attribute>
+      <layout class="QVBoxLayout" name="plots_layout">
+       <item>
+        <widget class="QScrollArea" name="plots_scroll">
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="widgetResizable"><bool>true</bool></property>
+         <widget class="QWidget" name="plots_scroll_content">
+          <layout class="QVBoxLayout" name="plots_scroll_layout">
+           <item>
+            <widget class="QGroupBox" name="presentation_group">
+             <property name="title"><string>Appearance</string></property>
+             <layout class="QFormLayout" name="presentation_layout">
+              <item row="0" column="0"><widget class="QLabel" name="style_label"><property name="text"><string>Style:</string></property></widget></item>
+              <item row="0" column="1"><widget class="QComboBox" name="style_combo"><item><property name="text"><string>Default (metafor)</string></property></item><item><property name="text"><string>RevMan</string></property></item><item><property name="text"><string>BMJ</string></property></item></widget></item>
+              <item row="1" column="0"><widget class="QLabel" name="point_size_label"><property name="text"><string>Point size:</string></property></widget></item>
+              <item row="1" column="1"><widget class="QDoubleSpinBox" name="point_size_spin"><property name="minimum"><double>0.250000000000000</double></property><property name="maximum"><double>3.000000000000000</double></property><property name="singleStep"><double>0.050000000000000</double></property><property name="value"><double>1.000000000000000</double></property></widget></item>
+              <item row="2" column="0" colspan="2"><widget class="QCheckBox" name="pooled_overlay_check"><property name="text"><string>Show pooled estimate</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="3" column="0" colspan="2"><widget class="QCheckBox" name="reference_line_check"><property name="text"><string>Show reference line</string></property><property name="checked"><bool>true</bool></property></widget></item>
+              <item row="4" column="0"><widget class="QLabel" name="label_policy_label"><property name="text"><string>Study labels:</string></property></widget></item>
+              <item row="4" column="1"><widget class="QComboBox" name="label_policy_combo"><item><property name="text"><string>None</string></property></item><item><property name="text"><string>Outside pseudo-confidence region</string></property></item><item><property name="text"><string>All</string></property></item></widget></item>
+             </layout>
+            </widget>
+           </item>
+           <item><spacer name="plots_spacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item><widget class="QProgressBar" name="progress_bar"><property name="visible"><bool>false</bool></property></widget></item>
+   <item><widget class="QLabel" name="failure_label"><property name="visible"><bool>false</bool></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="button_box"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources><include location="images/icons.qrc"/></resources>
+ <connections/>
+</ui>

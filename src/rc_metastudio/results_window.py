@@ -4,7 +4,10 @@
 
 import gzip
 import re
+import shutil
+import tempfile
 from collections import namedtuple
+from pathlib import Path
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import (
     QByteArray,
@@ -52,6 +55,7 @@ from rc_metastudio import (
     result_sections,
 )
 from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 from rc_metastudio.plot_editor_dialog import EditPlotDialog
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 from rc_metastudio.settings import (
@@ -861,6 +865,79 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self._edit_forest_plot(artifact, plot_item)
         elif regenerator == "regression":
             self.edit_regression_plot(artifact, plot_item)
+        elif regenerator == "funnel":
+            self._edit_funnel_plot(artifact, plot_item)
+
+    def _edit_funnel_plot(self, artifact, plot_item):
+        plot_params = r_bridge.load_vars_for_plot(
+            artifact.params_path, return_params_dict=True
+        )
+        if plot_params is False:
+            return
+        dialog = FunnelPlotEditorDialog(
+            plot_params, artifact.image_path, parent=self, plot_type=artifact.plot_kind
+        )
+        dialog.applied.connect(
+            app_error_handler.safe_slot(
+                lambda: self._apply_funnel_plot_edits(dialog, artifact, plot_item),
+                parent=self,
+            )
+        )
+        dialog.exec()
+
+    def _apply_funnel_plot_edits(self, dialog, artifact, plot_item):
+        updated_params = dialog.plot_params()
+        outpath = updated_params.get("funnel.outpath") or artifact.image_path
+        target_path = Path(outpath)
+        transaction_dir = Path(
+            tempfile.mkdtemp(prefix=".rcms-funnel-", dir=str(target_path.parent))
+        )
+        temporary_base = transaction_dir / "plot"
+        temporary_output = transaction_dir / (
+            "render" + (target_path.suffix or ".png")
+        )
+        persisted_params = Path("%s.params" % artifact.params_path)
+        persisted_backup = transaction_dir / "params.backup"
+        had_persisted_params = persisted_params.exists()
+        try:
+            for suffix in ("data", "res"):
+                source = Path("%s.%s" % (artifact.params_path, suffix))
+                shutil.copyfile(source, "%s.%s" % (temporary_base, suffix))
+            r_bridge.update_plot_params(
+                updated_params,
+                plot_params_name="params",
+                write_them_out=True,
+                outpath="%s.params" % temporary_base,
+            )
+            if had_persisted_params:
+                shutil.copyfile(persisted_params, persisted_backup)
+            r_bridge.regenerate_small_study_effects_funnel(
+                str(temporary_base), output_path=str(temporary_output)
+            )
+            r_bridge.update_plot_params(
+                updated_params,
+                plot_params_name="params",
+                write_them_out=True,
+                outpath=str(persisted_params),
+            )
+            os.replace(str(temporary_output), str(target_path))
+        except Exception:
+            dialog.mark_commit_failed()
+            if had_persisted_params and persisted_backup.exists():
+                try:
+                    shutil.copyfile(persisted_backup, persisted_params)
+                except Exception:
+                    pass
+            elif not had_persisted_params and persisted_params.exists():
+                try:
+                    persisted_params.unlink()
+                except OSError:
+                    pass
+            raise
+        finally:
+            shutil.rmtree(transaction_dir, ignore_errors=True)
+        self._refresh_plot_item(plot_item, artifact, outpath)
+        dialog.mark_commit_succeeded()
 
     def _edit_forest_plot(self, artifact, plot_item):
         plot_params = r_bridge.load_vars_for_plot(
@@ -959,13 +1036,16 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
 
         if not unscaled_image:
-            # Loading the artifact exposes its conventional ``plot.data`` object.
-            r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
-
             regenerator = artifact.capability["regenerator"]
+            if regenerator == "funnel":
+                r_bridge.load_vars_for_plot(artifact.params_path)
+            else:
+                # Loading the artifact exposes its conventional ``plot.data`` object.
+                r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
             default_path = {
                 "forest": "forest_plot",
                 "regression": "regression",
+                "funnel": "small_study_effects_funnel",
             }[regenerator]
             default_path = "%s.%s" % (default_path, export_format.extension)
 
