@@ -846,27 +846,6 @@ def test_frozen_startup_argv_keeps_existing_project_argument():
     assert launch._startup_project_path(argv) == sample_project
 
 
-def test_launchservices_process_serial_argument_is_removed_before_dispatch():
-    from rc_metastudio import launch
-
-    argv = [
-        "RCMetaStudio.app",
-        "-psn_0_123456",
-        "--automation-startup-project-smoke",
-        "--automation-startup-completion-marker",
-        "/tmp/launchservices-completion.json",
-        "sample_projects/amino.rcms",
-    ]
-
-    assert launch._resolve_startup_argv(argv=argv, frozen=False) == [
-        "RCMetaStudio.app",
-        "--automation-startup-project-smoke",
-        "--automation-startup-completion-marker",
-        "/tmp/launchservices-completion.json",
-        "sample_projects/amino.rcms",
-    ]
-
-
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_path):
     from rc_metastudio import automation
     from rc_metastudio import launch

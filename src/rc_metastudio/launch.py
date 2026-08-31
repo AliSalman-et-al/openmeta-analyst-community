@@ -124,14 +124,6 @@ def _startup_project_path(argv):
     return None
 
 
-def _strip_macos_process_serial_argument(argv):
-    """Remove the token LaunchServices inserts before application arguments."""
-    args = list(argv or [])
-    if len(args) > 1 and args[1].startswith("-psn_"):
-        return [args[0], *args[2:]]
-    return args
-
-
 def _argument_value(argv, option):
     args = list(argv or [])
     if option not in args:
@@ -143,16 +135,14 @@ def _argument_value(argv, option):
 
 
 def _resolve_startup_argv(argv=None, native_argv=None, frozen=None):
-    resolved = _strip_macos_process_serial_argument(
-        sys.argv if argv is None else argv
-    )
+    resolved = list(sys.argv if argv is None else argv)
     is_frozen = getattr(sys, "frozen", False) if frozen is None else frozen
     if not is_frozen:
         return resolved
 
     if native_argv is None:
         native_argv = _native_windows_command_line_argv()
-    native_argv = _strip_macos_process_serial_argument(native_argv)
+    native_argv = list(native_argv or [])
 
     if (
         _startup_project_path(resolved) is None
