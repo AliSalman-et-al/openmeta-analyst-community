@@ -1300,6 +1300,7 @@ def parse_out_results(result):
             "input_params",
             "eligibility",
             "tests.data",
+            "Trim-and-fill data",
         ]:  # skip low-level RCMetaR internals that are not display sections
             pass
         elif "gui.ignore" in text_n:

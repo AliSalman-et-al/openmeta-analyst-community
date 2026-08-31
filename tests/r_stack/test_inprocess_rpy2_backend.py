@@ -500,6 +500,15 @@ _NULL_RESULT_DRIVER = textwrap.dedent(
     parsed_null_section = r_bridge.parse_out_results(null_section_result)
     assert "Trim-and-fill data" not in parsed_null_section["texts"]
     assert parsed_null_section["texts"]["Warning"] == "kept"
+    nested_section_result = r_bridge.ro.r(
+        "list(Warning='kept', Summary='kept summary', `Trim-and-fill data`="
+        "list(fit=list(effect=c(0.1, 0.2), se=c(0.05, 0.06)), side='left'), "
+        "References='refs')"
+    )
+    parsed_nested_section = r_bridge.parse_out_results(nested_section_result)
+    assert "Trim-and-fill data" not in parsed_nested_section["texts"]
+    assert parsed_nested_section["texts"]["Warning"] == "kept"
+    assert parsed_nested_section["texts"]["Summary"] == "kept summary"
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
