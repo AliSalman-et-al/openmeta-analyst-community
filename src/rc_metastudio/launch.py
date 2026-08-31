@@ -208,7 +208,11 @@ def start():
     pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
     if pid_path:
         Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
-    if len(startup_argv) > 1 and startup_argv[1].startswith("--automation-"):
+    if (
+        len(startup_argv) > 1
+        and startup_argv[1].startswith("--automation-")
+        and startup_argv[1] != "--automation-startup-project-smoke"
+    ):
         from rc_metastudio import automation
 
         return automation.dispatch(startup_argv)
