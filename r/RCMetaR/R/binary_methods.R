@@ -8,21 +8,57 @@ binary.freeman_tukey.metrics <- c("PFT")
 binary.two.arm.metrics <- c("OR", "RD", "RR", "AS", "YUQ", "YUY")
 binary.one.arm.metrics <- c("PR", "PLN", "PLO", "PAS", "PFT")
 
+.rcmetar.binary.correction.target <- function(params) {
+    target <- if (!is.null(params$to)) as.character(params$to) else "only0"
+    if (!is.null(params$correction.policy)) target <- as.character(params$correction.policy)
+    switch(target,
+        "Studies with any zero cell"="only0",
+        "All studies"="all",
+        "All studies if any zero exists"="if0all",
+        target
+    )
+}
+
+rcmetar.corrected.binary.counts <- function(binary.data, params) {
+    values <- list(a=binary.data@g1O1, b=binary.data@g1O2,
+                   c=binary.data@g2O1, d=binary.data@g2O2)
+    if (length(values$a) == 0) return(values)
+    one.arm <- as.character(params$measure %||% "") %in% binary.one.arm.metrics
+    target <- .rcmetar.binary.correction.target(params)
+    adjust <- if (!is.null(params$adjust)) as.numeric(params$adjust) else 0
+    zero <- if (one.arm) {
+        (values$a == 0) | (values$b == 0)
+    } else {
+        (values$a * values$b * values$c * values$d) == 0
+    }
+    apply.correction <- switch(target,
+        only0=zero,
+        all=rep(TRUE, length(zero)),
+        if0all=if (any(zero)) rep(TRUE, length(zero)) else rep(FALSE, length(zero)),
+        rep(FALSE, length(zero))
+    )
+    target.names <- if (one.arm) c("a", "b") else names(values)
+    for (name in target.names) {
+        values[[name]][apply.correction] <- values[[name]][apply.correction] + adjust
+    }
+    values
+}
 
 compute.for.one.bin.study <- function(binary.data, params){
+    counts <- rcmetar.corrected.binary.counts(binary.data, params)
     if (params$measure %in% binary.one.arm.metrics) {
         res <- escalc(
             params$measure,
-            xi=binary.data@g1O1,
-            ni=binary.data@g1O1 + binary.data@g1O2,
-            add=params$adjust,
-            to=params$to
+            xi=counts$a,
+            ni=counts$a + counts$b,
+            add=0,
+            to="none"
         )
         return(res)
     }
-    res <- escalc(params$measure, ai=binary.data@g1O1, bi=binary.data@g1O2,
-                                    ci=binary.data@g2O1, di=binary.data@g2O2,
-                                    add=params$adjust, to=params$to)
+    res <- escalc(params$measure, ai=counts$a, bi=counts$b,
+                                    ci=counts$c, di=counts$d,
+                                    add=0, to="none")
     res
 }
 
@@ -179,8 +215,7 @@ binary.fixed.inv.var <- function(binary.data, params){
                         "res"=res)
     } else {
         res<-rma.uni(yi=binary.data@y, sei=binary.data@SE, slab=binary.data@study.names,
-                                level=params$conf.level, digits=params$digits, method="FE", test=inference.method, add=c(params$adjust,params$adjust),
-                                to=c(as.character(params$to), as.character(params$to)))
+                                level=params$conf.level, digits=params$digits, method="FE", test=inference.method)
         pure.res <- res
         metric.name <- pretty.metric.name(as.character(params$measure))
         model.title <- paste("Binary Fixed-Effect Model - Inverse Variance\n\nMetric: ", metric.name, sep="")
@@ -272,16 +307,17 @@ binary.fixed.mh <- function(binary.data, params){
         results <- list("Summary"=res,
                         "res"=res)
     } else {
-        res<-rma.mh(ai=binary.data@g1O1, bi=binary.data@g1O2,
-                    ci=binary.data@g2O1, di=binary.data@g2O2,
+        counts <- rcmetar.corrected.binary.counts(binary.data, params)
+        res<-rma.mh(ai=counts$a, bi=counts$b,
+                    ci=counts$c, di=counts$d,
                     slab=binary.data@study.names,
                     level=params$conf.level,
                     digits=params$digits,
                     measure=params$measure,
-                    add=c(params$adjust, 0),
-                    to=c(as.character(params$to), "none"))
+                    add=c(0, 0),
+                    to=c("none", "none"))
         pure.res <- res
-        if (is.null(binary.data@y) || is.null(binary.data@SE)) {
+        if (length(binary.data@y) == 0 || length(binary.data@SE) == 0) {
             binary.data <- compute.bin.point.estimates(binary.data, params)
         }
         metric.name <- pretty.metric.name(as.character(params$measure))
@@ -395,7 +431,7 @@ binary.fixed.peto <- function(binary.data, params) {
 
     input.params <- params
 
-    if (length(binary.data@g1O1) == 1) {
+    if (length(binary.data@g1O1) == 1 || length(binary.data@y) == 1) {
         res <- get.res.for.one.binary.study(binary.data, params)
         results <- list("Summary"=res,
                         "res"=res)
@@ -412,7 +448,7 @@ binary.fixed.peto <- function(binary.data, params) {
         binary.data@y <- res$yi
         binary.data@SE <- sqrt(res$vi)
 
-        if (is.null(binary.data@y) || is.null(binary.data@SE)) {
+        if (length(binary.data@y) == 0 || length(binary.data@SE) == 0) {
             binary.data <- compute.bin.point.estimates(binary.data, params)
         }
 
@@ -528,11 +564,9 @@ binary.random <- function(binary.data, params) {
         res<-rma.uni(yi=binary.data@y, sei=binary.data@SE,
                      slab=binary.data@study.names,
                      method=params$rm.method, test=inference.method, level=params$conf.level,
-                     digits=params$digits,
-                     add=c(params$adjust,params$adjust),
-                     to=as.character(params$to))
+                     digits=params$digits)
         pure.res <- res
-        if (is.null(binary.data@y) || is.null(binary.data@SE)) {
+        if (length(binary.data@y) == 0 || length(binary.data@SE) == 0) {
             binary.data <- compute.bin.point.estimates(binary.data, params)
         }
         metric.name <- pretty.metric.name(as.character(params$measure))

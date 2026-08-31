@@ -5,35 +5,34 @@ diagnostic.logit.metrics <- c("Sens", "Spec", "PPV", "NPV", "Acc")
 diagnostic.log.metrics <- c("PLR", "NLR", "DOR")
 bivariate.methods <- c("diagnostic.hsroc", "diagnostic.bivariate.ml")
 
-adjust.raw.data <- function(diagnostic.data, params) {
-    TP <- diagnostic.data@TP
-    FN <- diagnostic.data@FN
-    TN <- diagnostic.data@TN
-    FP <- diagnostic.data@FP
-
-    if ("to" %in% names(params)) {
-        if (params$to == "all") {
-            TP <- TP + params$adjust
-            FN <- FN + params$adjust
-            TN <- TN + params$adjust
-            FP <- FP + params$adjust
-        } else if (params$to == "only0") {
-            product <- TP * FN * TN * FP
-            TP[product == 0] <- TP[product == 0] + params$adjust
-            FN[product == 0] <- FN[product == 0] + params$adjust
-            TN[product == 0] <- TN[product == 0] + params$adjust
-            FP[product == 0] <- FP[product == 0] + params$adjust
-        } else if (params$to == "if0all") {
-            if (any(c(TP,FN,TN,FP) == 0)) {
-                TP <- TP + params$adjust
-                FN <- FN + params$adjust
-                TN <- TN + params$adjust
-                FP <- FP + params$adjust
-            }
-        }
+rcmetar.corrected.diagnostic.counts <- function(diagnostic.data, params) {
+    values <- list(TP=diagnostic.data@TP, FN=diagnostic.data@FN,
+                   TN=diagnostic.data@TN, FP=diagnostic.data@FP)
+    if (length(values$TP) == 0) return(values)
+    target <- if (!is.null(params$to)) as.character(params$to) else "only0"
+    if (!is.null(params$correction.policy)) target <- as.character(params$correction.policy)
+    target <- switch(target,
+        "Studies with any zero cell"="only0",
+        "All studies"="all",
+        "All studies if any zero exists"="if0all",
+        target
+    )
+    adjust <- if (!is.null(params$adjust)) as.numeric(params$adjust) else 0
+    zero <- (values$TP * values$FN * values$TN * values$FP) == 0
+    apply.correction <- switch(target,
+        only0=zero,
+        all=rep(TRUE, length(zero)),
+        if0all=if (any(zero)) rep(TRUE, length(zero)) else rep(FALSE, length(zero)),
+        rep(FALSE, length(zero))
+    )
+    for (name in names(values)) {
+        values[[name]][apply.correction] <- values[[name]][apply.correction] + adjust
     }
+    values
+}
 
-    data.adj <- list("TP"=TP, "FN"=FN, "TN"=TN, "FP"=FP)
+adjust.raw.data <- function(diagnostic.data, params) {
+    rcmetar.corrected.diagnostic.counts(diagnostic.data, params)
 }
 
 compute.diag.point.estimates <- function(diagnostic.data, params) {
@@ -123,8 +122,9 @@ diagnostic.transform.f <- function(metric.str){
 }
 
 get.res.for.one.diag.study <- function(diagnostic.data, params){
-
-    diagnostic.data <- compute.diag.point.estimates(diagnostic.data, params)
+    if (length(diagnostic.data@y) == 0 || length(diagnostic.data@SE) == 0) {
+        diagnostic.data <- compute.diag.point.estimates(diagnostic.data, params)
+    }
 
     y <- diagnostic.data@y
     se <- diagnostic.data@SE
@@ -345,22 +345,23 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         results <- list("Summary"=summary.disp)
     }
     else {
+        counts <- rcmetar.corrected.diagnostic.counts(diagnostic.data, params)
         res <- switch(params$measure,
 
-            "DOR" = rma.mh(ai=diagnostic.data@TP, bi=diagnostic.data@FN,
-                                ci=diagnostic.data@FP, di=diagnostic.data@TN, slab=diagnostic.data@study.names,
+            "DOR" = rma.mh(ai=counts$TP, bi=counts$FN,
+                                ci=counts$FP, di=counts$TN, slab=diagnostic.data@study.names,
                                 level=params$conf.level, digits=params$digits, measure="OR",
-                                add=c(params$adjust, 0), to=c(as.character(params$to), "none")),
+                                add=c(0, 0), to=c("none", "none")),
 
-            "PLR" = rma.mh(ai=diagnostic.data@TP, bi=diagnostic.data@FN,
-                                ci=diagnostic.data@FP, di=diagnostic.data@TN, slab=diagnostic.data@study.names,
+            "PLR" = rma.mh(ai=counts$TP, bi=counts$FN,
+                                ci=counts$FP, di=counts$TN, slab=diagnostic.data@study.names,
                                 level=params$conf.level, digits=params$digits, measure="RR",
-                                add=c(params$adjust, 0), to=c(as.character(params$to), "none")),
+                                add=c(0, 0), to=c("none", "none")),
 
-            "NLR" = rma.mh(ai=diagnostic.data@FN, bi=diagnostic.data@TP,
-                                ci=diagnostic.data@TN, di=diagnostic.data@FP, slab=diagnostic.data@study.names,
+            "NLR" = rma.mh(ai=counts$FN, bi=counts$TP,
+                                ci=counts$TN, di=counts$FP, slab=diagnostic.data@study.names,
                                 level=params$conf.level, digits=params$digits, measure="RR",
-                                add=c(params$adjust, 0), to=c(as.character(params$to), "none")))
+                                add=c(0, 0), to=c("none", "none")))
 
 		res$study.weights <- (1 / res$vi) / sum(1 / res$vi)
 		res$study.names <- diagnostic.data@study.names
@@ -377,7 +378,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
             write.results.to.file(diagnostic.data, params, res, outpath=results.path)
         }
         if ((is.null(params$create.plot)) || (params$create.plot == TRUE)) {
-            if (is.null(diagnostic.data@y) || is.null(diagnostic.data@SE)) {
+            if (length(diagnostic.data@y) == 0 || length(diagnostic.data@SE) == 0) {
                 diagnostic.data <- compute.diag.point.estimates(diagnostic.data, params)
             }
             forest.path <- paste(params$fp_outpath, sep="")
@@ -476,7 +477,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
 
     if (is.null(params$create.plot) || params$create.plot == TRUE ||
         is.null(params$write.to.file) || params$write.to.file == TRUE) {
-      if (is.null(diagnostic.data@y) || is.null(diagnostic.data@SE)) {
+      if (length(diagnostic.data@y) == 0 || length(diagnostic.data@SE) == 0) {
         diagnostic.data <- compute.bin.point.estimates(diagnostic.data, params)
       }
       if (is.null(params$write.to.file) || params$write.to.file == TRUE) {

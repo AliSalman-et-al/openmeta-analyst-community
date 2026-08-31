@@ -1,16 +1,51 @@
-# Domain vocabulary
+# Domain Docs
 
-Use these terms in code, tests, documentation, and issues. Keep external field names unchanged when an R function or the versioned project schema owns them.
+How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-- **Project**: the portable document saved as an `.rcms` archive. A project contains an analysis dataset and the application state needed to reopen it.
-- **Analysis dataset**: the in-memory collection of studies, outcomes, follow-ups, groups, and covariates.
-- **Study**: one included or excluded research record. A study stores metadata, covariate values, and analysis units.
-- **Outcome**: a measured result with a binary, continuous, diagnostic, or other data type.
-- **Follow-up**: the time point for an outcome. Do not use `time point` as a second name in new APIs.
-- **Group**: one arm within an analysis unit, including control or diagnostic groups.
-- **Analysis unit**: one study outcome at one follow-up. It owns the raw group data and calculated effects for that combination.
-- **Covariate**: a study-level continuous or categorical value used by subgroup analysis or meta-regression.
-- **Metric**: the statistical measure selected for an analysis, such as odds ratio or standardized mean difference.
-- **Effect**: an estimate and its uncertainty for one metric and group comparison.
+## Before exploring, read these
 
-Use full domain words in Python names. For example, use `confidence_level`, `covariate`, and `diagnostic_data`. Preserve schema keys such as `conf.level` only at the R boundary.
+- **`CONTEXT.md`** at the repo root, or
+- **`CONTEXT-MAP.md`** at the repo root if it exists: it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
+- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+
+If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+
+## File structure
+
+Single-context repo (most repos):
+
+```
+/
+├── CONTEXT.md
+├── docs/adr/
+│   ├── 0001-event-sourced-orders.md
+│   └── 0002-postgres-for-write-model.md
+└── src/
+```
+
+Multi-context repo (presence of `CONTEXT-MAP.md` at the root):
+
+```
+/
+├── CONTEXT-MAP.md
+├── docs/adr/                          ← system-wide decisions
+└── src/
+    ├── ordering/
+    │   ├── CONTEXT.md
+    │   └── docs/adr/                  ← context-specific decisions
+    └── billing/
+        ├── CONTEXT.md
+        └── docs/adr/
+```
+
+## Use the glossary's vocabulary
+
+When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+
+If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+
+## Flag ADR conflicts
+
+If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+
+> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_

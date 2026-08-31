@@ -28,6 +28,15 @@ SECTION_TITLE_REPLACEMENTS = {
     "Trace plots": "Trace Plots",
     "Leave-one-out Forest plot": "Leave-One-Out Forest Plot",
     "SROC": "Summary ROC Plot",
+    "Warning": "Interpretation",
+    "Data and eligibility": "Analysis Summary",
+    "Tests": "Small-Study Effects Tests",
+    "Pooled comparison": "Pooled Estimates",
+    "Trim-and-fill left": "Trim-and-Fill: Left Scenario",
+    "Trim-and-fill right": "Trim-and-Fill: Right Scenario",
+    "Trim-and-fill model": "Trim-and-Fill Model",
+    "Extrapolation": "Infinite-Precision Estimate",
+    "Failures": "Procedure Warnings",
 }
 
 METRIC_TITLE_REPLACEMENTS = (
@@ -97,6 +106,8 @@ def order_display_sections(texts, images, explicit_image_order=None):
 
     if _is_hsroc_result(context):
         return _order_hsroc_sections(text_sections, image_sections)
+    if _is_small_study_effects_result(context):
+        return _order_small_study_effects_sections(text_sections, image_sections)
     if _is_standard_meta_analysis_result(context):
         return _order_standard_meta_analysis_sections(text_sections, image_sections)
     return text_sections + image_sections
@@ -136,6 +147,42 @@ def _is_standard_meta_analysis_result(context):
         and WEIGHTS_SECTION_TITLE in context["text_titles"]
         and any(_is_primary_plot_title(title) for title in context["image_titles"])
     )
+
+
+def _is_small_study_effects_result(context):
+    return "Warning" in context["text_titles"] and (
+        "Data and eligibility" in context["text_titles"]
+        or any("Funnel Plot" in title for title in context["image_titles"])
+    )
+
+
+def _order_small_study_effects_sections(text_sections, image_sections):
+    ordered_keys = (
+        "Warning",
+        "Data and eligibility",
+        "Tests",
+        "Pooled comparison",
+        "Trim-and-fill",
+        "Trim-and-fill left",
+        "Trim-and-fill right",
+        "Trim-and-fill model",
+        "Extrapolation",
+        REFERENCE_SECTION_TITLE,
+        "Failures",
+    )
+    by_text = {section.key: section for section in text_sections}
+    result = []
+    for key in ordered_keys[:2]:
+        section = by_text.pop(key, None)
+        if section is not None:
+            result.append(section)
+    result.extend(image_sections)
+    for key in ordered_keys[2:]:
+        section = by_text.pop(key, None)
+        if section is not None:
+            result.append(section)
+    result.extend(by_text.values())
+    return result
 
 
 def _is_hsroc_result(context):

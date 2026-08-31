@@ -9,13 +9,12 @@ import textwrap
 
 from ._r_driver_support import run_python_driver
 
-
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 _DRIVER = textwrap.dedent(
     """
-    import os, sys, tempfile
+    import locale, os, sys, tempfile
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     os.environ.setdefault(
@@ -93,9 +92,11 @@ _DRIVER = textwrap.dedent(
 
     assert r_bridge._r_is_null(ro.r("list()").names) is True
     assert r_bridge._r_is_null(ro.r("c(a=1)").names) is False
-
     # Native translation maps τ² to t² on Windows, so decode R text as UTF-8.
-    from rpy2.rinterface_lib import conversion, openrlib
+    from rpy2.rinterface_lib import callbacks, conversion, openrlib
+
+    if sys.platform == "win32":
+        assert callbacks._CCHAR_ENCODING == locale.getpreferredencoding(False)
 
     tau_squared = chr(0x03C4) + chr(0x00B2)
     rchar = openrlib.rlib.Rf_mkCharCE(
@@ -415,14 +416,25 @@ _DRIVER = textwrap.dedent(
         metric="Sens",
         parameters={"conf.level": 95.0, "measure": "Sens"},
     )
-    diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
-        filtered_model,
-        selected.studies,
-        (filtered_model.covariate,),
-        diagnostic_meta_request,
-        False,
-        95.0,
-    )
+    previous_cwd = os.getcwd()
+    previous_scratch_dir = os.environ.pop("RCMS_ANALYSIS_SCRATCH_DIR", None)
+    try:
+        with tempfile.TemporaryDirectory(prefix="rcmetar-meta-regression-") as isolated_cwd:
+            try:
+                os.chdir(isolated_cwd)
+                diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
+                    filtered_model,
+                    selected.studies,
+                    (filtered_model.covariate,),
+                    diagnostic_meta_request,
+                    False,
+                    95.0,
+                )
+            finally:
+                os.chdir(previous_cwd)
+    finally:
+        if previous_scratch_dir is not None:
+            os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
     assert "Summary" in diagnostic_meta_result["texts"]
     for expression in (
         "tmp_obj@y",
@@ -460,6 +472,44 @@ _DRIVER = textwrap.dedent(
     # Hard-exit so embedded-R finalizers don't run: rpy2/R teardown can
     # segfault on interpreter shutdown on Windows, which would turn a passing
     # check into a spurious non-zero exit.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
+    """
+).replace("__REPO_ROOT__", repr(REPO_ROOT))
+
+
+_NULL_RESULT_DRIVER = textwrap.dedent(
+    """
+    import os, sys
+    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    sys.path.insert(0, os.path.join(__REPO_ROOT__, "src"))
+    from rc_metastudio import r_backend
+    r_backend.install_r_backend()
+    try:
+        from rc_metastudio import r_bridge
+    except Exception as exc:
+        sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
+        sys.exit(42)
+
+    assert r_bridge.r_object_to_python(r_bridge.ro.r("NULL")) is None
+    null_section_result = r_bridge.ro.r(
+        "list(Warning='kept', `Trim-and-fill data`=NULL, References='refs')"
+    )
+    parsed_null_section = r_bridge.parse_out_results(null_section_result)
+    assert "Trim-and-fill data" not in parsed_null_section["texts"]
+    assert parsed_null_section["texts"]["Warning"] == "kept"
+    nested_section_result = r_bridge.ro.r(
+        "list(Warning='kept', Summary='kept summary', `Trim-and-fill data`="
+        "list(fit=list(effect=c(0.1, 0.2), se=c(0.05, 0.06)), side='left'), "
+        "References='refs')"
+    )
+    parsed_nested_section = r_bridge.parse_out_results(nested_section_result)
+    assert "Trim-and-fill data" not in parsed_nested_section["texts"]
+    assert parsed_nested_section["texts"]["Warning"] == "kept"
+    assert parsed_nested_section["texts"]["Summary"] == "kept summary"
+    sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(0)
@@ -1004,6 +1054,63 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             '''
         )
 
+        ro.r(
+            '''
+            funnel_data <- new(
+              "ContinuousData",
+              y=seq(-0.4, 0.5, length.out=11),
+              SE=seq(0.08, 0.22, length.out=11),
+              study.names=paste0("funnel-study-", 1:11),
+              years=as.integer(2010:2020)
+            )
+            funnel_result <- rcmetar.run.small.study.effects(
+              funnel_data,
+              list(
+                data.type="continuous", metric="MD",
+                funnels=c("ordinary", "contour"),
+                tests=c("mixed-effects-egger", "begg-mazumdar"), conf.level=95,
+                `funnel.point.size`=c(1.0, 1.0)
+              )
+            )
+            funnel_base <- unname(funnel_result$plot_params_paths[["Contour Funnel Plot"]])
+            funnel_image <- unname(funnel_result$images[["Contour Funnel Plot"]])
+            '''
+        )
+        funnel_base = str(ro.globalenv["funnel_base"][0])
+        funnel_image = str(ro.globalenv["funnel_image"][0])
+        assert os.path.exists(funnel_image)
+        assert os.path.getsize(funnel_image) > 0
+        parsed_funnel_result = r_bridge.parse_out_results(
+            ro.globalenv["funnel_result"]
+        )
+        assert "Method details" in parsed_funnel_result["texts"]
+        method_details = parsed_funnel_result["texts"]["Method details"]
+        assert "Package:" in method_details
+        assert (
+            "Weighting: inverse-variance weights with REML heterogeneity"
+            in method_details
+        )
+        assert "Inference: z test from metafor::regtest" in method_details
+        assert "Weighting: not applicable (Kendall rank-based test)" in method_details
+        assert "Inference: z test from Kendall rank correlation" in method_details
+        funnel_params = r_bridge.load_vars_for_plot(
+            funnel_base, return_params_dict=True
+        )
+        assert len(funnel_params["prepared.effects"]) == 11
+        funnel_params["funnel.point.size"] = [1.5, 2.5]
+        r_bridge.update_plot_params(
+            funnel_params,
+            write_them_out=True,
+            outpath=funnel_base + ".params",
+        )
+        with tempfile.TemporaryDirectory(prefix="rcmetar-funnel-edit-") as edit_dir:
+            regenerated_funnel = os.path.join(edit_dir, "contour.png")
+            r_bridge.regenerate_small_study_effects_funnel(
+                funnel_base, output_path=regenerated_funnel
+            )
+            assert os.path.exists(regenerated_funnel)
+            assert os.path.getsize(regenerated_funnel) > 0
+
         sys.stdout.write("OK\\n")
         sys.stdout.flush()
         sys.stderr.flush()
@@ -1031,6 +1138,12 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     run_python_driver(_RCHAR_UTF8_DRIVER, env=env)
+
+
+def test_r_null_result_sections_are_omitted_before_formatting():
+    env = dict(os.environ)
+    env.pop("RCMS_STUB_BACKEND", None)
+    run_python_driver(_NULL_RESULT_DRIVER, env=env)
 
 
 def test_RCMetaR_summary_capture_uses_formatted_print_methods():

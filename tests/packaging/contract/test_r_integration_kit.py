@@ -11,6 +11,7 @@ import subprocess
 import sys
 import types
 from typing import Any
+import tarfile
 
 import pytest
 
@@ -22,6 +23,28 @@ def module():
     loaded = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(loaded)
     return loaded
+
+
+def provenance_module():
+    path = Path("scripts/create_r_kit_provenance.py")
+    spec = importlib.util.spec_from_file_location("create_r_kit_provenance", path)
+    assert spec and spec.loader
+    loaded = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loaded)
+    return loaded
+
+
+def test_source_license_inventory_retains_copyrights(tmp_path):
+    archive = tmp_path / "example.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        for name, content in (("LICENSE", b"license"), ("COPYRIGHTS", b"copyrights")):
+            source = tmp_path / name
+            source.write_bytes(content)
+            bundle.add(source, arcname=f"example-1.0/{name}")
+
+    records = provenance_module().archive_license_files(archive)
+
+    assert {Path(item["path"]).name for item in records} == {"LICENSE", "COPYRIGHTS"}
 
 
 def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
@@ -37,6 +60,9 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
             f"Package: {name}\nVersion: {version}\nLicense: GPL-2\n", encoding="utf-8"
         )
     (library / "RCMetaR" / "LICENSE").write_text("test license\n", encoding="utf-8")
+    (library / "RCMetaR" / "COPYRIGHTS").write_text(
+        "test copyrights\n", encoding="utf-8"
+    )
     bridge = tmp_path / "_rinterface_cffi_api.pyd"
     bridge.write_bytes(b"api-bridge")
     source_payload = tmp_path / "source-payload"
@@ -172,6 +198,9 @@ def test_build_verify_and_consume_content_addressed_api_kit(monkeypatch, tmp_pat
     manifest = kit.build(args)
     assert manifest["cffi_mode"] == "API"
     assert (args.output / "licenses/RCMetaR/LICENSE").read_text() == "test license\n"
+    assert (
+        args.output / "licenses/RCMetaR/COPYRIGHTS"
+    ).read_text() == "test copyrights\n"
     assert kit.verify(args.output)["kit_sha256"] == manifest["kit_sha256"]
     destination = tmp_path / "consumed"
     kit.consume(

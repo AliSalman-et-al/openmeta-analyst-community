@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """R bridge for RCMetaR calls through rpy2."""
 
+import locale
 import math
 import os
 import re
+import sys
 from typing import Callable
 
 from rc_metastudio import r_runtime
@@ -64,6 +66,22 @@ try:
     setattr(_rpy2_conversion, "_rchar_to_str", _rchar_to_str_as_utf8)
 except (ImportError, AttributeError):
     pass
+
+# R console callbacks on Windows are emitted in the native ANSI code page.
+# rpy2 otherwise initializes this private decoder from Python's UTF-8 default,
+# which turns ordinary non-ASCII diagnostics into callback UnicodeDecodeError
+# messages. Keep non-Windows behavior unchanged.
+if sys.platform == "win32":
+    try:
+        from rpy2.rinterface_lib import callbacks as _rpy2_callbacks
+
+        setattr(
+            _rpy2_callbacks,
+            "_CCHAR_ENCODING",
+            locale.getpreferredencoding(False),
+        )
+    except (ImportError, AttributeError):
+        pass
 
 
 _RFunction = Callable[..., object]
@@ -139,6 +157,9 @@ def execute_r_function(function_name, *args, **kwargs):
 
 
 class RLibraryLoader:
+    def load_meta(self):
+        return self._load_r_lib("meta", expected_version="8.5-0")
+
     def load_metafor(self):
         return self._load_r_lib("metafor")
 
@@ -154,9 +175,16 @@ class RLibraryLoader:
     def load_gemtc(self):
         return self._load_r_lib("gemtc")
 
-    def _load_r_lib(self, name):
+    def _load_r_lib(self, name, expected_version=None):
         try:
             execute_r_function("library", name)
+            if expected_version is not None:
+                version = get_r_package_version(name)
+                if version != expected_version:
+                    raise RuntimeError(
+                        "%s package version %s is required; found %s"
+                        % (name, expected_version, version)
+                    )
             msg = "%s package successfully loaded" % name
             return (True, msg)
         except Exception as exc:
@@ -180,6 +208,8 @@ def get_r_version_string():
 
 @serialized_r_call
 def get_r_package_version(package_name):
+    if package_name == "meta":
+        return str(execute_r_string("as.character(packageDescription('meta')$Version)")[0])
     version = execute_r_function("packageVersion", package_name)
     return str(execute_r_function("as.character", version)[0])
 
@@ -267,6 +297,8 @@ def named_r_list_to_dict(named_r_list):
 
 
 def r_object_to_python(data):
+    if _r_is_null(data):
+        return None
     if _has_r_names(data):
         return {
             key: r_object_to_python(value)
@@ -309,7 +341,13 @@ def _is_r_iterable(value, exclude_strings=True):
 
 
 def _has_r_names(value):
-    return hasattr(value, "names") and not _r_is_null(value.names)
+    if _r_is_null(value):
+        return False
+    try:
+        names = value.names
+    except Exception:
+        return False
+    return not _r_is_null(names)
 
 
 @serialized_r_call
@@ -917,6 +955,69 @@ def run_binary_analysis(
     )
 
 
+@serialized_r_call
+def run_small_study_effects(
+    table_model, request, res_name="small_study_effects_result", data_name="tmp_obj", preview=False
+):
+    """Run the complete guided small-study effects workflow in one R call.
+
+    Conversion is intentionally performed at this boundary.  RCMetaR then
+    reconstructs compatible raw effects, computes eligibility, validates the
+    request, and executes all selected procedures against one eligible set.
+    """
+    if not isinstance(request, dict):
+        raise TypeError("small-study effects request must be a mapping")
+    family = request.get("data.type")
+    if family == "binary":
+        dataset_to_simple_binary_r_object(table_model, var_name=data_name)
+    elif family == "continuous":
+        dataset_to_simple_continuous_r_object(table_model, var_name=data_name)
+    elif family == "diagnostic":
+        dataset_to_simple_diagnostic_r_object(
+            table_model, var_name=data_name, metric=request.get("metric", "DOR")
+        )
+    else:
+        raise ValueError("unsupported small-study effects data family: %r" % family)
+    r_request = dict(request)
+    r_request["preview"] = bool(preview)
+    result = execute_r_function(
+        "rcmetar.run.small.study.effects",
+        _r_object_from_symbol(data_name),
+        _to_r_params(r_request),
+    )
+    if preview:
+        return r_object_to_python(result.rx2("eligibility"))
+    ro.globalenv[_r_symbol(res_name)] = result
+    return parse_out_results(result)
+
+
+@serialized_r_call
+def regenerate_small_study_effects_funnel(params_path, output_path=None):
+    """Regenerate a funnel from persisted per-run data and presentation params."""
+    if not load_vars_for_plot(params_path):
+        raise ValueError("small-study effects plot data is incomplete: %s" % params_path)
+    result = execute_r_function(
+        "rcmetar.regenerate.small.study.funnel",
+        _r_object_from_symbol("om.data"),
+        _r_object_from_symbol("res"),
+        _r_object_from_symbol("params"),
+        _r_null_if_none(output_path),
+    )
+    return str(result[0]) if output_path is None and len(result) else output_path
+
+
+@serialized_r_call
+def generate_small_study_effects_funnel(file_path, params_name="params"):
+    """Write a funnel artifact using the loaded per-run funnel parameters."""
+    execute_r_function(
+        "rcmetar.regenerate.small.study.funnel",
+        _r_object_from_symbol("om.data"),
+        _r_object_from_symbol("res"),
+        _r_object_from_symbol(params_name),
+        str(file_path),
+    )
+
+
 def _r_param_value(param):
     if param is None:
         return rpy2.rinterface.NULL
@@ -1076,10 +1177,10 @@ def load_in_r(fpath):
 def update_plot_params(
     plot_params, plot_params_name="params", write_them_out=False, outpath=None
 ):
-    # first cast the params to an R data frame to make it
-    # R-palatable
-    params_df = _r_function("data.frame")(**plot_params)
-    ro.globalenv["tmp.params"] = params_df
+    # Plot parameters include both study-length vectors and one value per
+    # plotted funnel.  A data frame recycles or rejects those heterogeneous
+    # lengths; a named list preserves the serialized parameter contract.
+    ro.globalenv["tmp.params"] = _to_r_params(plot_params)
     plot_params_symbol = _r_symbol(plot_params_name)
 
     for param_name in plot_params:
@@ -1161,6 +1262,12 @@ def parse_out_results(result):
 
     for text_n, text in list(result.items()):
         display_text_n = _display_section_name(text_n)
+        # Optional RCMetaR sections are represented by R NULL when a
+        # procedure is not applicable.  Drop those sections before any
+        # display formatting so the rpy2 NULLType repr cannot leak into the
+        # Results window.
+        if _r_is_null(text):
+            continue
         # Some result sections carry plot names and forest-plot parameter paths.
         # Diagnostic analyses may return several plot parameter objects, so keep
         # this branch broad enough to preserve all named plot metadata.
@@ -1191,6 +1298,9 @@ def parse_out_results(result):
             "res.info",
             "input_data",
             "input_params",
+            "eligibility",
+            "tests.data",
+            "Trim-and-fill data",
         ]:  # skip low-level RCMetaR internals that are not display sections
             pass
         elif "gui.ignore" in text_n:

@@ -35,6 +35,7 @@
 #' @import graphics
 #' @import HSROC
 #' @import lme4
+#' @import meta
 #' @import metafor
 #' @import pdftools
 #' @import stats

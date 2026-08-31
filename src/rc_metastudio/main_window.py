@@ -62,6 +62,7 @@ from rc_metastudio.runtime_types import required
 
 from rc_metastudio import add_new_dialogs
 from rc_metastudio import results_window, analysis_setup_dialog
+from rc_metastudio import publication_bias_dialog
 from rc_metastudio import diagnostic_metrics_dialog
 from rc_metastudio import subgroup_analysis_dialog
 from rc_metastudio import edit_dialog
@@ -244,6 +245,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             (self.action_loo_ma, "leave-one-out-analysis"),
             (self.action_subgroup_ma, "subgroup-analysis"),
             (self.action_meta_regression, "meta-regression"),
+            (self.action_publication_bias, "publication-bias"),
         ):
             qt_layout.configure_analysis_action_icon(action, icon_name)
         qt_layout.configure_main_toolbar(self.toolBar)
@@ -299,6 +301,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.metric_menu_is_set_for = None
 
         self.action_meta_regression.setEnabled(False)
+        self.action_publication_bias.setEnabled(False)
 
         load_settings()
         self.populate_open_recent_menu()
@@ -387,6 +390,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self.action_cum_ma,
                 self.action_loo_ma,
                 self.action_meta_regression,
+                self.action_publication_bias,
                 self.action_subgroup_ma,
             )
         }
@@ -640,6 +644,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.action_loo_ma.setEnabled(enable)
         self._enable_action_meta_regression(enable)
         self._enable_action_subgroup_ma(enable)
+        self.action_publication_bias.setEnabled(enable)
 
     def _enable_action_meta_regression(self, dataset_analysis_enabled=None):
         """Enables action_meta_regression if analysis can run and covariates exist."""
@@ -813,6 +818,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             _connect_action(self.action_add_covariate, self.add_covariate)
 
             _connect_action(self.action_meta_regression, self.meta_reg)
+            _connect_action(self.action_publication_bias, self.publication_bias)
             _connect_action(self.action_subgroup_ma, self.meta_subgroup_get_cov)
 
             _connect_action(self.action_about_legal, self.show_about_legal)
@@ -845,6 +851,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if form is None:
             return
         form.show()
+
+    def publication_bias(self):
+        form = publication_bias_dialog.PublicationBiasDialog(self.model, parent=self)
+        form.exec()
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()

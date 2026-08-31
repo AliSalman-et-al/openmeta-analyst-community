@@ -1,0 +1,3 @@
+# Use meta for supported small-study-effects methods
+
+RCMetaR uses the pinned `meta` 8.5-0 package at runtime for classical Egger, Begg-Mazumdar, Harbord, Peters, Pustejovsky-Rodgers, Rücker arcsine, Deeks, and trim-and-fill. Package behavior is normative and reported with its version, including where the Deeks implementation differs from the primary-paper equation. `metafor` remains responsible for ordinary and contour-enhanced funnel rendering, pooled models, and the distinct mixed-effects Egger extension. This adds a small compatible dependency closure but avoids maintaining duplicate statistical implementations.

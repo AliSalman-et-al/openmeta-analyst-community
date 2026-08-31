@@ -135,6 +135,43 @@ rcmetar.method.references <- function(method) {
       "Random-effects meta-regression: Berkey, C. S., Hoaglin, D. C., Mosteller, F., & Colditz, G. A. (1995). A random-effects regression model for meta-analysis. Statistics in Medicine, 14(4), 395-411. doi:10.1002/sim.4780140406.",
       "Implementation reference: Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. Journal of Statistical Software, 36(3), 1-48. doi:10.18637/jss.v036.i03."
     ),
+    "publication.bias.egger"=c(
+      "Egger regression test: Egger, M., Davey Smith, G., Schneider, M., & Minder, C. (1997). Bias in meta-analysis detected by a simple, graphical test. BMJ, 315(7109), 629-634. doi:10.1136/bmj.315.7109.629."
+    ),
+    "publication.bias.egger.mixed"=c(
+      "Mixed-effects regression test: Sterne, J. A. C., & Egger, M. (2005). Regression methods to detect publication and other bias in meta-analysis. In Publication Bias in Meta-Analysis: Prevention, Assessment and Adjustments (pp. 99-110). Wiley."
+    ),
+    "publication.bias.begg"=c(
+      "Begg-Mazumdar rank test: Begg, C. B., & Mazumdar, M. (1994). Operating characteristics of a rank correlation test for publication bias. Biometrics, 50(4), 1088-1101. doi:10.2307/2533446."
+    ),
+    "publication.bias.harbord"=c(
+      "Harbord test: Harbord, R. M., Egger, M., & Sterne, J. A. C. (2006). A modified test for small-study effects in meta-analyses of controlled trials with binary endpoints. Statistics in Medicine, 25(20), 3443-3457. doi:10.1002/sim.2380."
+    ),
+    "publication.bias.peters"=c(
+      "Peters test: Peters, J. L., Sutton, A. J., Jones, D. R., Abrams, K. R., & Rushton, L. (2006). Comparison of two methods to detect publication bias in meta-analysis. JAMA, 295(6), 676-680. doi:10.1001/jama.295.6.676."
+    ),
+    "publication.bias.pustejovsky"=c(
+      "Standardized-mean-difference asymmetry test: Pustejovsky, J. E., & Rodgers, M. A. (2019). Testing for funnel plot asymmetry of standardized mean differences. Research Synthesis Methods, 10(1), 57-71. doi:10.1002/jrsm.1332."
+    ),
+    "publication.bias.rucker"=c(
+      "Arcsine asymmetry test: Rucker, G., Schwarzer, G., & Carpenter, J. R. (2008). Arcsine test for publication bias in meta-analyses with binary outcomes. Statistics in Medicine, 27(5), 746-763. doi:10.1002/sim.2971.",
+      "Additive random-effects regression: Thompson, S. G., & Sharp, S. J. (1999). Explaining heterogeneity in meta-analysis: A comparison of methods. Statistics in Medicine, 18(20), 2693-2708."
+    ),
+    "publication.bias.deeks"=c(
+      "Deeks test: Deeks, J. J., Macaskill, P., & Irwig, L. (2005). The performance of tests of publication bias and other sample size effects in systematic reviews of diagnostic test accuracy was assessed. Journal of Clinical Epidemiology, 58(9), 882-893. doi:10.1016/j.jclinepi.2004.06.012."
+    ),
+    "publication.bias.funnel"=c(
+      "Funnel plot axis choice: Sterne, J. A. C., & Egger, M. (2001). Funnel plots for detecting bias in meta-analysis: Guidelines on choice of axis. Journal of Clinical Epidemiology, 54(10), 1046-1055. doi:10.1016/S0895-4356(01)00377-8."
+    ),
+    "publication.bias.contour"=c(
+      "Contour-enhanced funnel plots: Peters, J. L., Sutton, A. J., Jones, D. R., Abrams, K. R., & Rushton, L. (2008). Contour-enhanced meta-analysis funnel plots help distinguish publication bias from other causes of asymmetry. Journal of Clinical Epidemiology, 61(10), 991-996. doi:10.1016/j.jclinepi.2007.11.010."
+    ),
+    "publication.bias.trimfill"=c(
+      "Trim-and-fill method: Duval, S., & Tweedie, R. (2000). Trim and fill: A simple funnel-plot-based method of testing and adjusting for publication bias in meta-analysis. Biometrics, 56(2), 455-463. doi:10.1111/j.0006-341X.2000.00455.x."
+    ),
+    "publication.bias.implementation"=c(
+      "Implementation reference: Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. Journal of Statistical Software, 36(3), 1-48. doi:10.18637/jss.v036.i03."
+    ),
     "bootstrap"=c(
       "Bootstrap methods: Davison, A. C., & Hinkley, D. V. (1997). Bootstrap Methods and Their Application. Cambridge University Press.",
       "Bootstrap confidence intervals: DiCiccio, T. J., & Efron, B. (1996). Bootstrap confidence intervals. Statistical Science, 11(3), 189-228.",

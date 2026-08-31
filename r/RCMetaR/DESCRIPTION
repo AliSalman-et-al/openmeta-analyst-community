@@ -23,6 +23,7 @@ Imports:
     graphics,
     HSROC,
     lme4,
+    meta,
     methods,
     metafor,
     pdftools,

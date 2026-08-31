@@ -474,14 +474,14 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
 
     assert family_counts == {
         "icons/actions": 23,
-        "icons/analyses": 5,
-        "icons/analyses/compact": 5,
+            "icons/analyses": 6,
+            "icons/analyses/compact": 6,
         "icons/dataset-types": 8,
         "icons/dataset-types/dark": 8,
         "icons/dataset-types/light": 8,
         "icons/table": 1,
     }
-    assert len(resources) == 58
+    assert len(resources) == 60
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),

@@ -67,6 +67,18 @@ def _get_analysis_plot_capabilities(
     return []
 
 
+def _run_small_study_effects(*_args: object, **_kwargs: object) -> object:
+    return _analysis_unavailable(*_args, **_kwargs)
+
+
+def _regenerate_small_study_effects_funnel(*_args: object, **_kwargs: object) -> object:
+    return _analysis_unavailable(*_args, **_kwargs)
+
+
+def _generate_small_study_effects_funnel(*_args: object, **_kwargs: object) -> object:
+    return _analysis_unavailable(*_args, **_kwargs)
+
+
 def _binary_convert_scale(
     x: object,
     metric_name: object,
@@ -161,6 +173,9 @@ class _StubRObjects:
 
 
 class _StubRLibraryLoader:
+    def load_meta(self) -> None:
+        return None
+
     def load_metafor(self) -> None:
         return None
 
@@ -212,6 +227,9 @@ class _StubRBridgeModule(types.ModuleType):
     get_params: _BackendCallable
     get_method_description: _BackendCallable
     get_analysis_plot_capabilities: _BackendCallable
+    run_small_study_effects: _BackendCallable
+    regenerate_small_study_effects_funnel: _BackendCallable
+    generate_small_study_effects_funnel: _BackendCallable
     run_binary_analysis: _BackendCallable
     run_continuous_analysis: _BackendCallable
     run_diagnostic_multi: _BackendCallable
@@ -255,6 +273,9 @@ class _StubRBridgeModule(types.ModuleType):
         self.get_params = _analysis_unavailable
         self.get_method_description = _analysis_unavailable
         self.get_analysis_plot_capabilities = _get_analysis_plot_capabilities
+        self.run_small_study_effects = _run_small_study_effects
+        self.regenerate_small_study_effects_funnel = _regenerate_small_study_effects_funnel
+        self.generate_small_study_effects_funnel = _generate_small_study_effects_funnel
         self.run_binary_analysis = _analysis_unavailable
         self.run_continuous_analysis = _analysis_unavailable
         self.run_diagnostic_multi = _analysis_unavailable

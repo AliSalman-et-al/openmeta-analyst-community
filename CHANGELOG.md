@@ -4,14 +4,29 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the Original OpenMeta[Analyst] Project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-08-31
+
+### Added
+
+- Added a guided Publication Bias and small-study-effects workflow with package-native eligibility checks, readable results, dynamic statistical-paper references, and per-run regeneration.
+- Added ordinary, contour-enhanced, Deeks, and trim-and-fill funnel artifacts, with partial plot failures preserved beside successful outputs.
+- Added Default (metafor), RevMan, and BMJ-inspired visual styles, plus expanded Edit Plot controls for funnel artifacts.
+- Added method-specific Egger, Begg, Harbord, Peters, Pustejovsky–Rodgers, Rücker, and Deeks behavior.
 
 ### Changed
 
+- Made Methods and Plots UI ownership and presentation consistent across the Publication Bias workflow.
+- Made effect reconstruction authoritative and propagated corrected effects through all dependent analyses and plots.
+- Pinned meta, metafor, and runtime packaging inputs across Windows and macOS for reproducible release artifacts.
 - Reorganized verification into focused fast, native Qt, R, and packaging lanes so each behavior has one clear owner and local feedback arrives sooner.
 - Reused generated Qt build outputs and reduced redundant native scale matrices while retaining representative standard and fractional-scale coverage.
 - Replaced migration-era, source-shape, and taxonomy tests with tests of current behavior and failure boundaries.
 - Rewrote the maintained documentation around setup, project files, and releases.
+
+### Fixed
+
+- Fixed R Graphics device cleanup so the Publication Bias workflow does not leak an R Graphics window.
+- Fixed result rendering and reference selection so statistical output remains readable and references stay current for the selected method.
 
 ### Removed
 

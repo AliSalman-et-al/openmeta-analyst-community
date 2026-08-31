@@ -488,6 +488,10 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
     assert 'install.packages.compile.from.source = "never"' in policy_runtime
     assert "HSROC source archive SHA256 mismatch" in policy_runtime
     assert "HSROC 2.1.9 must be the sole pinned source exception" in policy_loader
+    assert "meta" in windows["text"]
+    assert "getElement(packageDescription('meta'), 'Version')" in windows["text"]
+    assert "meta" in macos["text"]
+    assert "getElement(packageDescription('meta'), 'Version')" in macos["text"]
     assert "https://packagemanager.posit.co/cran/2026-07-16" in policy_loader
     assert {
         "Invoke-StrictRDependencyPolicy",

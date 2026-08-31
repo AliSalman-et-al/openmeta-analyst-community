@@ -78,7 +78,8 @@ def main() -> int:
             }
             for path in package_root.rglob("*")
             if path.is_file()
-            and path.name.upper() in {"COPYING", "COPYING.LIB", "LICENSE", "LICENCE"}
+            and path.name.upper()
+            in {"COPYRIGHTS", "COPYING", "COPYING.LIB", "LICENSE", "LICENCE"}
         ]
         license_name = metadata.get("License", "unknown")
         if declares_license_file(license_name) and not any(

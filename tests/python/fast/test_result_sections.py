@@ -76,6 +76,11 @@ def test_display_titles_normalize_result_navigation_labels():
         "Diagnostic Odds Ratio Forest Plot"
     )
     assert section_display_title("SROC", context) == "Summary ROC Plot"
+    assert section_display_title("Warning", context) == "Interpretation"
+    assert section_display_title("Data and eligibility", context) == "Analysis Summary"
+    assert section_display_title("Tests", context) == "Small-Study Effects Tests"
+    assert section_display_title("Pooled comparison", context) == "Pooled Estimates"
+    assert section_display_title("Failures", context) == "Procedure Warnings"
 
 
 def test_standard_meta_analysis_sections_keep_headline_result_with_plot():
@@ -116,4 +121,27 @@ def test_hsroc_sections_lead_with_clinical_result_before_model_details():
         ("text", "Study-Level Threshold Parameters"),
         ("image", "Density Plots"),
         ("image", "Trace Plots"),
+    ]
+
+
+def test_small_study_effects_sections_put_plot_between_context_and_tests():
+    ordered = order_display_sections(
+        texts=[
+            ("Failures", "none"),
+            ("References", "refs"),
+            ("Pooled comparison", "pool"),
+            ("Tests", "tests"),
+            ("Data and eligibility", "eligible"),
+            ("Warning", "warning"),
+        ],
+        images=[("Ordinary Funnel Plot", "ordinary.png")],
+    )
+
+    assert [section.key for section in ordered] == [
+        "Warning",
+        "Data and eligibility",
+        "Ordinary Funnel Plot",
+        "Tests",
+        "Pooled comparison",
+        "Failures",
     ]

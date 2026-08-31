@@ -228,6 +228,13 @@ def execute_analysis_requests(
     raise ValueError("Unsupported analysis data family: %s" % data_type)
 
 
+def execute_small_study_effects_request(model, request):
+    """Execute the dedicated immutable small-study effects request boundary."""
+    from rc_metastudio.publication_bias import execute_small_study_effects
+
+    return execute_small_study_effects(model, request)
+
+
 def _conversion_kwargs(
     selected_covariates: Sequence[analysis_dataset.Covariate],
 ) -> dict[str, object]:

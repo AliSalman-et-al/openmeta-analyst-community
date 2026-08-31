@@ -6,6 +6,12 @@ RC MetaStudio is an open-source desktop application for performing and reviewing
 
 It supports standard, cumulative, leave-one-out, subgroup, meta-regression, and diagnostic analyses. You can inspect results, create forest and bubble plots, export plots as PDF, PNG, SVG, or TIFF, and save your work in an `.rcms` project.
 
+## Small-study effects analysis
+
+Choose **Publication Bias** after at least two included studies to open the guided small-study effects analysis. “Publication Bias” is the navigation label; the analysis reports associations between study size or precision and observed effects and does not provide a bias-present or bias-absent verdict. RCMetaR computes method-specific eligibility from the included study set and shows the exact reason when a procedure or required input is unavailable. Ordinary and contour-enhanced funnels are presentation artifacts that can be edited and regenerated from the saved run. Diagnostic odds ratios use the separate Deeks effective-sample-size funnel.
+
+The workflow reports the package-native methods supported by `meta` 8.5-0 and the distinct mixed-effects Egger model from `metafor` 5.0-1. Depending on the effect measure and available raw inputs, it can show classical Egger, Harbord, Rücker AS+RE, Peters, Pustejovsky–Rodgers, Begg–Mazumdar, Deeks, trim-and-fill, and exploratory infinite-precision estimates. Each result includes its package/version and call; unavailable procedures retain their precise eligibility reason. Read the [small-study effects glossary](CONTEXT.md) for interpretation boundaries and the [release guide](docs/release.md) for runtime verification requirements.
+
 ## Download and install
 
 Download the latest release from [GitHub Releases](https://github.com/AliSalman-et-al/rc-metastudio/releases):

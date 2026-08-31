@@ -325,6 +325,7 @@
     <addaction name="action_subgroup_ma"/>
     <addaction name="separator"/>
     <addaction name="action_meta_regression"/>
+    <addaction name="action_publication_bias"/>
     <addaction name="action_change_confidence_level"/>
    </widget>
    <widget class="QMenu" name="menuDataset">
@@ -392,6 +393,7 @@
    <addaction name="action_loo_ma"/>
    <addaction name="action_subgroup_ma"/>
    <addaction name="action_meta_regression"/>
+   <addaction name="action_publication_bias"/>
    <addaction name="action_change_confidence_level"/>
   </widget>
   <action name="action_save">
@@ -491,6 +493,17 @@
    </property>
    <property name="text">
     <string>Meta-Regression</string>
+   </property>
+  </action>
+  <action name="action_publication_bias">
+   <property name="text">
+    <string>Publication Bias</string>
+   </property>
+   <property name="toolTip">
+    <string>Publication Bias and Small-Study Effects</string>
+   </property>
+   <property name="statusTip">
+    <string>Publication Bias and Small-Study Effects</string>
    </property>
   </action>
   <action name="action_undo">

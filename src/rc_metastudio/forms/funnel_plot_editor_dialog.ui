@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>FunnelPlotEditorDialog</class>
+ <widget class="QDialog" name="FunnelPlotEditorDialog">
+  <property name="windowTitle"><string>Edit funnel plot</string></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QScrollArea" name="content_scroll">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <widget class="QWidget" name="content_widget">
+      <layout class="QVBoxLayout" name="content_layout">
+       <item><widget class="QLabel" name="kind_label"><property name="text"><string>Funnel kind:</string></property></widget></item>
+       <item><widget class="QLabel" name="rerun_note"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Only presentation and funnel geometry can be edited here. Statistical models, tests, sensitivities, correction policies, and eligible study sets require a full small-study effects analysis rerun.</string></property></widget></item>
+       <item>
+        <widget class="QGroupBox" name="appearance_group"><property name="title"><string>Presentation</string></property>
+         <layout class="QGridLayout" name="appearance_layout">
+          <item row="0" column="0"><widget class="QLabel" name="style_label"><property name="text"><string>Style:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QComboBox" name="style_combo"><item><property name="text"><string>Default (metafor)</string></property></item><item><property name="text"><string>RevMan</string></property></item><item><property name="text"><string>BMJ</string></property></item></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="label_policy_label"><property name="text"><string>Study labels:</string></property></widget></item>
+          <item row="1" column="1"><widget class="QComboBox" name="label_policy_combo"><item><property name="text"><string>None</string></property></item><item><property name="text"><string>Outside pseudo-confidence region</string></property></item><item><property name="text"><string>All</string></property></item></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="point_symbol_label"><property name="text"><string>Point symbol:</string></property></widget></item>
+          <item row="2" column="1"><widget class="QComboBox" name="point_symbol_combo"><item><property name="text"><string>Filled circle</string></property></item><item><property name="text"><string>Open circle</string></property></item><item><property name="text"><string>Square</string></property></item><item><property name="text"><string>Triangle</string></property></item><item><property name="text"><string>Diamond</string></property></item></widget></item>
+          <item row="3" column="0"><widget class="QLabel" name="point_size_label"><property name="text"><string>Point size:</string></property></widget></item>
+          <item row="3" column="1"><widget class="QDoubleSpinBox" name="point_size_spin"><property name="minimum"><double>0.25</double></property><property name="maximum"><double>5.0</double></property><property name="singleStep"><double>0.25</double></property><property name="value"><double>1.0</double></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="point_color_label"><property name="text"><string>Point color:</string></property></widget></item>
+          <item row="4" column="1"><layout class="QHBoxLayout" name="point_color_layout"><item><widget class="QLineEdit" name="point_color_edit"><property name="text"><string>#000000</string></property></widget></item><item><widget class="QPushButton" name="point_color_button"><property name="text"><string>Choose...</string></property></widget></item></layout></item>
+          <item row="5" column="0"><widget class="QLabel" name="reference_color_label"><property name="text"><string>Reference/regression color:</string></property></widget></item>
+          <item row="5" column="1"><layout class="QHBoxLayout" name="reference_color_layout"><item><widget class="QLineEdit" name="reference_color_edit"><property name="text"><string>#4682B4</string></property></widget></item><item><widget class="QPushButton" name="reference_color_button"><property name="text"><string>Choose...</string></property></widget></item></layout></item>
+          <item row="6" column="0"><widget class="QLabel" name="region_color_label"><property name="text"><string>Confidence/contour color:</string></property></widget></item>
+          <item row="6" column="1"><layout class="QHBoxLayout" name="region_color_layout"><item><widget class="QLineEdit" name="region_color_edit"><property name="text"><string>#E5E5E5</string></property></widget></item><item><widget class="QPushButton" name="region_color_button"><property name="text"><string>Choose...</string></property></widget></item></layout></item>
+          <item row="7" column="0"><widget class="QLabel" name="background_color_label"><property name="text"><string>Background color:</string></property></widget></item>
+          <item row="7" column="1"><layout class="QHBoxLayout" name="background_color_layout"><item><widget class="QLineEdit" name="background_color_edit"><property name="text"><string>#FFFFFF</string></property></widget></item><item><widget class="QPushButton" name="background_color_button"><property name="text"><string>Choose...</string></property></widget></item></layout></item>
+          <item row="8" column="0"><widget class="QLabel" name="reference_visible_label"><property name="text"><string>Reference line:</string></property></widget></item>
+          <item row="8" column="1"><widget class="QCheckBox" name="reference_visible_check"><property name="text"><string>Show</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item row="9" column="0"><widget class="QLabel" name="regression_visible_label"><property name="text"><string>Regression line:</string></property></widget></item>
+          <item row="9" column="1"><widget class="QCheckBox" name="regression_visible_check"><property name="text"><string>Show</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item row="10" column="0"><widget class="QLabel" name="pooled_overlay_label"><property name="text"><string>Pooled display overlay:</string></property></widget></item>
+          <item row="10" column="1"><widget class="QCheckBox" name="pooled_overlay_check"><property name="text"><string>Show</string></property><property name="checked"><bool>true</bool></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="confidence_group"><property name="title"><string>Confidence and contour geometry</string></property>
+         <layout class="QGridLayout" name="confidence_layout">
+          <item row="0" column="0"><widget class="QLabel" name="sampling_confidence_label"><property name="text"><string>Sampling confidence level:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QDoubleSpinBox" name="sampling_confidence_spin"><property name="minimum"><double>50.0</double></property><property name="maximum"><double>99.9</double></property><property name="value"><double>95.0</double></property></widget></item>
+          <item row="1" column="0"><widget class="QCheckBox" name="include_tau2_check"><property name="text"><string>Include tau² in pseudo-confidence region</string></property></widget></item>
+          <item row="1" column="1"><widget class="QCheckBox" name="sampling_region_check"><property name="text"><string>Show pseudo-confidence region</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="contour_levels_label"><property name="text"><string>Null contour levels (%):</string></property></widget></item>
+          <item row="2" column="1"><widget class="QLineEdit" name="contour_levels_edit"><property name="text"><string>90,95,99</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="axis_group"><property name="title"><string>Axes</string></property>
+         <layout class="QGridLayout" name="axis_layout">
+          <item row="0" column="0"><widget class="QLabel" name="x_label_label"><property name="text"><string>X-axis label:</string></property></widget></item>
+          <item row="0" column="1"><widget class="QLineEdit" name="x_label_edit"><property name="text"><string>[default]</string></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="y_label_label"><property name="text"><string>Y-axis label:</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLineEdit" name="y_label_edit"><property name="text"><string>Standard error</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="x_lower_label"><property name="text"><string>X-axis lower bound:</string></property></widget></item>
+          <item row="2" column="1"><widget class="QLineEdit" name="x_lower_edit"><property name="text"><string>[default]</string></property></widget></item>
+          <item row="3" column="0"><widget class="QLabel" name="x_upper_label"><property name="text"><string>X-axis upper bound:</string></property></widget></item>
+          <item row="3" column="1"><widget class="QLineEdit" name="x_upper_edit"><property name="text"><string>[default]</string></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="x_ticks_label"><property name="text"><string>X-axis ticks:</string></property></widget></item>
+          <item row="4" column="1"><widget class="QLineEdit" name="x_ticks_edit"><property name="text"><string>[default]</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="path_layout">
+         <item><widget class="QLabel" name="path_label"><property name="text"><string>Save image to:</string></property></widget></item>
+         <item><widget class="QLineEdit" name="path_edit"/></item>
+         <item><widget class="QPushButton" name="browse_button"><property name="text"><string>Browse...</string></property><property name="accessibleName"><string>Browse funnel plot save path</string></property></widget></item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item><widget class="QDialogButtonBox" name="button_box"><property name="standardButtons"><set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <connections>
+  <connection>
+   <sender>button_box</sender>
+   <signal>accepted()</signal>
+   <receiver>FunnelPlotEditorDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel"><x>248</x><y>254</y></hint>
+    <hint type="destinationlabel"><x>157</x><y>274</y></hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>button_box</sender>
+   <signal>rejected()</signal>
+   <receiver>FunnelPlotEditorDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel"><x>316</x><y>260</y></hint>
+    <hint type="destinationlabel"><x>286</x><y>274</y></hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

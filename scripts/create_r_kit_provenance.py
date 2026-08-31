@@ -55,6 +55,7 @@ def archive_license_files(archive: Path) -> list[dict[str, str]]:
     with tarfile.open(archive.resolve(strict=True)) as bundle:
         for member in bundle.getmembers():
             if not member.isfile() or Path(member.name).name.casefold() not in {
+                "copyrights",
                 "license",
                 "licence",
                 "copying",

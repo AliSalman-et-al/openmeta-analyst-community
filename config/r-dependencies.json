@@ -18,7 +18,7 @@
       "Rcpp", "magrittr", "irlba", "minqa", "nloptr", "RcppEigen", "SparseM", "MatrixModels", "Formula",
       "latticeExtra", "acepack", "gridExtra", "data.table", "htmlTable", "viridis", "htmltools", "viridisLite",
       "htmlwidgets", "rmarkdown", "knitr", "stringr", "stringi", "colorspace", "gtable", "scales", "vctrs",
-      "rlang", "withr", "cli", "glue", "lifecycle", "isoband", "S7", "farver", "labeling"
+      "rlang", "withr", "cli", "glue", "lifecycle", "S7", "labeling", "meta", "metabook", "CompQuadForm", "isoband", "farver"
     ],
     "install_options": {
       "install.packages.check.source": "no",
@@ -111,6 +111,15 @@
       ],
       "reason": "Core binary, continuous, diagnostic, and meta-regression methods call metafor analysis functions.",
       "installed_version": "5.0-1"
+    },
+    {
+      "name": "meta",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["r/RCMetaR/DESCRIPTION"],
+      "evidence": ["r/RCMetaR/R/publication_bias.R: meta::metabias(...) and meta::trimfill(...)"],
+      "reason": "Pinned meta 8.5-0 owns the supported classical small-study effects methods and trim-and-fill behavior.",
+      "installed_version": "8.5-0"
     },
     {
       "name": "HSROC",
@@ -254,6 +263,18 @@
       "source": "cran",
       "reason": "Bundled as part of the app-level CRAN dependency closure.",
       "evidence": ["scripts/install-r-deps.R"]
+    },
+    {
+      "name": "metabook",
+      "source": "cran",
+      "reason": "Bundled as a transitive dependency of the pinned meta 8.5-0 runtime, outside RCMetaR's direct package metadata.",
+      "evidence": ["meta 8.5-0 package dependency closure", "scripts/install-r-deps.R"]
+    },
+    {
+      "name": "CompQuadForm",
+      "source": "cran",
+      "reason": "Bundled as a transitive dependency of the pinned meta 8.5-0 runtime, outside RCMetaR's direct package metadata.",
+      "evidence": ["meta 8.5-0 package dependency closure", "scripts/install-r-deps.R"]
     },
     {
       "name": "irlba",

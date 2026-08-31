@@ -23,6 +23,7 @@ def test_toolbar_analysis_actions_follow_analysis_menu_order():
         "action_loo_ma",
         "action_subgroup_ma",
         "action_meta_regression",
+        "action_publication_bias",
         "action_change_confidence_level",
     ]
     assert [

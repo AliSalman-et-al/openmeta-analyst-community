@@ -43,6 +43,9 @@ TOP_LEVEL_FORM_INVENTORY = {
     "meta_regression_dialog.ui": (
         ("meta_regression_dialog.py", "MetaRegressionDialog", "TRANSACTIONAL"),
     ),
+    "publication_bias_dialog.ui": (
+        ("publication_bias_dialog.py", "PublicationBiasDialog", "TRANSACTIONAL"),
+    ),
     "subgroup_analysis_dialog.ui": (
         ("subgroup_analysis_dialog.py", "SubgroupAnalysisDialog", "TRANSACTIONAL"),
     ),
@@ -55,6 +58,9 @@ TOP_LEVEL_FORM_INVENTORY = {
     "edit_dialog.ui": (("edit_dialog.py", "EditDialog", "EDIT_DATASET"),),
     "edit_plot_dialog.ui": (
         ("plot_editor_dialog.py", "EditPlotDialog", "TRANSACTIONAL"),
+    ),
+    "funnel_plot_editor_dialog.ui": (
+        ("funnel_plot_editor_dialog.py", "FunnelPlotEditorDialog", "TRANSACTIONAL"),
     ),
     "analysis_setup_dialog.ui": (
         ("analysis_setup_dialog.py", "AnalysisSetupDialog", "TRANSACTIONAL"),

@@ -239,16 +239,54 @@ rcmetar.create.diagnostic.data <- function(TP=numeric(), FN=numeric(), TN=numeri
 rcmetar.prepare.analysis.data <- function(om.data, params) {
     params <- .rcmetar.as.params.list(params)
     data.type <- .rcmetar.data.type(om.data)
+    study.count <- length(om.data@study.names)
     switch(
         data.type,
-        binary=compute.bin.point.estimates(om.data, params),
+        binary={
+            # Raw counts are authoritative whenever the complete row is
+            # available.  Entered effects remain untouched for effect-only
+            # rows, which is important for imported analyses without counts.
+            measure <- as.character(params$measure %||% "")
+            required <- if (measure %in% binary.one.arm.metrics) {
+                list(om.data@g1O1, om.data@g1O2)
+            } else {
+                list(om.data@g1O1, om.data@g1O2, om.data@g2O1, om.data@g2O2)
+            }
+            has.raw <- study.count > 0 &&
+                all(vapply(required, function(x)
+                           length(x) == study.count && all(is.finite(x)),
+                           logical(1)))
+            if (isTRUE(has.raw) && !is.null(params$measure)) compute.bin.point.estimates(om.data, params) else om.data
+        },
         continuous={
-            effect <- compute.for.one.cont.study(om.data, params)
-            om.data@y <- effect$yi
-            om.data@SE <- sqrt(effect$vi)
+            measure <- as.character(params$measure %||% "")
+            required <- if (identical(measure, "TXMean")) {
+                list(om.data@N1, om.data@mean1, om.data@sd1)
+            } else {
+                list(om.data@N1, om.data@mean1, om.data@sd1,
+                     om.data@N2, om.data@mean2, om.data@sd2)
+            }
+            has.raw <- study.count > 0 &&
+                all(vapply(required, function(x)
+                           length(x) == study.count && all(is.finite(x)),
+                           logical(1)))
+            if (has.raw) has.raw <- all(om.data@N1 > 0)
+            if (has.raw && !identical(measure, "TXMean")) has.raw <- all(om.data@N2 > 0)
+            if (isTRUE(has.raw) && !is.null(params$measure)) {
+                effect <- compute.for.one.cont.study(om.data, params)
+                om.data@y <- effect$yi
+                om.data@SE <- sqrt(effect$vi)
+            }
             om.data
         },
-        diagnostic=compute.diag.point.estimates(om.data, params)
+        diagnostic={
+            required <- list(om.data@TP, om.data@FN, om.data@TN, om.data@FP)
+            has.raw <- study.count > 0 &&
+                all(vapply(required, function(x)
+                           length(x) == study.count && all(is.finite(x)),
+                           logical(1)))
+            if (isTRUE(has.raw) && !is.null(params$measure)) compute.diag.point.estimates(om.data, params) else om.data
+        }
     )
 }
 
@@ -421,6 +459,13 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         stop.at.rma=stop.at.rma
     )
 
+    # Prepare exactly once at this boundary so every standard and wrapped
+    # analysis consumes the same authoritative effects. Peto retains its
+    # native count-based construction and therefore is deliberately excluded.
+    if (!identical(request$method, "binary.fixed.peto")) {
+        om.data <- rcmetar.prepare.analysis.data(om.data, request$params)
+    }
+
     result <- switch(
         request$workflow,
         standard=.rcmetar.dispatch.standard(om.data, request),
@@ -453,6 +498,9 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
     }
 
     params.list <- lapply(params.list, .rcmetar.as.params.list)
+    if (length(params.list) > 0 && !is.null(params.list[[1]]$measure)) {
+        diagnostic.data <- rcmetar.prepare.analysis.data(diagnostic.data, params.list[[1]])
+    }
     for (i in seq_along(methods)) {
         rcmetar.validate.analysis.request(
             diagnostic.data,

@@ -617,6 +617,43 @@ def test_results_window_regenerates_each_supported_export_format(
         _dispose(window, qapp)
 
 
+def test_results_window_rejects_svgz_for_funnel_export_before_r(
+    monkeypatch, qapp, tmp_path
+):
+    _use_isolated_settings(tmp_path)
+    window = results_window.ResultsWindow(_empty_results())
+    artifact = results_window.PlotArtifact(
+        "Contour Funnel Plot",
+        str(tmp_path / "funnel.png"),
+        _plot_capability(plot_kind="contour_funnel", regenerator="funnel"),
+        params_path=str(tmp_path / "funnel-params"),
+    )
+    calls = []
+    monkeypatch.setattr(
+        results_window.r_bridge,
+        "load_vars_for_plot",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.r_bridge,
+        "regenerate_small_study_effects_funnel",
+        lambda path: calls.append(("generate", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.QFileDialog,
+        "getSaveFileName",
+        lambda *_args, **_kwargs: (str(tmp_path / "funnel.svgz"), ""),
+    )
+    try:
+        with pytest.raises(ValueError, match="SVGZ export is not supported"):
+            window.save_image_as(artifact, format="svg")
+        assert calls == []
+    finally:
+        _dispose(window, qapp)
+
+
 @pytest.mark.parametrize("scale", [1.0, 1.25, 1.5, 1.75])
 def test_results_plot_geometry_preserves_fractional_logical_coordinates(
     qapp, tmp_path, scale
