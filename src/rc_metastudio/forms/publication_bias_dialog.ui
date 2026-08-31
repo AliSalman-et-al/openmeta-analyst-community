@@ -10,7 +10,7 @@
     <widget class="QTabWidget" name="tabs">
      <property name="currentIndex"><number>0</number></property>
      <widget class="QWidget" name="methods_tab">
-      <attribute name="title"><string>Method</string></attribute>
+      <attribute name="title"><string>Methods</string></attribute>
       <layout class="QVBoxLayout" name="methods_layout">
        <item>
         <widget class="QScrollArea" name="methods_scroll">

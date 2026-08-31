@@ -66,7 +66,7 @@ def test_dialog_matches_standard_method_and_plots_structure(qapp, monkeypatch):
     try:
         assert dialog.windowTitle() == "Method & Parameters"
         assert dialog.tabs.count() == 2
-        assert [dialog.tabs.tabText(i) for i in range(2)] == ["Method", "Plots"]
+        assert [dialog.tabs.tabText(i) for i in range(2)] == ["Methods", "Plots"]
         assert dialog.findChild(type(dialog.plots_scroll), "methods_scroll") is not None
         assert not hasattr(dialog, "primary_method_combo")
         assert not hasattr(dialog, "classical_egger_check")

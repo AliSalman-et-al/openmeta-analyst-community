@@ -230,10 +230,10 @@ def test_canonical_dialog_matches_method_and_plots_tabs():
     )
     assert ui.count('class="QScrollArea"') == 2
     assert "Method &amp; Parameters" in ui
-    assert ">Method<" in ui
+    assert ">Methods<" in ui
     assert ">Plots<" in ui
     assert ">Options<" not in ui
-    assert ui.index(">Method<") < ui.index(">Plots<")
+    assert ui.index(">Methods<") < ui.index(">Plots<")
     assert 'name="progress_bar"' in ui
     assert "QDialogButtonBox::Cancel|QDialogButtonBox::Ok" in ui
 
