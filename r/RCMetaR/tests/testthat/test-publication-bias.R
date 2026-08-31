@@ -285,7 +285,7 @@ test_that("generic tests use distinct package-native Egger and Begg procedures",
   expect_match(result$Tests, "95% CI")
   expect_match(result$`Method details`, "Weighting: inverse-variance weights with REML heterogeneity", fixed=TRUE)
   expect_match(result$`Method details`, "Inference: z test from metafor::regtest", fixed=TRUE)
-  expect_match(result$`Method details`, "Weighting: Kendall rank correlation", fixed=TRUE)
+  expect_match(result$`Method details`, "Weighting: not applicable (Kendall rank-based test)", fixed=TRUE)
   expect_match(result$`Method details`, "Inference: z test from Kendall rank correlation", fixed=TRUE)
   expect_match(result$`Pooled comparison`, "Common effect", ignore.case=TRUE)
   expect_match(result$`Pooled comparison`, "Random effects (REML)", fixed=TRUE)

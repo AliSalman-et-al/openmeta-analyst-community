@@ -242,7 +242,7 @@ publication.bias.effects <- function(om.data, params) {
                     method=method, role=entry$role, package="meta", package.version=utils::packageDescription("meta")$Version,
                     call=paste0("meta::metabias(x=prepared.meta.model, method.bias='", bias.method, "', k.min=", k.min, ")"),
                     predictor=if (method == "begg-mazumdar") "rank correlation of standardized effects and variance" else "SE",
-                    weighting=if (method == "begg-mazumdar") "Kendall rank correlation" else "inverse variance",
+                    weighting=if (method == "begg-mazumdar") "not applicable (Kendall rank-based test)" else "inverse variance",
                     inference=if (method == "begg-mazumdar") "z test from Kendall rank correlation" else "t-based meta::metabias test",
                     model=if (method == "begg-mazumdar") "Begg-Mazumdar rank correlation" else "multiplicative Egger regression",
                     usable.studies=length(y), df=df, p.value=as.numeric(fit$p.value %||% NA_real_),

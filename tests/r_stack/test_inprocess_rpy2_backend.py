@@ -1082,7 +1082,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             in method_details
         )
         assert "Inference: z test from metafor::regtest" in method_details
-        assert "Weighting: Kendall rank correlation" in method_details
+        assert "Weighting: not applicable (Kendall rank-based test)" in method_details
         assert "Inference: z test from Kendall rank correlation" in method_details
         funnel_params = r_bridge.load_vars_for_plot(
             funnel_base, return_params_dict=True
