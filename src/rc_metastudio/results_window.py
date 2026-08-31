@@ -126,7 +126,15 @@ def _svg_renderer_class():
     return QSvgRenderer
 
 
-def _path_with_export_extension(file_path, export_format):
+def _path_with_export_extension(file_path, export_format, *, allow_svgz=True):
+    if (
+        export_format.extension == "svg"
+        and not allow_svgz
+        and os.path.splitext(str(file_path))[1].lower() == ".svgz"
+    ):
+        raise ValueError(
+            "SVGZ export is not supported for funnel plots; use SVG instead."
+        )
     aliases = PLOT_EXPORT_EXTENSION_ALIASES[export_format.extension]
     if os.path.splitext(str(file_path))[1].lower() in aliases:
         return file_path
@@ -1038,14 +1046,10 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             raise Exception("Invalid format, needs to be one of: %s!" % valid_formats)
 
         export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
+        allow_svgz = artifact.capability.get("regenerator") != "funnel"
 
         if not unscaled_image:
             regenerator = artifact.capability["regenerator"]
-            if regenerator == "funnel":
-                r_bridge.load_vars_for_plot(artifact.params_path)
-            else:
-                # Loading the artifact exposes its conventional ``plot.data`` object.
-                r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
             default_path = {
                 "forest": "forest_plot",
                 "regression": "regression",
@@ -1062,7 +1066,14 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
             # now we re-generate it, unless they canceled, of course
             if file_path != "":
-                file_path = _path_with_export_extension(file_path, export_format)
+                file_path = _path_with_export_extension(
+                    file_path, export_format, allow_svgz=allow_svgz
+                )
+                if regenerator == "funnel":
+                    r_bridge.load_vars_for_plot(artifact.params_path)
+                else:
+                    # Loading the artifact exposes its conventional ``plot.data`` object.
+                    r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
                 function_name = plot_capabilities.regenerator_name(regenerator)
                 if function_name is None:
                     raise ValueError("Plot is not regeneratable: %s" % artifact.title)
@@ -1075,7 +1086,9 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 default_path,
             )
             if file_path != "":
-                file_path = _path_with_export_extension(file_path, export_format)
+                file_path = _path_with_export_extension(
+                    file_path, export_format, allow_svgz=allow_svgz
+                )
                 unscaled_image.save(file_path, export_format.qt_format)
 
     def position(self):

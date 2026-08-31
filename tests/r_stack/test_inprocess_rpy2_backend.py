@@ -1058,7 +1058,8 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
               funnel_data,
               list(
                 data.type="continuous", metric="MD",
-                funnels=c("ordinary", "contour"), tests=character(), conf.level=95,
+                funnels=c("ordinary", "contour"),
+                tests=c("mixed-effects-egger", "begg-mazumdar"), conf.level=95,
                 `funnel.point.size`=c(1.0, 1.0)
               )
             )
@@ -1074,7 +1075,15 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             ro.globalenv["funnel_result"]
         )
         assert "Method details" in parsed_funnel_result["texts"]
-        assert "Package:" in parsed_funnel_result["texts"]["Method details"]
+        method_details = parsed_funnel_result["texts"]["Method details"]
+        assert "Package:" in method_details
+        assert (
+            "Weighting: inverse-variance weights with REML heterogeneity"
+            in method_details
+        )
+        assert "Inference: z test from metafor::regtest" in method_details
+        assert "Weighting: Kendall rank correlation" in method_details
+        assert "Inference: z test from Kendall rank correlation" in method_details
         funnel_params = r_bridge.load_vars_for_plot(
             funnel_base, return_params_dict=True
         )
