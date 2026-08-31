@@ -420,17 +420,19 @@ _DRIVER = textwrap.dedent(
     previous_scratch_dir = os.environ.pop("RCMS_ANALYSIS_SCRATCH_DIR", None)
     try:
         with tempfile.TemporaryDirectory(prefix="rcmetar-meta-regression-") as isolated_cwd:
-            os.chdir(isolated_cwd)
-            diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
-                filtered_model,
-                selected.studies,
-                (filtered_model.covariate,),
-                diagnostic_meta_request,
-                False,
-                95.0,
-            )
+            try:
+                os.chdir(isolated_cwd)
+                diagnostic_meta_result = analysis_adapter.execute_meta_regression_request(
+                    filtered_model,
+                    selected.studies,
+                    (filtered_model.covariate,),
+                    diagnostic_meta_request,
+                    False,
+                    95.0,
+                )
+            finally:
+                os.chdir(previous_cwd)
     finally:
-        os.chdir(previous_cwd)
         if previous_scratch_dir is not None:
             os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
     assert "Summary" in diagnostic_meta_result["texts"]
