@@ -187,7 +187,7 @@ publication.bias.effects <- function(om.data, params) {
                     method="Deeks test (meta implementation)", role=entry$role, package="meta",
                     package.version=utils::packageDescription("meta")$Version,
                     call=paste0("meta::metabin(event.e=TP, n.e=TP+FN, event.c=FP, n.c=FP+TN, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML'); meta::metabias(x=prepared.DOR.model, method.bias='Deeks', k.min=", k.min, ")"),
-                    predictor="1/sqrt(ESS), ESS=4*n.e*n.c/(n.e+n.c)", weighting="native ESS weights",
+                    predictor="1/sqrt(ESS), ESS=4*n.e*n.c/(n.e+n.c)", weighting="native ESS weights", inference="t-based Deeks regression test",
                     model="Deeks effective-sample-size weighted regression", usable.studies=as.numeric(fit.model$k),
                     df=df, p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
                     coefficient=coefficient, standard.error=standard.error, confidence.interval=as.numeric(interval),
@@ -204,7 +204,7 @@ publication.bias.effects <- function(om.data, params) {
                     method=method, role=entry$role, package="metafor",
                     package.version=utils::packageDescription("metafor")$Version,
                     call="metafor::regtest(x=prepared.effects, sei=prepared.standard.errors, model='rma', predictor='sei', ret.fit=TRUE)",
-                    predictor="SE", weighting="REML mixed-effects", model="REML mixed-effects",
+                    predictor="SE", weighting="REML mixed-effects", inference="REML mixed-effects regression test", model="REML mixed-effects",
                     usable.studies=length(y), df=as.numeric(fit$dfs %||% NA_real_),
                     p.value=as.numeric(fit$pval), statistic=as.numeric(fit$zval),
                     coefficient=as.numeric(model$b[2]), standard.error=as.numeric(model$se[2]),
@@ -223,7 +223,7 @@ publication.bias.effects <- function(om.data, params) {
                 tests[[method]] <- list(
                     method=method, role=entry$role, package="meta", package.version=utils::packageDescription("meta")$Version,
                     call=paste0("meta::metacont(n.e, mean.e, sd.e, n.c, mean.c, sd.c, sm='SMD', common=TRUE, random=TRUE, method.tau='REML'); meta::metabias(x=prepared.SMD.model, method.bias='Pustejovsky', k.min=", k.min, ")"),
-                    predictor="sqrt(1/n.e + 1/n.c)", weighting="inverse variance from native Pustejovsky standard errors",
+                    predictor="sqrt(1/n.e + 1/n.c)", weighting="inverse variance from native Pustejovsky standard errors", inference="t-based Pustejovsky regression test",
                     model="Pustejovsky-Rodgers independent two-group regression", usable.studies=length(y), df=df,
                     p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
                     coefficient=coefficient, standard.error=standard.error, confidence.interval=as.numeric(interval),
@@ -243,6 +243,7 @@ publication.bias.effects <- function(om.data, params) {
                     call=paste0("meta::metabias(x=prepared.meta.model, method.bias='", bias.method, "', k.min=", k.min, ")"),
                     predictor=if (method == "begg-mazumdar") "rank correlation of standardized effects and variance" else "SE",
                     weighting=if (method == "begg-mazumdar") "Kendall rank correlation" else "inverse variance",
+                    inference="t-based meta::metabias test",
                     model=if (method == "begg-mazumdar") "Begg-Mazumdar rank correlation" else "multiplicative Egger regression",
                     usable.studies=length(y), df=df, p.value=as.numeric(fit$p.value %||% NA_real_),
                     statistic=as.numeric(fit$statistic %||% NA_real_), coefficient=coefficient,
@@ -280,6 +281,7 @@ publication.bias.effects <- function(om.data, params) {
                     call=paste0(fit.call, "; ", test.call),
                     predictor=if (method == "harbord") "Harbord Z/V on 1/sqrt(V), where V is the native score variance" else if (method == "peters") "1/(n.e+n.c), with native Peters seTE=sqrt(1/(event.e+event.c)+1/(non-events.e+non-events.c))" else "ASD effect on native ASD standard error",
                     weighting=if (method == "harbord") "native Harbord score variance V" else if (method == "peters") "1/Peters seTE^2" else "native AS+RE additive REML weights",
+                    inference="t-based meta::metabias test",
                     model=if (method == "rucker-as-re") "R\u00fccker AS+RE (ASD + Thompson)" else paste0(bias.method, " native metabin model"),
                     usable.studies=if (method == "rucker-as-re") as.numeric(fit.model$k) else length(y), df=df, p.value=as.numeric(fit$p.value %||% NA_real_),
                     statistic=as.numeric(fit$statistic %||% NA_real_), coefficient=coefficient,
@@ -341,6 +343,10 @@ publication.bias.effects <- function(om.data, params) {
         `Trim-and-fill data`=if (!is.null(trimfill)) trimfill else NULL
     )
     if (!diagnostic) output <- append(output, list(`Pooled comparison`=.small.study.pooled.text(pooled, metric)), after=3L)
+    output <- c(output, list(
+        `Method details`=.small.study.method.details(tests),
+        `Methods not applicable`=.small.study.methods.not.applicable(eligibility)
+    ))
     if (!is.null(trimfill)) output <- c(output, trimfill$text)
     if (!is.null(extrapolation)) output <- c(output, extrapolation)
     plots <- if (diagnostic && !isTRUE(derived$raw))
@@ -544,6 +550,32 @@ publication.bias.effects <- function(om.data, params) {
         )
         paste(lines, collapse="\n")
     }, character(1)), collapse="\n\n")
+}
+
+.small.study.method.details <- function(tests) {
+    if (!length(tests)) return("No formal method details are available.")
+    paste(vapply(tests, function(x) {
+        p.value <- suppressWarnings(as.numeric(x$p.value %||% NA_real_))
+        lines <- c(
+            .small.study.method.label(x$method),
+            paste0("  Package: ", x$package %||% "not recorded", " ", x$package.version %||% ""),
+            paste0("  Predictor: ", x$predictor %||% "not recorded"),
+            paste0("  Weighting: ", x$weighting %||% "not recorded"),
+            paste0("  Inference: ", x$inference %||% x$model %||% "not recorded"),
+            paste0("  Degrees of freedom: ", .small.study.number(x$df %||% NA_real_)),
+            paste0("  Exact p-value: ", if (is.finite(p.value[[1L]])) formatC(p.value[[1L]], digits=8, format="fg") else "not available"),
+            paste0("  Call: ", x$call %||% "not recorded")
+        )
+        paste(lines, collapse="\n")
+    }, character(1)), collapse="\n\n")
+}
+
+.small.study.methods.not.applicable <- function(eligibility) {
+    methods <- eligibility$methods[vapply(eligibility$methods, function(x) !isTRUE(x$available), logical(1))]
+    if (!length(methods)) return("No additional methods were marked not applicable.")
+    paste(vapply(methods, function(x) paste0(
+        .small.study.method.label(x$method), ": ", x$reason %||% "Not applicable."
+    ), character(1)), collapse="\n")
 }
 
 .small.study.pooled.text <- function(pooled, metric) {

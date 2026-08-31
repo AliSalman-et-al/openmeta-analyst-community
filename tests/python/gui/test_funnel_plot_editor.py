@@ -256,3 +256,19 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
         assert dialog.result() == 0
     finally:
         dialog.close()
+
+
+def test_funnel_editor_rejects_svgz_output_path(qapp):
+    artifact = results_window.PlotArtifact(
+        "Ordinary Funnel Plot", "funnel.png",
+        {"plot_kind": "funnel", "regenerator": "funnel"},
+        params_path="funnel",
+    )
+    window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
+
+    class Dialog:
+        def plot_params(self):
+            return {"funnel.outpath": "edited-funnel.svgz"}
+
+    with pytest.raises(ValueError, match="SVGZ output is not supported"):
+        window._apply_funnel_plot_edits(Dialog(), artifact, None)

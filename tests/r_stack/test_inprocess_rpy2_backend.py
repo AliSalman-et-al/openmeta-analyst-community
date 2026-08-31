@@ -1045,6 +1045,54 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             '''
         )
 
+        ro.r(
+            '''
+            funnel_data <- new(
+              "ContinuousData",
+              y=seq(-0.4, 0.5, length.out=11),
+              SE=seq(0.08, 0.22, length.out=11),
+              study.names=paste0("funnel-study-", 1:11),
+              years=as.integer(2010:2020)
+            )
+            funnel_result <- rcmetar.run.small.study.effects(
+              funnel_data,
+              list(
+                data.type="continuous", metric="MD",
+                funnels=c("ordinary", "contour"), tests=character(), conf.level=95,
+                `funnel.point.size`=c(1.0, 1.0)
+              )
+            )
+            funnel_base <- unname(funnel_result$plot_params_paths[["Contour Funnel Plot"]])
+            funnel_image <- unname(funnel_result$images[["Contour Funnel Plot"]])
+            '''
+        )
+        funnel_base = str(ro.globalenv["funnel_base"][0])
+        funnel_image = str(ro.globalenv["funnel_image"][0])
+        assert os.path.exists(funnel_image)
+        assert os.path.getsize(funnel_image) > 0
+        parsed_funnel_result = r_bridge.parse_out_results(
+            ro.globalenv["funnel_result"]
+        )
+        assert "Method details" in parsed_funnel_result["texts"]
+        assert "Package:" in parsed_funnel_result["texts"]["Method details"]
+        funnel_params = r_bridge.load_vars_for_plot(
+            funnel_base, return_params_dict=True
+        )
+        assert len(funnel_params["prepared.effects"]) == 11
+        funnel_params["funnel.point.size"] = [1.5, 2.5]
+        r_bridge.update_plot_params(
+            funnel_params,
+            write_them_out=True,
+            outpath=funnel_base + ".params",
+        )
+        with tempfile.TemporaryDirectory(prefix="rcmetar-funnel-edit-") as edit_dir:
+            regenerated_funnel = os.path.join(edit_dir, "contour.png")
+            r_bridge.regenerate_small_study_effects_funnel(
+                funnel_base, output_path=regenerated_funnel
+            )
+            assert os.path.exists(regenerated_funnel)
+            assert os.path.getsize(regenerated_funnel) > 0
+
         sys.stdout.write("OK\\n")
         sys.stdout.flush()
         sys.stderr.flush()

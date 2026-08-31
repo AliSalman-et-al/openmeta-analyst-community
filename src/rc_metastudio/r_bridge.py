@@ -1177,10 +1177,10 @@ def load_in_r(fpath):
 def update_plot_params(
     plot_params, plot_params_name="params", write_them_out=False, outpath=None
 ):
-    # first cast the params to an R data frame to make it
-    # R-palatable
-    params_df = _r_function("data.frame")(**plot_params)
-    ro.globalenv["tmp.params"] = params_df
+    # Plot parameters include both study-length vectors and one value per
+    # plotted funnel.  A data frame recycles or rejects those heterogeneous
+    # lengths; a named list preserves the serialized parameter contract.
+    ro.globalenv["tmp.params"] = _to_r_params(plot_params)
     plot_params_symbol = _r_symbol(plot_params_name)
 
     for param_name in plot_params:

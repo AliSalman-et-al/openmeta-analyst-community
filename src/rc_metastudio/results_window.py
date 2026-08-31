@@ -889,6 +889,10 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("funnel.outpath") or artifact.image_path
         target_path = Path(outpath)
+        if target_path.suffix.lower() == ".svgz":
+            raise ValueError(
+                "SVGZ output is not supported when editing funnel plots; use SVG instead."
+            )
         transaction_dir = Path(
             tempfile.mkdtemp(prefix=".rcms-funnel-", dir=str(target_path.parent))
         )
