@@ -55,3 +55,55 @@ _Avoid_: All studies if any zero exists
 **All studies if any zero exists**:
 A continuity-correction target that adjusts every cell in every study only when at least one included study contains a zero cell.
 _Avoid_: All studies
+
+**Reitsma bivariate model**:
+The joint random-effects model of sensitivity and false-positive rate used for count-based diagnostic meta-analysis. It has an equivalent HSROC parameterization but does not reproduce the removed Bayesian HSROC estimator.
+_Avoid_: Reitsma / HSROC method, Bayesian HSROC
+
+**Summary operating point**:
+The Reitsma model's paired summary sensitivity and specificity estimates.
+_Avoid_: Summary accuracy, pooled accuracy
+
+**Sampling-based summary ratios**:
+The mean, median, and equal-tail interval for positive likelihood ratio, negative likelihood ratio, and diagnostic odds ratio returned by `mada::SummaryPts()` for an intercept-only Reitsma fit.
+_Avoid_: Reitsma-derived summary ratios, ratios at the summary operating point
+
+**Univariate pooled ratios**:
+Likelihood-ratio or diagnostic-odds-ratio estimates from a model that pools one diagnostic measure separately rather than fitting sensitivity and specificity jointly.
+_Avoid_: Sampling-based summary ratios
+
+**False-positive rate**:
+The proportion of participants without the target condition who receive a positive test result. The Reitsma bivariate model uses it as the complement of specificity.
+_Avoid_: False-positive probability
+
+**Joint prediction region**:
+The region for the underlying paired sensitivity and specificity of a new study under the fitted Reitsma bivariate model. It does not predict observed counts or include a new study's binomial sampling error.
+_Avoid_: Confidence region, marginal prediction intervals
+
+**Reitsma bivariate meta-regression**:
+A Reitsma bivariate model in which selected study characteristics jointly explain sensitivity and false-positive rate. It is distinct from separate univariate meta-regressions of sensitivity, specificity, or diagnostic odds ratio.
+_Avoid_: Adjusted Reitsma model, diagnostic meta-regression
+
+**Moderator block test**:
+A likelihood-ratio test that removes every sensitivity-side and false-positive-rate-side coefficient belonging to one moderator, including all levels of a categorical moderator.
+_Avoid_: Coefficient test, moderator Wald test
+
+**SROC AUC**:
+The area under the Reitsma summary ROC curve evaluated over false-positive rates from 0.01 through 0.99.
+_Avoid_: Full AUC, ROC AUC
+
+**Normalized partial SROC AUC**:
+The `mada`-reported normalized area under the Reitsma summary ROC curve over observed false-positive-rate bounds truncated to 0.01 through 0.99. The package calculates it on a fixed grid, so it is an approximation rather than an exact normalized trapezoidal area.
+_Avoid_: Partial AUC, observed AUC
+
+**Statistical authority package**:
+The field-maintained R package whose estimator, inference, and reported numerical results define an RC MetaStudio analysis. RC MetaStudio validates inputs and presents package results but does not silently replace or correct their statistical calculations.
+_Avoid_: Gold-standard package, calculation backend
+
+**Residual diagnostic I² estimates**:
+The Zhou–Dendukuri and Holling I² values returned by `mada` for unexplained heterogeneity after fitting a Reitsma bivariate meta-regression. They are a named family of estimates, not one generic I² statistic.
+_Avoid_: Adjusted I², meta-regression I²
+
+**Moderator coefficient plot**:
+An editable forest plot of moderator coefficients for one modeled side of a Reitsma bivariate meta-regression. Sensitivity and specificity use separate plots.
+_Avoid_: Meta-regression bubble plot, two-panel coefficient plot
