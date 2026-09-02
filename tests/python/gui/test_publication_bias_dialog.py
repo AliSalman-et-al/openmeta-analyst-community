@@ -152,7 +152,9 @@ def test_correction_policy_refreshes_authoritative_or_routing(qapp, monkeypatch)
             [_method(primary, True, "primary")],
         )
 
-    monkeypatch.setattr(publication_bias_dialog.r_bridge, "run_small_study_effects", preview)
+    monkeypatch.setattr(
+        publication_bias_dialog.r_bridge, "run_small_study_effects", preview
+    )
     dialog = publication_bias_dialog.PublicationBiasDialog(_Model("binary", "OR"))
     try:
         assert dialog.automatic_test_label.text() == "Primary: Harbord"
@@ -163,7 +165,9 @@ def test_correction_policy_refreshes_authoritative_or_routing(qapp, monkeypatch)
         dialog.close()
 
 
-def test_context_is_compact_and_distinguishes_included_and_eligible_counts(qapp, monkeypatch):
+def test_context_is_compact_and_distinguishes_included_and_eligible_counts(
+    qapp, monkeypatch
+):
     report = _report("continuous", "MD", [_method("classical-egger", True, "primary")])
     monkeypatch.setattr(
         publication_bias_dialog.r_bridge,
@@ -203,7 +207,9 @@ def test_singleton_r_warning_is_accepted_at_dialog_boundary(qapp, monkeypatch):
 
 
 def test_correction_group_is_hidden_without_raw_count_eligibility(qapp, monkeypatch):
-    report = _report("continuous", "MD", [_method("classical-egger", True)], raw_data_available=False)
+    report = _report(
+        "continuous", "MD", [_method("classical-egger", True)], raw_data_available=False
+    )
     monkeypatch.setattr(
         publication_bias_dialog.r_bridge,
         "run_small_study_effects",
@@ -225,7 +231,9 @@ def test_correction_group_is_hidden_for_one_arm_proportion(qapp, monkeypatch):
         captured.append(request)
         return report
 
-    monkeypatch.setattr(publication_bias_dialog.r_bridge, "run_small_study_effects", preview)
+    monkeypatch.setattr(
+        publication_bias_dialog.r_bridge, "run_small_study_effects", preview
+    )
     dialog = publication_bias_dialog.PublicationBiasDialog(_Model("binary", "PR"))
     try:
         assert not dialog.correction_group.isVisible()
@@ -248,7 +256,11 @@ def test_failure_is_reported_in_dedicated_label(qapp, monkeypatch):
         "execute_small_study_effects",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("run failed")),
     )
-    monkeypatch.setattr(publication_bias_dialog.app_error_handler, "handle_exception", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        publication_bias_dialog.app_error_handler,
+        "handle_exception",
+        lambda *args, **kwargs: None,
+    )
     dialog = publication_bias_dialog.PublicationBiasDialog(_Model("continuous", "MD"))
     try:
         dialog.run()
@@ -273,7 +285,9 @@ def test_successful_run_delivers_results_and_closes_dialog(qapp, monkeypatch):
         "execute_small_study_effects",
         lambda *args, **kwargs: {"sections": []},
     )
-    dialog = publication_bias_dialog.PublicationBiasDialog(_Model("continuous", "MD"), owner)
+    dialog = publication_bias_dialog.PublicationBiasDialog(
+        _Model("continuous", "MD"), owner
+    )
     try:
         dialog.run()
         assert delivered == [{"sections": []}]

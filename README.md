@@ -36,6 +36,6 @@ See [Maintaining RC MetaStudio](docs/maintaining.md) for setup, verification, an
 
 ## License and provenance
 
-RC MetaStudio is developed by Research Consultancy (RC) and maintained by Ali Salman and RC MetaStudio contributors. It is derived from the Original OpenMeta[Analyst] Project.
+RC MetaStudio is developed by Research Consultancy (RC) and maintained by Ali Salman and RC MetaStudio contributors. It is derived from the original OpenMeta[Analyst] project.
 
 The project is distributed under the GNU General Public License, version 3 or later, where permitted by the original GPL-2.0-or-later grant covering derived portions. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for the full terms, provenance, warranty, and affiliation disclaimer.

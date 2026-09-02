@@ -106,10 +106,7 @@ def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition
     assert 'not evidence.get("passed")' in build
     assert "handle.isExposed()" in automation_source
     assert "geometry.width() <= 0 or geometry.height() <= 0" in automation_source
-    assert (
-        '"rows": model.rowCount() if model is not None else 0'
-        in automation_source
-    )
+    assert '"rows": model.rowCount() if model is not None else 0' in automation_source
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
     assert trust.count("--automation-startup-wizard-smoke") == 1

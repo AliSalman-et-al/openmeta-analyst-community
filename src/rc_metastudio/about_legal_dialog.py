@@ -25,7 +25,7 @@ maintained by Research Consultancy (RC).</p>
 github.com/AliSalman-et-al/rc-metastudio/issues</a></p>
 <p>RC MetaStudio is distributed without warranty, including without the implied
 warranty of merchantability or fitness for a particular purpose.</p>
-<p>RC MetaStudio is derived from the Original OpenMeta[Analyst] Project and is
+<p>RC MetaStudio is derived from the original OpenMeta[Analyst] project and is
 independently maintained. See NOTICE.md for provenance and affiliation details.</p>
 """
 

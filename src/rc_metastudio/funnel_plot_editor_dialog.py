@@ -92,13 +92,13 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
             ),
         ):
             edit.textChanged.connect(
-                lambda _text, color_edit=edit, color_button=button: self._update_color_button(
-                    color_edit, color_button
+                lambda _text, color_edit=edit, color_button=button: (
+                    self._update_color_button(color_edit, color_button)
                 )
             )
             button.clicked.connect(
-                lambda _checked=False, color_edit=edit, color_button=button, dialog_title=title: self._choose_color(
-                    color_edit, color_button, dialog_title
+                lambda _checked=False, color_edit=edit, color_button=button, dialog_title=title: (
+                    self._choose_color(color_edit, color_button, dialog_title)
                 )
             )
             self._update_color_button(edit, button)
@@ -215,9 +215,7 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
                 "all": "All",
             }.get(str(self._value("funnel.label.policy", "none")), "None")
         )
-        symbol = self._value(
-            "funnel.point.symbol", style["point_symbol"]
-        )
+        symbol = self._value("funnel.point.symbol", style["point_symbol"])
         try:
             symbol = int(symbol)
         except (TypeError, ValueError):
@@ -275,12 +273,8 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
         default_y_label = (
             "Log diagnostic odds ratio" if self.kind == "deeks" else "Standard error"
         )
-        self.x_label_edit.setText(
-            str(self._value("funnel.xlab", default_x_label))
-        )
-        self.y_label_edit.setText(
-            str(self._value("funnel.ylab", default_y_label))
-        )
+        self.x_label_edit.setText(str(self._value("funnel.xlab", default_x_label)))
+        self.y_label_edit.setText(str(self._value("funnel.ylab", default_y_label)))
         self.x_lower_edit.setText(str(self._value("funnel.xlim.lower", "[default]")))
         self.x_upper_edit.setText(str(self._value("funnel.xlim.upper", "[default]")))
         ticks = self._value("funnel.xticks", "[default]")
@@ -387,9 +381,7 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
             button.setStyleSheet("")
             return
         foreground = "#000000" if color.lightness() > 150 else "#FFFFFF"
-        button.setStyleSheet(
-            f"background-color: {color.name()}; color: {foreground};"
-        )
+        button.setStyleSheet(f"background-color: {color.name()}; color: {foreground};")
 
     @staticmethod
     def _scalar(value):
@@ -430,8 +422,12 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
             ],
             "funnel.point.size": self.point_size_spin.value(),
             "funnel.point.color": qt_text.to_native_text(self.point_color_edit.text()),
-            "funnel.reference.color": qt_text.to_native_text(self.reference_color_edit.text()),
-            "funnel.region.color": qt_text.to_native_text(self.region_color_edit.text()),
+            "funnel.reference.color": qt_text.to_native_text(
+                self.reference_color_edit.text()
+            ),
+            "funnel.region.color": qt_text.to_native_text(
+                self.region_color_edit.text()
+            ),
             "funnel.background.color": qt_text.to_native_text(
                 self.background_color_edit.text()
             ),
@@ -441,7 +437,9 @@ class FunnelPlotEditorDialog(QDialog, Ui_FunnelPlotEditorDialog):
             "funnel.sampling.conf.level": self.sampling_confidence_spin.value(),
             "funnel.sampling.region.visible": self.sampling_region_check.isChecked(),
             "funnel.include.tau2": self.include_tau2_check.isChecked(),
-            "funnel.contour.levels": qt_text.to_native_text(self.contour_levels_edit.text()),
+            "funnel.contour.levels": qt_text.to_native_text(
+                self.contour_levels_edit.text()
+            ),
             "funnel.xlab": qt_text.to_native_text(plot_text_value(self.x_label_edit)),
             "funnel.ylab": qt_text.to_native_text(plot_text_value(self.y_label_edit)),
             "funnel.xlim.lower": qt_text.to_native_text(self.x_lower_edit.text()),

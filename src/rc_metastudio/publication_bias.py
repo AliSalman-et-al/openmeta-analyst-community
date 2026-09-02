@@ -154,11 +154,17 @@ class FunnelPlotSpec:
             raise ValueError("contour levels must be between 0 and 100")
         if not isinstance(self.point_color, str) or not self.point_color.strip():
             raise ValueError("funnel point color must be text")
-        if not isinstance(self.reference_color, str) or not self.reference_color.strip():
+        if (
+            not isinstance(self.reference_color, str)
+            or not self.reference_color.strip()
+        ):
             raise ValueError("funnel reference color must be text")
         if not isinstance(self.region_color, str) or not self.region_color.strip():
             raise ValueError("funnel region color must be text")
-        if not isinstance(self.background_color, str) or not self.background_color.strip():
+        if (
+            not isinstance(self.background_color, str)
+            or not self.background_color.strip()
+        ):
             raise ValueError("funnel background color must be text")
 
 
@@ -249,7 +255,9 @@ def _funnel_kind(value: str | FunnelKind) -> FunnelKind:
         raise ValueError(f"unsupported funnel kind: {raw!r}") from error
 
 
-def _frozen_mapping(value: Mapping[str, object] | None) -> tuple[tuple[str, object], ...]:
+def _frozen_mapping(
+    value: Mapping[str, object] | None,
+) -> tuple[tuple[str, object], ...]:
     if value is None:
         return ()
     items: list[tuple[str, object]] = []
@@ -284,10 +292,14 @@ class SmallStudyEffectsRequest:
 
     def __post_init__(self) -> None:
         if self.data_type not in ("binary", "continuous", "diagnostic"):
-            raise ValueError(f"unsupported small-study effects data family: {self.data_type!r}")
+            raise ValueError(
+                f"unsupported small-study effects data family: {self.data_type!r}"
+            )
         _text(self.metric, "metric")
         if self.data_type == "diagnostic" and self.metric != "DOR":
-            raise ValueError("diagnostic small-study effects requests use read-only DOR")
+            raise ValueError(
+                "diagnostic small-study effects requests use read-only DOR"
+            )
         try:
             level = float(self.confidence_level)
         except (TypeError, ValueError) as error:
@@ -304,15 +316,22 @@ class SmallStudyEffectsRequest:
             raise TypeError("plot_specs must contain FunnelPlotSpec values")
         if not all(isinstance(spec, AsymmetryTestSpec) for spec in self.test_specs):
             raise TypeError("test_specs must contain AsymmetryTestSpec values")
-        if not all(isinstance(spec, SensitivitySpec) for spec in self.sensitivity_specs):
+        if not all(
+            isinstance(spec, SensitivitySpec) for spec in self.sensitivity_specs
+        ):
             raise TypeError("sensitivity_specs must contain SensitivitySpec values")
         if self.data_type == "diagnostic":
             if any(spec.kind is not FunnelKind.DEEKS for spec in self.plot_specs):
                 raise ValueError("diagnostic requests use only the Deeks funnel")
             if any(spec.method is not TestMethod.DEEKS for spec in self.test_specs):
                 raise ValueError("diagnostic requests use only the Deeks test")
-            if any(spec.trim_and_fill or spec.extrapolation for spec in self.sensitivity_specs):
-                raise ValueError("diagnostic requests do not support generic sensitivities")
+            if any(
+                spec.trim_and_fill or spec.extrapolation
+                for spec in self.sensitivity_specs
+            ):
+                raise ValueError(
+                    "diagnostic requests do not support generic sensitivities"
+                )
 
     @classmethod
     def create(
@@ -339,20 +358,22 @@ class SmallStudyEffectsRequest:
         extrapolation: bool = False,
     ) -> SmallStudyEffectsRequest:
         policy = (
-            None
-            if correction_policy is None
-            else CorrectionPolicy(correction_policy)
+            None if correction_policy is None else CorrectionPolicy(correction_policy)
         )
         label = LabelPolicy(label_policy)
         funnel_style = FunnelStyle(style)
         style_preset = FUNNEL_STYLE_PRESETS[funnel_style]
-        funnel_values = (FunnelKind.DEEKS.value,) if data_type == "diagnostic" else selected_funnels
+        funnel_values = (
+            (FunnelKind.DEEKS.value,) if data_type == "diagnostic" else selected_funnels
+        )
         funnels = tuple(
             FunnelPlotSpec(
-                _funnel_kind(item), float(confidence_level),
+                _funnel_kind(item),
+                float(confidence_level),
                 label_policy=label,
                 sampling_confidence_level=float(sampling_confidence_level),
-                include_tau2=bool(include_tau2), point_size=float(point_size),
+                include_tau2=bool(include_tau2),
+                point_size=float(point_size),
                 reference_line_visible=bool(reference_line_visible),
                 contour_levels=(
                     tuple(float(level) for level in contour_levels)
@@ -369,10 +390,7 @@ class SmallStudyEffectsRequest:
             )
             for item in funnel_values
         )
-        tests = tuple(
-            AsymmetryTestSpec(_test_method(item))
-            for item in selected_tests
-        )
+        tests = tuple(AsymmetryTestSpec(_test_method(item)) for item in selected_tests)
         sensitivities = (
             SensitivitySpec(
                 bool(trim_and_fill),
@@ -411,7 +429,9 @@ class SmallStudyEffectsRequest:
             "funnel.reverse.se.axis": [
                 spec.reverse_standard_error_axis for spec in self.plot_specs
             ],
-            "funnel.label.policy": [spec.label_policy.value for spec in self.plot_specs],
+            "funnel.label.policy": [
+                spec.label_policy.value for spec in self.plot_specs
+            ],
             "funnel.sampling.conf.level": [
                 spec.sampling_confidence_level for spec in self.plot_specs
             ],
@@ -430,22 +450,36 @@ class SmallStudyEffectsRequest:
             "funnel.style": [spec.style.value for spec in self.plot_specs],
             "funnel.point.symbol": [spec.point_symbol for spec in self.plot_specs],
             "funnel.point.color": [spec.point_color for spec in self.plot_specs],
-            "funnel.reference.color": [spec.reference_color for spec in self.plot_specs],
+            "funnel.reference.color": [
+                spec.reference_color for spec in self.plot_specs
+            ],
             "funnel.region.color": [spec.region_color for spec in self.plot_specs],
             "funnel.background.color": [
                 spec.background_color for spec in self.plot_specs
             ],
             "trim.and.fill": any(spec.trim_and_fill for spec in self.sensitivity_specs),
             "trim.and.fill.side": next(
-                (spec.side.value for spec in self.sensitivity_specs if spec.trim_and_fill),
+                (
+                    spec.side.value
+                    for spec in self.sensitivity_specs
+                    if spec.trim_and_fill
+                ),
                 TrimAndFillSide.AUTO.value,
             ),
             "trim.and.fill.estimator": next(
-                (spec.estimator.value for spec in self.sensitivity_specs if spec.trim_and_fill),
+                (
+                    spec.estimator.value
+                    for spec in self.sensitivity_specs
+                    if spec.trim_and_fill
+                ),
                 TrimAndFillEstimator.L0.value,
             ),
             "trim.and.fill.model": next(
-                (spec.model.value for spec in self.sensitivity_specs if spec.trim_and_fill),
+                (
+                    spec.model.value
+                    for spec in self.sensitivity_specs
+                    if spec.trim_and_fill
+                ),
                 TrimAndFillModel.RANDOM.value,
             ),
             "extrapolation": any(spec.extrapolation for spec in self.sensitivity_specs),
@@ -472,8 +506,13 @@ class EligibilityMethod:
     @classmethod
     def from_mapping(cls, value: Mapping[str, object]) -> EligibilityMethod:
         required_fields = {
-            "method", "available", "reason", "usable.studies",
-            "required.inputs", "warnings", "role",
+            "method",
+            "available",
+            "reason",
+            "usable.studies",
+            "required.inputs",
+            "warnings",
+            "role",
         }
         missing = sorted(required_fields - set(value))
         if missing:
@@ -486,7 +525,11 @@ class EligibilityMethod:
         method = _test_method(method_value).value
         reason = _text(value["reason"], "eligibility reason") if value["reason"] else ""
         count = value["usable.studies"]
-        if not isinstance(count, (int, float)) or isinstance(count, bool) or int(count) != count:
+        if (
+            not isinstance(count, (int, float))
+            or isinstance(count, bool)
+            or int(count) != count
+        ):
             raise ValueError("eligibility usable.studies must be an integer")
         usable = int(count)
         required = _text_values(value["required.inputs"], "eligibility required.inputs")
@@ -533,19 +576,29 @@ class EligibilityReport:
     @classmethod
     def from_mapping(cls, value: Mapping[str, object]) -> EligibilityReport:
         required_fields = {
-            "data.type", "metric", "usable.studies", "raw.data.available",
-            "precision.range", "methods", "warnings", "package.versions",
+            "data.type",
+            "metric",
+            "usable.studies",
+            "raw.data.available",
+            "precision.range",
+            "methods",
+            "warnings",
+            "package.versions",
         }
         missing = sorted(required_fields - set(value))
         if missing:
-            raise ValueError("eligibility report is missing fields: " + ", ".join(missing))
+            raise ValueError(
+                "eligibility report is missing fields: " + ", ".join(missing)
+            )
         method_values = value["methods"]
         # rpy2 scalarizes a length-one list of named records to its record
         # mapping.  Normalize that wire representation before validating the
         # otherwise stable sequence contract.
         if isinstance(method_values, Mapping):
             method_values = (method_values,)
-        if isinstance(method_values, (str, bytes)) or not isinstance(method_values, Sequence):
+        if isinstance(method_values, (str, bytes)) or not isinstance(
+            method_values, Sequence
+        ):
             raise ValueError("eligibility methods must be a sequence")
         methods = tuple(
             EligibilityMethod.from_mapping(
@@ -571,10 +624,16 @@ class EligibilityReport:
         package_versions = _frozen_mapping(
             _string_key_mapping(versions, "eligibility package.versions")
         )
-        if not isinstance(value["data.type"], str) or not isinstance(value["metric"], str):
+        if not isinstance(value["data.type"], str) or not isinstance(
+            value["metric"], str
+        ):
             raise ValueError("eligibility data.type and metric must be text")
         count = value["usable.studies"]
-        if not isinstance(count, (int, float)) or isinstance(count, bool) or int(count) != count:
+        if (
+            not isinstance(count, (int, float))
+            or isinstance(count, bool)
+            or int(count) != count
+        ):
             raise ValueError("eligibility usable.studies must be an integer")
         if not isinstance(value["raw.data.available"], bool):
             raise ValueError("eligibility raw.data.available must be boolean")
@@ -592,7 +651,9 @@ class EligibilityReport:
 
     @property
     def primary_method(self) -> EligibilityMethod | None:
-        return next((method for method in self.methods if method.role == "primary"), None)
+        return next(
+            (method for method in self.methods if method.role == "primary"), None
+        )
 
     def method(self, method_name: str) -> EligibilityMethod | None:
         return next((item for item in self.methods if item.method == method_name), None)
@@ -606,7 +667,9 @@ def parse_eligibility_report(value: object) -> EligibilityReport:
     )
 
 
-def execute_small_study_effects(model: object, request: SmallStudyEffectsRequest) -> AnalysisResult:
+def execute_small_study_effects(
+    model: object, request: SmallStudyEffectsRequest
+) -> AnalysisResult:
     """Convert and execute one immutable request through the serialized R call."""
     from rc_metastudio import r_bridge
 

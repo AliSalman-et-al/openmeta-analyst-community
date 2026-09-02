@@ -475,8 +475,8 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
 
     assert family_counts == {
         "icons/actions": 23,
-            "icons/analyses": 6,
-            "icons/analyses/compact": 6,
+        "icons/analyses": 6,
+        "icons/analyses/compact": 6,
         "icons/dataset-types": 8,
         "icons/dataset-types/dark": 8,
         "icons/dataset-types/light": 8,
@@ -5445,7 +5445,7 @@ def test_about_legal_and_welcome_links_show_current_project_information():
         assert "Ali Salman" in about_text
         assert "GPL-3.0-or-later" in about_text
         assert "without warranty" in about_text.lower()
-        assert "Original OpenMeta[Analyst] Project" in about_text
+        assert "original OpenMeta[Analyst] project" in about_text
         assert "NOTICE.md" in about_text
         about_dialogs[0].close()
 

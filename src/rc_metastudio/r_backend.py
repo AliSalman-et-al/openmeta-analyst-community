@@ -274,7 +274,9 @@ class _StubRBridgeModule(types.ModuleType):
         self.get_method_description = _analysis_unavailable
         self.get_analysis_plot_capabilities = _get_analysis_plot_capabilities
         self.run_small_study_effects = _run_small_study_effects
-        self.regenerate_small_study_effects_funnel = _regenerate_small_study_effects_funnel
+        self.regenerate_small_study_effects_funnel = (
+            _regenerate_small_study_effects_funnel
+        )
         self.generate_small_study_effects_funnel = _generate_small_study_effects_funnel
         self.run_binary_analysis = _analysis_unavailable
         self.run_continuous_analysis = _analysis_unavailable

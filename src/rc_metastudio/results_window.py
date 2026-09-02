@@ -905,9 +905,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             tempfile.mkdtemp(prefix=".rcms-funnel-", dir=str(target_path.parent))
         )
         temporary_base = transaction_dir / "plot"
-        temporary_output = transaction_dir / (
-            "render" + (target_path.suffix or ".png")
-        )
+        temporary_output = transaction_dir / ("render" + (target_path.suffix or ".png"))
         persisted_params = Path("%s.params" % artifact.params_path)
         persisted_backup = transaction_dir / "params.backup"
         had_persisted_params = persisted_params.exists()

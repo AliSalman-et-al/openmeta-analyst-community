@@ -215,7 +215,8 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         )
 
     meta_records = [
-        dependency for dependency in direct_dependencies
+        dependency
+        for dependency in direct_dependencies
         if isinstance(dependency, dict) and dependency.get("name") == "meta"
     ]
     if len(meta_records) != 1:
@@ -233,14 +234,20 @@ def validate_dependency_manifest(manifest: dict) -> list[str]:
         )
     for package in ("metabook", "CompQuadForm"):
         direct_matches = [
-            dependency for dependency in direct_dependencies
+            dependency
+            for dependency in direct_dependencies
             if isinstance(dependency, dict) and dependency.get("name") == package
         ]
         app_matches = [
-            dependency for dependency in app_dependencies
+            dependency
+            for dependency in app_dependencies
             if isinstance(dependency, dict) and dependency.get("name") == package
         ]
-        if direct_matches or len(app_matches) != 1 or app_matches[0].get("source") != "cran":
+        if (
+            direct_matches
+            or len(app_matches) != 1
+            or app_matches[0].get("source") != "cran"
+        ):
             raise ValidationError(
                 f"{DEPENDENCY_MANIFEST}: {package} must be transitive app closure only"
             )

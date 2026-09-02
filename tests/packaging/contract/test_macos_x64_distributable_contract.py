@@ -198,8 +198,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert "generated_ui_collection.py" in spec
     assert "pyinstaller_module_entries(qt6_build_root)" in spec
     assert "a.pure.extend(generated_ui_modules)" in spec
-    assert 'str(generated_package)' not in spec
-    assert 'str(generated_forms)' not in spec
+    assert "str(generated_package)" not in spec
+    assert "str(generated_forms)" not in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_TOC")' in spec
     assert 'os.environ.get("RCMS_PYINSTALLER_R_MAP")' in spec
     assert "a.datas.extend(" not in spec

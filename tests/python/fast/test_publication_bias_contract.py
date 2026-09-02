@@ -176,9 +176,7 @@ def test_contour_plot_spec_serializes_presentation_controls_without_options_bag(
         (FunnelStyle.BMJ, 18, "#6B58A6"),
     ],
 )
-def test_funnel_style_variants_serialize_the_shared_visual_preset(
-    style, symbol, color
-):
+def test_funnel_style_variants_serialize_the_shared_visual_preset(style, symbol, color):
     wire = SmallStudyEffectsRequest.create(
         data_type="continuous", metric="MD", style=style
     ).to_mapping()
@@ -213,7 +211,10 @@ def test_publication_bias_action_is_exposed_for_the_release():
 def test_publication_bias_icons_are_funnel_plot_glyphs_without_warning_symbols():
     for relative_path, center in (
         ("src/rc_metastudio/images/icons/analyses/publication-bias.svg", "M24 7v35"),
-        ("src/rc_metastudio/images/icons/analyses/compact/publication-bias.svg", "M10 3v15"),
+        (
+            "src/rc_metastudio/images/icons/analyses/compact/publication-bias.svg",
+            "M10 3v15",
+        ),
     ):
         svg = (ROOT / relative_path).read_text(encoding="utf-8")
         assert center in svg

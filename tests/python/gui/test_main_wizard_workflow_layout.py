@@ -566,9 +566,7 @@ finally:
         environment["PYTHONPATH"] = os.pathsep.join(
             [
                 str(root / "src"),
-                str(
-                    root / "build" / "qt6-verification" / "generated"
-                ),
+                str(root / "build" / "qt6-verification" / "generated"),
             ]
         )
         environment["RCMS_QT6_BUILD_ROOT"] = str(root / "build" / "qt6-verification")

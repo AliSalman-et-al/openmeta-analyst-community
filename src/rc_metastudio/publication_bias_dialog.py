@@ -43,7 +43,9 @@ _TEST_LABELS = {
 }
 
 
-class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog):
+class PublicationBiasDialog(
+    QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog
+):
     """Configure methods and plots while RCMetaR chooses eligible tests."""
 
     def __init__(self, model, parent=None):
@@ -52,8 +54,12 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         self.setupUi(self)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setModal(True)
-        self.correction_policy_combo.addItems([policy.value for policy in CorrectionPolicy])
-        self.trim_fill_estimator_combo.addItems([item.value for item in TrimAndFillEstimator])
+        self.correction_policy_combo.addItems(
+            [policy.value for policy in CorrectionPolicy]
+        )
+        self.trim_fill_estimator_combo.addItems(
+            [item.value for item in TrimAndFillEstimator]
+        )
         self.trim_fill_side_combo.addItems([item.value for item in TrimAndFillSide])
         self.trim_fill_model_combo.addItems([item.value for item in TrimAndFillModel])
         confidence_level = getattr(self.model, "get_confidence_level", lambda: 95.0)()
@@ -92,7 +98,9 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
     def _preview_request(self) -> SmallStudyEffectsRequest:
         data_type = str(self.model.get_current_outcome_type())
         metric = "DOR" if data_type == "diagnostic" else str(self.model.current_effect)
-        correction_applicable = data_type in {"binary", "diagnostic"} and metric not in ONE_ARM_METRICS
+        correction_applicable = (
+            data_type in {"binary", "diagnostic"} and metric not in ONE_ARM_METRICS
+        )
         return SmallStudyEffectsRequest.create(
             data_type=data_type,
             metric=metric,
@@ -204,10 +212,14 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         raw_data_available = bool(
             self._eligibility_report and self._eligibility_report.raw_data_available
         )
-        correction_applicable = str(self.model.get_current_outcome_type()) in {
-            "binary",
-            "diagnostic",
-        } and metric not in ONE_ARM_METRICS
+        correction_applicable = (
+            str(self.model.get_current_outcome_type())
+            in {
+                "binary",
+                "diagnostic",
+            }
+            and metric not in ONE_ARM_METRICS
+        )
         correction_enabled = correction_applicable and raw_data_available
         self.correction_policy_combo.setEnabled(correction_enabled)
         self.correction_group.setVisible(correction_enabled)
@@ -227,7 +239,9 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         metric = "DOR" if data_type == "diagnostic" else str(self.model.current_effect)
         selected_tests = [
             item.method
-            for item in (self._eligibility_report.methods if self._eligibility_report else ())
+            for item in (
+                self._eligibility_report.methods if self._eligibility_report else ()
+            )
             if item.available
         ]
         labels = {
@@ -251,7 +265,9 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
             selected_tests=selected_tests,
             selected_funnels=funnels,
             label_policy=labels[self.label_policy_combo.currentText()],
-            sampling_confidence_level=float(self.sampling_confidence_combo.currentText()),
+            sampling_confidence_level=float(
+                self.sampling_confidence_combo.currentText()
+            ),
             include_tau2=self.include_tau2_check.isChecked(),
             point_size=float(self.point_size_spin.value()),
             reference_line_visible=self.reference_line_check.isChecked(),
@@ -289,6 +305,8 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         except Exception as error:  # noqa: BLE001 - Qt boundary remains recoverable
             self.failure_label.setText(str(error))
             self.failure_label.setVisible(True)
-            app_error_handler.handle_exception(type(error), error, error.__traceback__, parent=self)
+            app_error_handler.handle_exception(
+                type(error), error, error.__traceback__, parent=self
+            )
             if run_button is not None:
                 run_button.setEnabled(True)

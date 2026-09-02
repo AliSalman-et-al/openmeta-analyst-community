@@ -60,7 +60,9 @@ REGENERATORS: dict[str, _Regenerator] = {
     },
     "funnel": {
         "function": "generate_small_study_effects_funnel",
-        "plot_kinds": frozenset(("funnel", "contour_funnel", "deeks_funnel", "trimfill_funnel")),
+        "plot_kinds": frozenset(
+            ("funnel", "contour_funnel", "deeks_funnel", "trimfill_funnel")
+        ),
     },
     "none": {
         "function": None,

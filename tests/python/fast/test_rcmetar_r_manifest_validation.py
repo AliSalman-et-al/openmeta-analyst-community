@@ -278,9 +278,11 @@ def test_manifest_rejects_wrong_meta_pin(tmp_path):
     root = copy_manifest_config(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    next(item for item in manifest["direct_RCMetaR_dependencies"] if item["name"] == "meta")[
-        "installed_version"
-    ] = "8.5.0"
+    next(
+        item
+        for item in manifest["direct_RCMetaR_dependencies"]
+        if item["name"] == "meta"
+    )["installed_version"] = "8.5.0"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     result = run_validator(root)

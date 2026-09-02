@@ -442,6 +442,7 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
     qapp, tmp_path
 ):
     from rc_metastudio import adaptive_window
+
     _use_isolated_settings(tmp_path)
     dialog = plot_editor_dialog.EditPlotDialog({}, "forest.png")
     try:
@@ -821,9 +822,7 @@ def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_edit
         calls.append((parent.plot_type, title, initial_path, file_filter))
         return next(selections)
 
-    monkeypatch.setattr(
-        plot_editor_dialog.QFileDialog, "getSaveFileName", choose_path
-    )
+    monkeypatch.setattr(plot_editor_dialog.QFileDialog, "getSaveFileName", choose_path)
     for plot_type in ("forest", "regression"):
         initial = str(tmp_path / f"{plot_type}-initial.svg")
         prefix = "bp" if plot_type == "regression" else "fp"
@@ -856,9 +855,7 @@ def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_edit
         str(tmp_path / "forest-initial.svg"),
         str(tmp_path / "regression-initial.svg"),
     ]
-    assert all(
-        call[3] == plot_editor_dialog.PLOT_EDITOR_SAVE_FILTER for call in calls
-    )
+    assert all(call[3] == plot_editor_dialog.PLOT_EDITOR_SAVE_FILTER for call in calls)
 
 
 def test_plot_save_path_browser_cancellation_never_mutates_or_applies(

@@ -209,7 +209,9 @@ def get_r_version_string():
 @serialized_r_call
 def get_r_package_version(package_name):
     if package_name == "meta":
-        return str(execute_r_string("as.character(packageDescription('meta')$Version)")[0])
+        return str(
+            execute_r_string("as.character(packageDescription('meta')$Version)")[0]
+        )
     version = execute_r_function("packageVersion", package_name)
     return str(execute_r_function("as.character", version)[0])
 
@@ -957,7 +959,11 @@ def run_binary_analysis(
 
 @serialized_r_call
 def run_small_study_effects(
-    table_model, request, res_name="small_study_effects_result", data_name="tmp_obj", preview=False
+    table_model,
+    request,
+    res_name="small_study_effects_result",
+    data_name="tmp_obj",
+    preview=False,
 ):
     """Run the complete guided small-study effects workflow in one R call.
 
@@ -995,7 +1001,9 @@ def run_small_study_effects(
 def regenerate_small_study_effects_funnel(params_path, output_path=None):
     """Regenerate a funnel from persisted per-run data and presentation params."""
     if not load_vars_for_plot(params_path):
-        raise ValueError("small-study effects plot data is incomplete: %s" % params_path)
+        raise ValueError(
+            "small-study effects plot data is incomplete: %s" % params_path
+        )
     result = execute_r_function(
         "rcmetar.regenerate.small.study.funnel",
         _r_object_from_symbol("om.data"),

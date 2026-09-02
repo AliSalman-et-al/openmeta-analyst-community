@@ -676,8 +676,8 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "a.binaries = [entry for entry in a.binaries if not "
         "is_windows_system_runtime(entry)]"
     ) in spec
-    assert 'str(generated_package)' not in spec
-    assert 'str(generated_forms)' not in spec
+    assert "str(generated_package)" not in spec
+    assert "str(generated_forms)" not in spec
     assert (
         'excludes=["PyQt5", "PySide2", "PySide6", "qtpy", "_rinterface_cffi_abi"]'
         in spec

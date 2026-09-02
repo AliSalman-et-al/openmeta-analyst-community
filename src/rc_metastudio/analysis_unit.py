@@ -39,9 +39,7 @@ class AnalysisUnit:
         else:
             raise ValueError(f"unrecognized outcome data type: {outcome.data_type!r}")
 
-        raw_data = raw_data or [
-            [""] * self.raw_data_length for _ in group_names
-        ]
+        raw_data = raw_data or [[""] * self.raw_data_length for _ in group_names]
 
         self.effects = {}
 
@@ -104,7 +102,13 @@ class AnalysisUnit:
             self.effects[effect][new_group] = self._new_effect_entry()
 
     def calculate_se_if_possible(
-        self, effect, group_comparison, est=None, lower=None, upper=None, confidence_multiplier=None
+        self,
+        effect,
+        group_comparison,
+        est=None,
+        lower=None,
+        upper=None,
+        confidence_multiplier=None,
     ):
         if confidence_multiplier is None:
             raise ValueError("Mult must be specified")
@@ -160,15 +164,20 @@ class AnalysisUnit:
         if None in [confidence_level, confidence_multiplier]:
             raise ValueError("confidence level and multiplier must be specified")
 
-        if check_if_necessary and not self._should_calculate_display_effect_and_ci_and_se(
-            effect, group_comparison, confidence_level
+        if (
+            check_if_necessary
+            and not self._should_calculate_display_effect_and_ci_and_se(
+                effect, group_comparison, confidence_level
+            )
         ):
             return
 
         if convert_to_display_scale is None:
             raise ValueError("Display-scale conversion is unavailable")
 
-        est, lower, upper = self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+        est, lower, upper = self.get_effect_and_ci(
+            effect, group_comparison, confidence_multiplier
+        )
         display_estimate, display_lower, display_upper = [
             convert_to_display_scale(x) for x in [est, lower, upper]
         ]
@@ -223,12 +232,18 @@ class AnalysisUnit:
         return self.effects[effect][group_comparison].get("est")
 
     def get_lower(self, effect, group_comparison, confidence_multiplier):
-        return self._helper_get_upper_lower("lower", effect, group_comparison, confidence_multiplier)
+        return self._helper_get_upper_lower(
+            "lower", effect, group_comparison, confidence_multiplier
+        )
 
     def get_upper(self, effect, group_comparison, confidence_multiplier):
-        return self._helper_get_upper_lower("upper", effect, group_comparison, confidence_multiplier)
+        return self._helper_get_upper_lower(
+            "upper", effect, group_comparison, confidence_multiplier
+        )
 
-    def _helper_get_upper_lower(self, boundary, effect, group_comparison, confidence_multiplier=None):
+    def _helper_get_upper_lower(
+        self, boundary, effect, group_comparison, confidence_multiplier=None
+    ):
         if confidence_multiplier is None:
             raise ValueError("Mult must be specified")
 
@@ -241,21 +256,34 @@ class AnalysisUnit:
         se = self.get_se(effect, group_comparison, confidence_multiplier)
         if est is None or se is None:
             return None
-        return est - confidence_multiplier * se if boundary == "lower" else est + confidence_multiplier * se
+        return (
+            est - confidence_multiplier * se
+            if boundary == "lower"
+            else est + confidence_multiplier * se
+        )
 
     def get_se(self, effect, group_comparison, confidence_multiplier):
         standard_error = self.effects[effect][group_comparison].get("SE")
         if standard_error is not None:
             return standard_error
-        return self.calculate_se_if_possible(effect, group_comparison, confidence_multiplier=confidence_multiplier)
+        return self.calculate_se_if_possible(
+            effect, group_comparison, confidence_multiplier=confidence_multiplier
+        )
 
-    def set_effect_and_ci(self, effect, group_comparison, est, lower, upper, confidence_multiplier):
+    def set_effect_and_ci(
+        self, effect, group_comparison, est, lower, upper, confidence_multiplier
+    ):
         self.set_effect(effect, group_comparison, est)
         self.effects[effect][group_comparison]["lower"] = lower
         self.effects[effect][group_comparison]["upper"] = upper
 
         se = self.calculate_se_if_possible(
-            effect, group_comparison, est, lower, upper, confidence_multiplier=confidence_multiplier
+            effect,
+            group_comparison,
+            est,
+            lower,
+            upper,
+            confidence_multiplier=confidence_multiplier,
         )
         self.set_standard_error(effect, group_comparison, se)
 

@@ -54,7 +54,9 @@ class IdentityTableModel(QtGui.QStandardItemModel):
         self.identities = list(identities)
 
     def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
-        from rc_metastudio.workspace_column_identity import WORKSPACE_COLUMN_IDENTITY_ROLE
+        from rc_metastudio.workspace_column_identity import (
+            WORKSPACE_COLUMN_IDENTITY_ROLE,
+        )
 
         if (
             orientation == QtCore.Qt.Orientation.Horizontal
