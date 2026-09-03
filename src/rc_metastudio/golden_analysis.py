@@ -1,6 +1,7 @@
 import json
 import datetime
 import hashlib
+from collections.abc import Mapping
 from importlib import metadata
 import os
 import platform
@@ -621,7 +622,7 @@ def run_curated_golden_set(report_path=None):
     }
     if report_path:
         with open(report_path, "w") as f:
-            json.dump(report, f, indent=2, sort_keys=True)
+            json.dump(_json_compatible(report), f, indent=2, sort_keys=True)
     return report
 
 
@@ -697,7 +698,7 @@ def capture_curated_binary_bundle(report_path=None):
     capture = capture_bundle(curated_golden_bundles()[0])
     if report_path:
         with open(report_path, "w") as f:
-            json.dump(capture, f, indent=2, sort_keys=True)
+            json.dump(_json_compatible(capture), f, indent=2, sort_keys=True)
     return capture
 
 
@@ -830,7 +831,15 @@ def _preserve_capture_artifacts(capture, bundle_id, artifacts_dir):
 def _write_json(path, data):
     _ensure_dir(os.path.dirname(path))
     with open(path, "w") as f:
-        json.dump(data, f, indent=2, sort_keys=True)
+        json.dump(_json_compatible(data), f, indent=2, sort_keys=True)
+
+
+def _json_compatible(value):
+    if isinstance(value, Mapping):
+        return {key: _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_compatible(item) for item in value]
+    return value
 
 
 def _ensure_dir(path):
