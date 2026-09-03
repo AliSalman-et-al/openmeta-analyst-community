@@ -7,20 +7,9 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 
 
-def test_r_backend_installs_stub_backend(monkeypatch):
-    legacy_qt4_name = "Py" + "Qt4"
-    for name in list(sys.modules):
-        if name == legacy_qt4_name or name.startswith(legacy_qt4_name + "."):
-            del sys.modules[name]
-    monkeypatch.setenv("RCMS_STUB_BACKEND", "1")
-
+def test_r_backend_composes_real_module_and_keeps_fakes_local():
     from rc_metastudio import r_backend
-
-    def register_backend(backend):
-        monkeypatch.setitem(sys.modules, "rc_metastudio.r_bridge", backend)
-        return backend
-
-    monkeypatch.setattr(r_backend, "_register_backend", register_backend)
+    from rc_metastudio import r_bridge
 
     r_bridge = r_backend.install_r_backend()
 
@@ -54,4 +43,6 @@ def test_r_backend_installs_stub_backend(monkeypatch):
         r_bridge.continuous_effect_for_study(1, 2)
 
     assert r_bridge.set_confidence_level(95) == 95.0
-    assert legacy_qt4_name not in sys.modules
+    fake = r_backend.make_test_backend()
+    assert fake is not r_bridge
+    assert fake.execute_r_string("R.version.string") == [95.0]

@@ -38,8 +38,6 @@ from rc_metastudio.meta_globals import (
     validate_confidence_level,
 )
 
-r_runtime.configure_bundled_r_environment()
-
 try:
     import rpy2.robjects as ro
 except Exception as error:

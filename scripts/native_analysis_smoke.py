@@ -54,20 +54,22 @@ def validate_evidence(path: Path) -> dict[str, object]:
     return evidence
 
 
-def _install_backend_stub(
+def _install_backend_test_double(
     backend: object, name: str, implementation: Callable[..., object]
 ) -> None:
-    """Install a deliberately dynamic test double at the R backend seam."""
+    """Patch one explicitly selected R bridge operation for this smoke test."""
     setattr(backend, name, implementation)
 
 
 def main() -> int:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
-    from rc_metastudio import r_backend
+    from rc_metastudio import r_backend, r_bridge
 
-    r_backend.install_stub_r_bridge()
+    backend_fake = r_backend.make_test_backend()
+    for name in dir(backend_fake):
+        if not name.startswith("_"):
+            setattr(r_bridge, name, getattr(backend_fake, name))
     _phase("backend-installed")
     from rc_metastudio import app_error_handler, analysis_setup_dialog, progress_dialog
 
@@ -87,12 +89,12 @@ def main() -> int:
 
     backend = analysis_setup_dialog.r_bridge
 
-    _install_backend_stub(
+    _install_backend_test_double(
         backend,
         "dataset_to_simple_binary_r_object",
         lambda *_args, **_kwargs: None,
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend,
         "get_available_methods",
         lambda **_kwargs: {"Random": "binary.random"},
@@ -107,10 +109,10 @@ def main() -> int:
             {},
         ),
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend, "get_method_description", lambda _method: "Random-effects analysis"
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend, "get_analysis_plot_capabilities", lambda *_args, **_kwargs: []
     )
 
@@ -139,8 +141,8 @@ def main() -> int:
         calls.append({"method": method, "parameters": dict(parameters)})
         return {"texts": {"Summary": "ok"}, "images": {}}
 
-    _install_backend_stub(backend, "run_binary_analysis", run_backend)
-    _install_backend_stub(backend, "reset_r_working_directory", lambda: None)
+    _install_backend_test_double(backend, "run_binary_analysis", run_backend)
+    _install_backend_test_double(backend, "reset_r_working_directory", lambda: None)
 
     def deferred_delete() -> None:
         QtCore.QCoreApplication.sendPostedEvents(

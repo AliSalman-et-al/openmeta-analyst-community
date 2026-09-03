@@ -26,10 +26,10 @@ def _phase(name: str) -> None:
     print("RCMS_NATIVE_CALCULATOR_PHASE " + name, flush=True)
 
 
-def _install_backend_stub(
+def _install_backend_test_double(
     backend: object, name: str, implementation: Callable[..., object]
 ) -> None:
-    """Install a deliberate runtime test double at the R backend seam."""
+    """Patch one explicitly selected R bridge operation for this smoke test."""
     setattr(backend, name, implementation)
 
 
@@ -102,13 +102,11 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
     encoded.save(path, format="PNG")
 
 
-def install_native_stub_backend() -> Any:
-    """Install and verify the calculator smoke's non-R backend boundary."""
+def install_native_test_backend() -> Any:
+    """Create the calculator smoke's explicit local test backend."""
     from rc_metastudio import r_backend
 
-    backend = r_backend.install_stub_r_bridge()
-    if getattr(backend, "_rcms_stub_backend", False) is not True:
-        raise RuntimeError("native calculator smoke did not install the stub backend")
+    backend = r_backend.make_test_backend()
     if "rpy2.rinterface" in sys.modules:
         raise RuntimeError(
             "rpy2.rinterface loaded before native calculator GUI imports"
@@ -197,7 +195,7 @@ def _run_main() -> int:
     prepare_generated_ui_imports()
     ensure_application_resources()
     repo_root = Path(__file__).resolve().parents[1]
-    install_native_stub_backend()
+    install_native_test_backend()
 
     from rc_metastudio import (
         binary_data_dialog,
@@ -206,7 +204,7 @@ def _run_main() -> int:
         dataset_table_model,
     )
 
-    _install_backend_stub(
+    _install_backend_test_double(
         binary_data_dialog.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _level: 1.96,
@@ -216,12 +214,12 @@ def _run_main() -> int:
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         binary_data_dialog.r_bridge,
         "impute_binary_data",
         lambda _data: {"FAIL": True},
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         binary_data_dialog.r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
@@ -236,7 +234,7 @@ def _run_main() -> int:
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         continuous_data_dialog.r_bridge,
         "impute_continuous_data",
         lambda _data, _alpha: {
@@ -244,7 +242,7 @@ def _run_main() -> int:
             "comment": "complete input",
         },
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         continuous_data_dialog.r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
@@ -254,7 +252,7 @@ def _run_main() -> int:
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         continuous_data_dialog.r_bridge,
         "back_calculate_continuous_data",
         lambda *_args, **_kwargs: {"FAIL": True},
@@ -264,12 +262,12 @@ def _run_main() -> int:
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         diagnostic_data_dialog.r_bridge,
         "impute_diagnostic_data",
         lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         diagnostic_data_dialog.r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
@@ -512,7 +510,6 @@ def _run_main() -> int:
 
 
 def main() -> int:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     faulthandler.enable()
     faulthandler.dump_traceback_later(30, repeat=True)
     try:

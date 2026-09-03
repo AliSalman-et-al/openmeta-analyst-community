@@ -9,11 +9,6 @@ from rc_metastudio import two_way_dict
 from rc_metastudio.analysis_unit import AnalysisUnit
 from rc_metastudio import meta_globals
 
-from rc_metastudio import r_backend
-
-r_backend.install_r_backend()
-from rc_metastudio import r_bridge
-
 BINARY = meta_globals.BINARY
 CONTINUOUS = meta_globals.CONTINUOUS
 DIAGNOSTIC = meta_globals.DIAGNOSTIC
@@ -400,6 +395,7 @@ class Dataset:
         elif compare_by == "outcomes":
             if confidence_multiplier is None:
                 raise ValueError("confidence multiplier must be specified")
+            from rc_metastudio import r_bridge
 
             def compare_outcomes(study_a, study_b):
                 analysis_unit_a = study_a.get_analysis_unit(outcome_name, follow_up)

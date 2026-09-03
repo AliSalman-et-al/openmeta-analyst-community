@@ -416,15 +416,17 @@ def _native_device_pixel_ratio(repo_root: Path) -> float:
 
 
 def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     from PyQt6 import QtCore, QtWidgets
 
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    from rc_metastudio import r_backend
+    from rc_metastudio import r_backend, r_bridge
 
-    r_backend.install_stub_r_bridge()
+    backend_fake = r_backend.make_test_backend()
+    for name in dir(backend_fake):
+        if not name.startswith("_"):
+            setattr(r_bridge, name, getattr(backend_fake, name))
     from rc_metastudio import app_error_handler, results_window
     from rc_metastudio.analysis_results import parse_analysis_result
 

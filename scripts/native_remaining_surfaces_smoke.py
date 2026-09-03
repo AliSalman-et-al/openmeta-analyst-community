@@ -886,16 +886,18 @@ def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, obj
 
 
 def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     from PyQt6 import QtCore, QtGui, QtWidgets
     from PyQt6.QtTest import QTest
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
     QtCore.qInstallMessageHandler(_qt_message_handler)
-    from rc_metastudio import r_backend, qt6_resources
+    from rc_metastudio import r_backend, r_bridge, qt6_resources
 
-    r_backend.install_stub_r_bridge()
+    backend_fake = r_backend.make_test_backend()
+    for name in dir(backend_fake):
+        if not name.startswith("_"):
+            setattr(r_bridge, name, getattr(backend_fake, name))
     qt6_resources.ensure_application_resources()
     from rc_metastudio import adaptive_window, app_error_handler
 

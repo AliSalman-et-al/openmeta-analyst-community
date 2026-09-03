@@ -113,7 +113,6 @@ try {
             "uv", "run", "python", "scripts/build_qt6.py", "native-smoke",
             "--build-root", $BuildRoot, "--exit-after-ms", "100"
         )
-        $env:RCMS_STUB_BACKEND = "1"
         Invoke-NativeSmokeCommand -Label "Native RC MetaStudio Qt6 shell smoke" -Command @(
             "uv", "run", "rc-metastudio", "--automation-native-shell-smoke"
         )

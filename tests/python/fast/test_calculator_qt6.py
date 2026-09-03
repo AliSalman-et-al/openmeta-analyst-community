@@ -158,18 +158,11 @@ def test_native_calculator_png_encoding_never_calls_qt_save(tmp_path):
         assert encoded.getpixel((6, 4)) == (211, 31, 69, 255)
 
 
-def test_native_calculator_installs_stub_without_loading_real_rpy2(monkeypatch):
+def test_native_calculator_creates_local_backend_without_loading_real_rpy2(monkeypatch):
     smoke = _load_native_calculator_smoke()
-    from rc_metastudio import r_backend
-
-    def register_backend(backend):
-        monkeypatch.setitem(sys.modules, "rc_metastudio.r_bridge", backend)
-        return backend
-
-    monkeypatch.setattr(r_backend, "_register_backend", register_backend)
     monkeypatch.delitem(sys.modules, "rpy2.rinterface", raising=False)
-    backend = smoke.install_native_stub_backend()
-    assert backend._rcms_stub_backend is True
+    backend = smoke.install_native_test_backend()
+    assert backend.execute_r_string("R.version.string") == [95.0]
     assert "rpy2.rinterface" not in sys.modules
 
 
@@ -178,7 +171,7 @@ def test_native_calculator_backend_contract_fails_closed_for_loaded_rpy2(monkeyp
     monkeypatch.setitem(sys.modules, "rpy2.rinterface", object())
 
     with pytest.raises(RuntimeError, match="rpy2.rinterface"):
-        smoke.install_native_stub_backend()
+        smoke.install_native_test_backend()
 
 
 def test_verified_hard_exit_flushes_marker_before_success_exit():

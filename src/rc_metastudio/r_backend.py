@@ -1,6 +1,3 @@
-import os
-import sys
-import types
 from collections.abc import Callable
 from typing import NoReturn
 
@@ -17,6 +14,7 @@ class AnalysisBackendUnavailableError(RuntimeError):
 
 
 _BackendCallable = Callable[..., object]
+_REAL_BACKEND = None
 
 
 def _analysis_unavailable(*_args: object, **_kwargs: object) -> NoReturn:
@@ -166,13 +164,13 @@ def _impute_diagnostic_data(diagnostic_data: object) -> dict[str, None]:
     return {"TP": None, "TN": None, "FP": None, "FN": None}
 
 
-class _StubRObjects:
+class _TestRObjects:
     @staticmethod
     def r(expression: object) -> list[float]:
         return [95.0]
 
 
-class _StubRLibraryLoader:
+class _TestRLibraryLoader:
     def load_meta(self) -> None:
         return None
 
@@ -186,10 +184,9 @@ class _StubRLibraryLoader:
         return None
 
 
-class _StubRBridgeModule(types.ModuleType):
-    """Typed module-shaped compatibility surface for tests without in-process R."""
+class _TestRBridge:
+    """Explicit local fake used by tests that do not exercise the R boundary."""
 
-    _rcms_stub_backend: bool
     AnalysisBackendUnavailableError: type[AnalysisBackendUnavailableError]
     get_confidence_multiplier_from_r: _BackendCallable
     set_confidence_level: _BackendCallable
@@ -229,12 +226,10 @@ class _StubRBridgeModule(types.ModuleType):
     run_workflow_analysis: _BackendCallable
     run_diagnostic_workflow: _BackendCallable
     run_meta_regression: _BackendCallable
-    ro: type[_StubRObjects]
-    RLibraryLoader: type[_StubRLibraryLoader]
+    ro: type[_TestRObjects]
+    RLibraryLoader: type[_TestRLibraryLoader]
 
     def __init__(self) -> None:
-        super().__init__("rc_metastudio.r_bridge")
-        self._rcms_stub_backend = True
         self.AnalysisBackendUnavailableError = AnalysisBackendUnavailableError
         self.get_confidence_multiplier_from_r = _get_confidence_multiplier_from_r
         self.set_confidence_level = _set_confidence_level
@@ -276,55 +271,30 @@ class _StubRBridgeModule(types.ModuleType):
         self.run_workflow_analysis = _analysis_unavailable
         self.run_diagnostic_workflow = _analysis_unavailable
         self.run_meta_regression = _analysis_unavailable
-        self.ro = _StubRObjects
-        self.RLibraryLoader = _StubRLibraryLoader
+        self.ro = _TestRObjects
+        self.RLibraryLoader = _TestRLibraryLoader
 
 
-def _registered_backend() -> types.ModuleType | None:
-    return sys.modules.get("rc_metastudio.r_bridge")
-
-
-def _register_backend(backend: types.ModuleType) -> types.ModuleType:
-    sys.modules["rc_metastudio.r_bridge"] = backend
-    return backend
-
-
-def install_r_backend() -> types.ModuleType:
-    """Install and return the real R backend, or the test compatibility backend."""
-    # The real backend is the in-process rpy2 module (r_bridge). When R/rpy2
-    # is unavailable -- notably in CI and GUI-only tests -- fall back to a pure
-    # Python stub. Set RCMS_STUB_BACKEND=1 to force the stub even where R exists;
-    # set RCMS_REQUIRE_IN_PROCESS_RPY2=1 to fail loudly instead of falling back.
-    if os.environ.get("RCMS_STUB_BACKEND") == "1":
-        return install_stub_r_bridge()
-
-    existing = _registered_backend()
-    if existing is not None:
-        return _register_backend(existing)
-
+def install_r_backend():
+    """Configure and return the one real in-process embedded-R backend."""
+    global _REAL_BACKEND
+    if _REAL_BACKEND is not None:
+        return _REAL_BACKEND
     try:
         from rc_metastudio import r_runtime
 
         r_runtime.configure_bundled_r_environment()
         from rc_metastudio import r_bridge
 
-        return r_bridge
-    except Exception:
-        if (
-            getattr(sys, "frozen", False)
-            or os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1"
-        ):
-            raise
-        return install_stub_r_bridge()
+        _REAL_BACKEND = r_bridge
+        return _REAL_BACKEND
+    except Exception as error:
+        raise AnalysisBackendUnavailableError(
+            "Unable to start the embedded R runtime. Install the pinned R/RCMetaR "
+            "runtime or repair the packaged integration kit, then restart RC MetaStudio."
+        ) from error
 
 
-def install_stub_r_bridge() -> types.ModuleType:
-    existing = _registered_backend()
-    if existing is not None and getattr(existing, "_rcms_stub_backend", False):
-        return _register_backend(existing)
-
-    return _register_backend(_StubRBridgeModule())
-
-
-if os.environ.get("RCMS_STUB_BACKEND") == "1" and _registered_backend() is None:
-    install_stub_r_bridge()
+def make_test_backend() -> _TestRBridge:
+    """Create a local fake explicitly for tests that avoid real R."""
+    return _TestRBridge()

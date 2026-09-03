@@ -22,10 +22,6 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
     script = textwrap.dedent(
         """
         import json
-        from rc_metastudio import r_backend
-
-        r_backend.install_r_backend()
-
         from rc_metastudio import analysis_dataset
         from rc_metastudio import meta_globals
 
@@ -62,7 +58,6 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
 
     for seed in ("1", "2"):
         env = os.environ.copy()
-        env["RCMS_STUB_BACKEND"] = "1"
         env["PYTHONHASHSEED"] = seed
         env["PYTHONPATH"] = os.path.abspath("src")
         result = subprocess.run(
