@@ -175,7 +175,7 @@ def macos_code_bundle(
     return executable
 
 
-def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
+def test_macos_arm64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     build = text("scripts/build-macos-package.sh")
     spec = text("packaging/pyinstaller/rc-metastudio-macos.spec")
 
@@ -192,7 +192,7 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     assert (
         ROOT / "src" / "rc_metastudio" / "images" / "rc-metastudio-app-icon-rounded.png"
     ).is_file()
-    assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in spec
+    assert 'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "arm64")' in spec
     assert all(f'"{name}"' in spec for name in ("PyQt5", "PySide2", "PySide6", "qtpy"))
     assert "project_schema_data" in spec
     assert "generated_ui_collection.py" in spec
@@ -228,11 +228,8 @@ def test_macos_x64_uses_one_authoritative_pyinstaller_spec(tmp_path):
     launch = text("src/rc_metastudio/automation.py")
     assert "isTRUE(requireNamespace('tcltk', quietly=TRUE))" in launch
     assert "raise SystemExit(1) from exc" in launch
-    spike = text("scripts/package-macos-x64-direct-r-spike.sh")
+    assert not (ROOT / "scripts/package-macos-x64-direct-r-spike.sh").exists()
     assert not (ROOT / ".github/workflows/macos-x64-direct-r-spike.yml").exists()
-    assert "build-macos-package.sh" in spike
-    assert "sudo installer" not in spike
-    assert 'installed_framework="/Library/Frameworks/R.framework"' not in spike
 
 
 def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
@@ -308,7 +305,7 @@ def test_macos_packager_qualifies_deployment_smoke_archive_and_evidence():
     assert "${{ matrix.artifact }}-archive-inspection.json" in workflow_text
     assert "work/qualification/**" in workflow_text
     public_command = text("scripts/package-macos.sh")
-    assert "--architecture x64 or arm64 is required" in public_command
+    assert "--architecture arm64 is required" in public_command
     assert "r-integration-kit" not in public_command
     assert "Xcode Command Line Tools" in public_command
     assert 'ditto -x -k "$zip_path" "$extracted_root"' in build
@@ -386,13 +383,13 @@ def test_direct_provenance_uses_named_cli_and_rejects_missing_named_inputs(tmp_p
             "--source-commit",
             "c" * 40,
             "--target",
-            "macos-x64",
+            "macos-arm64",
             "--official-r-url",
-            "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
+            "https://cloud.r-project.org/bin/macosx/big-sur-arm64/base/R-4.6.1-arm64.pkg",
             "--official-r-sha256",
             "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571",
             "--ppm-contrib-path",
-            "bin/macosx/big-sur-x86_64/contrib/4.6",
+            "bin/macosx/big-sur-arm64/contrib/4.6",
             "--bridge",
             str(tmp_path / "missing.so"),
             "--output",

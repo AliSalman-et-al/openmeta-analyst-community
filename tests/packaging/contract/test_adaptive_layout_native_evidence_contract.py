@@ -76,7 +76,7 @@ def test_hosted_package_workflow_does_not_require_native_layout_evidence():
         == "./.github/workflows/package-target.yml"
     )
     targets = target["jobs"]["package"]["strategy"]["matrix"]["include"]
-    assert {item["target"] for item in targets} == {"macos-x64", "macos-arm64"}
+    assert {item["target"] for item in targets} == {"macos-arm64"}
     steps = target["jobs"]["package"]["steps"] + windows["jobs"]["package"]["steps"]
     assert not any(
         "adaptive-layout-evidence" in str(step) or "evidence_path" in str(step)

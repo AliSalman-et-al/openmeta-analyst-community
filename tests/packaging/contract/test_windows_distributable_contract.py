@@ -268,7 +268,6 @@ def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():
     assert workflow["on"]["push"]["branches"] == ["master"]
     assert jobs["source-fast-targets"]["strategy"]["matrix"]["include"] == [
         {"target": "windows-x64", "runner": "windows-latest", "platform": "windows"},
-        {"target": "macos-x64", "runner": "macos-15-intel", "platform": "macos"},
         {"target": "macos-arm64", "runner": "macos-15", "platform": "macos"},
     ]
     refs = []
@@ -368,7 +367,6 @@ def test_package_workflow_builds_path_aware_artifacts():
         {key: item[key] for key in ("target", "architecture", "runner")}
         for item in target_job["strategy"]["matrix"]["include"]
     ] == [
-        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
         {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
     ]
     assert target_job["timeout-minutes"] == 90

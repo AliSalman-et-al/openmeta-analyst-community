@@ -110,7 +110,7 @@ exe = EXE(
     upx=False,
     console=False,
     argv_emulation=False,
-    target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64"),
+    target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "arm64"),
     codesign_identity=None,
     entitlements_file=None,
 )
