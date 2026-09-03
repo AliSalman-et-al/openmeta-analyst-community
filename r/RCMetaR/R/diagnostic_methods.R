@@ -5,6 +5,13 @@ diagnostic.logit.metrics <- c("Sens", "Spec", "PPV", "NPV", "Acc")
 diagnostic.log.metrics <- c("PLR", "NLR", "DOR")
 bivariate.methods <- c("diagnostic.reitsma")
 
+diagnostic.summary.metric.name <- function(metric) {
+    if (trimws(as.character(metric)) == "DOR") {
+        return("Odds Ratio")
+    }
+    pretty.metric.name(metric)
+}
+
 rcmetar.corrected.diagnostic.counts <- function(diagnostic.data, params) {
     values <- list(TP=diagnostic.data@TP, FN=diagnostic.data@FN,
                    TN=diagnostic.data@TN, FP=diagnostic.data@FP)
@@ -191,7 +198,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
             plot.names <- c(plot.names, analysis_result$plot_names)
             analysis_summary <- list("Summary"=analysis_result$Summary)
-            names(analysis_summary) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
+            names(analysis_summary) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
 
 		    references <- c(references, analysis_result$References)
 			results <- c(results, analysis_summary)
@@ -236,7 +243,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
         model.title <- paste("Diagnostic Fixed-Effect Model - Inverse Variance (k = ", res$k, ")", sep="")
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.fixed.inv.var.pretty.names()
-        pretty.metric <- pretty.metric.name(as.character(params$measure))
+        pretty.metric <- diagnostic.summary.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
           summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }
@@ -344,7 +351,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         model.title <- "Diagnostic Fixed-Effect Model - Mantel-Haenszel"
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.fixed.mh.pretty.names()
-        pretty.metric <- pretty.metric.name(as.character(params$measure))
+        pretty.metric <- diagnostic.summary.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
           summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }
@@ -444,7 +451,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
     model.title <- "Diagnostic Fixed-Effect Model - Peto"
     summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
     pretty.names <- diagnostic.fixed.peto.pretty.names()
-    pretty.metric <- pretty.metric.name(as.character(params$measure))
+    pretty.metric <- diagnostic.summary.metric.name(as.character(params$measure))
     for (count in 1:length(summary.disp$table.titles)) {
       summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
     }
@@ -548,7 +555,7 @@ diagnostic.random <- function(diagnostic.data, params){
         model.title <- paste("Diagnostic Random-Effects Model (k = ", res$k, ")", sep="")
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.random.pretty.names()
-        pretty.metric <- pretty.metric.name(as.character(params$measure))
+        pretty.metric <- diagnostic.summary.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
             summary.disp$table.titles[count] <- paste(pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }
