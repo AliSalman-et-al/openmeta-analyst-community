@@ -43,9 +43,11 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-EXPECTED_SUMMARY_SHA256 = (
-    "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933"
-)
+EXPECTED_SUMMARY_SHA256_BY_SAMPLE = {
+    "amino.rcms": "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0",
+    "BCG.rcms": "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933",
+}
+EXPECTED_SUMMARY_SHA256 = EXPECTED_SUMMARY_SHA256_BY_SAMPLE["amino.rcms"]
 FORBIDDEN_GENERATED_SOURCE_SUFFIXES = {".py", ".pyc", ".pyo", ".ui", ".qrc"}
 FORBIDDEN_BINDINGS = ("pyqt5", "pyside2", "pyside6", "qtpy")
 REQUIRED_PROJECT_SCHEMAS = {
@@ -776,6 +778,9 @@ def write_qualification_evidence(
         "analysis_after_reopen",
     }
     workflows = smoke.get("workflows", {})
+    expected_summary_sha256 = EXPECTED_SUMMARY_SHA256_BY_SAMPLE.get(
+        workflows.get("converted_sample")
+    )
     scales = smoke.get("scales", [])
     log_text = smoke_log.read_text(encoding="utf-8")
     required_log_markers = {
@@ -807,12 +812,15 @@ def write_qualification_evidence(
             }
         )
         or workflows.get("converted_sample") != "amino.rcms"
+        or expected_summary_sha256 is None
         or workflows.get("expected_normalized_summary_sha256")
-        != EXPECTED_SUMMARY_SHA256
-        or workflows.get("normalized_summary_sha256") != EXPECTED_SUMMARY_SHA256
+        != expected_summary_sha256
+        or workflows.get("normalized_summary_sha256") != expected_summary_sha256
         or not _valid_sha256(workflows.get("raw_summary_sha256"))
         or not _valid_sha256_map(workflows.get("svg_sha256"))
-        or not _valid_locale_variants(workflows.get("locale_variants"), workflows)
+        or not _valid_locale_variants(
+            workflows.get("locale_variants"), workflows, expected_summary_sha256
+        )
         or not _valid_sample_projects(workflows.get("sample_projects"))
         or smoke.get("execution")
         != {
@@ -943,7 +951,9 @@ def write_qualification_evidence(
     return evidence
 
 
-def _valid_locale_variants(variants: object, workflows: dict) -> bool:
+def _valid_locale_variants(
+    variants: object, workflows: dict, expected_summary_sha256: str | None
+) -> bool:
     if (
         not isinstance(variants, list)
         or len(variants) != 2
@@ -962,7 +972,7 @@ def _valid_locale_variants(variants: object, workflows: dict) -> bool:
         == typed_variants[1].get("canonical_value")
         and typed_variants[0].get("normalized_summary_sha256")
         == typed_variants[1].get("normalized_summary_sha256")
-        == EXPECTED_SUMMARY_SHA256
+        == expected_summary_sha256
         and typed_variants[0].get("raw_summary_sha256")
         == typed_variants[1].get("raw_summary_sha256")
         == workflows.get("raw_summary_sha256")
