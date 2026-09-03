@@ -18,7 +18,7 @@ import sys
 import zipfile
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-
+from typing import TypedDict, TypeGuard
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -89,6 +89,30 @@ _TECHNICAL_SECTIONS = {
 }
 
 
+class AuditSummary(TypedDict):
+    errors: int
+    warnings: int
+    sources: int
+
+
+class AuditInventory(TypedDict):
+    required: list[str]
+    covered: list[str]
+    missing: list[str]
+    sources_by_category: dict[str, list[str]]
+
+
+class AuditReport(TypedDict):
+    schema_version: int
+    summary: AuditSummary
+    inventory: AuditInventory
+    findings: list[dict[str, str]]
+
+
+def _string_keyed_mapping(value: object) -> TypeGuard[Mapping[str, object]]:
+    return isinstance(value, Mapping) and all(isinstance(key, str) for key in value)
+
+
 def _finding(code: str, source: str, message: str, section: str | None = None) -> dict[str, str]:
     item = {
         "severity": "error",
@@ -105,12 +129,12 @@ def _as_sections(value: object, field: str) -> list[tuple[str, object]]:
     """Read mappings and list-shaped sections while preserving list duplicates."""
     if value is None:
         return []
-    if isinstance(value, Mapping):
+    if _string_keyed_mapping(value):
         return [(str(key), item) for key, item in value.items()]
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         sections: list[tuple[str, object]] = []
         for item in value:
-            if not isinstance(item, Mapping):
+            if not _string_keyed_mapping(item):
                 sections.append(("", item))
                 continue
             title = item.get("title", item.get("name", ""))
@@ -301,7 +325,7 @@ def _audit_order(source: str, sections: list[tuple[str, object]], categories: se
     return []
 
 
-def audit_records(records: Iterable[Mapping[str, object]]) -> dict[str, object]:
+def audit_records(records: Iterable[Mapping[str, object]]) -> AuditReport:
     findings: list[dict[str, str]] = []
     inventory: dict[str, list[str]] = {}
     source_count = 0
@@ -385,7 +409,7 @@ def audit_records(records: Iterable[Mapping[str, object]]) -> dict[str, object]:
         )
     )
     covered = sorted(category for category in inventory if category in REQUIRED_CATEGORIES)
-    report = {
+    report: AuditReport = {
         "schema_version": 1,
         "summary": {
             "errors": len(findings),
@@ -406,16 +430,18 @@ def audit_records(records: Iterable[Mapping[str, object]]) -> dict[str, object]:
 
 
 def _records_from_json(value: object, source: str) -> list[dict[str, object]]:
-    if isinstance(value, Mapping):
-        if isinstance(value.get("records"), list):
-            return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(value["records"], 1) if isinstance(item, Mapping)]
-        if isinstance(value.get("captures"), list):
-            return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(value["captures"], 1) if isinstance(item, Mapping)]
+    if _string_keyed_mapping(value):
+        records = value.get("records")
+        if isinstance(records, list):
+            return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(records, 1) if _string_keyed_mapping(item)]
+        captures = value.get("captures")
+        if isinstance(captures, list):
+            return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(captures, 1) if _string_keyed_mapping(item)]
         if "texts" in value or "sections" in value:
             return [dict(value, _source=source)]
         return []
     if isinstance(value, list):
-        return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(value, 1) if isinstance(item, Mapping)]
+        return [dict(item, _source=f"{source}#{index}") for index, item in enumerate(value, 1) if _string_keyed_mapping(item)]
     return []
 
 

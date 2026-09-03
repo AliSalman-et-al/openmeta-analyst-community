@@ -499,8 +499,14 @@ def test_sroc_plot_editor_keeps_dynamic_controls_inside_scrollable_content(
         assert sroc_options is not None
         assert dialog.content_scroll.isAncestorOf(sroc_options)
         assert dialog.content_layout.indexOf(sroc_options) >= 0
-        assert dialog.content_scroll.viewport().height() > 0
-        assert dialog.content_scroll.verticalScrollBar().maximum() > 0
+        content_viewport = required(
+            dialog.content_scroll.viewport(), "content viewport"
+        )
+        content_scrollbar = required(
+            dialog.content_scroll.verticalScrollBar(), "content scrollbar"
+        )
+        assert content_viewport.height() > 0
+        assert content_scrollbar.maximum() > 0
         assert dialog.content_scroll.isAncestorOf(dialog.buttonBox) is False
     finally:
         _dispose(dialog, qapp)

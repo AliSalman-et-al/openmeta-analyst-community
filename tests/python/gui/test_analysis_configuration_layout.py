@@ -42,6 +42,11 @@ class _AnalysisModel(object):
     def included_studies_have_point_estimates(self, effect):
         return True
 
+    def get_studies(
+        self, only_if_included: bool = True
+    ) -> list[analysis_dataset.Study]:
+        return []
+
 
 def _install_analysis_backend(monkeypatch, analysis_setup_dialog):
     methods = {
@@ -212,7 +217,6 @@ def test_diagnostic_reitsma_method_layout_and_meta_regression_uses_joint_mode(
 
     covariate = SimpleNamespace(name="quality", data_type=4)
     model = _AnalysisModel("diagnostic", (covariate,))
-    model.get_studies = lambda only_if_included=True: []
     backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
     monkeypatch.setattr(
         backend,
@@ -304,7 +308,9 @@ def test_diagnostic_reitsma_method_layout_and_meta_regression_uses_joint_mode(
             dialog.width(),
             dialog.method_lbl.width(),
             dialog.methods_tab.width(),
-            dialog.method_cbo_box.parentWidget().width(),
+            required(
+                dialog.method_cbo_box.parentWidget(), "method combo parent"
+            ).width(),
             dialog.parameter_grp_box.width(),
         )
         estimator = next(
@@ -332,7 +338,11 @@ def test_diagnostic_reitsma_method_layout_and_meta_regression_uses_joint_mode(
             "execute_meta_regression_request",
             lambda *args, **_kwargs: requests.append(args) or {},
         )
-        dialog._run_analysis = lambda operation, *_args, **_kwargs: operation()
+        monkeypatch.setattr(
+            dialog,
+            "_run_analysis",
+            lambda operation, *_args, **_kwargs: operation(),
+        )
         dialog.run_meta_regression()
         request = requests[0][3]
         assert request.method == "diagnostic.reitsma"
@@ -352,7 +362,6 @@ def test_diagnostic_reitsma_meta_regression_hides_legacy_controls_for_factor_and
     continuous = SimpleNamespace(name="threshold", data_type=0)
     factor = SimpleNamespace(name="reader", data_type=1)
     model = _AnalysisModel("diagnostic", (continuous, factor))
-    model.get_studies = lambda only_if_included=True: []
     backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
     monkeypatch.setattr(
         backend,

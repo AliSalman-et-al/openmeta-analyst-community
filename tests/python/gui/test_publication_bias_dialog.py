@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QStyle, QWidget
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from test_types import required
 
 prepare_generated_ui_imports()
 
@@ -107,7 +108,7 @@ def test_dialog_keeps_researcher_labels_readable_at_high_dpi(qapp, monkeypatch):
         assert dialog.width() >= publication_bias_dialog.PUBLICATION_BIAS_MIN_WIDTH
         assert dialog.width() >= min(
             publication_bias_dialog.PUBLICATION_BIAS_PREFERRED_WIDTH,
-            dialog.screen().availableGeometry().width(),
+            required(dialog.screen(), "dialog screen").availableGeometry().width(),
         )
         assert dialog.automatic_test_label.wordWrap()
     finally:
@@ -136,12 +137,14 @@ def test_dialog_form_surfaces_never_introduce_horizontal_scrollbars(
                 scroll_area.horizontalScrollBarPolicy()
                 == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
             )
-            assert scroll_area.horizontalScrollBar().maximum() == 0
+            assert required(
+                scroll_area.horizontalScrollBar(), "horizontal scrollbar"
+            ).maximum() == 0
 
         # The long tau² option is a useful sentinel for the original defect:
         # it must remain wholly reachable in the content viewport.
         checkbox = dialog.include_tau2_check
-        style = checkbox.style()
+        style = required(checkbox.style(), "checkbox style")
         indicator_width = style.pixelMetric(
             QStyle.PixelMetric.PM_IndicatorWidth, None, checkbox
         )
@@ -154,17 +157,20 @@ def test_dialog_form_surfaces_never_introduce_horizontal_scrollbars(
             + checkbox.fontMetrics().horizontalAdvance(checkbox.text())
         )
         assert checkbox.width() >= required_width
-        assert dialog.methods_scroll.viewport().width() >= required_width
+        methods_viewport = required(
+            dialog.methods_scroll.viewport(), "methods viewport"
+        )
+        assert methods_viewport.width() >= required_width
         dialog.methods_scroll.ensureWidgetVisible(dialog.include_tau2_check)
         qapp.processEvents()
         top_left = dialog.include_tau2_check.mapTo(
-            dialog.methods_scroll.viewport(), dialog.include_tau2_check.rect().topLeft()
+            methods_viewport, dialog.include_tau2_check.rect().topLeft()
         )
         bottom_right = dialog.include_tau2_check.mapTo(
-            dialog.methods_scroll.viewport(), dialog.include_tau2_check.rect().bottomRight()
+            methods_viewport, dialog.include_tau2_check.rect().bottomRight()
         )
         assert top_left.x() >= 0
-        assert bottom_right.x() < dialog.methods_scroll.viewport().width()
+        assert bottom_right.x() < methods_viewport.width()
     finally:
         dialog.close()
 
