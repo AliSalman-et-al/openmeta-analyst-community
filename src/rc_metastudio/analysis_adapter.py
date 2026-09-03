@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
 from rc_metastudio import r_bridge
@@ -85,9 +87,38 @@ class AnalysisRequest:
     method: str
     metric: str
     parameters: tuple[AnalysisParameter, ...]
+    version: int = 1
 
     def __post_init__(self) -> None:
+        if self.version != 1:
+            raise ValueError(f"unsupported analysis request version: {self.version}")
         _required_text("metric", self.metric)
+
+    @property
+    def semantic_id(self) -> str:
+        """Stable identity for this request's meaning, excluding presentation."""
+        payload = {
+            "data_type": self.data_type,
+            "metric": self.metric,
+            "method": self.method,
+            "parameters": [(item.name, item.value) for item in self.parameters],
+            "version": self.version,
+            "workflow": self.workflow,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    def to_mapping(self) -> dict[str, object]:
+        """Return the explicit wire representation consumed by RCMetaR."""
+        return {
+            "version": self.version,
+            "data_type": self.data_type,
+            "workflow": self.workflow,
+            "method": self.method,
+            "metric": self.metric,
+            "parameters": self.parameter_values(),
+        }
 
     def parameter_values(self) -> dict[str, AnalysisValue]:
         return {parameter.name: parameter.value for parameter in self.parameters}
@@ -391,7 +422,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
 
     if not merged_result["image_order"]:
         merged_result["image_order"] = None
-    return merged_result
+    return parse_analysis_result(merged_result)
 
 
 def _empty_diagnostic_result() -> AnalysisResult:

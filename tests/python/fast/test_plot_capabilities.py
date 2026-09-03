@@ -100,6 +100,13 @@ def test_analysis_result_parser_validates_all_boundary_fields():
         parse_analysis_result({"display_images": {"Forest Plot": "display.svg"}})
 
 
+def test_analysis_result_parser_returns_immutable_values():
+    parsed = parse_analysis_result({"texts": {"Summary": "ok"}})
+
+    with pytest.raises(TypeError):
+        parsed["texts"]["Summary"] = "changed"
+
+
 def test_option_groups_are_keyed_by_explicit_plot_kind():
     assert "columns" in plot_capabilities.option_groups("forest")
     assert "columns" not in plot_capabilities.option_groups("cumulative_forest")

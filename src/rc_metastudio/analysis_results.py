@@ -4,8 +4,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Literal, TypedDict
+from collections.abc import Iterable, Mapping
+from types import MappingProxyType
+from typing import Literal, Self, SupportsIndex, TypedDict
 
 
 PlotKind = Literal[
@@ -58,6 +59,46 @@ class AnalysisResult(TypedDict):
     plot_capabilities: dict[str, PlotCapability]
 
 
+class _FrozenList(list[str]):
+    """List-shaped immutable sequence retaining the v0.3.1 equality contract."""
+
+    def _immutable(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError("analysis result values are immutable")
+
+    __setitem__ = __delitem__ = append = clear = extend = insert = remove = reverse = sort = _immutable
+
+    def pop(self, index: SupportsIndex = -1, /) -> str:
+        raise TypeError("analysis result values are immutable")
+
+    def __iadd__(self, value: Iterable[str], /) -> Self:
+        raise TypeError("analysis result values are immutable")
+
+    def __imul__(self, value: SupportsIndex, /) -> Self:
+        raise TypeError("analysis result values are immutable")
+
+
+def _freeze_result(value: AnalysisResult) -> AnalysisResult:
+    frozen = {
+        "texts": MappingProxyType(dict(value["texts"])),
+        "images": MappingProxyType(dict(value["images"])),
+        "display_images": MappingProxyType(dict(value["display_images"])),
+        "image_var_names": MappingProxyType(dict(value["image_var_names"])),
+        "image_params_paths": MappingProxyType(dict(value["image_params_paths"])),
+        "image_order": (
+            None
+            if value["image_order"] is None
+            else _FrozenList(value["image_order"])
+        ),
+        "plot_capabilities": MappingProxyType(
+            {
+                key: MappingProxyType(dict(capability))
+                for key, capability in value["plot_capabilities"].items()
+            }
+        ),
+    }
+    return frozen  # type: ignore[return-value]
+
+
 def empty_analysis_result() -> AnalysisResult:
     return {
         "texts": {},
@@ -108,7 +149,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
             "Display artifacts have no matching plot artifact: %s"
             % ", ".join(extra_display_images)
         )
-    return {
+    return _freeze_result({
         "texts": raw["texts"],
         "images": raw["images"],
         "display_images": raw["display_images"],
@@ -116,7 +157,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
         "image_params_paths": raw["image_params_paths"],
         "image_order": raw["image_order"],
         "plot_capabilities": capabilities,
-    }
+    })
 
 
 def _string_mapping(value: object, label: str) -> dict[str, str]:

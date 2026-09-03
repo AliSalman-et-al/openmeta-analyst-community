@@ -62,6 +62,17 @@ def test_analysis_request_rejects_cross_family_metric() -> None:
         make_analysis_request(**values)
 
 
+def test_analysis_request_is_versioned_and_semantically_identified() -> None:
+    first = make_analysis_request(**_request_kwargs())
+    second = make_analysis_request(**_request_kwargs())
+
+    assert first.version == 1
+    assert first.semantic_id == second.semantic_id
+    assert first.to_mapping()["parameters"] == {}
+    with pytest.raises(ValueError, match="unsupported analysis request version"):
+        type(first)(first.data_type, first.workflow, first.method, first.metric, (), 2)
+
+
 def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
     monkeypatch,
 ):
