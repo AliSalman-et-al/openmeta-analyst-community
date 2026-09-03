@@ -20,7 +20,10 @@ RCMETAR_BOOTSTRAP = textwrap.dedent(
     r"""
     repo <- normalizePath(__REPO_ROOT__, winslash = "/")
     suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/classes.R")))
-    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/utilities.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/analysis_contracts.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/analysis_output.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/display.R")))
+    suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/results_display.R")))
     suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/rcmetar-core.R")))
     suppressPackageStartupMessages(source(file.path(repo, "r/RCMetaR/R/diagnostic_methods.R")))
     """
