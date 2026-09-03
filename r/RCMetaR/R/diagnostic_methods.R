@@ -186,7 +186,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             prepared_diagnostic_data <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
             analysis_result <- .rcmetar.call.method(fnames[count], prepared_diagnostic_data, params.list[[count]])
             analysis_images <- analysis_result$images
-            names(analysis_images) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
+            names(analysis_images) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             images <- c(images, analysis_images)
             plot.capabilities[[names(analysis_images)[[1]]]] <- .rcmetar.plot.descriptor.for.kind(
                 "forest",
@@ -194,7 +194,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             )
             image.order <- c(image.order, names(analysis_images))
             analysis_plot_paths <- analysis_result$plot_params_paths
-            names(analysis_plot_paths) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
+            names(analysis_plot_paths) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
             plot.names <- c(plot.names, analysis_result$plot_names)
             analysis_summary <- list("Summary"=analysis_result$Summary)
