@@ -619,11 +619,9 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	}
 	metric.name <- pretty.metric.name(as.character(suppressed_params$measure))
 	model.title <- switch(fname,
-                          diagnostic.bivariate.ml  = paste("Diagnostic Bivariate - Maximum Likelihood\n\nMetric: ", metric.name, sep=""),
                           diagnostic.fixed.inv.var = paste("Diagnostic Fixed-Effect Inverse Variance\n\nMetric: ", metric.name, sep=""),
                           diagnostic.fixed.mh      = paste("Diagnostic Fixed-Effect Mantel-Haenszel\n\nMetric: ", metric.name, sep=""),
                           diagnostic.fixed.peto    = paste("Diagnostic Fixed-Effect Peto\n\nMetric: ", metric.name, sep=""),
-                          diagnostic.hsroc         = paste("Diagnostic HSROC\n\nMetric: ", metric.name, sep=""),
                           diagnostic.random        = paste("Diagnostic Random-Effects\n\nMetric: ", metric.name, sep=""))
 	cum.disp <- create.overall.display(res=cum.results, study.names, params, model.title, data.type="diagnostic")
 	forest.path <- paste(params$fp_outpath, sep="")
@@ -680,6 +678,9 @@ multiple.cum.ma.diagnostic <- function(fnames, params.list, diagnostic.data) {
 		analysis_images <- c(res$images[[1]])
 		names(analysis_images) <- image.name
 		images <- c(images, analysis_images)
+		analysis_plot_paths <- res$plot_params_paths
+		names(analysis_plot_paths) <- image.name
+		plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
 
 		analysis_plot_names <- c("forest plot"="forest.plot")
 		plot.names <- c(plot.names, analysis_plot_names)
@@ -691,6 +692,7 @@ multiple.cum.ma.diagnostic <- function(fnames, params.list, diagnostic.data) {
 
 	results <- c(results, list("images"=images,
 					           "plot_names"=plot.names,
+							   "plot_params_paths"=plot.params.paths,
 							   "References"=rcmetar.unique.references(references)))
 	results
 

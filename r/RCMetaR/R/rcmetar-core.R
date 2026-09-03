@@ -38,7 +38,7 @@
 #' Use \code{rcmetar.analysis.methods()} to inspect methods known to the core
 #' dispatcher. The dispatcher still calls the package's existing method
 #' implementations, including \code{metafor}-based fixed and random effects,
-#' Mantel-Haenszel, Peto, bivariate diagnostic, HSROC, bootstrap, subgroup,
+#' Mantel-Haenszel, Peto, Reitsma bivariate diagnostic, bootstrap, subgroup,
 #' cumulative, leave-one-out, and meta-regression workflows.
 #'
 #' @section References:
@@ -46,7 +46,7 @@
 #' Use \code{rcmetar.method.references()} to inspect the statistical references
 #' associated with a method family.
 #'
-#' @aliases rcmetar.run.analysis rcmetar.run.diagnostic.analyses rcmetar.run.permutation rcmetar.validate.analysis.request rcmetar.analysis.methods rcmetar.analysis.plot.capabilities rcmetar.available.methods rcmetar.method.parameters rcmetar.method.description rcmetar.set.global.conf.level rcmetar.get.mult.from.conf.level rcmetar.create.covariate.values rcmetar.create.binary.data rcmetar.create.continuous.data rcmetar.create.diagnostic.data rcmetar.prepare.analysis.data rcmetar.impute.binary rcmetar.impute.diagnostic rcmetar.impute.continuous.study rcmetar.impute.continuous.prepost rcmetar.back.calculate.continuous rcmetar.convert.scale rcmetar.binary.study.effect rcmetar.continuous.study.effect rcmetar.diagnostic.study.effects rcmetar.regenerate.plot.data rcmetar.regenerate.regression.plot.data rcmetar.save.plot.data rcmetar.draw.forest.plot rcmetar.draw.regression.plot rcmetar.graphics.off rcmetar.method.references
+#' @aliases rcmetar.run.analysis rcmetar.run.diagnostic.analyses rcmetar.run.permutation rcmetar.validate.analysis.request rcmetar.analysis.methods rcmetar.analysis.plot.capabilities rcmetar.available.methods rcmetar.method.parameters rcmetar.method.description rcmetar.set.global.conf.level rcmetar.get.mult.from.conf.level rcmetar.create.covariate.values rcmetar.create.binary.data rcmetar.create.continuous.data rcmetar.create.diagnostic.data rcmetar.prepare.analysis.data rcmetar.impute.binary rcmetar.impute.diagnostic rcmetar.impute.continuous.study rcmetar.impute.continuous.prepost rcmetar.back.calculate.continuous rcmetar.convert.scale rcmetar.binary.study.effect rcmetar.continuous.study.effect rcmetar.diagnostic.study.effects rcmetar.regenerate.plot.data rcmetar.regenerate.regression.plot.data rcmetar.save.plot.data rcmetar.draw.forest.plot rcmetar.draw.sroc.plot rcmetar.draw.regression.plot rcmetar.graphics.off rcmetar.method.references
 #' @name RCMetaR-core-api
 NULL
 
@@ -69,11 +69,11 @@ rcmetar.analysis.methods <- function(data.type=NULL, workflow=NULL) {
             "meta-regression"=c("meta.regression")
         ),
         diagnostic=list(
-            standard=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random", "diagnostic.hsroc", "diagnostic.bivariate.ml"),
+            standard=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random", "diagnostic.reitsma"),
             cumulative=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
             "leave-one-out"=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
             subgroup=c("diagnostic.fixed.inv.var", "diagnostic.fixed.mh", "diagnostic.fixed.peto", "diagnostic.random"),
-            "meta-regression"=c("meta.regression")
+            "meta-regression"=c("diagnostic.reitsma")
         )
     )
 
@@ -154,19 +154,18 @@ rcmetar.analysis.plot.capabilities <- function(data.type, method, workflow="stan
     if (workflow == "leave-one-out") return(list(descriptor("leave_one_out_forest")))
     if (workflow == "subgroup") return(list(descriptor("subgroup_forest")))
     if (workflow == "bootstrap") return(list(descriptor("other")))
+    if (method == "diagnostic.reitsma") {
+        if (workflow == "meta-regression") {
+            # Reitsma meta-regression emits one coefficient forest per modeled
+            # side.  Do not advertise the generic metafor bubble plot or its
+            # controls for this joint model.
+            return(list(descriptor("forest")))
+        }
+        return(list(
+            .rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)
+        ))
+    }
     if (workflow == "meta-regression") return(list(descriptor("regression")))
-    if (method == "diagnostic.hsroc") {
-        return(list(
-            descriptor("sroc"),
-            descriptor("forest")
-        ))
-    }
-    if (method == "diagnostic.bivariate.ml") {
-        return(list(
-            descriptor("roc"),
-            descriptor("forest")
-        ))
-    }
     list(descriptor("forest"))
 }
 
@@ -392,6 +391,25 @@ rcmetar.diagnostic.study.effects <- function(tp, fn, fp, tn, metrics=c("Spec", "
 }
 
 rcmetar.regenerate.plot.data <- function(om.data, res, params) {
+    if (is.list(params) && !is.null(params$reitsma.coefficient.scale) && inherits(res, "reitsma")) {
+        coefficients <- summary(res, level=as.numeric(params$conf.level %||% 95) / 100)$coefficients
+        specificity <- identical(as.character(params$reitsma.coefficient.scale), "Specificity")
+        selected <- coefficients[grepl(if (specificity) "tfpr" else "tsens", rownames(coefficients), fixed=TRUE),,drop=FALSE]
+        selected <- rcmetar.reitsma.coefficient.table(selected, specificity=specificity)
+        selected <- rcmetar.reitsma.restore.coefficient.labels(
+            selected, params$reitsma.moderator.coding %||% list()
+        )
+        selected <- rcmetar.reitsma.add.reference.rows(
+            selected, params$reitsma.moderator.coding %||% list()
+        )
+        return(rcmetar.reitsma.coefficient.bundle(selected, as.character(params$reitsma.coefficient.scale), params))
+    }
+    if (inherits(res, "reitsma")) {
+        level <- as.numeric(params$conf.level %||% 95) / 100
+        return(rcmetar.reitsma.plot.data(res, om.data, level=level,
+                                         extrapolate=isTRUE(params$fp_extrapolate %||% params$sroc_extrapolate %||% FALSE),
+                                         params=params))
+    }
     if (inherits(res, "rcmetar_forest_regeneration_state")) {
         res <- rcmetar.validate.forest.regeneration.state(res)
         variant <- as.character(res$variant)
@@ -432,10 +450,31 @@ rcmetar.save.plot.data <- function(plot.data, out.path=NULL) {
 }
 
 rcmetar.draw.forest.plot <- function(plot.data, outpath) {
+    if (rcmetar.is.reitsma.coefficient.bundle(plot.data)) {
+        return(rcmetar.draw.reitsma.coefficient(plot.data, outpath))
+    }
     if (rcmetar.is.metafor.forest.bundle(plot.data)) {
         return(rcmetar.draw.metafor.forest(plot.data, outpath))
     }
     stop("Forest plot data must be a metafor render bundle.", call.=FALSE)
+}
+
+#' Render a Reitsma SROC plot
+#'
+#' Draw a saved Reitsma SROC render bundle to the requested plot path. The
+#' bundle is the public regeneration contract used by RC MetaStudio, so this
+#' helper supports the same SVG, PNG, PDF, and TIFF export paths as the other
+#' public plot facades.
+#'
+#' @param plot.data A Reitsma SROC render bundle returned by
+#'   code{rcmetar.regenerate.plot.data()}.
+#' @param outpath A file path whose extension selects the output format.
+#' @return The result returned by the Reitsma renderer, typically invisibly.
+#' @rdname RCMetaR-core-api
+#' @export
+rcmetar.draw.sroc.plot <- function(plot.data, outpath) {
+    if (!is.list(plot.data) || !identical(plot.data$kind, "sroc")) stop("SROC plot data expected.", call.=FALSE)
+    rcmetar.reitsma.draw(plot.data, outpath)
 }
 
 rcmetar.draw.regression.plot <- function(plot.data, outpath) {
@@ -459,10 +498,11 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         stop.at.rma=stop.at.rma
     )
 
-    # Prepare exactly once at this boundary so every standard and wrapped
-    # analysis consumes the same authoritative effects. Peto retains its
-    # native count-based construction and therefore is deliberately excluded.
-    if (!identical(request$method, "binary.fixed.peto")) {
+    # Reitsma owns the count transformation.  Keep raw TP/FN/FP/TN all the
+    # way through that method; other methods still receive their prepared
+    # effect data at this boundary.
+    raw.diagnostic <- identical(request$data.type, "diagnostic") && identical(request$method, "diagnostic.reitsma")
+    if (!identical(request$method, "binary.fixed.peto") && !raw.diagnostic) {
         om.data <- rcmetar.prepare.analysis.data(om.data, request$params)
     }
 
@@ -473,7 +513,9 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
         "leave-one-out"=.rcmetar.dispatch.meta.workflow(om.data, request),
         subgroup=.rcmetar.dispatch.meta.workflow(om.data, request),
         bootstrap=bootstrap(request$method, om.data, request$params, request$cond.means.data),
-        "meta-regression"=meta.regression(om.data, request$params, request$cond.means.data, request$stop.at.rma)
+        "meta-regression"=if (identical(request$data.type, "diagnostic") && identical(request$method, "diagnostic.reitsma")) {
+            diagnostic.reitsma.meta.regression(om.data, request$params, request$stop.at.rma)
+        } else meta.regression(om.data, request$params, request$cond.means.data, request$stop.at.rma)
     )
 
     if (!isTRUE(request$stop.at.rma)) {
@@ -498,7 +540,8 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
     }
 
     params.list <- lapply(params.list, .rcmetar.as.params.list)
-    if (length(params.list) > 0 && !is.null(params.list[[1]]$measure)) {
+    if (length(params.list) > 0 && !is.null(params.list[[1]]$measure) &&
+        !any(methods == "diagnostic.reitsma")) {
         diagnostic.data <- rcmetar.prepare.analysis.data(diagnostic.data, params.list[[1]])
     }
     for (i in seq_along(methods)) {
@@ -577,6 +620,10 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     method <- as.character(method)
     if (length(method) != 1 || is.na(method) || !nzchar(method)) {
         stop("Analysis request must include one method name.", call.=FALSE)
+    }
+
+    if (method %in% c("diagnostic.hsroc", "diagnostic.bivariate.ml")) {
+        stop(sprintf("Diagnostic method '%s' was removed. Use 'diagnostic.reitsma' (Reitsma bivariate model) for count-based joint analysis.", method), call.=FALSE)
     }
 
     supported <- rcmetar.analysis.methods(data.type, workflow)
@@ -750,6 +797,9 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (length(method) != 1 || is.na(method) || !nzchar(method)) {
         stop("A single method name is required.", call.=FALSE)
     }
+    if (method %in% c("diagnostic.hsroc", "diagnostic.bivariate.ml")) {
+        stop(sprintf("Diagnostic method '%s' was removed. Use 'diagnostic.reitsma' (Reitsma bivariate model) for count-based joint analysis.", method), call.=FALSE)
+    }
     known.methods <- unique(unlist(rcmetar.analysis.methods(), use.names=FALSE))
     if (!(method %in% known.methods)) {
         stop(sprintf("Unknown RCMetaR analysis method '%s'.", method), call.=FALSE)
@@ -850,6 +900,18 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (!setequal(names(result$plot_capabilities), image.names)) {
         stop("Plot capability descriptors must match the returned plot artifacts.", call.=FALSE)
     }
+    missing.plot.data <- vapply(image.names, function(title) {
+        capability <- result$plot_capabilities[[title]]
+        if (!isTRUE(capability$editable)) return(FALSE)
+        params.paths <- result$plot_params_paths
+        if (is.null(params.paths) || is.null(names(params.paths)) || !(title %in% names(params.paths))) return(TRUE)
+        path <- params.paths[[title]]
+        length(path) != 1L || is.na(path) || !nzchar(as.character(path))
+    }, logical(1))
+    if (any(missing.plot.data)) {
+        stop(sprintf("Editable plot capability descriptor missing plot data for: %s",
+                     paste(image.names[missing.plot.data], collapse=", ")), call.=FALSE)
+    }
     result
 }
 
@@ -866,7 +928,7 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         bootstrap="other",
         "meta-regression"="regression",
         standard={
-            if (length(methods) != 1 || methods %in% c("diagnostic.hsroc", "diagnostic.bivariate.ml")) {
+            if (length(methods) != 1 || methods %in% c("diagnostic.reitsma")) {
                 stop("Heterogeneous diagnostic plot producers must declare their own capabilities.", call.=FALSE)
             }
             "forest"
@@ -893,7 +955,7 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         subgroup_forest=list(styleable=TRUE, regenerator="forest", option.groups=TRUE),
         regression=list(styleable=TRUE, regenerator="regression", option.groups=TRUE),
         roc=list(styleable=FALSE, regenerator="none", option.groups=FALSE),
-        sroc=list(styleable=FALSE, regenerator="none", option.groups=FALSE),
+        sroc=list(styleable=TRUE, regenerator="sroc", option.groups=TRUE),
         other=list(styleable=FALSE, regenerator="none", option.groups=FALSE)
     )
 }

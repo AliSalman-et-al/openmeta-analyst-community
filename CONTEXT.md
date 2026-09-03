@@ -33,7 +33,7 @@ An assumption-dependent analysis that estimates and adds studies to a funnel plo
 _Avoid_: Bias correction, adjusted true effect
 
 **Extrapolated infinite-precision estimate**:
-An exploratory regression estimate evaluated where its precision predictor approaches the large-study limit. It is not a corrected estimate of the true effect.
+An exploratory regression estimate evaluated where its standard-error predictor approaches the large-study limit. It is not a corrected estimate of the true effect.
 _Avoid_: Regression limit estimate, bias-adjusted estimate
 
 **Deeks effective-sample-size funnel**:

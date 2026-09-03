@@ -844,10 +844,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         form.show()
 
     def meta_reg(self):
-        form = self._build_analysis_specs_dialog(
-            analysis_type="meta-regression",
-            confidence_level=self.model.get_confidence_level(),
-        )
+        kwargs = {
+            "analysis_type": "meta-regression",
+            "confidence_level": self.model.get_confidence_level(),
+        }
+        if self.model.get_current_outcome_type() == "diagnostic":
+            # Reitsma meta-regression is a single joint sensitivity/
+            # specificity model. Keep that intent explicit at the UI seam.
+            kwargs["diagnostic_metrics"] = ["sens", "spec"]
+        form = self._build_analysis_specs_dialog(**kwargs)
         if form is None:
             return
         form.show()

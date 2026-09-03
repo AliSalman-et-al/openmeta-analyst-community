@@ -18,8 +18,7 @@
 #' \code{\link{RCMetaR-repeated-analyses}},
 #' \code{\link{RCMetaR-meta-regression}},
 #' \code{\link{RCMetaR-plotting}},
-#' \code{\link{RCMetaR-data-completion}},
-#' \code{\link{RCMetaR-hsroc-helpers}}
+#' \code{\link{RCMetaR-data-completion}}
 #'
 #' @keywords internal
 "_PACKAGE"
@@ -31,16 +30,14 @@
 #' intentionally not exported as caller-facing interface.
 #'
 #' @import boot
+#' @importFrom ellipse ellipse
 #' @import grDevices
 #' @import graphics
-#' @import HSROC
-#' @import lme4
 #' @import meta
 #' @import metafor
-#' @import pdftools
 #' @import stats
 #' @import utils
-#' @importFrom methods is new setClass
+#' @importFrom methods is new setClass slot
 #' @rawNamespace S3method(print,summary.data)
 #' @rawNamespace S3method(print,summary.display)
 #' @rawNamespace exportClasses(AnalysisSpecification, BinaryData, ContinuousData, CovariateValues, DiagnosticData, OMData)

@@ -10,6 +10,7 @@ from typing import Literal, Protocol, TypeAlias, runtime_checkable
 
 from rc_metastudio import r_bridge
 from rc_metastudio import analysis_dataset
+from rc_metastudio import result_sections
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.analysis_errors import DiagnosticExecutionError
 
@@ -98,6 +99,7 @@ class StudySelectionResult:
 
     studies: tuple[analysis_dataset.Study, ...]
     has_missing_values: bool
+    excluded_study_names: tuple[str, ...] = ()
 
 
 def select_studies_for_covariates(
@@ -112,6 +114,7 @@ def select_studies_for_covariates(
         for covariate in selected_covariates
     }
     studies = []
+    excluded_study_names = []
     has_missing_values = False
     for study in model.get_studies(only_if_included=True):
         if all(
@@ -121,7 +124,10 @@ def select_studies_for_covariates(
             studies.append(study)
         else:
             has_missing_values = True
-    return StudySelectionResult(tuple(studies), has_missing_values)
+            excluded_study_names.append(str(study.name))
+    return StudySelectionResult(
+        tuple(studies), has_missing_values, tuple(excluded_study_names)
+    )
 
 
 def make_analysis_request(
@@ -280,6 +286,7 @@ def execute_meta_regression_request(
             fixed_effects=fixed_effects,
             confidence_level=parameters.get("conf.level", default_confidence_level),
             params=parameters,
+            method=request.method,
         )
     )
 
@@ -307,6 +314,13 @@ def _run_continuous_request(request):
 def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
     if model.included_studies_have_raw_data():
         return False
+
+    joint_methods = [request for request in requests if request.method == "diagnostic.reitsma"]
+    if joint_methods:
+        raise ValueError(
+            "Reitsma bivariate model requires complete TP/FN/FP/TN counts; "
+            "entered diagnostic effects cannot be used for this method."
+        )
 
     missing_metrics = [
         request.metric
@@ -395,6 +409,18 @@ def _empty_diagnostic_result() -> AnalysisResult:
 def _merge_diagnostic_result(
     merged_result: AnalysisResult, metric_result: AnalysisResult
 ) -> None:
+    # References are a result-level collection rather than a metric-specific
+    # section.  A plain mapping update would silently discard citations from
+    # every metric except the last successful one.  Merge them first, keeping
+    # producer order and the existing reference formatter's de-duplication
+    # rules; the remaining keyed sections are intentionally metric-scoped.
+    merged_references = _merge_reference_texts(
+        merged_result["texts"].get("References"),
+        metric_result.get("texts", {}).get("References"),
+    )
+    if merged_references:
+        merged_result["texts"]["References"] = merged_references
+
     for key in (
         "texts",
         "images",
@@ -403,7 +429,16 @@ def _merge_diagnostic_result(
         "image_params_paths",
         "plot_capabilities",
     ):
-        merged_result[key].update(metric_result.get(key, {}))
+        if key == "texts":
+            merged_result[key].update(
+                {
+                    name: value
+                    for name, value in metric_result.get(key, {}).items()
+                    if name != "References"
+                }
+            )
+        else:
+            merged_result[key].update(metric_result.get(key, {}))
 
     image_order = metric_result.get("image_order")
     if image_order:
@@ -422,3 +457,31 @@ def _diagnostic_result_has_successes(result: AnalysisResult) -> bool:
 
 def _format_diagnostic_failures(failures):
     return "\n".join("%s failed: %s" % (metric, error) for metric, error in failures)
+
+
+def _merge_reference_texts(existing, incoming):
+    """Combine already-formatted reference sections without losing citations."""
+    references = _reference_entries(existing) + _reference_entries(incoming)
+    if not references:
+        return ""
+    return result_sections.format_references(
+        result_sections.dedupe_references_preserving_order(references)
+    )
+
+
+def _reference_entries(value):
+    if not value:
+        return []
+    if not isinstance(value, str):
+        return [str(value)]
+    entries = []
+    for line in value.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # parse_out_results numbers references for display.  Remove that
+        # presentation detail before applying stable de-duplication.
+        if ". " in line and line.split(". ", 1)[0].isdigit():
+            line = line.split(". ", 1)[1]
+        entries.append(line)
+    return entries

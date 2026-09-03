@@ -1,4 +1,5 @@
 import re
+from collections.abc import Mapping
 from collections import namedtuple
 
 
@@ -9,34 +10,24 @@ DisplaySection = namedtuple("DisplaySection", ["kind", "key", "display_title", "
 
 
 DIAGNOSTIC_SECTION_GROUPS = (
-    ("sens", "spec", "bivariate"),
+    ("sens", "spec", "reitsma"),
     ("likelihood", "nlr", "plr"),
 )
 
-HSROC_SECTION_TITLES = {
-    "Between-study parameters": "HSROC Model Parameters",
-    "Within-study parameters": "Study-Level Parameters",
-    "Within-study parameters - theta": "Study-Level Threshold Parameters",
-    "Within-study parameters - alpha": "Study-Level Accuracy Parameters",
-    "Within-study parameters - pi": "Study-Level Prevalence Parameters",
-    "Within-study parameters - S1": "Study-Level Sensitivity Parameters",
-    "Within-study parameters - C1": "Study-Level Specificity Parameters",
-}
-
 SECTION_TITLE_REPLACEMENTS = {
-    "Density plots": "Density Plots",
-    "Trace plots": "Trace Plots",
     "Leave-one-out Forest plot": "Leave-One-Out Forest Plot",
     "SROC": "Summary ROC Plot",
     "Warning": "Interpretation",
     "Data and eligibility": "Analysis Summary",
     "Tests": "Small-Study Effects Tests",
     "Pooled comparison": "Pooled Estimates",
-    "Trim-and-fill left": "Trim-and-Fill: Left Scenario",
-    "Trim-and-fill right": "Trim-and-Fill: Right Scenario",
+    "Trim-and-fill left": "Trim-and-Fill: Left Estimate",
+    "Trim-and-fill right": "Trim-and-Fill: Right Estimate",
     "Trim-and-fill model": "Trim-and-Fill Model",
     "Extrapolation": "Infinite-Precision Estimate",
     "Failures": "Procedure Warnings",
+    "Method details": "Method Details",
+    "Methods not applicable": "Methods Not Applicable",
 }
 
 METRIC_TITLE_REPLACEMENTS = (
@@ -49,7 +40,19 @@ METRIC_TITLE_REPLACEMENTS = (
 
 
 def format_references(references):
-    ordered_references = dedupe_references_preserving_order(list(references))
+    if references is None:
+        return ""
+    if isinstance(references, Mapping):
+        references = references.values()
+    elif isinstance(references, str):
+        references = [references]
+    else:
+        try:
+            references = list(references)
+        except TypeError:
+            references = [references]
+    references = [_reference_text(reference) for reference in references]
+    ordered_references = dedupe_references_preserving_order(references)
     return "".join(
         "%d. %s\n" % (index + 1, reference)
         for index, reference in enumerate(ordered_references)
@@ -68,18 +71,37 @@ def dedupe_references_preserving_order(references):
     return deduped
 
 
+def _reference_text(reference):
+    if reference is None:
+        return ""
+    if not isinstance(reference, str):
+        try:
+            values = list(reference)
+        except TypeError:
+            values = None
+        if values is not None:
+            if not values:
+                return ""
+            if len(values) == 1:
+                return _reference_text(values[0])
+            return "; ".join(_reference_text(value) for value in values)
+    text = str(reference).replace("\r\n", "\n").strip()
+    text = re.sub(r"^\[\d+\]\s+", "", text)
+    return text.strip('"')
+
+
 def order_text_sections(items, include_references=False):
-    ordered = _group_items(
-        [
-            (title, value)
-            for title, value in items
-            if include_references or title != REFERENCE_SECTION_TITLE
-        ],
-        *DIAGNOSTIC_SECTION_GROUPS,
-    )
-    if include_references:
-        return ordered
-    return ordered
+    filtered = [
+        (title, value)
+        for title, value in items
+        if include_references or title != REFERENCE_SECTION_TITLE
+    ]
+    # Most workflows deliberately emit a meaningful narrative order.  Only
+    # the legacy multi-metric diagnostic result has a narrow ordering contract;
+    # arbitrary/new result sections must remain in producer order.
+    if _looks_like_diagnostic_sections(filtered):
+        return _group_items(filtered, *DIAGNOSTIC_SECTION_GROUPS)
+    return filtered
 
 
 def order_image_sections(items, explicit_order=None):
@@ -88,32 +110,37 @@ def order_image_sections(items, explicit_order=None):
         return [
             (title, item_dict[title]) for title in explicit_order if title in item_dict
         ]
-    return _group_items(list(items), *DIAGNOSTIC_SECTION_GROUPS)
+    items = list(items)
+    if _looks_like_diagnostic_sections(items):
+        return _group_items(items, *DIAGNOSTIC_SECTION_GROUPS)
+    return items
 
 
 def order_display_sections(texts, images, explicit_image_order=None):
     context = _section_context(texts, images)
     text_sections = [
-        DisplaySection("text", title, section_display_title(title, context), value)
+        DisplaySection("text", title, section_display_title(title, context, "text"), value)
         for title, value in order_text_sections(texts)
     ]
     image_sections = [
-        DisplaySection("image", title, section_display_title(title, context), value)
+        DisplaySection("image", title, section_display_title(title, context, "image"), value)
         for title, value in order_image_sections(
             images, explicit_order=explicit_image_order
         )
     ]
 
-    if _is_hsroc_result(context):
-        return _order_hsroc_sections(text_sections, image_sections)
     if _is_small_study_effects_result(context):
         return _order_small_study_effects_sections(text_sections, image_sections)
+    if _is_reitsma_meta_regression_result(context):
+        return _order_reitsma_meta_regression_sections(text_sections, image_sections)
+    if _is_reitsma_result(context):
+        return _order_reitsma_sections(text_sections, image_sections)
     if _is_standard_meta_analysis_result(context):
         return _order_standard_meta_analysis_sections(text_sections, image_sections)
     return text_sections + image_sections
 
 
-def section_display_title(title, context=None):
+def section_display_title(title, context=None, kind=None):
     if context is None:
         context = {"text_titles": [], "image_titles": []}
 
@@ -121,8 +148,9 @@ def section_display_title(title, context=None):
         if "Regression Plot" in context["image_titles"]:
             return "Meta-Regression Summary"
         return "Meta-Analysis Summary"
-    if title in HSROC_SECTION_TITLES:
-        return HSROC_SECTION_TITLES[title]
+    if kind == "image" and title in ("Trim-and-fill left", "Trim-and-fill right"):
+        side = "Left" if title.endswith("left") else "Right"
+        return "Trim-and-Fill: %s Plot" % side
     if title in SECTION_TITLE_REPLACEMENTS:
         return SECTION_TITLE_REPLACEMENTS[title]
     return _normalize_metric_title(title)
@@ -156,6 +184,102 @@ def _is_small_study_effects_result(context):
     )
 
 
+def _is_reitsma_result(context):
+    titles = set(context["text_titles"])
+    # AUC is an optional derived quantity: mada can fail to provide it for a
+    # valid fit (for example when the SROC geometry is undefined).  The
+    # result still has the Reitsma contract when its clinical headline and at
+    # least one of the model's supporting outputs are present.
+    return "Clinical interpretation" in titles and bool(
+        titles
+        & {
+            "Summary operating point",
+            "Sampling-based summary ratios",
+            "Marginal prediction",
+            "Between-study heterogeneity",
+            "Diagnostic I-squared",
+            "Model information",
+        }
+    )
+
+
+def _is_reitsma_meta_regression_result(context):
+    titles = set(context["text_titles"])
+    return "Overall ML likelihood-ratio test" in titles and (
+        "Sensitivity coefficients" in titles or "Specificity coefficients" in titles
+    )
+
+
+def _take_sections(sections, keys):
+    by_key = {section.key: section for section in sections}
+    selected = []
+    for key in keys:
+        section = by_key.pop(key, None)
+        if section is not None:
+            selected.append(section)
+    return selected, by_key
+
+
+def _order_reitsma_sections(text_sections, image_sections):
+    result = []
+    primary, remaining = _take_sections(
+        text_sections,
+        ("Clinical interpretation", "Summary operating point", "SROC AUC"),
+    )
+    result.extend(primary)
+    sroc, remaining_images = _take_sections(image_sections, ("SROC", "Summary ROC"))
+    result.extend(sroc)
+    support, remaining = _take_sections(
+        list(remaining.values()),
+        (
+            "Sampling-based summary ratios",
+            "Marginal prediction",
+            "Between-study heterogeneity",
+            "Diagnostic I-squared",
+        ),
+    )
+    result.extend(support)
+    model, remaining = _take_sections(
+        list(remaining.values()), ("Model information",)
+    )
+    result.extend(remaining.values())
+    result.extend(model)
+    result.extend(remaining_images.values())
+    return result
+
+
+def _order_reitsma_meta_regression_sections(text_sections, image_sections):
+    result = []
+    primary, remaining = _take_sections(text_sections, ("Clinical interpretation",))
+    result.extend(primary)
+    tests, remaining = _take_sections(
+        list(remaining.values()),
+        ("Overall ML likelihood-ratio test", "Moderator block tests"),
+    )
+    result.extend(tests)
+    for table_key, plot_prefix in (
+        ("Sensitivity coefficients", "Sensitivity Moderator Coefficients"),
+        ("Specificity coefficients", "Specificity Moderator Coefficients"),
+    ):
+        table, remaining = _take_sections(list(remaining.values()), (table_key,))
+        result.extend(table)
+        plots = [
+            section
+            for section in image_sections
+            if section.key == plot_prefix
+        ]
+        result.extend(plots)
+        image_sections = [section for section in image_sections if section not in plots]
+    details, remaining = _take_sections(
+        list(remaining.values()),
+        ("Residual diagnostic I-squared", "Moderator coding", "Model information"),
+    )
+    result.extend(details)
+    result.extend(remaining.values())
+    result.extend(image_sections)
+    return result
+
+
 def _order_small_study_effects_sections(text_sections, image_sections):
     ordered_keys = (
         "Warning",
@@ -185,19 +309,6 @@ def _order_small_study_effects_sections(text_sections, image_sections):
     return result
 
 
-def _is_hsroc_result(context):
-    titles = set(context["text_titles"]) | set(context["image_titles"])
-    return bool(
-        {
-            "Clinical Accuracy Summary",
-            "Summary ROC",
-            "Between-study parameters",
-            "HSROC Model Parameters",
-        }
-        & titles
-    )
-
-
 def _order_standard_meta_analysis_sections(text_sections, image_sections):
     summary = _matching_sections(
         text_sections, lambda section: section.key == "Summary"
@@ -219,31 +330,6 @@ def _order_standard_meta_analysis_sections(text_sections, image_sections):
     return summary + primary_images + weights + other_text + other_images
 
 
-def _order_hsroc_sections(text_sections, image_sections):
-    combined = text_sections + image_sections
-    return sorted(combined, key=lambda section: _hsroc_priority(section))
-
-
-def _hsroc_priority(section):
-    title = section.key
-    priority_by_title = {
-        "Clinical Accuracy Summary": 0,
-        "Summary": 0,
-        "Summary ROC": 1,
-        "HSROC Model Parameters": 2,
-        "Between-study parameters": 2,
-        "Within-study parameters": 3,
-        "Within-study parameters - theta": 3,
-        "Within-study parameters - alpha": 3,
-        "Within-study parameters - pi": 3,
-        "Within-study parameters - S1": 3,
-        "Within-study parameters - C1": 3,
-        "Density plots": 4,
-        "Trace plots": 5,
-    }
-    return (priority_by_title.get(title, 6), section.kind, title)
-
-
 def _matching_sections(sections, predicate):
     return [section for section in sections if predicate(section)]
 
@@ -254,6 +340,7 @@ def _is_primary_plot_title(title):
 
 def _normalize_metric_title(title):
     display_title = str(title).replace("Forest plot", "Forest Plot")
+    display_title = _normalize_identifier_label(display_title)
     for abbreviation, label in METRIC_TITLE_REPLACEMENTS:
         display_title = re.sub(
             r"\b%s\b" % re.escape(abbreviation),
@@ -263,11 +350,79 @@ def _normalize_metric_title(title):
     return display_title
 
 
+def _looks_like_diagnostic_sections(items):
+    titles = [str(title).lower() for title, _value in items]
+    has_accuracy = any(
+        title.startswith(("sens", "spec", "reitsma")) for title in titles
+    )
+    has_ratios = any(
+        title.startswith(("nlr", "plr", "negative likelihood", "positive likelihood", "likelihood"))
+        for title in titles
+    )
+    return has_accuracy and has_ratios
+
+
+def _normalize_identifier_label(value):
+    """Make R identifiers readable while retaining statistical notation."""
+    text = str(value).replace("I\ufffd", "I²").replace("\ufffd", "-")
+    replacements = {
+        "posLR": "Positive Likelihood Ratio",
+        "negLR": "Negative Likelihood Ratio",
+        "invnegLR": "Inverse Negative Likelihood Ratio",
+        "pos.lr": "Positive Likelihood Ratio",
+        "neg.lr": "Negative Likelihood Ratio",
+        "inv.neg.lr": "Inverse Negative Likelihood Ratio",
+        # Keep this ASCII-safe because some embedded-R locales decode an
+        # en-dash in dimnames as U+FFFD before it reaches the Qt document.
+        "Zhou.Dendukuri": "Zhou-Dendukuri",
+        "Holling.Unadjusted": "Holling (unadjusted)",
+        "Holling.Adjusted": "Holling (adjusted)",
+        "I.squared": "I²",
+        "I_squared": "I²",
+        "I2": "I²",
+        "tau.squared": "τ²",
+        "tau_squared": "τ²",
+        "tau2": "τ²",
+    }
+    for raw_label, display_label in sorted(
+        replacements.items(), key=lambda item: len(item[0]), reverse=True
+    ):
+        text = text.replace(raw_label, display_label)
+    if text in replacements:
+        return replacements[text]
+    text = re.sub(r"\bPr\s*\(>\|[^)]+\)", "p-value", text)
+    text = re.sub(r"\b(?:p[._-]?value|pval)\b", "p-value", text, flags=re.I)
+    text = re.sub(r"\b(?:z[._-]?value|zval)\b", "z-value", text, flags=re.I)
+    text = re.sub(r"\b(?:I[._-]?squared|I2)\b", "I²", text, flags=re.I)
+    text = re.sub(r"\b(?:tau[._-]?squared|tau2)\b", "τ²", text, flags=re.I)
+    text = re.sub(r"(?<![A-Za-z])([A-Z]{2,})(?=[A-Z][a-z]|\b)", r"\1 ", text)
+    text = text.replace("_", " ").replace(".", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    words = []
+    for word in text.split(" "):
+        lower = word.lower()
+        if lower in {"nlr", "plr", "dor"}:
+            words.append({"nlr": "Negative Likelihood Ratio", "plr": "Positive Likelihood Ratio", "dor": "Diagnostic Odds Ratio"}[lower])
+        elif lower == "sens":
+            words.append("Sensitivity")
+        elif lower == "spec":
+            words.append("Specificity")
+        else:
+            words.append(word)
+    return " ".join(words)
+
+
+def normalize_identifier_label(value):
+    """Public label helper for result values crossing the R boundary."""
+    return _normalize_identifier_label(value)
+
+
 def _group_items(items, *groups):
     def _get_group_id(key):
+        normalized_key = key.strip().lower()
         for group_id, group in enumerate(groups):
             for group_member in group:
-                if key.lower().find(group_member.lower()) != -1:
+                if normalized_key.startswith(group_member.lower()):
                     return group_id
         return None
 

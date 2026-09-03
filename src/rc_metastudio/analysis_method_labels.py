@@ -12,8 +12,7 @@ _KNOWN_METHOD_LABELS = {
     "diagnostic.fixed.mh": "Diagnostic Fixed-Effect Mantel-Haenszel",
     "diagnostic.fixed.peto": "Diagnostic Fixed-Effect Peto",
     "diagnostic.random": "Diagnostic Random-Effects",
-    "diagnostic.hsroc": "HSROC",
-    "diagnostic.bivariate.ml": "Bivariate (Maximum Likelihood)",
+    "diagnostic.reitsma": "Reitsma bivariate model",
     "meta.regression": "Meta-Regression",
 }
 
@@ -28,8 +27,6 @@ _TOKEN_LABELS = {
     "var": "Variance",
     "mh": "Mantel-Haenszel",
     "peto": "Peto",
-    "hsroc": "HSROC",
-    "bivariate": "Bivariate",
     "ml": "Maximum Likelihood",
     "meta": "Meta",
     "regression": "Regression",
@@ -38,6 +35,10 @@ _TOKEN_LABELS = {
 _CANONICAL_LABEL_REPLACEMENTS = (("Mantel Haenszel", "Mantel-Haenszel"),)
 
 _KNOWN_PARAMETER_VALUE_LABELS = {
+    # Keep estimator choices compact in constrained dialogs.  The raw codes
+    # remain the backend values and are standard statistical abbreviations.
+    ("estimator", "REML"): "REML",
+    ("estimator", "ML"): "ML",
     ("rm.method", "HE"): "Hedges",
     ("rm.method", "DL"): "DerSimonian-Laird",
     ("rm.method", "SJ"): "Sidik-Jonkman",
@@ -56,23 +57,20 @@ _KNOWN_PARAMETER_VALUE_LABELS = {
     ("to", "all"): "All studies",
     ("to", "if0all"): "All studies if any study has zero events",
     ("to", "none"): "No studies",
+    ("correction.policy", "Studies with any zero cell"): "Studies with any zero cell",
+    ("correction.policy", "All studies if any zero exists"): "All studies if any zero exists",
+    ("correction.policy", "None"): "None",
 }
 
 _KNOWN_PARAMETER_LABELS = {
     "rm.method": "Random-Effects Method",
+    "estimator": "Estimator",
     "inference.method": "Inference Method",
     "to": "Correction Factor Target",
+    "correction.policy": "Correction Policy",
     "conf.level": "Confidence Level",
     "digits": "Decimal Places",
     "adjust": "Correction Factor",
-    "num.iters": "Number of Iterations",
-    "burn.in": "Burn-In Iterations",
-    "thin": "Thinning Interval",
-    "num.chains": "Number of Chains",
-    "theta.lower": "Accuracy Prior Lower Bound",
-    "theta.upper": "Accuracy Prior Upper Bound",
-    "lambda.lower": "Threshold Prior Lower Bound",
-    "lambda.upper": "Threshold Prior Upper Bound",
 }
 
 _DIAGNOSTIC_METRIC_GROUP_LABELS = {

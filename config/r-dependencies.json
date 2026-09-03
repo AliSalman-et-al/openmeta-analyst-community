@@ -13,12 +13,12 @@
     "normal_install_type": "binary",
     "source_fallback": false,
     "required_normal_packages": [
-      "metafor", "lme4", "pdftools", "rsvg", "svglite", "tiff", "xml2", "roxygen2", "testthat",
-      "mcmc", "MCMCpack", "igraph", "quantreg", "ape", "Hmisc", "mice", "ggplot2", "RColorBrewer", "coda",
+      "mada", "metafor", "rsvg", "svglite", "tiff", "xml2", "roxygen2", "testthat",
+      "igraph", "quantreg", "ape", "Hmisc", "mice", "ggplot2", "RColorBrewer",
       "Rcpp", "magrittr", "irlba", "minqa", "nloptr", "RcppEigen", "SparseM", "MatrixModels", "Formula",
       "latticeExtra", "acepack", "gridExtra", "data.table", "htmlTable", "viridis", "htmltools", "viridisLite",
       "htmlwidgets", "rmarkdown", "knitr", "stringr", "stringi", "colorspace", "gtable", "scales", "vctrs",
-      "rlang", "withr", "cli", "glue", "lifecycle", "S7", "labeling", "meta", "metabook", "CompQuadForm", "isoband", "farver"
+      "rlang", "withr", "cli", "glue", "lifecycle", "S7", "labeling", "meta", "metabook", "CompQuadForm", "isoband", "farver", "mvtnorm", "ellipse", "mvmeta", "mixmeta"
     ],
     "install_options": {
       "install.packages.check.source": "no",
@@ -44,18 +44,7 @@
         "contrib_path": "bin/macosx/sonoma-arm64/contrib/4.6"
       }
     },
-    "source_exceptions": [
-      {
-        "name": "HSROC",
-        "version": "2.1.9",
-        "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-        "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
-        "dependencies": ["lattice", "coda", "MASS", "MCMCpack"],
-        "install_type": "source",
-        "repos": null,
-        "dependencies_install": false
-      }
-    ]
+    "source_exceptions": []
   },
   "package_metadata": {
     "package": "RCMetaR",
@@ -99,6 +88,15 @@
       "installed_version": "4.6.1"
     },
     {
+      "name": "mada",
+      "source": "cran",
+      "scope": ["runtime"],
+      "declared_in": ["r/RCMetaR/DESCRIPTION"],
+      "evidence": ["r/RCMetaR/R/reitsma_methods.R: mada::reitsma(), SummaryPts(), AUC(), and SROC geometry"],
+      "reason": "mada 0.5.12 is the statistical authority for the count-based Reitsma bivariate model.",
+      "installed_version": "0.5.12"
+    },
+    {
       "name": "metafor",
       "source": "cran",
       "scope": ["runtime"],
@@ -120,31 +118,6 @@
       "evidence": ["r/RCMetaR/R/publication_bias.R: meta::metabias(...) and meta::trimfill(...)"],
       "reason": "Pinned meta 8.5-0 owns the supported classical small-study effects methods and trim-and-fill behavior.",
       "installed_version": "8.5-0"
-    },
-    {
-      "name": "HSROC",
-      "source": "cran-archive",
-      "scope": ["runtime"],
-      "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.R: diagnostic.hsroc delegates to HSROC(...) and HSROCSummary(...)",
-        "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-        "scripts/install-r-deps.R"
-      ],
-      "reason": "Diagnostic HSROC analysis delegates sampling and summaries to the latest available archived HSROC package.",
-      "installed_version": "2.1.9"
-    },
-    {
-      "name": "pdftools",
-      "source": "cran",
-      "scope": ["runtime"],
-      "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.R: hsroc.rasterize.pdf converts stock HSROC PDF plots into PNG images for the Results window",
-        "scripts/install-r-deps.R"
-      ],
-      "reason": "Stock archived HSROC writes PDF plots; RCMetaR rasterizes them so the PyQt Results window can display HSROC plots as images.",
-      "installed_version": "3.9.0"
     },
     {
       "name": "svglite",
@@ -180,15 +153,6 @@
       "installed_version": "0.1-12"
     },
     {
-      "name": "lme4",
-      "source": "cran",
-      "scope": ["runtime"],
-      "declared_in": ["r/RCMetaR/DESCRIPTION"],
-      "evidence": ["r/RCMetaR/R/bivariate.R: bivariate.dx.test uses lmer(...) for mixed-model fitting"],
-      "reason": "Bivariate diagnostic model fitting uses lme4 mixed-model functionality.",
-      "installed_version": "2.0-1"
-    },
-    {
       "name": "methods",
       "source": "base-runtime",
       "scope": ["runtime"],
@@ -203,7 +167,6 @@
       "scope": ["runtime"],
       "declared_in": ["r/RCMetaR/DESCRIPTION"],
       "evidence": [
-        "r/RCMetaR/R/diagnostic_methods.R: bivariate diagnostic confidence intervals use boot.ci(...)",
         "r/RCMetaR/R/meta_methods.R: bootstrap analysis uses boot(...)",
         "r/RCMetaR/R/meta_reg.R: boot(...) and boot.ci(...)"
       ],
@@ -361,12 +324,6 @@
       "evidence": ["scripts/install-r-deps.R"]
     },
     {
-      "name": "MCMCpack",
-      "source": "cran",
-      "reason": "Bundled for app-level R workflows and transitive Bayesian analysis support outside direct RCMetaR metadata.",
-      "evidence": ["scripts/install-r-deps.R"]
-    },
-    {
       "name": "igraph",
       "source": "cran",
       "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
@@ -415,12 +372,6 @@
       "evidence": ["scripts/install-r-deps.R"]
     },
     {
-      "name": "coda",
-      "source": "cran",
-      "reason": "Bundled as part of the app-level CRAN dependency closure.",
-      "evidence": ["scripts/install-r-deps.R"]
-    },
-    {
       "name": "MASS",
       "source": "recommended",
       "reason": "Bundled as part of the app-level CRAN dependency closure.",
@@ -443,12 +394,6 @@
       "source": "recommended",
       "reason": "Installed by the app bundle outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
       "evidence": ["r/RCMetaR/DESCRIPTION", "scripts/install-r-deps.R"]
-    },
-    {
-      "name": "mcmc",
-      "source": "cran",
-      "reason": "Installed by the app-level archived dependency bootstrap for Bayesian dependency chains, not direct RCMetaR metadata.",
-      "evidence": ["scripts/install-r-deps.R"]
     }
   ],
   "validation": {

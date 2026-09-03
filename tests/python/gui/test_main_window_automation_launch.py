@@ -1485,7 +1485,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "conf.level": "float",
         "digits": "float",
         "adjust": "float",
-        "theta.lower": "float",
     }
     defaults = {
         "rm.method": "DL",
@@ -1494,7 +1493,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         "conf.level": 95.0,
         "digits": 2,
         "adjust": 0.5,
-        "theta.lower": -2.0,
     }
     pretty_names = {
         "rm.method": {
@@ -1535,10 +1533,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
             "pretty.name": "Correction factor",
             "description": "Constant added to two-by-two table entries.",
         },
-        "theta.lower": {
-            "pretty.name": "Prior lower bound",
-            "description": "Lower value in a uniform prior range.",
-        },
     }
 
     monkeypatch.setattr(
@@ -1564,7 +1558,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "conf.level",
                 "digits",
                 "adjust",
-                "theta.lower",
             ],
             pretty_names,
         ),
@@ -1659,18 +1652,13 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         non_conf_double_spinboxes = [
             spinbox for spinbox in double_spinboxes if spinbox.suffix() != "%"
         ]
-        assert len(non_conf_double_spinboxes) == 2
+        assert len(non_conf_double_spinboxes) == 1
         correction_spinbox = next(
             spinbox for spinbox in non_conf_double_spinboxes if spinbox.minimum() == 0
-        )
-        signed_spinbox = next(
-            spinbox for spinbox in non_conf_double_spinboxes if spinbox.minimum() < 0
         )
         correction_spinbox.lineEdit().setText("-1")
         correction_spinbox.interpretText()
         assert correction_spinbox.value() == 0.5
-        signed_spinbox.setValue(-2.5)
-        assert signed_spinbox.value() == -2.5
 
         digit_spinboxes = specs[0].parameter_grp_box.findChildren(QtWidgets.QSpinBox)
         assert len(digit_spinboxes) == 1
@@ -1691,10 +1679,9 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
                 "Confidence level",
                 "Decimal places",
                 "Correction factor",
-                "Prior lower bound",
             }
         ]
-        assert len(parameter_labels) == 7
+        assert len(parameter_labels) == 6
         for label in parameter_labels:
             assert label.minimumWidth() <= label.sizeHint().width()
             assert label.maximumWidth() >= label.sizeHint().width()
@@ -1705,7 +1692,6 @@ def test_method_parameters_dialog_displays_enum_defaults(monkeypatch):
         assert specs[0].current_param_vals["conf.level"] == 95.0
         assert specs[0].current_param_vals["digits"] == 2
         assert specs[0].current_param_vals["adjust"] == 0.5
-        assert specs[0].current_param_vals["theta.lower"] == -2.5
     finally:
         window.close()
         app.processEvents()
@@ -1720,16 +1706,14 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
     r_bridge = sys.modules["rc_metastudio.r_bridge"]
 
     params = {
-        "num.iters": "int",
-        "lambda.lower": "float",
-        "theta.upper": "float",
         "conf.level": "float",
+        "adjust": "float",
+        "digits": "int",
     }
     defaults = {
-        "num.iters": 5000,
-        "lambda.lower": -2.0,
-        "theta.upper": 2.0,
         "conf.level": 95.0,
+        "adjust": 0.5,
+        "digits": 2,
     }
 
     monkeypatch.setattr(
@@ -1744,7 +1728,7 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
         lambda method: (
             dict(params),
             dict(defaults),
-            ["num.iters", "lambda.lower", "theta.upper", "conf.level"],
+            ["conf.level", "adjust", "digits"],
             {},
         ),
         raising=False,
@@ -1775,13 +1759,9 @@ def test_method_parameters_dialog_normalizes_missing_parameter_metadata(monkeypa
             str(label.text())
             for label in specs[0].parameter_grp_box.findChildren(QtWidgets.QLabel)
         }
-        assert "Number of Iterations" in labels
-        assert "Threshold Prior Lower Bound" in labels
-        assert "Accuracy Prior Upper Bound" in labels
         assert "Confidence Level" in labels
-        assert "num.iters" not in labels
-        assert "lambda.lower" not in labels
-        assert "theta.upper" not in labels
+        assert "Correction Factor" in labels
+        assert "Decimal Places" in labels
     finally:
         window.close()
         app.processEvents()
@@ -2043,6 +2023,36 @@ def test_meta_regression_uses_shared_method_covariates_and_plots_dialog(monkeypa
         os.chdir(REPO_ROOT)
 
 
+def test_diagnostic_meta_regression_requests_joint_metrics(monkeypatch):
+    app, window = automation.start_automation()
+    built = []
+
+    class SharedSpecsDialog(object):
+        def show(self):
+            pass
+
+    def build_specs(**kwargs):
+        built.append(kwargs)
+        return SharedSpecsDialog()
+
+    monkeypatch.setattr(window, "_build_analysis_specs_dialog", build_specs)
+    try:
+        assert window.open(_sample_project_path("lymph.rcms")) is True
+        window.meta_reg()
+
+        assert built == [
+            {
+                "analysis_type": "meta-regression",
+                "confidence_level": window.model.get_confidence_level(),
+                "diagnostic_metrics": ["sens", "spec"],
+            }
+        ]
+    finally:
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
 def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_enabled():
 
     app, window = automation.start_automation()
@@ -2056,87 +2066,6 @@ def test_meta_regression_action_stays_disabled_without_covariates_when_data_are_
         assert window.action_subgroup_ma.isEnabled() is False
         assert window.action_meta_regression.isEnabled() is False
     finally:
-        window.close()
-        app.processEvents()
-        os.chdir(REPO_ROOT)
-
-
-def test_meta_regression_dialog_disables_ok_and_does_not_run_without_covariates(
-    monkeypatch,
-):
-    from rc_metastudio import meta_regression_dialog
-
-    app, window = automation.start_automation()
-    r_bridge = sys.modules["rc_metastudio.r_bridge"]
-    warnings = []
-    calls = []
-
-    monkeypatch.setattr(
-        meta_regression_dialog.QMessageBox,
-        "warning",
-        lambda *args: warnings.append(args),
-    )
-    monkeypatch.setattr(
-        r_bridge,
-        "run_meta_regression",
-        lambda *args, **kwargs: calls.append((args, kwargs)),
-        raising=False,
-    )
-
-    try:
-        form = meta_regression_dialog.MetaRegressionDialog(window.model, parent=window)
-
-        assert form.covs_and_check_boxes == []
-        assert (
-            required(
-                form.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
-                "ok button",
-            ).isEnabled()
-            is False
-        )
-
-        form.run_meta_reg()
-
-        assert calls == []
-        assert warnings
-        assert warnings[0][1:3] == (
-            "No Covariates Selected",
-            "Select at least one covariate before running meta-regression.",
-        )
-    finally:
-        window.close()
-        app.processEvents()
-        os.chdir(REPO_ROOT)
-
-
-def test_diagnostic_meta_regression_dialog_fits_radio_group_labels():
-    from rc_metastudio import meta_regression_dialog
-
-    app, window = automation.start_automation()
-    form = None
-
-    try:
-        assert window.open(_sample_project_path("lymph.rcms")) is True
-        covariate_values = {
-            study.name: index + 1
-            for index, study in enumerate(window.model.dataset.studies)
-        }
-        window.model.add_covariate("dose", "continuous", covariate_values)
-
-        form = meta_regression_dialog.MetaRegressionDialog(window.model, parent=window)
-        form.show()
-        app.processEvents()
-        required(form.layout(), "meta-regression layout").activate()
-
-        assert form.diagnostic_group_box.isVisible()
-        for group_box in (form.diagnostic_group_box, form.groupBox):
-            assert group_box.height() >= group_box.sizeHint().height()
-
-        assert form.height() >= form.sizeHint().height()
-    finally:
-        window.current_data_unsaved = False
-        if form is not None:
-            form.close()
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2264,104 +2193,6 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
         )
     finally:
         window.current_data_unsaved = False
-        window.close()
-        app.processEvents()
-        os.chdir(REPO_ROOT)
-
-
-def test_factor_covariate_meta_regression_runs_and_paint_roles_are_qt_safe(monkeypatch):
-    from PyQt6 import QtCore
-    from rc_metastudio import meta_regression_dialog
-
-    app, window = automation.start_automation()
-    form = None
-    main_window = sys.modules["rc_metastudio.main_window"]
-    r_bridge = sys.modules["rc_metastudio.r_bridge"]
-    shown = []
-
-    class ResultDialog(object):
-        def __init__(self, result, parent=None):
-            shown.append((result, parent))
-
-        def show(self):
-            shown.append("shown")
-
-    def run_meta_regression(dataset, studies, covariates, metric, **kwargs):
-        shown.append(
-            (
-                "run-meta-regression",
-                [cov.name for cov in covariates],
-                [study.name for study in studies],
-                metric,
-                kwargs.get("fixed_effects"),
-                kwargs.get("confidence_level"),
-            )
-        )
-        return {
-            "texts": {"Summary": "factor meta-regression"},
-            "images": {},
-        }
-
-    monkeypatch.setattr(main_window.results_window, "ResultsWindow", ResultDialog)
-    monkeypatch.setattr(
-        r_bridge,
-        "dataset_to_simple_binary_r_object",
-        lambda *args, **kwargs: None,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        r_bridge, "run_meta_regression", run_meta_regression, raising=False
-    )
-
-    try:
-        assert window.open(_sample_project_path("amino.rcms")) is True
-        group_values = {
-            study.name: "East" if index % 2 else "West"
-            for index, study in enumerate(window.model.dataset.studies)
-        }
-        window.model.add_covariate("region", "factor", group_values)
-
-        form = meta_regression_dialog.MetaRegressionDialog(window.model, parent=window)
-        for cov, check_box in form.covs_and_check_boxes:
-            check_box.setChecked(cov.name == "region")
-
-        form.run_meta_reg()
-
-        assert shown[0] == (
-            "run-meta-regression",
-            ["region"],
-            [study.name for study in window.model.dataset.studies if study.include],
-            "OR",
-            False,
-            window.model.get_confidence_level(),
-        )
-        assert shown[-2:] == [
-            (
-                _analysis_result({"texts": {"Summary": "factor meta-regression"}}),
-                window,
-            ),
-            "shown",
-        ]
-
-        factor_column = window.model.columnCount() - 1
-        factor_index = window.model.index(0, factor_column)
-        assert window.model.data(factor_index, QtCore.Qt.ItemDataRole.DisplayRole) in (
-            "East",
-            "West",
-        )
-
-        for role in (
-            QtCore.Qt.ItemDataRole.DecorationRole,
-            QtCore.Qt.ItemDataRole.ForegroundRole,
-            QtCore.Qt.ItemDataRole.FontRole,
-            QtCore.Qt.ItemDataRole.SizeHintRole,
-        ):
-            value = window.model.data(factor_index, role)
-            assert value is None
-    finally:
-        window.current_data_unsaved = False
-        if form is not None:
-            form.close()
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -3710,6 +3541,97 @@ def test_plot_text_inputs_enforce_publication_readability_limit():
         app.processEvents()
 
 
+def test_sroc_plot_editor_round_trips_reitsma_style_contract():
+    from rc_metastudio import r_backend
+
+    r_backend.install_r_backend()
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = plot_editor_dialog.EditPlotDialog(
+        {
+            "fp_xlabel": "False positive rate",
+            "fp_ylabel": "Sensitivity",
+            "fp_marker_area": "sample-size",
+            "fp_show_labels": True,
+            "fp_extrapolate": True,
+            "fp_curve_color": "#123456",
+            "fp_confidence_color": "#234567",
+            "fp_prediction_color": "#345678",
+            "fp_curve_lty": 2,
+            "fp_confidence_lty": 3,
+            "fp_prediction_lty": 4,
+            "fp_text_cex": 1.2,
+            "fp_show_confidence": False,
+            "fp_show_prediction": True,
+            "fp_show_summary": False,
+            "fp_show_auc": False,
+            "fp_show_legend": True,
+            "fp_plot_lb": "0.05",
+            "fp_plot_ub": "0.95",
+            "fp_xticks": "0.05, 0.5, 0.95",
+            "fp_sroc_plot_lb": "0.1",
+            "fp_sroc_plot_ub": "0.9",
+            "fp_sroc_yticks": "0.1, 0.5, 0.9",
+        },
+        "sroc.svg",
+        plot_type="sroc",
+    )
+    try:
+        params = dialog.plot_params()
+        assert params["fp_ylabel"] == "Sensitivity"
+        assert params["fp_marker_area"] == "sample-size"
+        assert params["fp_show_labels"] is True
+        assert params["fp_extrapolate"] is True
+        assert params["fp_curve_color"] == "#123456"
+        assert params["fp_confidence_lty"] == 3
+        assert params["fp_text_cex"] == pytest.approx(1.2)
+        assert params["fp_show_confidence"] is False
+        assert params["fp_show_summary"] is False
+        assert params["fp_show_legend"] is True
+        assert params["fp_show_marker_legend"] is True
+        assert params["fp_plot_lb"] == "0.05"
+        assert params["fp_plot_ub"] == "0.95"
+        assert params["fp_xticks"] == "0.05, 0.5, 0.95"
+        assert params["fp_sroc_plot_lb"] == "0.1"
+        assert params["fp_sroc_plot_ub"] == "0.9"
+        assert params["fp_sroc_yticks"] == "0.1, 0.5, 0.9"
+        assert dialog.sroc_show_marker_legend.isEnabled()
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
+def test_sroc_plot_editor_limits_marker_legend_to_sample_size_scaling():
+    from rc_metastudio import r_backend
+
+    r_backend.install_r_backend()
+    from rc_metastudio import plot_editor_dialog
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    dialog = plot_editor_dialog.EditPlotDialog(
+        {"fp_marker_area": "uniform", "fp_show_marker_legend": False},
+        "sroc.svg",
+        plot_type="sroc",
+    )
+    try:
+        assert dialog.plot_params()["fp_show_marker_legend"] is False
+        assert not dialog.sroc_show_marker_legend.isEnabled()
+        assert not dialog.sroc_show_marker_legend.isChecked()
+        dialog.sroc_marker_area.setCurrentIndex(1)
+        assert dialog.sroc_show_marker_legend.isEnabled()
+        assert not dialog.sroc_show_marker_legend.isChecked()
+        assert dialog.plot_params()["fp_show_marker_legend"] is False
+        dialog.sroc_show_marker_legend.setChecked(True)
+        assert dialog.plot_params()["fp_show_marker_legend"] is True
+        dialog.sroc_show_marker_legend.setChecked(False)
+        assert dialog.plot_params()["fp_show_marker_legend"] is False
+        dialog.sroc_marker_area.setCurrentIndex(0)
+        assert not dialog.sroc_show_marker_legend.isEnabled()
+        assert not dialog.sroc_show_marker_legend.isChecked()
+    finally:
+        dialog.close()
+        app.processEvents()
+
+
 def test_edit_plot_dialog_flags_truncated_legacy_plot_text():
     from rc_metastudio import r_backend
 
@@ -3993,7 +3915,7 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     form.show_4 = QtWidgets.QCheckBox()
     form.show_4.setChecked(True)
     form.col4_str_edit = QtWidgets.QLineEdit("Control")
-    form.x_lbl_le = QtWidgets.QLineEdit("Odds Ratio")
+    form.x_lbl_le = QtWidgets.QLineEdit("[default]")
     form.image_path = QtWidgets.QLineEdit("forest.png")
     form.plot_lb_le = QtWidgets.QLineEdit("[default]")
     form.plot_ub_le = QtWidgets.QLineEdit("[default]")
@@ -4018,6 +3940,7 @@ def test_pre_run_plots_tab_exports_style_and_appearance_params(monkeypatch):
     assert form.current_param_vals["fp_show_raw_counts"] is False
     assert form.current_param_vals["fp_show_headers"] is False
     assert form.current_param_vals["fp_show_annotation"] is False
+    assert form.current_param_vals["fp_xlabel"] is None
     assert form.current_param_vals["fp_col3_str"] == "Treatment"
     assert form.current_param_vals["fp_col4_str"] == "Control"
     display_path = cast(str, form.current_param_vals["fp_display_path"])
@@ -4280,8 +4203,7 @@ def test_meta_regression_enables_plots_only_for_one_continuous_covariate():
 @pytest.mark.parametrize(
     ("method_label", "method_name"),
     [
-        ("Bivariate (Maximum Likelihood)", "diagnostic.bivariate.ml"),
-        ("HSROC", "diagnostic.hsroc"),
+        ("Reitsma bivariate model", "diagnostic.reitsma"),
     ],
 )
 def test_diagnostic_forest_methods_enable_pre_run_plots_tab(
@@ -4523,7 +4445,7 @@ def test_results_window_ignores_missing_image_order_entries():
     window = results_window.ResultsWindow(
         _analysis_result(
             {
-                "texts": {"Summary": "HSROC summary"},
+                "texts": {"Summary": "Reitsma summary"},
                 "images": {},
                 "image_order": ["Summary ROC"],
             }
@@ -4554,7 +4476,7 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     plot_paths = {}
-    for name in ["forest", "roc", "density", "trace"]:
+    for name in ["forest", "roc"]:
         plot_path = tmp_path / ("%s.png" % name)
         image = results_window.QImage(80, 40, results_window.QImage.Format.Format_RGB32)
         image.fill(results_window.Qt.GlobalColor.white)
@@ -4589,35 +4511,19 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
         standard_window.close()
         app.processEvents()
 
-    hsroc_window = results_window.ResultsWindow(
+    reitsma_window = results_window.ResultsWindow(
         _analysis_result(
             {
                 "texts": {
-                    "Within-study parameters - theta": "theta",
-                    "Between-study parameters": "between",
-                    "Clinical Accuracy Summary": "clinical",
+                    "Summary operating point": "point",
+                    "Marginal prediction": "prediction",
+                    "Model information": "model",
                 },
-                "images": {
-                    "Density plots": plot_paths["density"],
-                    "Trace plots": plot_paths["trace"],
-                    "Summary ROC": plot_paths["roc"],
-                },
-                "image_order": ["Summary ROC", "Density plots", "Trace plots"],
+                "images": {"SROC": plot_paths["roc"]},
+                "image_order": ["SROC"],
                 "plot_capabilities": {
-                    "Summary ROC": _plot_capability(
+                    "SROC": _plot_capability(
                         plot_kind="sroc",
-                        editable=False,
-                        styleable=False,
-                        regenerator="none",
-                    ),
-                    "Density plots": _plot_capability(
-                        plot_kind="other",
-                        editable=False,
-                        styleable=False,
-                        regenerator="none",
-                    ),
-                    "Trace plots": _plot_capability(
-                        plot_kind="other",
                         editable=False,
                         styleable=False,
                         regenerator="none",
@@ -4628,22 +4534,20 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     )
     try:
         nav_titles = [
-            required(hsroc_window.nav_tree.topLevelItem(index), "navigation item").text(
+            required(reitsma_window.nav_tree.topLevelItem(index), "navigation item").text(
                 0
             )
-            for index in range(hsroc_window.nav_tree.topLevelItemCount())
+            for index in range(reitsma_window.nav_tree.topLevelItemCount())
         ]
 
         assert nav_titles == [
-            "Clinical Accuracy Summary",
-            "Summary ROC",
-            "HSROC Model Parameters",
-            "Study-Level Threshold Parameters",
-            "Density Plots",
-            "Trace Plots",
+            "Summary operating point",
+            "Marginal prediction",
+            "Model information",
+            "Summary ROC Plot",
         ]
     finally:
-        hsroc_window.close()
+        reitsma_window.close()
         app.processEvents()
 
 
@@ -5624,7 +5528,6 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
     from rc_metastudio import binary_data_dialog
     from rc_metastudio import continuous_data_dialog
     from rc_metastudio import diagnostic_data_dialog
-    from rc_metastudio import meta_regression_dialog
     from rc_metastudio import subgroup_analysis_dialog
 
     app, window = automation.start_automation()
@@ -5645,7 +5548,6 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
         model.add_covariate("region", "factor", covariate_values)
         dialogs.extend(
             [
-                meta_regression_dialog.MetaRegressionDialog(model, parent=window),
                 subgroup_analysis_dialog.SubgroupAnalysisDialog(model, parent=window),
                 binary_data_dialog.BinaryDataDialog(
                     copy.deepcopy(model.get_current_analysis_unit_for_study(0)),

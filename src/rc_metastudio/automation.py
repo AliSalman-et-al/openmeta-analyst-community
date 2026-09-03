@@ -22,7 +22,7 @@ from rc_metastudio.cocoa_accessibility import (
     bounded_error_message,
     find_accessibility_element,
 )
-from rc_metastudio.result_text_identity import normalize_heterogeneity_header
+from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
 from rc_metastudio.r_call_serialization import serialized_r_call
 
 from rc_metastudio.launch import (
@@ -40,9 +40,7 @@ from rc_metastudio.launch import (
 )
 
 PACKAGED_SUMMARY_SHA256 = (
-    "f83aafec6de6b2ba65e0fdc9def3c47e8deb9cb86ad6a990adf962e79b9d18b5"
-    if sys.platform == "darwin"
-    else "78294820c83cd94c19dfdca8c24b6a96cdc8b6f1319a5cd1bedffacde73851e2"
+    "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0"
 )
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
@@ -1373,14 +1371,18 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
 def _packaged_result_identity(result):
     summary = result.get("texts", {}).get("Summary", "").replace("\r\n", "\n")
     raw_summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
-    normalized_summary = normalize_heterogeneity_header(summary)
+    normalized_summary = normalize_packaged_summary_identity(summary)
     normalized_summary_sha256 = hashlib.sha256(
         normalized_summary.encode("utf-8")
     ).hexdigest()
     if normalized_summary_sha256 != PACKAGED_SUMMARY_SHA256:
         raise SystemExit(
-            "Packaged summary identity mismatch: %s != %s"
-            % (normalized_summary_sha256, PACKAGED_SUMMARY_SHA256)
+            "Packaged summary identity mismatch: %s != %s. Normalized summary: %r"
+            % (
+                normalized_summary_sha256,
+                PACKAGED_SUMMARY_SHA256,
+                normalized_summary,
+            )
         )
     display_images = result.get("display_images", {})
     svg_hashes = {}
@@ -1837,8 +1839,8 @@ def _assert_standard_binary_summary_is_formatted(meta):
         "Metric: Odds Ratio",
         "Model Results",
         "Estimate",
-        "Lower bound",
-        "Upper bound",
+        "Lower bound (95% CI)",
+        "Upper bound (95% CI)",
         "p-value",
         "Heterogeneity",
     ]

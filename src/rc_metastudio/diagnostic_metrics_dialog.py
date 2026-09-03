@@ -24,6 +24,10 @@ class DiagnosticMetricsDialog(
     def __init__(self, model, parent=None, analysis_type=None, external_params=None):
         super(DiagnosticMetricsDialog, self).__init__(parent)
         self.setupUi(self)
+        # The count-based joint workflow is the default diagnostic experience;
+        # likelihood-ratio and DOR analyses remain explicit optional requests.
+        self.chk_box_lr.setChecked(False)
+        self.chk_box_dor.setChecked(False)
         self._configure_focus_revelation()
         self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL

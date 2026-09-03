@@ -47,7 +47,6 @@ def main() -> int:
         "post_sign_native_inventory": root / "post-sign-native-inventory.json",
         "signing_inventory": root / "ad-hoc-signing-inventory.json",
         "ppm_archive_inventory": root / "ppm-archive-inventory.json",
-        "hsroc_source_archive": root / "HSROC_2.1.9.tar.gz",
         "rcmetar_source_archive": root / "RCMetaR-0.2.0-source.tar.gz",
         "r_runtime_profile": root / "embedded-r-runtime-profile.json",
         "runtime_probe": root / "runtime-probe.json",
@@ -106,7 +105,7 @@ def main() -> int:
         + "\n"
     )
     inputs = {key: record(path) for key, path in names.items()}
-    hsroc, rcmetar = names["hsroc_source_archive"], names["rcmetar_source_archive"]
+    rcmetar = names["rcmetar_source_archive"]
     payload = {
         "schema_version": 1,
         "kind": "rc-metastudio-direct-macos-target-build",
@@ -118,14 +117,6 @@ def main() -> int:
         },
         "ppm_snapshot": "https://packagemanager.posit.co/cran/2026-07-16",
         "ppm_archives": archives,
-        "hsroc_source_exception": {
-            "name": "HSROC",
-            "version": "2.1.9",
-            "install_type": "source",
-            "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-            "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
-            "archive": record(hsroc),
-        },
         "rcmetar_source": {
             "name": "RCMetaR",
             "version": "0.2.0",

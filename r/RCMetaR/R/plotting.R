@@ -539,6 +539,7 @@ create.plot.data.reg <- function(reg.data, params, fitted.line, selected.cov=NUL
 
 
 set.plot.options <- function(params) {
+    params <- rcmetar.normalize.plot.text.params(params)
     plot.options <- list()
     changed.params <- list()
     if (params$fp_xticks[1] == '[default]') {
@@ -585,7 +586,7 @@ set.plot.options <- function(params) {
        plot.options$col4.str <- as.character(params$fp_col4_str)
     }
 
-    if (params$fp_xlabel == "[default]") {
+    if (rcmetar.is.plot.default.text(params$fp_xlabel)) {
         xlabel <- pretty.metric.name(as.character(params$measure))
         if (metric.is.log.scale(params$measure)) {
             xlabel <- paste(xlabel, " (log scale)", sep="")

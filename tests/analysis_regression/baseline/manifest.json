@@ -1,24 +1,24 @@
 {
-  "schema_version": 1,
-  "purpose": "Frozen behavior oracle for statistical regression tests.",
-  "golden_plot_descriptor_contract": {
-    "path": "tests/analysis_regression/baseline/plot-descriptors.json",
-    "sha256": "a254d95a1820a3e93ddfd807bb076f163902e5fb41729c78d3d86d066e201c70",
-    "size": 5396
-  },
   "golden_numeric_contract": {
     "path": "tests/analysis_regression/baseline/numeric-contract.json",
-    "sha256": "23a714aea993b1ce960a34a0d26a7159ec70b52b53367f4ac11402ecc4ef3206",
+    "sha256": "51bbdfabb79cd9842ab45c78e4857e99d51bdf9167c5cc945ca2bffc3ff31157",
     "size": 42282
+  },
+  "golden_plot_descriptor_contract": {
+    "path": "tests/analysis_regression/baseline/plot-descriptors.json",
+    "sha256": "a4f5c9672991988db45fe91d7716c13e755bdbea627ecbb8fc97625a2da7dc6f",
+    "size": 6364
   },
   "observed_golden_analysis_bundle": {
     "path": "tests/analysis_regression/baseline/observed-golden-baseline.zip",
-    "sha256": "73f0973b0916d202e2d95ad83f3b7ac0622439ecf5501a05b74c9a7c2ae0e938",
-    "size": 7116014
+    "sha256": "85627378aa20cf6e9b599ab762d1e63d787960300829332848969c593bd9d1ce",
+    "size": 7088913
   },
+  "purpose": "Frozen behavior oracle for statistical regression tests.",
   "runtime_identities": {
     "rpy2": "3.6.7",
     "rpy2-rinterface": "3.6.6",
     "rpy2-robjects": "3.6.5"
-  }
+  },
+  "schema_version": 1
 }

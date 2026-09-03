@@ -40,9 +40,6 @@ TOP_LEVEL_FORM_INVENTORY = {
     "continuous_data_dialog.ui": (
         ("continuous_data_dialog.py", "ContinuousDataDialog", "TRANSACTIONAL"),
     ),
-    "meta_regression_dialog.ui": (
-        ("meta_regression_dialog.py", "MetaRegressionDialog", "TRANSACTIONAL"),
-    ),
     "publication_bias_dialog.ui": (
         ("publication_bias_dialog.py", "PublicationBiasDialog", "TRANSACTIONAL"),
     ),

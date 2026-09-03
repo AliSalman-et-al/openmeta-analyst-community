@@ -39,7 +39,11 @@ PLOT_OPTION_GROUPS = {
     "subgroup_forest": frozenset(("style", "appearance", "forest", "axis", "summary")),
     "regression": frozenset(("style", "appearance", "axis", "regression")),
     "roc": frozenset(),
-    "sroc": frozenset(),
+    "sroc": frozenset(("style", "appearance", "axis", "sroc")),
+    # Reitsma coefficient plots are forest-shaped, but they have no study
+    # rows or raw-count columns. Keep the shared style/axis editor while
+    # omitting controls that cannot affect this coefficient-only renderer.
+    "reitsma_coefficient": frozenset(("style", "appearance", "axis")),
     "funnel": frozenset(("funnel", "axis")),
     "contour_funnel": frozenset(("funnel", "axis")),
     "deeks_funnel": frozenset(("funnel", "axis")),
@@ -64,9 +68,13 @@ REGENERATORS: dict[str, _Regenerator] = {
             ("funnel", "contour_funnel", "deeks_funnel", "trimfill_funnel")
         ),
     },
+    "sroc": {
+        "function": "generate_sroc_plot",
+        "plot_kinds": frozenset(("sroc",)),
+    },
     "none": {
         "function": None,
-        "plot_kinds": frozenset(("roc", "sroc", "other")),
+        "plot_kinds": frozenset(("roc", "other")),
     },
 }
 
@@ -228,6 +236,8 @@ def _regenerator(value: object, title: str) -> PlotRegenerator:
         return "regression"
     if value == "funnel":
         return "funnel"
+    if value == "sroc":
+        return "sroc"
     if value == "none":
         return "none"
     raise ValueError("Unknown plot regenerator for %s: %s" % (title, value))

@@ -20,13 +20,14 @@ test_that("comprehensive visual QA accounts for every user-visible plot family",
       "coefficient_forest",
       "bootstrap_histogram",
       "roc",
-      "sroc",
-      "hsroc_diagnostics"
+      "sroc"
     )
   )
   expect_true(all(inventory$status %in% c("covered", "excluded")))
   expect_true(all(nzchar(inventory$reason[inventory$status == "excluded"])))
   expect_true(all(nzchar(inventory$evidence[inventory$status == "excluded"])))
+  expect_true(all(inventory$status[match(c("coefficient_forest", "sroc"), inventory$family)] == "covered"))
+  expect_true(all(inventory$harness[match(c("coefficient_forest", "sroc"), inventory$family)] == "reitsma"))
   expect_setequal(unique(inventory$plot_kind), names(.rcmetar.plot.kind.capabilities()))
 
   covered <- inventory$family[inventory$status == "covered"]

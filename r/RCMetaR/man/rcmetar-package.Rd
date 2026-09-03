@@ -14,7 +14,8 @@ RCMetaR contains the statistical routines used by RC MetaStudio. The
 package-level interface is the \code{rcmetar.*} core facade documented in
 \code{\link{RCMetaR-core-api}}; older method, plotting, transformation, and
 data-completion functions are private implementation details behind that
-facade.
+facade. Count-based joint diagnostic analyses use the mada 0.5.12 Reitsma
+bivariate model.
 }
 \seealso{
 \code{\link{RCMetaR-core-api}},
@@ -25,8 +26,7 @@ facade.
 \code{\link{RCMetaR-repeated-analyses}},
 \code{\link{RCMetaR-meta-regression}},
 \code{\link{RCMetaR-plotting}},
-\code{\link{RCMetaR-data-completion}},
-\code{\link{RCMetaR-hsroc-helpers}}
+\code{\link{RCMetaR-data-completion}}
 }
 \author{
 \strong{Maintainer}: Ali Salman \email{alisalman.et.al@gmail.com}

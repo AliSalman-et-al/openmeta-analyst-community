@@ -651,6 +651,9 @@ g.bootstrap.meta.regression.cond.means <- function(
 
 
 meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=FALSE) {
+	if (is(reg.data, "DiagnosticData")) {
+		return(diagnostic.reitsma.meta.regression(reg.data, params, stop.at.rma=stop.at.rma))
+	}
 	cov.data <- extract.cov.data(reg.data)
 	cov.array <- cov.data$cov.array
 	cat.ref.var.and.levels <- cov.data$cat.ref.var.and.levels

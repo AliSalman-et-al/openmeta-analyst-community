@@ -104,9 +104,6 @@ def main() -> int:
     )
     parser.add_argument("--ppm-index", type=Path, required=True)
     parser.add_argument("--ppm-archive-root", type=Path, required=True)
-    parser.add_argument("--hsroc-archive", type=Path, required=True)
-    parser.add_argument("--hsroc-url", required=True)
-    parser.add_argument("--hsroc-build-log", type=Path, required=True)
     parser.add_argument("--rcmetar-archive", type=Path, required=True)
     parser.add_argument("--rcmetar-url", required=True)
     parser.add_argument("--rcmetar-build-log", type=Path, required=True)
@@ -140,14 +137,6 @@ def main() -> int:
             package_record(record, args.ppm_archive_root) for record in ppm_index
         ],
         "source_packages": [
-            source_record(
-                "HSROC",
-                args.hsroc_archive,
-                args.hsroc_url,
-                args.hsroc_build_log,
-                args.toolchain,
-                "GPL-2",
-            ),
             source_record(
                 "RCMetaR",
                 args.rcmetar_archive,

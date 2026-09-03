@@ -204,7 +204,6 @@ quarantine_profile_path="$qualification_root/embedded-r-runtime-quarantine.json"
 r_substrate_probe_path="$qualification_root/r-substrate-probe.json"
 r_direct_build_manifest_path="$qualification_root/direct-r-build-manifest.json"
 ppm_archive_root="$qualification_root/ppm-archives"
-hsroc_archive_path="$qualification_root/HSROC_2.1.9.tar.gz"
 rcmetar_archive_path="$qualification_root/RCMetaR-0.2.0-source.tar.gz"
 runner_environment_path="$qualification_root/runner-environment.json"
 official_r_signature_path="$qualification_root/official-r-signature.json"
@@ -443,14 +442,14 @@ run_strict_r_dependency_policy() {
   mkdir -p "$library"
   R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" R_MAKEVARS_USER="$r_makevars" \
     RCMS_CRAN_REPO="$pinned_cran_repo" RCMS_POLICY_PYTHON="$python_exe" \
-    RCMS_R_PACKAGE_ARCHIVE_DIR="$ppm_archive_root" RCMS_HSROC_ARCHIVE="$hsroc_archive_path" \
+    RCMS_R_PACKAGE_ARCHIVE_DIR="$ppm_archive_root" \
     "$rscript" "$repo_root/scripts/install-r-deps.R"
 }
 
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','meta','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)" >/dev/null 2>&1
 }
 
 install_local_r_packages() {
@@ -475,7 +474,7 @@ run_strict_r_dependency_policy "$r_lib"
 
 step "Installing local RCMetaR package"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('HSROC','meta','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
 
 if ! test_bundled_r_packages "$r_lib"; then
   echo "Bundled R package verification failed after local RCMetaR install." >&2
@@ -673,9 +672,7 @@ relocate_canonical_r_framework_main() {
 
 # These retained records are the authoritative acquisition/build inputs for the
 # direct native production manifest; no installed library tree is reused.
-[ -s "$hsroc_archive_path" ] || { echo "HSROC acquisition archive was not retained." >&2; exit 1; }
 [ -s "$rcmetar_archive_path" ] || { echo "RCMetaR source archive was not retained." >&2; exit 1; }
-[ "$(shasum -a 256 "$hsroc_archive_path" | awk '{print $1}')" = "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874" ] || { echo "HSROC archive digest changed." >&2; exit 1; }
 step "Canonicalizing the staged R framework before PyInstaller signing"
 canonicalize_r_framework "$r_framework"
 relocate_canonical_r_framework_main "$r_framework"

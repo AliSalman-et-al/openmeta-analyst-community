@@ -40,7 +40,7 @@ def test_eligibility_parser_requires_the_dotted_rcmetar_schema():
             "metric": "OR",
             "usable.studies": 4,
             "raw.data.available": True,
-            "precision.range": [0.1, 0.4],
+            "standard.error.range": [0.1, 0.4],
             "package.versions": {"meta": "8.5-0"},
             "warnings": [],
             "methods": [
@@ -71,7 +71,7 @@ def test_eligibility_parser_rejects_incomplete_wire_entries():
                 "metric": "MD",
                 "usable.studies": 4,
                 "raw.data.available": False,
-                "precision.range": [0.1, 0.4],
+                "standard.error.range": [0.1, 0.4],
                 "package.versions": {"meta": "8.5-0"},
                 "warnings": [],
                 "methods": [{"method": "classical-egger"}],
@@ -86,7 +86,7 @@ def test_eligibility_parser_normalizes_scalarized_single_method_mapping():
             "metric": "DOR",
             "usable.studies": 4,
             "raw.data.available": True,
-            "precision.range": [0.1, 0.4],
+            "standard.error.range": [0.1, 0.4],
             "package.versions": {"meta": "8.5-0"},
             "warnings": "one warning",
             "methods": {

@@ -110,3 +110,38 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
         "Sens Error": "Sens conversion failed",
         "Spec Summary": "Spec",
     }
+
+
+def test_diagnostic_fallback_merges_references_in_stable_order():
+    from rc_metastudio import analysis_adapter
+    from rc_metastudio.analysis_errors import DiagnosticExecutionError
+
+    requests = tuple(
+        make_analysis_request(
+            data_type="diagnostic",
+            workflow="standard",
+            method="diagnostic.random",
+            metric=metric,
+            parameters={},
+        )
+        for metric in ("Sens", "Spec", "DOR")
+    )
+
+    def run_metric(request):
+        if request.metric == "Spec":
+            raise DiagnosticExecutionError("specificity backend failed")
+        references = (
+            "1. Shared method reference\n2. Sensitivity reference\n"
+            if request.metric == "Sens"
+            else "1. Shared method reference\n2. DOR reference\n"
+        )
+        return {"texts": {"Summary": request.metric, "References": references}}
+
+    result = analysis_adapter._run_diagnostic_methods_per_metric(requests, run_metric)
+
+    assert result["texts"]["Spec Error"] == "specificity backend failed"
+    assert result["texts"]["References"] == (
+        "1. Shared method reference\n"
+        "2. Sensitivity reference\n"
+        "3. DOR reference\n"
+    )

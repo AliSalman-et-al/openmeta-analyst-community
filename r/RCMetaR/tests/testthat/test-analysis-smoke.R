@@ -143,7 +143,7 @@ test_that("plot kind capabilities derive editability from support and artifact d
     subgroup_forest = list(styleable = TRUE, regenerator = "forest", editable = TRUE),
     regression = list(styleable = TRUE, regenerator = "regression", editable = TRUE),
     roc = list(styleable = FALSE, regenerator = "none", editable = FALSE),
-    sroc = list(styleable = FALSE, regenerator = "none", editable = FALSE),
+    sroc = list(styleable = TRUE, regenerator = "sroc", editable = TRUE),
     other = list(styleable = FALSE, regenerator = "none", editable = FALSE)
   )
 
@@ -178,14 +178,18 @@ test_that("analysis plot capability query maps workflows through the kind regist
     )
   }
 
-  hsroc <- rcmetar.analysis.plot.capabilities(
-    "diagnostic", "diagnostic.hsroc", "standard"
+  reitsma <- rcmetar.analysis.plot.capabilities(
+    "diagnostic", "diagnostic.reitsma", "standard"
   )
-  bivariate <- rcmetar.analysis.plot.capabilities(
-    "diagnostic", "diagnostic.bivariate.ml", "standard"
+  expect_identical(vapply(reitsma, `[[`, character(1), "plot_kind"), "sroc")
+
+  reitsma.regression <- rcmetar.analysis.plot.capabilities(
+    "diagnostic", "diagnostic.reitsma", "meta-regression"
   )
-  expect_identical(vapply(hsroc, `[[`, character(1), "plot_kind"), c("sroc", "forest"))
-  expect_identical(vapply(bivariate, `[[`, character(1), "plot_kind"), c("roc", "forest"))
+  expect_identical(
+    vapply(reitsma.regression, `[[`, character(1), "plot_kind"),
+    "forest"
+  )
 })
 
 test_that("plot data availability is matched to each plot artifact", {
@@ -479,16 +483,14 @@ test_that("single factor diagnostic meta-regression returns adjusted means", {
   fixture <- diagnostic_fixture("DOR")
   result <- rcmetar.run.analysis(
     fixture$data,
-    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+    list(method = "diagnostic.reitsma", params = fixture$params, workflow = "meta-regression")
   )
 
-  expect_named(result, c("Summary", "Adjusted Mean", "res", "res.info", "References", "Inference Method"))
-  expect_match(result[["Adjusted Mean"]], "Adjusted Means")
-  expect_match(result[["Adjusted Mean"]], "A")
-  expect_match(result[["Adjusted Mean"]], "B")
+  expect_true(all(c("Summary", "res", "References") %in% names(result)))
+  expect_true(all(c("Sensitivity coefficients", "Specificity coefficients") %in% names(result$Summary)))
 })
 
-test_that("HSROC feasibility requires count-based diagnostic data", {
+test_that("Reitsma feasibility requires count-based diagnostic data", {
   entered.effects <- new(
     "DiagnosticData",
     y = c(qlogis(0.65), qlogis(0.80), qlogis(0.77), qlogis(0.71), qlogis(0.58)),
@@ -497,7 +499,6 @@ test_that("HSROC feasibility requires count-based diagnostic data", {
   )
   count.data <- diagnostic_fixture("Sens")$data
 
-  expect_false(diagnostic.hsroc.is.feasible(entered.effects, "Sens"))
-  expect_true(diagnostic.hsroc.is.feasible(count.data, "Sens"))
-  expect_identical(diagnostic.hsroc.ml.is.feasible, diagnostic.hsroc.is.feasible)
+  expect_false(diagnostic.reitsma.is.feasible(entered.effects, "Sens"))
+  expect_true(diagnostic.reitsma.is.feasible(count.data, "Sens"))
 })

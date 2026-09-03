@@ -14,4 +14,3 @@ lib <- normalizePath(lib, winslash = "/", mustWork = TRUE)
 .libPaths(c(lib, .libPaths()))
 
 install_rcms_binary_packages(policy, lib)
-install_rcms_source_exception(policy, lib)

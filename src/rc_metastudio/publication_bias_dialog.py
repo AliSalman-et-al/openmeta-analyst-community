@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QSizePolicy
 
 from rc_metastudio import adaptive_window, app_error_handler, r_bridge
 from rc_metastudio.meta_globals import ALL_METRIC_NAMES, ONE_ARM_METRICS
@@ -42,6 +42,13 @@ _TEST_LABELS = {
     "deeks": "Deeks",
 }
 
+# Publication-bias method names and eligibility explanations are researcher-
+# facing prose.  Keep enough logical width for those labels at high DPI while
+# allowing the adaptive-window policy to clamp the preferred size to a small
+# screen.
+PUBLICATION_BIAS_MIN_WIDTH = 560
+PUBLICATION_BIAS_PREFERRED_WIDTH = 700
+
 
 class PublicationBiasDialog(
     QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog
@@ -52,6 +59,7 @@ class PublicationBiasDialog(
         super().__init__(parent)
         self.model = model
         self.setupUi(self)
+        self._configure_scroll_surfaces()
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setModal(True)
         self.correction_policy_combo.addItems(
@@ -91,9 +99,35 @@ class PublicationBiasDialog(
         self.button_box.accepted.connect(
             app_error_handler.safe_slot(self.run, parent=self)
         )
-        adaptive_window.register_adaptive_window(
+        self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
+        # Install the readable-width contract after registration.  The shared
+        # helper also changes the layout constraint to preserve this explicit
+        # minimum across native QDialog's show-time adjustSize pass.
+        adaptive_window.set_content_preferred_width(
+            self,
+            PUBLICATION_BIAS_MIN_WIDTH,
+            PUBLICATION_BIAS_PREFERRED_WIDTH,
+        )
+        self._layout_controller.request_content_refit()
+
+    def _configure_scroll_surfaces(self):
+        """Keep form content readable without a second horizontal viewport."""
+        for scroll_area, content in (
+            (self.methods_scroll, self.methods_scroll_content),
+            (self.plots_scroll, self.plots_scroll_content),
+        ):
+            scroll_area.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            scroll_area.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
+            scroll_area.setWidgetResizable(True)
+            content.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
 
     def _preview_request(self) -> SmallStudyEffectsRequest:
         data_type = str(self.model.get_current_outcome_type())

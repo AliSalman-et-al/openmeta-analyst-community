@@ -221,6 +221,25 @@ def register_adaptive_window(
     return controller
 
 
+def set_content_preferred_width(window, minimum_width, preferred_width):
+    """Set a content-driven width that the adaptive policy can later clamp."""
+    minimum = max(1, int(minimum_width))
+    preferred = max(minimum, int(preferred_width))
+    # Keep the contract outside Qt's mutable minimum-size property.  Native
+    # QDialog show/adjustSize can replace that property with the style hint.
+    window._adaptive_minimum_size_contract = QSize(minimum, 0)
+    # layout-audit: allow=adaptive-window-policy; reason=content width is bounded by the registered adaptive window policy
+    window.setMinimumWidth(minimum)
+    # SetMinimumSize lets QDialog's native show path replace an explicit
+    # minimum with the platform style's narrow size hint.  This helper owns a
+    # measured content contract, so retain the explicit minimum and let the
+    # adaptive controller perform the actual refit instead.
+    if window.layout() is not None:
+        window.layout().setSizeConstraint(QLayout.SizeConstraint.SetDefaultConstraint)
+    # layout-audit: allow=adaptive-window-policy; reason=content width is bounded by the registered adaptive window policy
+    window.resize(max(window.width(), preferred), window.height())
+
+
 def adaptive_window_state(window):
     """Return the typed adaptive policy registered for ``window``."""
     controller = getattr(window, "_adaptive_window_controller", None)
@@ -264,6 +283,9 @@ class AdaptiveWindowController(QObject):
         self._normal_frame_geometry = QRect()
         self._window_handle = None
         self._runtime_screen = None
+        self._minimum_size_contract = QSize(
+            getattr(window, "_adaptive_minimum_size_contract", QSize())
+        )
 
         # layout-audit: allow=adaptive-window-policy; reason=central adaptive policy owns screen-safe outer geometry
         window.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
@@ -295,7 +317,29 @@ class AdaptiveWindowController(QObject):
                 self.apply_first_use_geometry()
             self._connect_window_handle()
             self.request_runtime_clamp()
+            # Native QDialog show can run an adjustSize pass after the Show
+            # event and replace an explicit minimum with its narrow style
+            # hint.  Restore the application-owned contract on the next event
+            # loop turn, then let the normal refit path compute the safe size.
+            if self._has_minimum_size_contract():
+                QTimer.singleShot(0, self._restore_minimum_size_contract)
         return super(AdaptiveWindowController, self).eventFilter(watched, event)
+
+    def _restore_minimum_size_contract(self):
+        contract = QSize(
+            getattr(self.window, "_adaptive_minimum_size_contract", self._minimum_size_contract)
+        )
+        if not self._has_minimum_size_contract():
+            return
+        # layout-audit: allow=adaptive-window-policy; reason=restore explicit content minimum after native QDialog show-time size adjustment
+        self.window.setMinimumWidth(contract.width())
+        self.request_content_refit()
+
+    def _has_minimum_size_contract(self):
+        contract = getattr(self.window, "_adaptive_minimum_size_contract", None)
+        if contract is None:
+            contract = self._minimum_size_contract
+        return contract.width() > 0 or contract.height() > 0
 
     def apply_first_use_geometry(self):
         """Apply the registered role's sizing behavior before user ownership."""
@@ -450,6 +494,14 @@ class AdaptiveWindowController(QObject):
         minimum = self.window.minimumSizeHint()
         if minimum.isValid():
             preferred = preferred.expandedTo(minimum)
+        # ``minimumSizeHint()`` describes the layout's natural minimum, but it
+        # does not necessarily include an application-owned minimum installed
+        # with ``setMinimumWidth``/``setMinimumHeight``.  Preserve that
+        # explicit contract when a later content refit recomputes the size.
+        contract = QSize(
+            getattr(self.window, "_adaptive_minimum_size_contract", self.window.minimumSize())
+        )
+        preferred = preferred.expandedTo(contract)
         margins = self._frame_margins()
         return QSize(
             preferred.width() + margins.left() + margins.right(),

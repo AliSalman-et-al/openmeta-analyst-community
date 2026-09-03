@@ -5,6 +5,13 @@ from PyQt6.QtWidgets import QToolTip
 
 PLOT_TEXT_INPUT_LIMIT = 80
 
+# These values are emitted by the generated Qt forms for an untouched plot
+# option.  Keep the list at the presentation boundary so renderers receive a
+# real unset value rather than having to know about a GUI placeholder.
+PLOT_DEFAULT_TEXT_SENTINELS = frozenset(
+    ("", "[default]", "<default>", "(default)", "default")
+)
+
 
 def apply_plot_text_input_limits(surface):
     """Limit plot-only labels without constraining data or numeric fields."""
@@ -62,3 +69,27 @@ def plot_text_value(widget):
     if original is not None and not widget.property("plotTextWasEdited"):
         return str(original)
     return widget.text()
+
+
+def normalize_plot_text_value(value, *, was_edited=False):
+    """Convert an untouched GUI default placeholder to an unset value.
+
+    A researcher may deliberately use one of these strings as a label.  Such
+    an edited value is therefore retained; only an untouched form default is
+    normalized.  The pure value-level helper is also useful to non-Qt callers
+    that already know whether a value came from an edited control.
+    """
+    if value is None:
+        return None
+    text = str(value)
+    if not was_edited and text.strip().casefold() in PLOT_DEFAULT_TEXT_SENTINELS:
+        return None
+    return value
+
+
+def plot_parameter_text_value(widget):
+    """Return a plot text control's value with default placeholders unset."""
+    return normalize_plot_text_value(
+        plot_text_value(widget),
+        was_edited=bool(widget.property("plotTextWasEdited")),
+    )

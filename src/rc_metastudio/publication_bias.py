@@ -570,7 +570,7 @@ class EligibilityReport:
     methods: tuple[EligibilityMethod, ...]
     warnings: tuple[str, ...] = ()
     raw_data_available: bool = False
-    precision_range: tuple[float, float] | None = None
+    standard_error_range: tuple[float, float] | None = None
     package_versions: tuple[tuple[str, str], ...] = ()
 
     @classmethod
@@ -580,7 +580,7 @@ class EligibilityReport:
             "metric",
             "usable.studies",
             "raw.data.available",
-            "precision.range",
+            "standard.error.range",
             "methods",
             "warnings",
             "package.versions",
@@ -609,14 +609,19 @@ class EligibilityReport:
         )
         if len(methods) != len(method_values):
             raise ValueError("eligibility methods must contain mappings")
-        precision = value["precision.range"]
-        precision_range = None
-        if not isinstance(precision, (list, tuple)) or len(precision) not in (0, 2):
-            raise ValueError("eligibility precision.range must have zero or two values")
-        if len(precision) == 2:
-            precision_range = (
-                _float(precision[0], "eligibility precision.range"),
-                _float(precision[1], "eligibility precision.range"),
+        standard_error = value["standard.error.range"]
+        standard_error_range = None
+        if not isinstance(standard_error, (list, tuple)) or len(standard_error) not in (
+            0,
+            2,
+        ):
+            raise ValueError(
+                "eligibility standard.error.range must have zero or two values"
+            )
+        if len(standard_error) == 2:
+            standard_error_range = (
+                _float(standard_error[0], "eligibility standard.error.range"),
+                _float(standard_error[1], "eligibility standard.error.range"),
             )
         versions = value["package.versions"]
         if not isinstance(versions, Mapping):
@@ -645,7 +650,7 @@ class EligibilityReport:
             methods=methods,
             warnings=tuple(str(item) for item in warnings if item is not None),
             raw_data_available=value["raw.data.available"],
-            precision_range=precision_range,
+            standard_error_range=standard_error_range,
             package_versions=tuple((key, str(item)) for key, item in package_versions),
         )
 

@@ -162,8 +162,7 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
             backend,
             "get_available_methods",
             lambda **kwargs: {
-                "Bivariate (Maximum Likelihood)": "diagnostic.hsroc",
-                "HSROC": "diagnostic.hsroc",
+                "Reitsma bivariate model": "diagnostic.reitsma",
                 "Diagnostic Random-Effects": "diagnostic.random",
             },
         )
@@ -258,7 +257,7 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
             if widget.isVisible()
         }
 
-        assert "Method & Parameters" in visible_dialog_titles
+        assert "Method & Parameters for Sensitivity and Specificity" in visible_dialog_titles
         assert "Diagnostic MA with Multiple Metrics" not in visible_dialog_titles
         assert metrics_form.isVisible() is False
     finally:
@@ -380,7 +379,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
             backend,
             "get_available_methods",
             lambda **kwargs: {
-                "HSROC": "diagnostic.hsroc",
+                "Reitsma bivariate model": "diagnostic.reitsma",
                 "Diagnostic Random-Effects": "diagnostic.random",
             },
         )
@@ -403,7 +402,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
                 raise DiagnosticExecutionError("combined diagnostic failure")
             metric = param_vals[0]["measure"]
             if metric == "Sens":
-                raise DiagnosticExecutionError("HSROC failed to converge")
+                raise DiagnosticExecutionError("Reitsma bivariate model failed to converge")
             title = "%s Forest plot" % metric
             return {
                 "texts": {
@@ -440,7 +439,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
             confidence_level=window.model.get_confidence_level(),
         )
         form.diagnostic_analysis_details = {
-            "Sens": ("diagnostic.hsroc", {"conf.level": 95.0}),
+            "Sens": ("diagnostic.reitsma", {"conf.level": 95.0}),
             "DOR": ("diagnostic.random", {"conf.level": 95.0}),
             "PLR": ("diagnostic.random", {"conf.level": 95.0}),
             "NLR": ("diagnostic.random", {"conf.level": 95.0}),
@@ -452,7 +451,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
 
         assert shown == []
         assert len(results) == 1
-        assert results[0]["texts"]["Sens Error"] == "HSROC failed to converge"
+        assert results[0]["texts"]["Sens Error"] == "Reitsma bivariate model failed to converge"
         assert results[0]["texts"]["DOR Summary"] == "DOR ok"
         assert results[0]["texts"]["PLR Summary"] == "PLR ok"
         assert results[0]["texts"]["NLR Summary"] == "NLR ok"
@@ -502,15 +501,32 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             backend,
             "get_available_methods",
             lambda **kwargs: {
-                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-                "HSROC": "diagnostic.hsroc",
+                "Reitsma bivariate model": "diagnostic.reitsma",
                 "Diagnostic Random-Effects": "diagnostic.random",
             },
         )
 
         def get_params(method):
-            if method == "diagnostic.hsroc":
-                return ({"num.iters": "int"}, {"num.iters": 5000}, ["num.iters"], {})
+            if method == "diagnostic.reitsma":
+                definitions = {
+                    "estimator": ["REML", "ML"],
+                    "conf.level": "float",
+                    "adjust": "float",
+                    "correction.policy": [
+                        "Studies with any zero cell",
+                        "All studies if any zero exists",
+                        "None",
+                    ],
+                    "digits": "int",
+                }
+                defaults = {
+                    "estimator": "REML",
+                    "conf.level": 95.0,
+                    "adjust": 0.5,
+                    "correction.policy": "All studies if any zero exists",
+                    "digits": 2,
+                }
+                return (definitions, defaults, list(definitions), {})
             if method == "diagnostic.random":
                 definitions = {
                     "rm.method": ["DL", "REML"],
@@ -581,10 +597,11 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             __import__("traceback").format_exception(preparation_errors[0])
         )
         assert form is not None
-        form.method_cbo_box.setCurrentText("HSROC")
+        form.method_cbo_box.setCurrentText("Reitsma bivariate model")
         form.lr_dor_method_cbo_box.setCurrentText("Diagnostic Random-Effects")
         form.current_param_vals.update(
-            {"conf.level": 90.0, "digits": 4, "adjust": 0.25, "to": "all"}
+            {"estimator": "ML", "conf.level": 90.0, "digits": 4,
+             "adjust": 0.25, "correction.policy": "All studies if any zero exists"}
         )
         form.lr_dor_panel.params["rm.method"] = "REML"
         form.add_current_analysis_details()
@@ -603,15 +620,18 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         assert not any(button.text() == "next >" for button in form.buttonBox.buttons())
         sens_method, sens_params = form.diagnostic_analysis_details["Sens"]
         dor_method, dor_params = form.diagnostic_analysis_details["DOR"]
-        assert sens_method == "diagnostic.hsroc"
-        assert sens_params == {"num.iters": 5000}
+        assert sens_method == "diagnostic.reitsma"
+        assert sens_params == {
+            "estimator": "ML", "conf.level": 90.0, "digits": 4,
+            "adjust": 0.25, "correction.policy": "All studies if any zero exists",
+        }
         assert dor_method == "diagnostic.random"
         assert dor_params == {
             "rm.method": "REML",
             "conf.level": 90.0,
             "digits": 4,
             "adjust": 0.25,
-            "to": "all",
+                "to": "only0",
         }
         monkeypatch.setattr(
             analysis_setup_dialog,
@@ -764,7 +784,7 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
             backend,
             "get_available_methods",
             lambda **kwargs: {
-                "HSROC": "diagnostic.hsroc",
+                "Reitsma bivariate model": "diagnostic.reitsma",
                 "Diagnostic Random-Effects": "diagnostic.random",
             },
         )
@@ -800,13 +820,7 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
             isinstance(request, analysis_adapter.AnalysisRequest)
             for request in requests
         )
-        assert [request.metric for request in requests] == [
-            "Sens",
-            "Spec",
-            "NLR",
-            "PLR",
-            "DOR",
-        ]
+        assert [request.metric for request in requests] == ["Sens", "NLR", "PLR", "DOR"]
         assert all(request.workflow == "standard" for request in requests)
         assert all(
             isinstance(request.parameter_values()["conf.level"], float)
@@ -1094,8 +1108,7 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
             backend,
             "get_available_methods",
             lambda **kwargs: {
-                "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
-                "HSROC": "diagnostic.hsroc",
+                "Reitsma bivariate model": "diagnostic.reitsma",
                 "Diagnostic Random-Effects": "diagnostic.random",
                 "Diagnostic Fixed-Effect Inverse Variance": "diagnostic.fixed.inv.var",
             },
@@ -1123,8 +1136,7 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
             for index in range(form.method_cbo_box.count())
         ]
 
-        assert "HSROC" not in method_names
-        assert "Bivariate (Maximum Likelihood)" not in method_names
+        assert "Reitsma bivariate model" not in method_names
         assert method_names == [
             "Diagnostic Random-Effects",
             "Diagnostic Fixed-Effect Inverse Variance",

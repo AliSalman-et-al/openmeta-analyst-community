@@ -79,6 +79,38 @@ def run_headless_analysis(case):
         )
 
     if family == "diagnostic":
+        workflow = case.analysis_type or "standard"
+        if workflow == "meta_regression":
+            workflow = "meta-regression"
+        if workflow == "meta-regression":
+            method = case.method or "diagnostic.reitsma"
+            if isinstance(method, list):
+                if len(method) != 1:
+                    raise ValueError(
+                        "Diagnostic meta-regression requires exactly one method."
+                    )
+                method = method[0]
+            metric = _analysis_metric(case.metric, case.parameters)
+            effective_parameters = dict(case.parameters)
+            effective_parameters["measure"] = metric
+            request = analysis_adapter.make_analysis_request(
+                data_type=family,
+                workflow=workflow,
+                method=method,
+                metric=metric,
+                parameters=effective_parameters,
+            )
+            study_selection = analysis_adapter.select_studies_for_covariates(
+                model, tuple(selected_covariates)
+            )
+            return analysis_adapter.execute_meta_regression_request(
+                model,
+                study_selection.studies,
+                tuple(selected_covariates),
+                request,
+                False,
+                effective_parameters.get("conf.level", 95),
+            )
         if case.metric is not None:
             model.set_current_metric(case.metric)
         methods = case.method if isinstance(case.method, list) else [case.method]

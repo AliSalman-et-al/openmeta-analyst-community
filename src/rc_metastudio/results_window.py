@@ -875,6 +875,38 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self.edit_regression_plot(artifact, plot_item)
         elif regenerator == "funnel":
             self._edit_funnel_plot(artifact, plot_item)
+        elif regenerator == "sroc":
+            self._edit_sroc_plot(artifact, plot_item)
+
+    def _edit_sroc_plot(self, artifact, plot_item):
+        plot_params = r_bridge.load_vars_for_plot(
+            artifact.params_path, return_params_dict=True
+        )
+        if plot_params is False:
+            return
+        dialog = EditPlotDialog(
+            plot_params, artifact.image_path, parent=self, plot_type="sroc"
+        )
+        dialog.applied.connect(
+            app_error_handler.safe_slot(
+                lambda: self._apply_sroc_plot_edits(dialog, artifact, plot_item),
+                parent=self,
+            )
+        )
+        dialog.exec()
+
+    def _apply_sroc_plot_edits(self, dialog, artifact, plot_item):
+        updated_params = dialog.plot_params()
+        outpath = updated_params.get("fp_outpath") or artifact.image_path
+        r_bridge.update_plot_params(
+            updated_params,
+            write_them_out=True,
+            outpath="%s.params" % artifact.params_path,
+        )
+        r_bridge.regenerate_plot_data()
+        r_bridge.generate_sroc_plot(outpath)
+        r_bridge.write_out_plot_data(artifact.params_path)
+        self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _edit_funnel_plot(self, artifact, plot_item):
         plot_params = r_bridge.load_vars_for_plot(
@@ -1052,6 +1084,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 "forest": "forest_plot",
                 "regression": "regression",
                 "funnel": "small_study_effects_funnel",
+                "sroc": "sroc",
             }[regenerator]
             default_path = "%s.%s" % (default_path, export_format.extension)
 

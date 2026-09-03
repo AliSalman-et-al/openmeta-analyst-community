@@ -31,6 +31,7 @@
 \alias{rcmetar.regenerate.regression.plot.data}
 \alias{rcmetar.save.plot.data}
 \alias{rcmetar.draw.forest.plot}
+\alias{rcmetar.draw.sroc.plot}
 \alias{rcmetar.draw.regression.plot}
 \alias{rcmetar.graphics.off}
 \alias{rcmetar.method.references}
@@ -77,12 +78,20 @@ implementation details, while application code calls this core interface so
 that validation, dispatch, and future compatibility changes are centralized
 in rcmetar.
 }
+\section{SROC plot rendering}{
+
+\code{rcmetar.draw.sroc.plot()} renders a Reitsma SROC render bundle returned
+by \code{rcmetar.regenerate.plot.data()} to the requested SVG, PNG, PDF, or
+TIFF path. Its \code{plot.data} argument is the SROC bundle and \code{outpath}
+selects the export format by file extension.
+}
 \section{Supported methods}{
 
 Use \code{rcmetar.analysis.methods()} to inspect methods known to the core
 dispatcher. The dispatcher still calls the package's existing method
 implementations, including \code{metafor}-based fixed and random effects,
-Mantel-Haenszel, Peto, bivariate diagnostic, HSROC, bootstrap, subgroup,
+Mantel-Haenszel, Peto, the mada-backed Reitsma bivariate diagnostic model,
+bootstrap, subgroup,
 cumulative, leave-one-out, and meta-regression workflows.
 }
 

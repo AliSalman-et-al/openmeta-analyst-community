@@ -52,7 +52,7 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
     library = runtime / "library"
     runtime.mkdir()
     (runtime / "COPYING").write_text("R test license\n", encoding="utf-8")
-    versions = {"RCMetaR": "0.2.0", "HSROC": "2.1.9", "metafor": "4.8-0"}
+    versions = {"RCMetaR": "0.2.0", "metafor": "4.8-0"}
     for name, version in versions.items():
         package = library / name
         package.mkdir(parents=True)
@@ -68,12 +68,10 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
     source_payload = tmp_path / "source-payload"
     source_payload.mkdir()
     payloads = {}
-    for name in ("HSROC", "RCMetaR", "rpy2", "rpy2-rinterface", "rpy2-robjects"):
+    for name in ("RCMetaR", "rpy2", "rpy2-rinterface", "rpy2-robjects"):
         archive = source_payload / f"{name}.tar.gz"
         archive.write_bytes(f"source:{name}".encode())
         payloads[name] = hashlib.sha256(archive.read_bytes()).hexdigest()
-    if kit is not None:
-        kit.HSROC_SHA256 = payloads["HSROC"]
     provenance = tmp_path / "provenance.json"
     sha = "a" * 64
     provenance.write_text(
@@ -115,11 +113,6 @@ def build_args(tmp_path: Path, kit=None) -> argparse.Namespace:
                         "license": "GPL-2",
                     }
                     for name, version, url in (
-                        (
-                            "HSROC",
-                            "2.1.9",
-                            "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-                        ),
                         (
                             "RCMetaR",
                             "0.2.0",
@@ -431,14 +424,14 @@ def test_provenance_requires_each_rpy2_split_license_payload(tmp_path, distribut
 
 
 @pytest.mark.parametrize(
-    "archive_name", ["HSROC", "RCMetaR", "rpy2", "rpy2-rinterface", "rpy2-robjects"]
+    "archive_name", ["RCMetaR", "rpy2", "rpy2-rinterface", "rpy2-robjects"]
 )
 def test_source_payload_requires_each_exact_retained_archive(tmp_path, archive_name):
     kit = module()
     args = build_args(tmp_path, kit)
     provenance = json.loads(args.provenance_manifest.read_text(encoding="utf-8"))
     (args.source_payload / f"{archive_name}.tar.gz").unlink()
-    with pytest.raises(kit.KitError, match="exactly the five retained archives"):
+    with pytest.raises(kit.KitError, match="retained archives"):
         kit.copy_source_payload(
             args.source_payload, provenance, tmp_path / "retained-sources"
         )
@@ -516,7 +509,6 @@ def test_provenance_rejects_wrong_locked_artifact_identities(tmp_path):
         lambda value: value["ppm_packages"][0].update(
             {"url": "https://cran.r-project.org/bin/windows/contrib/4.6/metafor.zip"}
         ),
-        lambda value: value["source_packages"][0].update({"sha256": "0" * 64}),
         lambda value: value["official_r"].update({"sha256": "0" * 64}),
         lambda value: value["official_r"].update(
             {"signature_identity": "CN=R Core Team"}
@@ -529,7 +521,7 @@ def test_provenance_rejects_wrong_locked_artifact_identities(tmp_path):
         candidate = json.loads(json.dumps(original))
         mutate(candidate)
         args.provenance_manifest.write_text(json.dumps(candidate), encoding="utf-8")
-        with pytest.raises(kit.KitError, match="provenance|HSROC"):
+        with pytest.raises(kit.KitError, match="provenance"):
             kit.load_provenance(
                 args.provenance_manifest, "windows-x64", args.api_bridge
             )
@@ -540,7 +532,6 @@ def test_installed_package_inventory_rejects_unclaimed_non_base_package():
     provenance = {
         "ppm_packages": [{"name": "metafor", "version": "4.8-0"}],
         "source_packages": [
-            {"name": "HSROC", "version": "2.1.9"},
             {"name": "RCMetaR", "version": "0.2.0"},
         ],
     }
@@ -548,7 +539,6 @@ def test_installed_package_inventory_rejects_unclaimed_non_base_package():
         {"name": name, "version": version, "priority": None}
         for name, version in (
             ("metafor", "4.8-0"),
-            ("HSROC", "2.1.9"),
             ("RCMetaR", "0.2.0"),
             ("ambientPackage", "1.0"),
         )

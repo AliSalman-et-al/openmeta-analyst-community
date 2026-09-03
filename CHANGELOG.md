@@ -2,6 +2,31 @@
 
 All notable RC MetaStudio changes will be recorded in this file.
 
+## 0.3.1 - 2026-09-03
+
+### Added
+
+- Added package-native summary sensitivity and specificity, sampling-based likelihood ratios and diagnostic odds ratios, SROC AUC and normalized partial AUC, prediction intervals and regions, and named diagnostic heterogeneity estimates.
+- Added additive Reitsma meta-regression with continuous and categorical moderators, likelihood-ratio tests, explicit factor coding, and separate editable sensitivity and specificity coefficient plots.
+- Added deterministic numerical, visual, adapter, and packaged-runtime qualification for the Reitsma workflow and its PNG, PDF, SVG, and TIFF exports.
+
+### Changed
+
+- Replaced the legacy joint diagnostic implementations with the count-based `mada` 0.5.12 Reitsma bivariate model. Sensitivity and specificity remain familiar selections while a joint request is fitted once.
+- Reworked result presentation across the application so conclusions, effect estimates, uncertainty, heterogeneity, model details, warnings, and references appear in a researcher-focused order with readable labels and consistent numerical formatting.
+- Expanded Publication Bias output with a primary interpretation, usable-study counts, confidence intervals, exact standard-error ranges, method applicability, caveats, and deduplicated references.
+
+### Fixed
+
+- Fixed SROC labels, region legends, marker-size controls, plot-editor behavior, and binary SVG export so the displayed plot and exported files use the same stored geometry.
+- Fixed Publication Bias dialog clipping on native Windows, including high-DPI layouts, and prevented adaptive refits from shrinking unrelated dialogs or workspace windows.
+- Fixed partial diagnostic result and citation handling so one unavailable output or method does not discard valid estimates, artifacts, warnings, or references.
+- Fixed native adaptive-layout evidence capture and package provenance checks used by the Windows release build.
+
+### Removed
+
+- Removed the Bayesian HSROC sampler, exact-binomial joint implementation, legacy joint method identifiers, and their source/runtime packaging exceptions. Existing diagnostic projects continue to load without migration.
+
 RC MetaStudio starts a fresh maintained-product changelog. Historical release history for the original OpenMeta[Analyst] project is not reconstructed here; see [NOTICE.md](NOTICE.md) for provenance.
 
 ## 0.3.0 - 2026-08-31

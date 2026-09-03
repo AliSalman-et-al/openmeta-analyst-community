@@ -145,9 +145,6 @@ def manifest_roots(manifest_path: Path) -> tuple[list[str], set[str], str]:
     manifest = json.loads(raw)
     roots = {"RCMetaR"}
     roots.update(manifest["binary_package_policy"]["required_normal_packages"])
-    roots.update(
-        item["name"] for item in manifest["binary_package_policy"]["source_exceptions"]
-    )
     roots.update(item["name"] for item in manifest["direct_RCMetaR_dependencies"])
     roots.update(item["name"] for item in manifest["app_r_bundle_dependencies"])
     builtin = (

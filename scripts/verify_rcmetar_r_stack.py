@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from importlib import metadata
 import json
 import os
@@ -24,6 +25,7 @@ R_BINARY_POLICY = Path("scripts") / "r_binary_policy.R"
 R_POLICY_LOADER = Path("scripts") / "r_dependency_policy.py"
 R_VERIFICATION_SUPPORT = Path("scripts") / "r_verification_support.py"
 R_SMOKE_TEST = Path("scripts") / "analysis-smoke-test.R"
+R_REITSMA_VISUAL_QA = Path("scripts") / "verify_reitsma_visual_qa.R"
 R_MANIFEST_VALIDATOR = Path("scripts") / "validate_rcmetar_r_manifests.py"
 R_STACK_TESTS = (Path("tests") / "r_stack",)
 BRIDGE_TESTS = R_STACK_TESTS
@@ -32,6 +34,8 @@ REQUIRED_RPY2_IDENTITIES = {
     "rpy2-rinterface": "3.6.6",
     "rpy2-robjects": "3.6.5",
 }
+REITSMA_VISUAL_CASE_COUNT = 21
+REITSMA_VISUAL_DETERMINISTIC_EXTENSIONS = {"svg", "svgz", "png", "tif", "tiff"}
 
 
 class VerificationError(Exception):
@@ -292,6 +296,112 @@ def verify_manifest_versions(
     )
 
 
+def _read_reitsma_visual_manifest(root: Path) -> tuple[list[dict[str, str]], dict]:
+    manifest_path = root / "manifest.csv"
+    descriptor_path = root / "descriptor-contract.json"
+    if not manifest_path.is_file() or not descriptor_path.is_file():
+        raise VerificationError(
+            "Reitsma visual QA did not produce its manifest and descriptor contract"
+        )
+    with manifest_path.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    try:
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise VerificationError("Reitsma descriptor contract is not valid JSON") from exc
+    if len(rows) != REITSMA_VISUAL_CASE_COUNT:
+        raise VerificationError(
+            f"Reitsma visual QA expected {REITSMA_VISUAL_CASE_COUNT} cases, observed {len(rows)}"
+        )
+    if len({row.get("case", "") for row in rows}) != REITSMA_VISUAL_CASE_COUNT:
+        raise VerificationError("Reitsma visual QA manifest contains duplicate case identifiers")
+    required = {
+        "case", "family", "kind", "workflow", "style", "scenario", "extension",
+        "image", "bytes", "sha256", "pdf_contract", "error",
+    }
+    if any(not required.issubset(row) for row in rows):
+        raise VerificationError("Reitsma visual QA manifest is missing release contract columns")
+    failures = [
+        row["case"]
+        for row in rows
+        if row.get("error", "").strip() not in {"", "NA"}
+    ]
+    if failures:
+        raise VerificationError("Reitsma visual QA failures: " + ", ".join(failures))
+    for row in rows:
+        image = Path(row["image"])
+        if not image.is_file() or int(float(row["bytes"])) <= 1000:
+            raise VerificationError(f"Reitsma visual QA artifact is missing or empty: {row['case']}")
+        extension = row["extension"].lower()
+        if extension in REITSMA_VISUAL_DETERMINISTIC_EXTENSIONS and len(row["sha256"]) != 64:
+            raise VerificationError(f"Missing deterministic hash for Reitsma case: {row['case']}")
+        if extension == "pdf":
+            try:
+                contract = json.loads(row["pdf_contract"])
+            except json.JSONDecodeError as exc:
+                raise VerificationError(f"Invalid PDF contract for Reitsma case: {row['case']}") from exc
+            if (
+                contract.get("signature") != "%PDF-"
+                or contract.get("pages") != 1
+                or contract.get("has_xref_or_xref_stream") is not True
+                or contract.get("has_eof") is not True
+            ):
+                raise VerificationError(f"PDF semantic contract failed for Reitsma case: {row['case']}")
+    if descriptor.get("schema_version") != 1 or set(descriptor.get("descriptors", {})) != {
+        "sroc", "coefficient_forest"
+    }:
+        raise VerificationError("Reitsma descriptor contract has unexpected coverage")
+    return rows, descriptor
+
+
+def verify_reitsma_visual_evidence(
+    root: Path, rscript: Path, env: dict[str, str], work_dir: Path
+) -> None:
+    """Run and compare the maintained 21-case visual release harness twice.
+
+    Raster/SVG outputs are deterministic release artifacts and must retain
+    stable SHA-256 values. PDFs are intentionally checked through their
+    normalized semantic contract because producers may embed timestamps.
+    """
+    # The release gate must exercise the package that was just built and
+    # installed above.  The visual script deliberately supports a source mode
+    # for local development, but this integrated gate must never silently fall
+    # back to pkgload::load_all() from the workspace.
+    visual_env = dict(env)
+    visual_env["RCMS_REITSMA_VISUAL_QA_MODE"] = "installed"
+    visual_env["RCMS_REITSMA_VISUAL_QA_LIBRARY"] = env["R_LIBS"]
+    evidence = []
+    for index in (1, 2):
+        output = work_dir / f"reitsma-visual-qa-{index}"
+        output.mkdir(parents=True, exist_ok=True)
+        run([rscript, R_REITSMA_VISUAL_QA, output], cwd=root, env=visual_env)
+        evidence.append(_read_reitsma_visual_manifest(output))
+    first_rows, first_descriptor = evidence[0]
+    second_rows, second_descriptor = evidence[1]
+    if first_descriptor != second_descriptor:
+        raise VerificationError("Reitsma normalized descriptor contract is not deterministic")
+    first_by_case = {row["case"]: row for row in first_rows}
+    second_by_case = {row["case"]: row for row in second_rows}
+    if set(first_by_case) != set(second_by_case):
+        raise VerificationError("Reitsma visual QA case inventory changed between runs")
+    for case, first in first_by_case.items():
+        second = second_by_case[case]
+        extension = first["extension"].lower()
+        if extension in REITSMA_VISUAL_DETERMINISTIC_EXTENSIONS and first["sha256"] != second["sha256"]:
+            raise VerificationError(f"Reitsma deterministic visual hash drifted: {case}")
+        if extension == "pdf" and first["pdf_contract"] != second["pdf_contract"]:
+            raise VerificationError(f"Reitsma PDF semantic contract drifted: {case}")
+    step("Reitsma visual release evidence verified: 21 cases, deterministic hashes and normalized PDF/descriptor contracts")
+
+
+def bridge_test_command(python: str, pytest_runner: str) -> list[str | Path]:
+    # Always invoke the exact interpreter selected by --python.  In
+    # particular, `uv run` can resolve a different project interpreter and
+    # invalidate the rpy2 identity and installed-R-library checks above.
+    del pytest_runner
+    return [python, "-m", "pytest", *map(str, BRIDGE_TESTS)]
+
+
 def verify(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     python = (
@@ -313,8 +423,12 @@ def verify(args: argparse.Namespace) -> None:
 
     run([python, R_MANIFEST_VALIDATOR, "--root", root], cwd=root, env=base_env)
 
+    work_dir_parent = args.work_dir.resolve() if args.work_dir else None
+    if work_dir_parent is not None:
+        work_dir_parent.mkdir(parents=True, exist_ok=True)
+
     with tempfile.TemporaryDirectory(
-        prefix="RCMetaR-r-stack-", dir=args.work_dir
+        prefix="RCMetaR-r-stack-", dir=work_dir_parent
     ) as temp_name:
         work_dir = Path(temp_name)
         bootstrap_library = work_dir / "bootstrap-library"
@@ -361,11 +475,10 @@ def verify(args: argparse.Namespace) -> None:
 
         verify_manifest_versions(root, python, rscript, env)
         run([rscript, R_SMOKE_TEST], cwd=root, env=env)
+        verify_reitsma_visual_evidence(root, rscript, env, work_dir)
 
         env["RCMS_R_STACK_REQUIRED"] = "1"
-        pytest_command = [args.pytest_runner, *map(str, BRIDGE_TESTS)]
-        if args.pytest_runner == "uv":
-            pytest_command = ["uv", "run", "pytest", *map(str, BRIDGE_TESTS)]
+        pytest_command = bridge_test_command(python, args.pytest_runner)
         run(pytest_command, cwd=root, env=env)
         run(
             [

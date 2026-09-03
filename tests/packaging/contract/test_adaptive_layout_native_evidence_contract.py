@@ -121,6 +121,19 @@ def test_native_evidence_runner_covers_the_release_review_contract():
     assert "pixel-diff" in runner
 
 
+def test_windows_adaptive_evidence_scales_from_native_dpr():
+    windows = _text("scripts", "build-windows-package.ps1")
+    evidence = windows.split(
+        "function Invoke-PackagedAdaptiveLayoutEvidence", 1
+    )[1].split("function Invoke-PackagedWizardLayoutSmokeTest", 1)[0]
+
+    assert "RCMS_ADAPTIVE_LAYOUT_SCALE = $env:RCMS_ADAPTIVE_LAYOUT_SCALE" in evidence
+    assert "runtimeProbePath" in evidence
+    assert "$baselineDpr" in evidence
+    assert "/ [double]$baselineDpr" in evidence
+    assert "$env:RCMS_ADAPTIVE_LAYOUT_SCALE = $scale.Value" in evidence
+
+
 def _load_validator():
     validator_path = ROOT / "scripts" / "validate_adaptive_layout_evidence.py"
     return load_module_from_path("evidence_validator", validator_path)
@@ -195,7 +208,7 @@ def _write_validator_fixture(tmp_path, validator):
                 "client_paint_probe_pixel_size": client_size,
                 "client_paint_probe_device_pixel_ratio": 1.0,
                 "capture_region": "native-frame",
-                "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
+                "capture_method": "QScreen.grabWindow(window); native frame capture",
             }
         )
     artifact = tmp_path / "intrinsic-ratio-evidence.png"

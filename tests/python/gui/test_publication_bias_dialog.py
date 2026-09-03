@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from types import SimpleNamespace
 
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QStyle, QWidget
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -48,7 +49,7 @@ def _report(data_type, metric, methods, raw_data_available=True, warnings=None):
         "metric": metric,
         "usable.studies": 10,
         "raw.data.available": raw_data_available,
-        "precision.range": [0.1, 0.4],
+        "standard.error.range": [0.1, 0.4],
         "package.versions": {"meta": "8.5-0", "metafor": "5.0-1"},
         "warnings": [] if warnings is None else warnings,
         "methods": methods,
@@ -83,6 +84,87 @@ def test_dialog_matches_standard_method_and_plots_structure(qapp, monkeypatch):
         assert dialog.trim_fill_group.isHidden()
         dialog.trim_fill_check.setChecked(True)
         assert not dialog.trim_fill_group.isHidden()
+    finally:
+        dialog.close()
+
+
+def test_dialog_keeps_researcher_labels_readable_at_high_dpi(qapp, monkeypatch):
+    report = _report(
+        "binary",
+        "OR",
+        [_method("classical-egger", True, "primary")],
+    )
+    monkeypatch.setattr(
+        publication_bias_dialog.r_bridge,
+        "run_small_study_effects",
+        lambda *args, **kwargs: report,
+    )
+    dialog = publication_bias_dialog.PublicationBiasDialog(_Model("binary", "OR"))
+    try:
+        dialog.show()
+        qapp.processEvents()
+        assert dialog.minimumWidth() >= publication_bias_dialog.PUBLICATION_BIAS_MIN_WIDTH
+        assert dialog.width() >= publication_bias_dialog.PUBLICATION_BIAS_MIN_WIDTH
+        assert dialog.width() >= min(
+            publication_bias_dialog.PUBLICATION_BIAS_PREFERRED_WIDTH,
+            dialog.screen().availableGeometry().width(),
+        )
+        assert dialog.automatic_test_label.wordWrap()
+    finally:
+        dialog.close()
+
+
+def test_dialog_form_surfaces_never_introduce_horizontal_scrollbars(
+    qapp, monkeypatch
+):
+    report = _report("binary", "OR", [_method("classical-egger", True, "primary")])
+    monkeypatch.setattr(
+        publication_bias_dialog.r_bridge,
+        "run_small_study_effects",
+        lambda *args, **kwargs: report,
+    )
+    dialog = publication_bias_dialog.PublicationBiasDialog(_Model("binary", "OR"))
+    try:
+        dialog.show()
+        qapp.processEvents()
+        dialog._layout_controller.request_content_refit()
+        qapp.processEvents()
+        dialog.tabs.setCurrentWidget(dialog.plots_tab)
+        qapp.processEvents()
+        for scroll_area in (dialog.methods_scroll, dialog.plots_scroll):
+            assert (
+                scroll_area.horizontalScrollBarPolicy()
+                == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            assert scroll_area.horizontalScrollBar().maximum() == 0
+
+        # The long tau² option is a useful sentinel for the original defect:
+        # it must remain wholly reachable in the content viewport.
+        checkbox = dialog.include_tau2_check
+        style = checkbox.style()
+        indicator_width = style.pixelMetric(
+            QStyle.PixelMetric.PM_IndicatorWidth, None, checkbox
+        )
+        label_spacing = style.pixelMetric(
+            QStyle.PixelMetric.PM_CheckBoxLabelSpacing, None, checkbox
+        )
+        required_width = (
+            indicator_width
+            + label_spacing
+            + checkbox.fontMetrics().horizontalAdvance(checkbox.text())
+        )
+        assert checkbox.width() >= required_width
+        assert dialog.methods_scroll.viewport().width() >= required_width
+        dialog.methods_scroll.ensureWidgetVisible(dialog.include_tau2_check)
+        qapp.processEvents()
+        top_left = dialog.include_tau2_check.mapTo(
+            dialog.methods_scroll.viewport(), dialog.include_tau2_check.rect().topLeft()
+        )
+        bottom_right = dialog.include_tau2_check.mapTo(
+            dialog.methods_scroll.viewport(), dialog.include_tau2_check.rect().bottomRight()
+        )
+        assert top_left.x() >= 0
+        assert bottom_right.x() < dialog.methods_scroll.viewport().width()
     finally:
         dialog.close()
 
@@ -192,7 +274,7 @@ def test_singleton_r_warning_is_accepted_at_dialog_boundary(qapp, monkeypatch):
         "continuous",
         "MD",
         [_method("classical-egger", True, "primary")],
-        warnings="Observed precision range",
+        warnings="Observed standard-error range",
     )
     monkeypatch.setattr(
         publication_bias_dialog.r_bridge,

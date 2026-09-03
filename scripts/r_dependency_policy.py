@@ -26,18 +26,6 @@ EXPECTED_PLATFORMS = {
         "bin/macosx/sonoma-arm64/contrib/4.6",
     ),
 }
-HSROC = {
-    "name": "HSROC",
-    "version": "2.1.9",
-    "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-    "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
-    "dependencies": ["lattice", "coda", "MASS", "MCMCpack"],
-    "install_type": "source",
-    "repos": None,
-    "dependencies_install": False,
-}
-
-
 class PolicyError(ValueError):
     """Raised when the dependency manifest does not encode the release policy."""
 
@@ -103,8 +91,8 @@ def load_policy(manifest_path: Path) -> dict:
             raise PolicyError(f"invalid native binary mapping for {target}: {actual!r}")
 
     exceptions = policy.get("source_exceptions")
-    if exceptions != [HSROC]:
-        raise PolicyError("HSROC 2.1.9 must be the sole pinned source exception")
+    if exceptions != []:
+        raise PolicyError("RCMetaR R dependencies must not contain archived source exceptions")
 
     dependency_records = [
         *manifest.get("direct_RCMetaR_dependencies", []),
@@ -118,12 +106,11 @@ def load_policy(manifest_path: Path) -> dict:
     normal_packages = policy.get("required_normal_packages")
     if (
         not isinstance(normal_packages, list)
-        or len(normal_packages) != 57
-        or len(set(normal_packages)) != 57
+        or len(normal_packages) != len(set(normal_packages))
         or not all(isinstance(name, str) and name for name in normal_packages)
     ):
         raise PolicyError(
-            "required_normal_packages must contain 57 unique package names"
+            "required_normal_packages must contain unique package names"
         )
     if not declared_normal_packages <= set(normal_packages):
         raise PolicyError(
@@ -137,17 +124,6 @@ def load_policy(manifest_path: Path) -> dict:
         and record.get("source") in {"base-runtime", "recommended"}
         and record.get("name") != "R"
     )
-    direct_hsroc = [
-        record
-        for record in manifest.get("direct_RCMetaR_dependencies", [])
-        if isinstance(record, dict) and record.get("name") == "HSROC"
-    ]
-    if len(direct_hsroc) != 1 or direct_hsroc[0].get("source") != "cran-archive":
-        raise PolicyError(
-            "HSROC source exception must match the direct dependency manifest"
-        )
-    if direct_hsroc[0].get("installed_version") != HSROC["version"]:
-        raise PolicyError("HSROC manifest version does not match the source exception")
 
     direct_meta = [
         record
@@ -180,7 +156,6 @@ def load_policy(manifest_path: Path) -> dict:
         "platforms": platforms,
         "normal_packages": normal_packages,
         "runtime_packages": runtime_packages,
-        "source_exception": exceptions[0],
     }
 
 
@@ -205,16 +180,6 @@ def emit_dcf(policy: dict) -> str:
         fields[f"{prefix}-R-Arch"] = record["r_arch"]
         fields[f"{prefix}-Pkg-Type"] = record["pkg_type"]
         fields[f"{prefix}-Contrib-Path"] = record["contrib_path"]
-    exception = policy["source_exception"]
-    fields.update(
-        {
-            "Source-Exception-Name": exception["name"],
-            "Source-Exception-Version": exception["version"],
-            "Source-Exception-URL": exception["url"],
-            "Source-Exception-SHA256": exception["sha256"],
-            "Source-Exception-Dependencies": ",".join(exception["dependencies"]),
-        }
-    )
     return (
         "\n".join(f"{key}: {_dcf_value(str(value))}" for key, value in fields.items())
         + "\n"

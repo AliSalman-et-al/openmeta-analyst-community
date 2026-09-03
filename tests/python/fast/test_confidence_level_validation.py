@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.abspath("src"))
 from rc_metastudio.meta_globals import (
     normalize_confidence_level_params,
     seems_sane,
-    validate_analysis_count,
     validate_analysis_digits,
     validate_correction_factor,
     validate_confidence_level,
@@ -77,57 +76,7 @@ def test_validate_correction_factor_rejects_negative_and_non_finite_values():
             validate_correction_factor(value)
 
 
-def test_validate_analysis_count_accepts_integer_counts():
-    assert validate_analysis_count("num.iters", 10) == 10
-    assert validate_analysis_count("burn.in", 0) == 0
-    assert validate_analysis_count("thin", "2") == 2
-    assert validate_analysis_count("num.chains", 3.0) == 3
-
-
-def test_validate_analysis_count_rejects_invalid_counts():
-    invalid_values = {
-        "num.iters": 0,
-        "burn.in": -1,
-        "thin": 0,
-        "num.chains": 1.5,
-    }
-    for name, value in invalid_values.items():
-        with pytest.raises(ValueError, match="must be"):
-            validate_analysis_count(name, value)
-
-
-def test_normalize_confidence_level_params_validates_numeric_analysis_params():
-    params = {
-        "conf.level": 95,
-        "digits": "3",
-        "adjust": "0.5",
-        "num.iters": "5000",
-        "burn.in": "0",
-        "thin": "2",
-        "num.chains": "3",
-        "theta.lower": "-2.5",
-    }
-
-    normalized = normalize_confidence_level_params(params)
-
-    assert normalized["digits"] == 3
-    assert normalized["adjust"] == 0.5
-    assert normalized["num.iters"] == 5000
-    assert normalized["burn.in"] == 0
-    assert normalized["thin"] == 2
-    assert normalized["num.chains"] == 3
-    assert normalized["theta.lower"] == -2.5
-
-
-def test_normalize_confidence_level_params_rejects_bad_numeric_analysis_params():
-    bad_params = [
-        {"adjust": -0.5},
-        {"num.iters": 0},
-        {"burn.in": -1},
-        {"thin": 0},
-        {"num.chains": 2.5},
-        {"theta.lower": math.inf},
-    ]
-    for params in bad_params:
-        with pytest.raises(ValueError):
-            normalize_confidence_level_params(params)
+def test_normalize_confidence_level_params_validates_reitsma_controls():
+    assert normalize_confidence_level_params(
+        {"conf.level": "99.9", "digits": "3", "adjust": "0.5"}
+    ) == {"conf.level": 99.9, "digits": 3, "adjust": 0.5}

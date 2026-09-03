@@ -11,8 +11,7 @@ qa_visual_coverage_inventory <- function() {
       "coefficient_forest",
       "bootstrap_histogram",
       "roc",
-      "sroc",
-      "hsroc_diagnostics"
+      "sroc"
     ),
     plot_kind = c(
       "forest",
@@ -22,26 +21,22 @@ qa_visual_coverage_inventory <- function() {
       "regression",
       rep("other", 2),
       "roc",
-      "sroc",
-      "other"
+      "sroc"
     ),
-    status = c(rep("covered", 5), rep("excluded", 5)),
-    harness = c(rep("forest", 4), "bubble", rep("", 5)),
+    status = c(rep("covered", 6), rep("excluded", 2), "covered"),
+    harness = c(rep("forest", 4), "bubble", "reitsma", rep("", 2), "reitsma"),
     reason = c(
-      rep("", 5),
-      "The optional coefficient plot does not yet have an independent Plot Capability Descriptor or maintained renderer contract.",
+      rep("", 6),
       "Bootstrap plots depend on stochastic resampling and remain in Full R Stack Evidence rather than the deterministic visual matrix.",
       "The legacy ROC renderer is tracked for journal-grade migration before visual baselines are accepted.",
-      "The legacy SROC renderer is tracked for journal-grade migration before visual baselines are accepted.",
-      "HSROC diagnostic figures require the external sampler and are exercised only by Full R Stack Evidence."
+      ""
     ),
     evidence = c(
       rep("generated manifest", 5),
-      "Plot Capability Descriptor contract",
+      "Reitsma semantic SVG harness",
       "Full R Stack Evidence",
       "GitHub issue #271",
-      "GitHub issue #271",
-      "Full R Stack Evidence"
+      "Reitsma semantic SVG harness"
     ),
     stringsAsFactors = FALSE
   )
@@ -114,14 +109,19 @@ qa_find_visual_script_root <- function(start = getwd()) {
   }
 }
 
-qa_write_visual_qa_reports <- function(output.root, forest.manifest, bubble.manifest) {
+qa_write_visual_qa_reports <- function(output.root, forest.manifest, bubble.manifest, reitsma.manifest=NULL) {
   inventory <- qa_visual_coverage_inventory()
   required <- c("case", "family", "kind", "workflow", "style", "scenario", "image", "bytes", "error")
   if (!all(required %in% names(forest.manifest)) ||
       !all(required %in% names(bubble.manifest))) {
     stop("Visual QA manifests do not share the required report columns.", call.=FALSE)
   }
-  combined <- rbind(forest.manifest[required], bubble.manifest[required])
+  manifests <- list(forest.manifest, bubble.manifest)
+  if (!is.null(reitsma.manifest)) manifests[[length(manifests) + 1L]] <- reitsma.manifest
+  if (any(!vapply(manifests, function(x) all(required %in% names(x)), logical(1)))) {
+    stop("Visual QA manifests do not share the required report columns.", call.=FALSE)
+  }
+  combined <- do.call(rbind, lapply(manifests, function(x) x[required]))
   failed <- !is.na(combined$error) & nzchar(combined$error)
   missing.image <- is.na(combined$image) | !file.exists(combined$image)
   empty.image <- is.na(combined$bytes) | combined$bytes <= 0
@@ -150,9 +150,16 @@ qa_write_visual_qa_matrix <- function(repo.root, output.root) {
   script <- file.path(repo.root, "r", "RCMetaR", "inst", "qa", "forest_contact_sheets.py")
   matrix.root <- file.path(output.root, "matrix")
   dir.create(matrix.root, recursive = TRUE, showWarnings = FALSE)
+  # The contact-sheet helper is raster-only. Reitsma's SVGs are still fully
+  # checked by its semantic harness and remain in the primary manifest; keep
+  # them out of this optional PNG overview rather than silently rasterizing
+  # them with a different renderer.
+  matrix.manifest <- file.path(matrix.root, "manifest-raster.csv")
+  manifest <- utils::read.csv(file.path(output.root, "manifest.csv"), stringsAsFactors=FALSE)
+  utils::write.csv(manifest[grepl("\\.png$", manifest$image, ignore.case=TRUE), ], matrix.manifest, row.names=FALSE)
   status <- system2(
     python,
-    c(script, file.path(output.root, "manifest.csv"), "--out-dir", matrix.root),
+    c(script, matrix.manifest, "--out-dir", matrix.root),
     stdout = TRUE,
     stderr = TRUE
   )
@@ -176,6 +183,7 @@ qa_run_comprehensive_visual_qa <- function(repo.root = qa_find_visual_script_roo
 
   forest <- new.env(parent = globalenv())
   bubble <- new.env(parent = globalenv())
+  reitsma <- new.env(parent = globalenv())
   sys.source(
     file.path(repo.root, "r", "RCMetaR", "inst", "qa", "render_forest_visual_qa.R"),
     envir = forest
@@ -184,18 +192,26 @@ qa_run_comprehensive_visual_qa <- function(repo.root = qa_find_visual_script_roo
     file.path(repo.root, "r", "RCMetaR", "inst", "qa", "render_bubble_visual_qa.R"),
     envir = bubble
   )
+  sys.source(
+    file.path(repo.root, "scripts", "verify_reitsma_visual_qa.R"),
+    envir = reitsma
+  )
   forest$qa_load_rcmetar(repo.root)
 
   forest.root <- file.path(output.root, "forest")
   bubble.root <- file.path(output.root, "bubble")
+  reitsma.root <- file.path(output.root, "reitsma")
   dir.create(forest.root, recursive = TRUE, showWarnings = FALSE)
   dir.create(bubble.root, recursive = TRUE, showWarnings = FALSE)
+  dir.create(reitsma.root, recursive = TRUE, showWarnings = FALSE)
   forest.manifest <- forest$qa_render_matrix(forest.root)
   bubble.manifest <- bubble$qa_render_matrix(bubble.root)
+  reitsma.manifest <- reitsma$qa_render(reitsma.root)
   inventory <- qa_write_visual_qa_reports(
     output.root,
     forest.manifest,
-    bubble.manifest
+    bubble.manifest,
+    reitsma.manifest
   )
   qa_write_visual_qa_matrix(repo.root, output.root)
   cat(

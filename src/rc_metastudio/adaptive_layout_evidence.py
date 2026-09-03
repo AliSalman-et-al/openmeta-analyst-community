@@ -26,6 +26,14 @@ NON_NATIVE_PLUGINS = {"offscreen", "minimal", "minimalegl", "vnc"}
 EXPECTED_NATIVE_PLUGINS = {"win32": "windows", "darwin": "cocoa"}
 
 
+def _requested_scale_factor():
+    """Return the absolute evidence scale, separate from Qt's multiplier."""
+    return os.environ.get(
+        "RCMS_ADAPTIVE_LAYOUT_SCALE",
+        os.environ.get("QT_SCALE_FACTOR", "native"),
+    )
+
+
 def configure_isolated_evidence_settings(output_dir):
     """Keep package verification from reading or overwriting user geometry."""
     settings_root = Path(output_dir).resolve() / "settings"
@@ -215,7 +223,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         "qt": QtCore.QT_VERSION_STR,
         "pyqt": QtCore.PYQT_VERSION_STR,
         "platform_plugin": plugin,
-        "scale_factor_environment": os.environ.get("QT_SCALE_FACTOR", "native"),
+        "scale_factor_environment": _requested_scale_factor(),
         "screen": _screen_record(screen),
         "logical_dpi": round(screen.logicalDotsPerInch(), 2),
         "device_pixel_ratio": round(screen.devicePixelRatio(), 2),
@@ -422,42 +430,39 @@ def _capture_surface(
         "screenshot": str(path.relative_to(screenshots.parent)).replace("\\", "/"),
         "sha256": hashlib.sha256(payload).hexdigest(),
         "capture_region": "native-frame",
-        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
+        "capture_method": "QScreen.grabWindow(window); native frame capture",
     }
 
 
 def _grab_native_frame(screen, window):
     frame = window.frameGeometry()
-    desktop = screen.grabWindow(0)
-    if desktop.isNull():
-        return desktop
-    screen_geometry = screen.geometry()
-    dpr = desktop.devicePixelRatio()
-    physical = QtCore.QRect(
-        _physical_pixel_extent(frame.x() - screen_geometry.x(), dpr),
-        _physical_pixel_extent(frame.y() - screen_geometry.y(), dpr),
-        _physical_pixel_extent(frame.width(), dpr),
-        _physical_pixel_extent(frame.height(), dpr),
+    margins = window.windowHandle().frameMargins()
+    captured = screen.grabWindow(
+        window.winId(),
+        -margins.left(),
+        -margins.top(),
+        frame.width(),
+        frame.height(),
     )
-    captured = desktop.copy(physical)
-    captured.setDevicePixelRatio(dpr)
     return captured
-
-
-def _physical_pixel_extent(logical_extent, device_pixel_ratio):
-    return int((logical_extent * device_pixel_ratio) + 0.5)
 
 
 def _grab_painted_native_frame(app, screen, window, attempts=5):
     """Wait for the compositor to expose real frame pixels before accepting a grab."""
     pixmap = QtGui.QPixmap()
     for attempt in range(attempts):
+        # qwindows can expose the native window before its first paint has
+        # reached the desktop compositor.  Request a synchronous client paint
+        # and pump its events before every native grab; otherwise retries can
+        # repeatedly sample the same stale blank frame.
+        window.update()
+        window.repaint()
+        _flush(app)
         pixmap = _grab_native_frame(screen, window)
         if not pixmap.isNull() and _pixmap_has_pixel_variation(pixmap):
             return pixmap
         if attempt + 1 < attempts:
             QtCore.QThread.msleep(50)
-            _flush(app)
     raise RuntimeError(
         "%s native frame remained blank after %s compositor capture attempts."
         % (window.objectName() or window.windowTitle(), attempts)

@@ -7,6 +7,7 @@ import math
 import os
 import re
 import sys
+from collections.abc import Mapping
 from typing import Callable
 
 from rc_metastudio import r_runtime
@@ -301,6 +302,13 @@ def named_r_list_to_dict(named_r_list):
 def r_object_to_python(data):
     if _r_is_null(data):
         return None
+
+    # Matrix/array ``names`` in rpy2 is an alias for ``dimnames``.  Looking at
+    # names first therefore turns a matrix into a mapping whose keys are
+    # StrVector reprs (``[1] \"row 1\"``).  Dimensions are the stronger shape
+    # signal and must be handled before ordinary named vectors/lists.
+    if _r_dims(data):
+        return [_r_na_to_none(value) for value in list(data)]
     if _has_r_names(data):
         return {
             key: r_object_to_python(value)
@@ -344,6 +352,10 @@ def _is_r_iterable(value, exclude_strings=True):
 
 def _has_r_names(value):
     if _r_is_null(value):
+        return False
+    # rpy2 exposes matrix/array dimnames through ``names`` as well.  Those
+    # are labels for axes, not key/value names for a mapping.
+    if _r_dims(value):
         return False
     try:
         names = value.names
@@ -1244,6 +1256,15 @@ def generate_reg_plot(file_path, params_name="plot.data"):
 
 
 @serialized_r_call
+def generate_sroc_plot(file_path, params_name="plot.data"):
+    execute_r_function(
+        "rcmetar.draw.sroc.plot",
+        _r_object_from_symbol(params_name),
+        str(file_path),
+    )
+
+
+@serialized_r_call
 def generate_forest_plot(file_path, params_name="plot.data"):
     execute_r_function(
         "rcmetar.draw.forest.plot",
@@ -1264,8 +1285,11 @@ def parse_out_results(result):
     if _r_inherits(result, "try-error"):
         raise RuntimeError(_r_error_message(result))
 
-    # Turn result into a nice dictionary
-    result = dict(list(zip(list(result.names), list(result))))
+    # Turn result into an ordered stream of display sections.  RCMetaR returns
+    # a named list, but keeping this boundary total makes diagnostics and
+    # future producers safe when they return a scalar, vector, or unnamed list.
+    result_items = _result_items_for_display(result)
+    result = dict(result_items)
     study_names = _study_names_from_result(result)
 
     for text_n, text in list(result.items()):
@@ -1280,23 +1304,17 @@ def parse_out_results(result):
         # Diagnostic analyses may return several plot parameter objects, so keep
         # this branch broad enough to preserve all named plot metadata.
         if text_n == "images":
-            image_path_d = {} if _r_is_null(text) else r_object_to_python(text)
+            image_path_d = _r_mapping_or_empty(text)
         elif text_n == "display_images":
-            display_image_path_d = {} if _r_is_null(text) else r_object_to_python(text)
+            display_image_path_d = _r_mapping_or_empty(text)
         elif text_n == "image_order":
             image_order = None if _r_is_null(text) else list(text)
         elif text_n == "plot_names":
-            if _r_is_null(text):
-                image_var_name_d = {}
-            else:
-                image_var_name_d = r_object_to_python(text)
+            image_var_name_d = _r_mapping_or_empty(text)
         elif text_n == "plot_params_paths":
-            if _r_is_null(text):
-                image_params_paths_d = {}
-            else:
-                image_params_paths_d = r_object_to_python(text)
+            image_params_paths_d = _r_mapping_or_empty(text)
         elif text_n == "plot_capabilities":
-            plot_capability_d = {} if _r_is_null(text) else r_object_to_python(text)
+            plot_capability_d = _r_mapping_or_empty(text)
         elif text_n == "References":
             text_d[display_text_n] = result_sections.format_references(text)
         elif text_n in ("weights", "Weights"):
@@ -1314,9 +1332,7 @@ def parse_out_results(result):
         elif "gui.ignore" in text_n:
             pass
         else:
-            if isinstance(text, rpy2.robjects.vectors.StrVector):
-                text_d[display_text_n] = _format_result_text(text[0])
-            elif _is_summary_display(text):
+            if _is_summary_display(text):
                 text_d[display_text_n] = _format_result_text(
                     _capture_formatted_summary(text)
                 )
@@ -1324,16 +1340,20 @@ def parse_out_results(result):
                 text_d.update(
                     _format_table_summary(display_text_n, text, study_names=study_names)
                 )
-            elif _is_named_table_summary(text):
+            elif _is_named_result_summary(text):
                 text_d.update(
-                    _format_named_table_summary(
+                    _format_named_result_summary(
                         display_text_n, text, study_names=study_names
                     )
                 )
-            elif _is_named_text_summary(text):
-                text_d.update(_format_named_text_summary(display_text_n, text))
+            elif _is_r_iterable(text):
+                text_d[display_text_n] = _format_r_vector(
+                    text, field_name=text_n
+                )
             else:
-                text_d[display_text_n] = _format_result_text(str(text))
+                text_d[display_text_n] = _format_r_table_cell(
+                    text, field_name=text_n
+                )
 
     to_return = {
         "images": image_path_d,
@@ -1347,6 +1367,40 @@ def parse_out_results(result):
     return parse_analysis_result(to_return)
 
 
+def _result_items_for_display(result):
+    """Return ``(section, value)`` pairs without leaking R's NULL names."""
+    if _r_is_null(result):
+        return []
+    names = _r_result_names(result)
+    if names is not None:
+        return [
+            (name if name else "Result %d" % (index + 1), value)
+            for index, (name, value) in enumerate(zip(names, list(result)))
+        ]
+    if isinstance(result, rpy2.robjects.vectors.ListVector):
+        return [
+            ("Result %d" % (index + 1), value)
+            for index, value in enumerate(list(result))
+        ]
+    return [("Result", result)]
+
+
+def _r_result_names(value):
+    """Read partial names for a top-level R list without axis confusion."""
+    if _r_is_null(value) or _r_dims(value):
+        return None
+    try:
+        names = value.names
+    except Exception:
+        return None
+    if _r_is_null(names):
+        return None
+    try:
+        return [str(name) for name in list(names)]
+    except Exception:
+        return None
+
+
 def _study_names_from_result(result):
     input_data = result.get("input_data")
     if input_data is None:
@@ -1358,6 +1412,19 @@ def _study_names_from_result(result):
     if not study_names or any(name == "" for name in study_names):
         return None
     return study_names
+
+
+def _r_mapping_or_empty(r_object):
+    """Convert named R metadata to a mapping, including empty vectors."""
+    if _r_is_null(r_object):
+        return {}
+    try:
+        if len(r_object) == 0:
+            return {}
+    except TypeError:
+        pass
+    converted = r_object_to_python(r_object)
+    return converted if isinstance(converted, Mapping) else {}
 
 
 def _r_inherits(r_object, class_name):
@@ -1395,12 +1462,18 @@ def _capture_formatted_summary(r_object):
 def _format_table_summary(section_name, r_object, title=None, study_names=None):
     dims = _r_dims(r_object)
     if len(dims) == 2:
+        if _is_large_display_shape(dims):
+            return {section_name: _format_shape_summary(dims)}
         return {section_name: _format_r_matrix(r_object, study_names=study_names)}
     if len(dims) == 3:
+        if _is_large_display_shape(dims):
+            return {section_name: _format_shape_summary(dims)}
         return _format_r_array_sections(
             "Summary", section_name, r_object, study_names=study_names
         )
-    return {section_name: str(r_object)}
+    return {
+        section_name: _format_r_table_cell(r_object, field_name=section_name)
+    }
 
 
 def _is_named_table_summary(r_object):
@@ -1414,13 +1487,48 @@ def _is_named_table_summary(r_object):
     return False
 
 
+def _is_named_result_summary(r_object):
+    """Return whether an R value can be safely rendered as named output."""
+    if not _has_r_names(r_object):
+        return False
+    if isinstance(r_object, rpy2.robjects.vectors.ListVector):
+        return True
+    if isinstance(r_object, rpy2.robjects.vectors.Vector):
+        return True
+    return False
+
+
+def _format_named_result_summary(parent_name, r_object, study_names=None):
+    # The one-study methods wrap their four useful values in a technical
+    # ``MAResults`` list for compatibility with the multi-study model.  It is
+    # not a meaningful heading in the Results window, so unwrap that single
+    # transport layer before rendering the fields.
+    if _has_r_names(r_object):
+        names = [str(name) for name in list(r_object.names)]
+        if len(names) == 1 and names[0].replace(" ", "") == "MAResults":
+            wrapped = list(r_object)[0]
+            if _has_r_names(wrapped):
+                return {parent_name: _format_named_value(wrapped, study_names=study_names)}
+    if _is_named_table_summary(r_object):
+        return _format_named_table_summary(
+            parent_name, r_object, study_names=study_names
+        )
+    if _is_named_text_summary(r_object):
+        return _format_named_text_summary(parent_name, r_object)
+    rendered = _format_named_value(r_object, study_names=study_names)
+    return {parent_name: rendered} if rendered else {}
+
+
 def _is_named_text_summary(r_object):
     if not _has_r_names(r_object):
         return False
 
     has_named_text = False
     for item in list(r_object):
-        if not _is_r_string_vector(item):
+        # A named character vector is a structured estimate (for example,
+        # Estimate/Lower bound/Upper bound), not a one-line text section.
+        # Treating it as text silently discarded all but item[0].
+        if not _is_r_string_vector(item) or _r_names_or_none(item) is not None:
             return False
         has_named_text = True
     return has_named_text
@@ -1447,11 +1555,12 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
             continue
 
         display_name = _display_section_name(name)
+        section_name = _summary_section_name(parent_name, display_name)
         dims = _r_dims(item)
         if len(dims) == 2:
             sections.update(
                 _format_table_summary(
-                    _summary_section_name(parent_name, display_name),
+                    section_name,
                     item,
                     display_name,
                     study_names=study_names,
@@ -1464,13 +1573,151 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
                 )
             )
         elif _is_r_string_vector(item):
-            sections[_summary_section_name(parent_name, display_name)] = (
-                _format_result_text(item[0])
+            sections[section_name] = _format_result_text(
+                ", ".join(str(value) for value in item)
+            )
+        elif _has_r_names(item):
+            rendered = _format_named_value(item, study_names=study_names)
+            if rendered:
+                sections[section_name] = rendered
+        elif _is_r_iterable(item):
+            rendered = _format_r_vector(item)
+            if rendered:
+                sections[section_name] = rendered
+        else:
+            sections[section_name] = _format_r_table_cell(
+                item, field_name=name
             )
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
     return sections
+
+
+def _format_named_value(r_object, study_names=None):
+    """Render a named R list without exposing R's console representation."""
+    lines = []
+    names = list(r_object.names)
+    named_items = list(zip(names, list(r_object)))
+    named_items = sorted(
+        enumerate(named_items),
+        key=lambda pair: (_named_value_priority(pair[1][0]), pair[0]),
+    )
+    for _index, (name, item) in named_items:
+        if not name or _r_is_null(item):
+            continue
+        label = _format_summary_label(name)
+        rendered = _format_nested_value(
+            item, study_names=study_names, field_name=name
+        )
+        if not rendered:
+            continue
+        if "\n" in rendered:
+            lines.append("%s:" % label)
+            lines.extend("  %s" % line for line in rendered.splitlines())
+        else:
+            lines.append("%s: %s" % (label, rendered))
+    return "\n".join(lines)
+
+
+def _format_nested_value(r_object, study_names=None, field_name=None):
+    dims = _r_dims(r_object)
+    if len(dims) == 2:
+        if dims[0] > 20 or dims[0] * dims[1] > 100:
+            return "%d rows x %d columns" % (dims[0], dims[1])
+        return _format_r_matrix(r_object, study_names=study_names)
+    if len(dims) == 3:
+        rendered = _format_r_array_sections(
+            "Summary", "Values", r_object, study_names=study_names
+        )
+        return "\n\n".join(rendered.values())
+    if _has_r_names(r_object):
+        return _format_named_value(r_object, study_names=study_names)
+    if _is_r_iterable(r_object):
+        return _format_r_vector(r_object, field_name=field_name)
+    return _format_r_table_cell(r_object, field_name=field_name)
+
+
+def _format_r_vector(r_object, field_name=None):
+    names = _r_names_or_none(r_object)
+    values = list(r_object)
+    if not values:
+        return ""
+    if names is not None:
+        return "\n".join(
+            "%s: %s" % (
+                _format_summary_label(name),
+                _format_r_table_cell(value, field_name=name),
+            )
+            for name, value in zip(names, values)
+        )
+    if len(values) == 1:
+        return _format_r_table_cell(values[0], field_name=field_name)
+    return ", ".join(
+        _format_r_table_cell(value, field_name=field_name) for value in values
+    )
+
+
+def _named_value_priority(name):
+    """Order decision-relevant fields before implementation diagnostics."""
+    compact = re.sub(r"[^a-z0-9]", "", str(name).lower())
+    if compact in {"estimate", "te", "effect", "coefficient", "b"}:
+        return 0
+    if compact in {"lower", "lowerbound", "cilb", "ci95lb", "lowerci"}:
+        return 1
+    if compact in {"upper", "upperbound", "ciub", "ci95ub", "upperci"}:
+        return 2
+    if compact in {"p", "pvalue", "pval", "prz"}:
+        return 3
+    if compact in {"se", "stderr", "standarderror", "z", "zvalue", "zval"}:
+        return 4
+    return 10
+
+
+def _is_large_display_shape(dims):
+    return bool(dims) and (dims[0] > 20 or math.prod(dims) > 100)
+
+
+def _format_shape_summary(dims):
+    if len(dims) == 2:
+        return "%d rows x %d columns" % (dims[0], dims[1])
+    if len(dims) == 3:
+        return "%d rows x %d columns x %d slices" % tuple(dims)
+    return "Array with dimensions %s" % " x ".join(str(dim) for dim in dims)
+
+
+def _format_summary_label(name):
+    labels = {
+        "normalized.partial.AUC": "Normalized partial AUC",
+        "partial.FPR.bounds": "Partial FPR bounds",
+        "false.positive.rate": "False-positive rate",
+        "covariance.sensitivity.specificity": "Sensitivity-specificity covariance",
+        "correlation.sensitivity.specificity": "Sensitivity-specificity correlation",
+        "summary.seed": "Summary seed",
+        "summary.iterations": "Summary iterations",
+        "p.value": "p-value",
+        "z.value": "z-value",
+    }
+    raw_name = str(name)
+    if raw_name in labels:
+        return labels[raw_name]
+    compact_name = re.sub(r"[^a-z0-9]", "", raw_name.lower())
+    if compact_name in {"b", "estimate"}:
+        return "Estimate"
+    if compact_name in {"lower", "cilb", "lowerbound", "lowerci", "lb"}:
+        return "Lower bound"
+    if compact_name in {"upper", "ciub", "upperbound", "upperci", "ub"}:
+        return "Upper bound"
+    if compact_name in {"se", "sei", "stderr", "standarderror"}:
+        return "Std. error"
+    if compact_name in {"sensitivity", "summarysensitivity"}:
+        return "Sensitivity"
+    if compact_name in {"specificity", "summaryspecificity"}:
+        return "Specificity"
+    # Keep one label policy for section titles and nested result values.  The
+    # shared helper expands R's dotted/underscored identifiers and diagnostic
+    # abbreviations without changing numeric/statistical content.
+    return result_sections.normalize_identifier_label(raw_name)
 
 
 def _summary_section_name(parent_name, child_name):
@@ -1488,7 +1735,12 @@ def _is_r_string_vector(r_object):
 
 
 def _r_dims(r_object):
-    dims = execute_r_function("dim", r_object)
+    if not isinstance(r_object, rpy2.robjects.vectors.Vector):
+        return []
+    try:
+        dims = execute_r_function("dim", r_object)
+    except Exception:
+        return []
     if _r_is_null(dims):
         return []
     return [int(dim) for dim in list(dims)]
@@ -1505,6 +1757,8 @@ def _r_dimnames(r_object):
 
 
 def _r_names_or_none(r_object):
+    if _r_dims(r_object):
+        return None
     names = getattr(r_object, "names", None)
     if names is None or _r_is_null(names):
         return None
@@ -1555,13 +1809,13 @@ def _format_r_array_sections(parent_name, array_name, r_array, study_names=None)
 
 
 def _format_matrix_values(values, nrow, ncol, row_names, col_names, study_names=None):
-    headers = (
-        [_format_r_table_header(name) for name in list(col_names)]
-        if col_names is not None
-        else ["V%s" % (index + 1) for index in range(ncol)]
-    )
+    # rpy2 exposes an R data.frame as a list of column vectors, while a plain
+    # matrix is exposed as one column-major flat vector.  Both objects have
+    # the same ``dim`` contract, so normalize the values before indexing.
+    values = _matrix_cell_values(values, nrow, ncol)
+    headers = _matrix_column_names(col_names, ncol)
     rows = []
-    row_names = _display_row_names(row_names, study_names)
+    row_names = _matrix_row_names(row_names, nrow, study_names)
     include_row_names = row_names is not None
     if include_row_names:
         headers = [""] + headers
@@ -1571,10 +1825,61 @@ def _format_matrix_values(values, nrow, ncol, row_names, col_names, study_names=
         if include_row_names:
             row.append(row_names[row_index])
         for col_index in range(ncol):
-            row.append(_format_r_table_cell(values[row_index + (col_index * nrow)]))
+            field_name = headers[col_index + (1 if include_row_names else 0)]
+            row.append(
+                _format_r_table_cell(
+                    values[row_index + (col_index * nrow)],
+                    field_name=field_name,
+                )
+            )
         rows.append(row)
 
     return _format_text_table(headers, rows)
+
+
+def _matrix_cell_values(values, nrow, ncol):
+    """Return exactly ``nrow * ncol`` safe, column-major table cells."""
+    values = list(values)
+    expected = nrow * ncol
+    if len(values) == expected:
+        return values
+
+    # A data.frame iterates over its ncol column vectors.  Flatten each
+    # column explicitly; this is the common shape for named Reitsma tables.
+    if len(values) == ncol:
+        flattened = []
+        for column in values:
+            try:
+                column_values = list(column)
+            except TypeError:
+                column_values = [column]
+            flattened.extend(column_values[:nrow])
+            if len(column_values) < nrow:
+                flattened.extend([None] * (nrow - len(column_values)))
+        values = flattened
+
+    # Malformed or partially populated R objects should remain renderable;
+    # missing cells are clearer than an indexing exception in the GUI.
+    if len(values) < expected:
+        values.extend([None] * (expected - len(values)))
+    return values[:expected]
+
+
+def _matrix_column_names(col_names, ncol):
+    names = list(col_names) if col_names is not None else []
+    names = names[:ncol]
+    names.extend("V%s" % (index + 1) for index in range(len(names), ncol))
+    return [_format_r_table_header(name) for name in names]
+
+
+def _matrix_row_names(row_names, nrow, study_names):
+    if row_names is None:
+        return None
+    names = list(row_names)[:nrow]
+    if len(names) < nrow:
+        names.extend(str(index + 1) for index in range(len(names), nrow))
+    names = _display_row_names(names, study_names)
+    return [result_sections.normalize_identifier_label(name) for name in names]
 
 
 def _display_row_names(row_names, study_names):
@@ -1593,12 +1898,23 @@ def _row_names_are_generic_study_ids(row_names, study_names):
     return list(row_names) in (expected_numbers, expected_studies)
 
 
-def _format_r_table_cell(value):
-    if str(value) == "NA":
+def _format_r_table_cell(value, field_name=None):
+    if _is_r_iterable(value) and len(value) == 1:
+        value = _r_singleton_to_scalar(value)
+    if value is None or str(value) == "NA":
         return "NA"
-    if isinstance(value, float):
-        return "%g" % value
-    return str(value)
+    if isinstance(value, (float, int)) and not isinstance(value, bool):
+        if isinstance(value, float) and not math.isfinite(value):
+            return "NA" if math.isnan(value) else ("-Inf" if value < 0 else "Inf")
+        compact_name = re.sub(r"[^a-z0-9]", "", str(field_name or "").lower())
+        if compact_name in {"p", "pvalue", "pval", "prz", "qmp", "qep"}:
+            if value < 0.001:
+                return "< 0.001"
+            return "%.3f" % value
+        if float(value).is_integer():
+            return str(int(value))
+        return "%.4g" % value
+    return _format_result_text(str(value))
 
 
 def _format_text_table(headers, rows):
@@ -1624,9 +1940,29 @@ def _format_text_table(headers, rows):
 
 def _format_r_table_header(value):
     normalized = str(value).strip()
+    # Percentile column labels such as ``2.5%`` are already meaningful; do
+    # not run them through identifier normalization, which would turn the
+    # decimal point into a space.
+    percentile = re.fullmatch(r"(\d+(?:\.\d+)?)\s*%", normalized)
+    if percentile:
+        return "%s%%" % percentile.group(1)
+    if re.fullmatch(
+        r"\d+(?:\.\d+)?\s*%?\s*ci[._\s]*(?:lb|lower)",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
+        return "Lower bound"
+    if re.fullmatch(
+        r"\d+(?:\.\d+)?\s*%?\s*ci[._\s]*(?:ub|upper)",
+        normalized,
+        flags=re.IGNORECASE,
+    ):
+        return "Upper bound"
     compact = normalized.lower().replace(".", " ").replace("_", " ").replace("-", " ")
     compact = " ".join(compact.split())
     if compact == "p value":
+        return "p-value"
+    if normalized.lower() == "pr(>|z|)":
         return "p-value"
     if compact == "het p value":
         return "Het. p-value"
@@ -1640,17 +1976,52 @@ def _format_r_table_header(value):
         return "Upper bound"
     if compact == "median estimate":
         return "Median estimate"
-    return normalized
+    return result_sections.normalize_identifier_label(normalized)
 
 
 def _format_result_text(text):
     if not isinstance(text, str):
         text = str(text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(
         r"<U\+([0-9A-Fa-f]{4,6})>",
         lambda match: chr(int(match.group(1), 16)),
         text,
     )
+    # ``capture.output(print(...))`` is occasionally the only representation
+    # available for a legacy R object.  Remove console framing while retaining
+    # the actual text.  Structured values are rendered by the helpers above,
+    # so this is intentionally conservative for arbitrary user prose.
+    cleaned_lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("attr(,\"", "[[")):
+            if stripped.startswith(("attr(,\"", "[[")):
+                continue
+            cleaned_lines.append("")
+            continue
+        if stripped == "NULL":
+            continue
+        match = re.match(r"^\[\d+\]\s+(.*)$", stripped)
+        if match:
+            payload = match.group(1)
+            quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
+            if quoted and " ".join(quoted) == payload.replace('"', '').strip():
+                payload = ", ".join(quoted)
+            line = payload
+        if stripped.startswith("$"):
+            continue
+        cleaned_lines.append(line)
+    text = "\n".join(cleaned_lines).strip()
+    for raw_label, display_label in (
+        ("Zhou.Dendukuri", "Zhou-Dendukuri"),
+        ("Holling.Unadjusted", "Holling (unadjusted)"),
+        ("Holling.Adjusted", "Holling (adjusted)"),
+        ("posLR", "Positive Likelihood Ratio"),
+        ("negLR", "Negative Likelihood Ratio"),
+        ("invnegLR", "Inverse Negative Likelihood Ratio"),
+    ):
+        text = text.replace(raw_label, display_label)
     insensitive_replacements = (
         (r"\bHPD[._\s]+(?:low|lower)\b", "Lower bound"),
         (r"\bHPD[._\s]+(?:high|upper)\b", "Upper bound"),
@@ -1671,15 +2042,27 @@ def _format_result_text(text):
 
 def make_weights_str(results):
     """Make a string representing the weights due to each study in the meta analysis"""
-    if "weights" not in results and "Weights" in results:
-        results["weights"] = results["Weights"]
-    if "weights" not in results:
+    weights_object = results.get("weights", results.get("Weights"))
+    if weights_object is None:
         raise Exception("make_weights_str() requires 'weights' in the results")
 
     digits = PERCENTAGE_DISPLAY_DIGITS
-    weights_object = results["weights"]
-    weights = list(weights_object)
-    weights = ["{0:.{digits}f}%".format(x, digits=digits) for x in weights]
+    if _is_r_iterable(weights_object):
+        raw_weights = list(weights_object)
+    else:
+        raw_weights = [weights_object]
+    if not raw_weights:
+        return "No study weights available.\n"
+    weights = []
+    for value in raw_weights:
+        scalar = _r_singleton_to_scalar(value) if _is_r_iterable(value) and len(value) == 1 else value
+        if scalar is None or str(scalar) == "NA":
+            weights.append("NA")
+        else:
+            try:
+                weights.append("{0:.{digits}f}%".format(float(scalar), digits=digits))
+            except (TypeError, ValueError):
+                weights.append(_format_r_table_cell(scalar))
     if "input_data" in results:
         study_names = list(results["input_data"].do_slot("study.names"))
     else:
@@ -1688,6 +2071,8 @@ def make_weights_str(results):
             study_names = weight_names
         else:
             study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
+    if len(study_names) != len(weights):
+        study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
 
     table, widths = tabulate(
         [study_names, weights], sep=": ", return_col_widths=True, align=["L", "R"]
@@ -1710,6 +2095,7 @@ def run_meta_regression(
     fixed_effects=False,
     confidence_level=None,
     params=None,
+    method="meta.regression",
 ):
 
     confidence_level = validate_confidence_level(confidence_level)
@@ -1721,7 +2107,7 @@ def run_meta_regression(
     params["measure"] = metric_name
     return _run_rcmetar_core_analysis(
         data_name,
-        "meta.regression",
+        method,
         params,
         workflow="meta-regression",
         res_name=results_name,

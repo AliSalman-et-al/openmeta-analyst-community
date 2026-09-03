@@ -137,6 +137,22 @@ def test_method_parameters_declares_scroll_body_with_actions_outside(qapp):
         dialog.close()
 
 
+def test_analysis_setup_keeps_scratch_plot_path_internal(qapp, monkeypatch):
+    from rc_metastudio import analysis_setup_dialog
+
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        _AnalysisModel("binary"), confidence_level=95.0
+    )
+    try:
+        assert dialog.image_path.text().endswith("forest.png")
+        assert dialog.label_3.isHidden()
+        assert dialog.image_path.isHidden()
+        assert dialog.save_btn.isHidden()
+    finally:
+        dialog.close()
+
+
 @pytest.mark.parametrize(
     ("data_type", "diagnostic_metrics", "expected_title", "expected_method_label"),
     (
@@ -169,6 +185,275 @@ def test_method_dialog_wording_is_scoped_to_its_analysis_family(
     try:
         assert dialog.windowTitle() == expected_title
         assert dialog.method_lbl.text() == expected_method_label
+    finally:
+        dialog.close()
+
+
+@pytest.mark.parametrize(
+    ("analysis_type", "expected_title", "expected_method_label"),
+    (
+        (
+            "meta-regression",
+            "Reitsma Meta-Regression",
+            "Reitsma bivariate model",
+        ),
+        (
+            None,
+            "Method & Parameters for Sensitivity and Specificity",
+            "Method for Sensitivity and Specificity",
+        ),
+    ),
+    ids=["meta-regression", "standard"],
+)
+def test_diagnostic_reitsma_method_layout_and_meta_regression_uses_joint_mode(
+    monkeypatch, qapp, analysis_type, expected_title, expected_method_label
+):
+    from rc_metastudio import adaptive_window, analysis_adapter, analysis_setup_dialog
+
+    covariate = SimpleNamespace(name="quality", data_type=4)
+    model = _AnalysisModel("diagnostic", (covariate,))
+    model.get_studies = lambda only_if_included=True: []
+    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    monkeypatch.setattr(
+        backend,
+        "dataset_to_simple_diagnostic_r_object",
+        lambda *_args, **_kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_available_methods",
+        lambda **_kwargs: {"Reitsma bivariate model": "diagnostic.reitsma"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_params",
+        lambda _method: (
+            {
+                "estimator": ["REML", "ML"],
+                "conf.level": "float",
+                "adjust": "float",
+                "correction.policy": [
+                    "Studies with any zero cell",
+                    "All studies if any zero exists",
+                    "None",
+                ],
+                "digits": "int",
+            },
+            {
+                "estimator": "REML",
+                "conf.level": 95.0,
+                "adjust": 0.5,
+                "correction.policy": "All studies if any zero exists",
+                "digits": 2,
+            },
+            ["estimator", "conf.level", "adjust", "correction.policy", "digits"],
+            {},
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_method_description",
+        lambda _method: "Count-based joint Reitsma model",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_analysis_plot_capabilities",
+        lambda *_args, **_kwargs: [],
+        raising=False,
+    )
+
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        model,
+        analysis_type=analysis_type,
+        diagnostic_metrics=["sens", "spec"],
+        confidence_level=95.0,
+    )
+    try:
+        monkeypatch.setattr(
+            adaptive_window,
+            "available_geometry_for_window",
+            lambda _window: QtCore.QRect(0, 0, 800, 600),
+        )
+        font = QtGui.QFont(dialog.font())
+        font.setPointSize(max(14, font.pointSize() + 5))
+        dialog.setFont(font)
+        dialog.specs_tab.setCurrentWidget(dialog.methods_tab)
+        dialog.show()
+        qapp.processEvents()
+
+        assert dialog.windowTitle() == expected_title
+        assert dialog.method_lbl.text() == expected_method_label
+        assert dialog.current_method == "diagnostic.reitsma"
+        assert dialog.diagnostic_regression_group.isHidden() is (
+            analysis_type == "meta-regression"
+        )
+        assert dialog.regression_model_group.isHidden() is (
+            analysis_type == "meta-regression"
+        )
+        method_text_width = dialog.method_cbo_box.fontMetrics().horizontalAdvance(
+            dialog.method_cbo_box.currentText()
+        )
+        assert method_text_width <= dialog.method_cbo_box.width(), (
+            method_text_width,
+            dialog.method_cbo_box.width(),
+            dialog.method_cbo_box.sizeHint().width(),
+            dialog.width(),
+            dialog.method_lbl.width(),
+            dialog.methods_tab.width(),
+            dialog.method_cbo_box.parentWidget().width(),
+            dialog.parameter_grp_box.width(),
+        )
+        estimator = next(
+            combo
+            for combo in dialog.parameter_grp_box.findChildren(QtWidgets.QComboBox)
+            if combo.findData("REML") >= 0
+        )
+        assert [estimator.itemText(i) for i in range(estimator.count())] == [
+            "REML",
+            "ML",
+        ]
+        assert estimator.currentData() == "REML"
+        estimator.setCurrentText("ML")
+        assert estimator.currentData() == "ML"
+        assert dialog.current_param_vals["estimator"] == "ML"
+        assert dialog.buttonBox.isVisible()
+        assert dialog.contentsRect().contains(dialog.buttonBox.geometry().center())
+
+        if analysis_type is None:
+            return
+
+        requests = []
+        monkeypatch.setattr(
+            analysis_adapter,
+            "execute_meta_regression_request",
+            lambda *args, **_kwargs: requests.append(args) or {},
+        )
+        dialog._run_analysis = lambda operation, *_args, **_kwargs: operation()
+        dialog.run_meta_regression()
+        request = requests[0][3]
+        assert request.method == "diagnostic.reitsma"
+        assert request.metric == "Sens"
+        assert request.parameter_values()["joint.metrics"] == "Sens,Spec"
+    finally:
+        dialog.close()
+        qapp.processEvents()
+
+
+def test_diagnostic_reitsma_meta_regression_hides_legacy_controls_for_factor_and_multiple_moderators(
+    monkeypatch, qapp
+):
+    """Joint Reitsma regression must not expose univariate model controls."""
+    from rc_metastudio import analysis_setup_dialog
+
+    continuous = SimpleNamespace(name="threshold", data_type=0)
+    factor = SimpleNamespace(name="reader", data_type=1)
+    model = _AnalysisModel("diagnostic", (continuous, factor))
+    model.get_studies = lambda only_if_included=True: []
+    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    monkeypatch.setattr(
+        backend,
+        "dataset_to_simple_diagnostic_r_object",
+        lambda *_args, **_kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_available_methods",
+        lambda **_kwargs: {"Reitsma bivariate model": "diagnostic.reitsma"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend,
+        "get_params",
+        lambda _method: (
+            {
+                "estimator": ["REML", "ML"],
+                "conf.level": "float",
+                "adjust": "float",
+                "correction.policy": [
+                    "Studies with any zero cell",
+                    "All studies if any zero exists",
+                    "None",
+                ],
+                "digits": "int",
+            },
+            {
+                "estimator": "REML",
+                "conf.level": 95.0,
+                "adjust": 0.5,
+                "correction.policy": "All studies if any zero exists",
+                "digits": 2,
+            },
+            ["estimator", "conf.level", "adjust", "correction.policy", "digits"],
+            {},
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        backend, "get_method_description", lambda _method: "Reitsma", raising=False
+    )
+    monkeypatch.setattr(
+        backend, "get_analysis_plot_capabilities", lambda *_args, **_kwargs: [
+            {"plot_kind": "forest", "styleable": True}
+        ], raising=False
+    )
+
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        model,
+        analysis_type="meta-regression",
+        diagnostic_metrics=["sens", "spec"],
+        confidence_level=95.0,
+    )
+    try:
+        assert dialog.regression_model_group.isHidden()
+        assert dialog.diagnostic_regression_group.isHidden()
+        assert not dialog.fixed_effects_radio.isVisible()
+        assert len(dialog.covs_and_check_boxes) == 2
+        # A factor moderator cannot use the bubble-plot controls. Selecting it
+        # alongside the continuous moderator also proves multiple moderators
+        # do not re-enable the obsolete plot path.
+        dialog.covs_and_check_boxes[1][1].setChecked(True)
+        assert not dialog.plot_tab.isEnabled()
+    finally:
+        dialog.close()
+
+
+def test_meta_regression_missing_moderator_confirmation_names_excluded_studies(
+    monkeypatch, qapp
+):
+    from rc_metastudio import analysis_adapter, analysis_setup_dialog
+
+    covariate = SimpleNamespace(name="quality", data_type=0)
+    model = _AnalysisModel("continuous", (covariate,))
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        model, analysis_type="meta-regression", confidence_level=95.0
+    )
+    messages = []
+    monkeypatch.setattr(
+        analysis_adapter,
+        "select_studies_for_covariates",
+        lambda *_args, **_kwargs: analysis_adapter.StudySelectionResult(
+            studies=(),
+            has_missing_values=True,
+            excluded_study_names=("Study A", "Study B"),
+        ),
+    )
+    monkeypatch.setattr(
+        analysis_setup_dialog.QMessageBox,
+        "warning",
+        lambda _parent, _title, text, _buttons: messages.append(text)
+        or QtWidgets.QMessageBox.StandardButton.No,
+    )
+    try:
+        dialog.run_meta_regression()
+        assert len(messages) == 1
+        assert "Study A, Study B" in messages[0]
+        assert "Run the regression without those studies?" in messages[0]
     finally:
         dialog.close()
 
@@ -223,19 +508,24 @@ def test_method_parameters_variants_stay_bounded_and_stable(qapp, monkeypatch):
 
             stable_geometry = QtCore.QRect(dialog.frameGeometry())
             plot_was_enabled = dialog.plot_tab.isEnabled()
-            dialog.method_cbo_box.setCurrentIndex(1)
-            qapp.processEvents()
+            if dialog.method_cbo_box.count() > 1:
+                dialog.method_cbo_box.setCurrentIndex(1)
+                qapp.processEvents()
             assert dialog.frameGeometry() == stable_geometry
             if workflow not in ("meta-regression",):
                 assert plot_was_enabled is True
                 assert dialog.plot_tab.isEnabled() is False
 
+            if getattr(dialog, "_combined_diagnostic", False):
+                # Combined diagnostic dialogs intentionally expose shared
+                # method parameters in their dedicated panel. Their local
+                # method box need not contain a second enum control.
+                continue
+
+            enum_control = dialog.parameter_grp_box.findChild(QtWidgets.QComboBox)
             enum_control = cast(
                 QtWidgets.QComboBox,
-                required(
-                    dialog.parameter_grp_box.findChild(QtWidgets.QComboBox),
-                    "parameter combo",
-                ),
+                required(enum_control, "parameter combo"),
             )
             assert enum_control.maximumWidth() == QtWidgets.QWIDGETSIZE_MAX
             complete_value_width = max(
@@ -344,11 +634,10 @@ def test_method_parameters_opens_at_its_content_preferred_width(qapp, monkeypatc
         dialog.close()
 
 
-def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monkeypatch):
+def test_subgroup_and_covariate_selectors_use_transactional_layouts(qapp, monkeypatch):
     from rc_metastudio import adaptive_controls
     from rc_metastudio import adaptive_window
     from rc_metastudio import covariate_type_dialog
-    from rc_metastudio import meta_regression_dialog
     from rc_metastudio import subgroup_analysis_dialog
     from rc_metastudio.meta_globals import FACTOR
 
@@ -385,7 +674,6 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
 
     parent = QtWidgets.QWidget()
     setattr(parent, "meta_subgroup", lambda _covariate: None)
-    regression = meta_regression_dialog.MetaRegressionDialog(Model(), parent=parent)
     subgroup = subgroup_analysis_dialog.SubgroupAnalysisDialog(Model(), parent=parent)
 
     class PreviewModel(QtGui.QStandardItemModel):
@@ -399,19 +687,10 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         SimpleNamespace(), SimpleNamespace(), parent=parent
     )
     try:
-        regression.show()
         subgroup.show()
         covariate_type.show()
         qapp.processEvents()
 
-        assert (
-            adaptive_window.adaptive_window_state(regression).policy.archetype
-            is adaptive_window.WindowArchetype.TRANSACTIONAL
-        )
-        assert regression.content_scroll_area.isAncestorOf(
-            regression.covariate_group_box
-        )
-        assert not regression.content_scroll_area.isAncestorOf(regression.buttonBox)
         assert (
             adaptive_window.adaptive_window_state(subgroup).policy.archetype
             is adaptive_window.WindowArchetype.TRANSACTIONAL
@@ -453,7 +732,6 @@ def test_regression_and_subgroup_selectors_use_transactional_layouts(qapp, monke
         )
         assert covariate_type.buttonBox.isVisible()
     finally:
-        regression.close()
         subgroup.close()
         covariate_type.close()
         parent.close()

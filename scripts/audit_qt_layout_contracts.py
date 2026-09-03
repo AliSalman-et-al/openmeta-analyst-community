@@ -67,7 +67,7 @@ GUARDED_GEOMETRY_METHODS = {
 SOURCE_EXCEPTION_RULES = {
     "adaptive-window-policy": {
         "paths": {"adaptive_window.py"},
-        "methods": {"move", "resize", "setMaximumSize"},
+        "methods": {"move", "resize", "setMaximumSize", "setMinimumWidth"},
     },
     "bounded-native-popup": {
         "paths": {

@@ -42,8 +42,6 @@ PPM_CONTRIB_PATHS = {
     "macos-arm64": "bin/macosx/sonoma-arm64/contrib/4.6",
 }
 PPM_REPOSITORY = "https://packagemanager.posit.co/cran/2026-07-16"
-HSROC_URL = "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
-HSROC_SHA256 = "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874"
 WINDOWS_SYSTEM_DLLS = {
     "advapi32.dll",
     "bcrypt.dll",
@@ -286,8 +284,8 @@ def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, Any]:
         ):
             raise KitError("PPM archive provenance is incomplete or invalid")
     source_names = {record.get("name") for record in source_packages}
-    if not {"HSROC", "RCMetaR"} <= source_names:
-        raise KitError("HSROC and RCMetaR source provenance is required")
+    if "RCMetaR" not in source_names:
+        raise KitError("RCMetaR source provenance is required")
     for record in source_packages:
         if not (
             _verified_https(record.get("url"))
@@ -299,13 +297,6 @@ def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, Any]:
             and record.get("license")
         ):
             raise KitError("source-package provenance is incomplete or invalid")
-    hsroc = next(record for record in source_packages if record.get("name") == "HSROC")
-    if not (
-        hsroc.get("version") == "2.1.9"
-        and hsroc.get("url") == HSROC_URL
-        and hsroc.get("sha256") == HSROC_SHA256
-    ):
-        raise KitError("HSROC provenance differs from the locked source exception")
     return provenance
 
 
@@ -381,7 +372,7 @@ def copy_source_payload(
             "sha256": record["sha256"],
         }
         for record in provenance["source_packages"]
-        if record.get("name") in {"HSROC", "RCMetaR"}
+        if record.get("name") == "RCMetaR"
     ]
     claims.extend(
         {
@@ -396,7 +387,7 @@ def copy_source_payload(
     for path in candidates:
         by_hash.setdefault(sha256_file(path), []).append(path)
     if len(candidates) != len(claims):
-        raise KitError("source payload must contain exactly the five retained archives")
+        raise KitError("source payload must contain exactly the retained archives")
     destination.mkdir()
     records = []
     for claim in claims:
@@ -1019,14 +1010,14 @@ def verify(root: Path, *, target: str | None = None) -> dict[str, Any]:
         == sha256_file(bridge)
         and isinstance(sources.get("installed_packages"), list)
         and isinstance(sources.get("source_payload"), list)
-        and len(sources.get("source_payload", [])) == 5
+        and len(sources.get("source_payload", [])) == 4
     ):
         raise KitError("integration-kit source provenance is incomplete")
     validate_installed_provenance(sources["installed_packages"], sources["provenance"])
     required_source_hashes = {
         record["sha256"]
         for record in sources["provenance"]["source_packages"]
-        if record.get("name") in {"HSROC", "RCMetaR"}
+        if record.get("name") == "RCMetaR"
     } | {
         record["sha256"] for record in sources["provenance"]["rpy2"]["source_archives"]
     }
