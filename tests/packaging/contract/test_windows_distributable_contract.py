@@ -407,7 +407,7 @@ def test_macos_distributable_contract_is_declared():
     macos_spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio-macos.spec")
     assert "BUNDLE(" in macos_spec
     assert (
-        'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in macos_spec
+        'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "arm64")' in macos_spec
     )
     assert "RCMS_BUNDLE_IDENTIFIER" in macos_spec
     assert {
