@@ -10,8 +10,8 @@ cum.ma.binary <- function(fname, binary.data, params){
 
     suppressed_params <- params
 	suppressed_params$supress.output <- TRUE
-    res <- eval(call(fname, binary.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, binary.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
 
     cum.results <- array(list(NULL), dim=c(length(binary.data@study.names)))
 
@@ -31,8 +31,8 @@ cum.ma.binary <- function(fname, binary.data, params){
         } else {
             subset_binary_data <- new('BinaryData', y=subset_effects, SE=subset_standard_errors, study.names=subset_study_names)
         }
-        current_result <- eval(call(fname, subset_binary_data, suppressed_params))
-        current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+        current_result <- .rcmetar.call.method(fname, subset_binary_data, suppressed_params)
+        current_overall <- .rcmetar.call.overall(fname, current_result)
         cum.results[[i]] <- current_overall
     }
     study.names <- binary.data@study.names[1]
@@ -168,8 +168,8 @@ bootstrap <- function(fname, omdata, params, cond.means.data=FALSE) {
 		subset_data <- get.subset(omdata, indices, make.unique.names=TRUE)
 
 
-	   res <- eval(call(fname, subset_data, suppressed_params))
-	   res.pure <- eval(call(paste(fname, ".overall", sep=""), res))
+	   res <- .rcmetar.call.method(fname, subset_data, suppressed_params)
+	   res.pure <- .rcmetar.call.overall(fname, res)
 	   res.pure$b
 	}
 
@@ -420,8 +420,8 @@ loo.ma.binary <- function(fname, binary.data, params){
     suppressed_params <- params
 
 	suppressed_params$supress.output <- TRUE
-    res <- eval(call(fname, binary.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, binary.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     N <- length(binary.data@study.names)
     for (i in 1:N){
         index.ls <- setdiff(1:N, i)
@@ -442,8 +442,8 @@ loo.ma.binary <- function(fname, binary.data, params){
         } else{
             subset_binary_data <- new('BinaryData', y=subset_effects, SE=subset_standard_errors, study.names=subset_study_names)
         }
-        current_result <- eval(call(fname, subset_binary_data, suppressed_params))
-        current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+        current_result <- .rcmetar.call.method(fname, subset_binary_data, suppressed_params)
+        current_overall <- .rcmetar.call.overall(fname, current_result)
         loo.results[[i]] <- current_overall
     }
     loo.results <- c(list(res.overall), loo.results)
@@ -500,8 +500,8 @@ cum.ma.continuous <- function(fname, cont.data, params){
 
     suppressed_params <- params
 	suppressed_params$supress.output <- TRUE
-    res <- eval(call(fname, cont.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, cont.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
 
     params$fp_show_col3 <- FALSE
     params$fp_show_col4 <- FALSE
@@ -532,8 +532,8 @@ cum.ma.continuous <- function(fname, cont.data, params){
                                 y=subset_effects, SE=subset_standard_errors,
                                 study.names=subset_study_names)
         }
-        current_result <- eval(call(fname, subset_continuous_data, suppressed_params))
-        current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+        current_result <- .rcmetar.call.method(fname, subset_continuous_data, suppressed_params)
+        current_overall <- .rcmetar.call.overall(fname, current_result)
         cum.results[[i]] <- current_overall
     }
     study.names <- c()
@@ -586,8 +586,8 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	suppressed_params <- params
 	suppressed_params$create.plot <- FALSE
 	suppressed_params$write.to.file <- FALSE
-	res <- eval(call(fname, diagnostic.data, suppressed_params))
-	res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+	res <- .rcmetar.call.method(fname, diagnostic.data, suppressed_params)
+	res.overall <- .rcmetar.call.overall(fname, res)
 
 
 	cum.results <- array(list(NULL), dim=c(length(diagnostic.data@study.names)))
@@ -609,8 +609,8 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 		} else {
 			subset_diagnostic_data <- new('DiagnosticData', y=subset_effects, SE=subset_standard_errors, study.names=subset_study_names)
 		}
-		current_result <- eval(call(fname, subset_diagnostic_data, suppressed_params))
-		current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+		current_result <- .rcmetar.call.method(fname, subset_diagnostic_data, suppressed_params)
+		current_overall <- .rcmetar.call.overall(fname, current_result)
 		cum.results[[i]] <- current_overall
 	}
 	study.names <- diagnostic.data@study.names[1]
@@ -670,7 +670,7 @@ multiple.cum.ma.diagnostic <- function(fnames, params.list, diagnostic.data) {
 		res <- cum.ma.diagnostic(fname, diagnostic.data, params)
 
 		summary <- list("Summary"=res[["Cumulative Summary"]])
-		names(summary) <- paste(eval(parse(text=paste("pretty.names$measure$", params$measure,sep=""))), " Summary", sep="")
+		names(summary) <- paste(pretty.metric.name(as.character(params$measure)), " Summary", sep="")
 
 		results <- c(results, summary)
 
@@ -706,8 +706,8 @@ loo.ma.continuous <- function(fname, cont.data, params){
     loo.results <- array(list(NULL), dim=c(length(cont.data@study.names)))
     suppressed_params <- params
 	suppressed_params$supress.output <- TRUE
-    res <- eval(call(fname, cont.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, cont.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     N <- length(cont.data@study.names)
     for (i in 1:N){
         index.ls <- setdiff(1:N, i)
@@ -735,8 +735,8 @@ loo.ma.continuous <- function(fname, cont.data, params){
                                 y=subset_effects, SE=subset_standard_errors,
                                 study.names=subset_study_names)
         }
-        current_result <- eval(call(fname, subset_continuous_data, suppressed_params))
-        current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+        current_result <- .rcmetar.call.method(fname, subset_continuous_data, suppressed_params)
+        current_overall <- .rcmetar.call.overall(fname, current_result)
         loo.results[[i]] <- current_overall
     }
     loo.results <- c(list(res.overall), loo.results)
@@ -804,13 +804,13 @@ subgroup.ma.binary <- function(fname, binary.data, params){
       col3.denoms <- c(col3.denoms, subset_binary_data@g1O1 + subset_binary_data@g1O2, sum(subset_binary_data@g1O1 + subset_binary_data@g1O2))
       col4.nums <- c(col4.nums, subset_binary_data@g2O1, sum(subset_binary_data@g2O1))
       col4.denoms <- c(col4.denoms, subset_binary_data@g2O1 + subset_binary_data@g2O2, sum(subset_binary_data@g2O1 + subset_binary_data@g2O2))
-      current_result <- eval(call(fname, subset_binary_data, suppressed_params))
-      current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+      current_result <- .rcmetar.call.method(fname, subset_binary_data, suppressed_params)
+      current_overall <- .rcmetar.call.overall(fname, current_result)
       subgroup.results[[count]] <- current_overall
       count <- count + 1
     }
-    res <- eval(call(fname, binary.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, binary.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     grouped.data[[count]] <- binary.data
     subgroup.results[[count]] <- res.overall
     subgroup.names <- paste("Subgroup ", subgroup.list, sep="")
@@ -897,13 +897,13 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     for (i in subgroup.list){
       subset_continuous_data <- get.subgroup.data.cont(cont.data, i, cov.vals)
       grouped.data[[count]] <- subset_continuous_data
-      current_result <- eval(call(fname, subset_continuous_data, params))
-      current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+      current_result <- .rcmetar.call.method(fname, subset_continuous_data, params)
+      current_overall <- .rcmetar.call.overall(fname, current_result)
       subgroup.results[[count]] <- current_overall
       count <- count + 1
     }
-    res <- eval(call(fname, cont.data, params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, cont.data, params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     grouped.data[[count]] <- cont.data
     subgroup.results[[count]] <- res.overall
     subgroup.names <- paste("Subgroup ", subgroup.list, sep="")
@@ -997,10 +997,10 @@ update.plot.data.multiple <- function(binary.data, params, results) {
     data.type <- "binary"
     plot.options <- extract.plot.options(params)
     if (!is.null(params$fp_display.lb)) {
-        plot.options$display.lb <- eval(call(transform.name, params$measure))$calc.scale(params$fp_display.lb)
+        plot.options$display.lb <- rcmetar.transform("binary", params$measure)$calc.scale(params$fp_display.lb)
     }
     if (!is.null(params$fp_display.ub)) {
-        plot.options$display.ub <- eval(call(transform.name, params$measure))$calc.scale(params$fp_display.ub)
+        plot.options$display.ub <- rcmetar.transform("binary", params$measure)$calc.scale(params$fp_display.ub)
     }
     if (!is.null(params$fp_show.summary.line)) {
         plot.options$show.summary.line <- params$fp_show_summary_line
@@ -1025,9 +1025,10 @@ update.plot.data.multiple <- function(binary.data, params, results) {
     lb <- c(lb, lb.overall)
     ub <- c(ub, ub.overall)
 
-    y.disp <- eval(call(transform.name, params$measure))$display.scale(y)
-    lb.disp <- eval(call(transform.name, params$measure))$display.scale(lb)
-    ub.disp <- eval(call(transform.name, params$measure))$display.scale(ub)
+    transform <- rcmetar.transform("binary", params$measure)
+    y.disp <- transform$display.scale(y)
+    lb.disp <- transform$display.scale(lb)
+    ub.disp <- transform$display.scale(ub)
 
     if (params$fp_show_col2=='TRUE') {
         effect.size.col <- format.effect.size.col(y.disp, lb.disp, ub.disp, params)
@@ -1045,7 +1046,7 @@ update.plot.data.multiple <- function(binary.data, params, results) {
     plot.data$effects <- effects
     if (!is.null(selected.cov)){
         cov.val.str <- paste("binary.data@covariates$", selected.cov, sep="")
-        cov.values <- eval(parse(text=cov.val.str))
+        cov.values <- binary.data@covariates[[selected.cov]]
         plot.data$covariate <- list(varname = selected.cov,
                                    values = cov.values)
     }
@@ -1072,14 +1073,14 @@ multiple.loo.diagnostic <- function(fnames, params.list, diagnostic.data) {
             subset_diagnostic_data <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
             analysis_result <- loo.ma.diagnostic(fnames[[count]], subset_diagnostic_data, params.list[[count]])
             analysis_images <- analysis_result$images
-            names(analysis_images) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+            names(analysis_images) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             images <- c(images, analysis_images)
             analysis_plot_paths <- analysis_result$plot_params_paths
-            names(analysis_plot_paths) <- paste(eval(parse(text=paste("pretty.names$measure$", params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+            names(analysis_plot_paths) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
             plot.names <- c(plot.names, analysis_result$plot.names)
             analysis_summary <- list("Summary"=analysis_result$Summary)
-            names(analysis_summary) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Summary", sep="")
+            names(analysis_summary) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
 
 			references <- c(references, analysis_result$References)
 
@@ -1099,8 +1100,8 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
     suppressed_params <- params
     suppressed_params$create.plot <- FALSE
     suppressed_params$write.to.file <- FALSE
-    res <- eval(call(fname, diagnostic.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, diagnostic.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     N <- length(diagnostic.data@study.names)
     for (i in 1:N){
         index.ls <- setdiff(1:N, i)
@@ -1121,8 +1122,8 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
         } else{
             subset_diagnostic_data <- new('DiagnosticData', y=subset_effects, SE=subset_standard_errors, study.names=subset_study_names)
         }
-        current_result <- eval(call(fname, subset_diagnostic_data, suppressed_params))
-        current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+        current_result <- .rcmetar.call.method(fname, subset_diagnostic_data, suppressed_params)
+        current_overall <- .rcmetar.call.overall(fname, current_result)
         loo.results[[i]] <- current_overall
     }
     loo.results <- c(list(res.overall), loo.results)
@@ -1183,15 +1184,15 @@ multiple.subgroup.diagnostic <- function(fnames, params.list, diagnostic.data) {
             analysis_result <- subgroup.ma.diagnostic(fnames[[count]], subset_diagnostic_data, params.list[[count]], selected.cov)
             if (is.null(params.list[[count]]$create.plot)) {
                 analysis_images <- analysis_result$images
-                names(analysis_images) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+                names(analysis_images) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
                 images <- c(images, analysis_images)
                 analysis_plot_paths <- analysis_result$plot_params_paths
-                names(analysis_plot_paths) <- paste(eval(parse(text=paste("pretty.names$measure$", params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+                names(analysis_plot_paths) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
                 plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
                 plot.names <- c(plot.names, analysis_result$plot_names)
             }
             analysis_summary <- list("Summary"=analysis_result$Summary)
-            names(analysis_summary) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Summary", sep="")
+                names(analysis_summary) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
 
 			references <- c(references, analysis_result$References)
 
@@ -1226,13 +1227,13 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
       terms <- compute.diagnostic.terms(raw.data, suppressed_params)
       col3.nums <- c(col3.nums, terms$numerator, sum(terms$numerator))
       col3.denoms <- c(col3.denoms, terms$denominator, sum(terms$denominator))
-      current_result <- eval(call(fname, subset_diagnostic_data, suppressed_params))
-      current_overall <- eval(call(paste(fname, ".overall", sep=""), current_result))
+      current_result <- .rcmetar.call.method(fname, subset_diagnostic_data, suppressed_params)
+      current_overall <- .rcmetar.call.overall(fname, current_result)
       subgroup.results[[count]] <- current_overall
       count <- count + 1
     }
-    res <- eval(call(fname, diagnostic.data, suppressed_params))
-    res.overall <- eval(call(paste(fname, ".overall", sep=""), res))
+    res <- .rcmetar.call.method(fname, diagnostic.data, suppressed_params)
+    res.overall <- .rcmetar.call.overall(fname, res)
     grouped.data[[count]] <- diagnostic.data
     subgroup.results[[count]] <- res.overall
     subgroup.names <- paste("Subgroup ", subgroup.list, sep="")

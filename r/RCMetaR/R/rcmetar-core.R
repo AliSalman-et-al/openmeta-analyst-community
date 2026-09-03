@@ -103,9 +103,8 @@ rcmetar.available.methods <- function(data.type=NULL, om.data=NULL, metric=NULL,
     available <- c()
     for (method in methods) {
         feasible <- TRUE
-        feasible.function <- paste(method, "is.feasible", sep=".")
-        if (!is.null(om.data) && exists(feasible.function, mode="function")) {
-            feasible <- isTRUE(eval(call(feasible.function, om.data, metric)))
+        if (!is.null(om.data)) {
+            feasible <- isTRUE(.rcmetar.method.feasible(method, om.data, metric))
         }
 
         if (feasible) {
@@ -122,11 +121,7 @@ rcmetar.available.methods <- function(data.type=NULL, om.data=NULL, metric=NULL,
 
 rcmetar.method.parameters <- function(method) {
     .rcmetar.validate.method.name(method)
-    parameter.function <- paste(method, "parameters", sep=".")
-    if (!exists(parameter.function, mode="function")) {
-        stop(sprintf("Method '%s' does not expose parameters.", method), call.=FALSE)
-    }
-    parameters <- eval(call(parameter.function))
+    parameters <- .rcmetar.method.parameters(method)
     parameters$pretty.names <- .rcmetar.method.pretty.names(method)
     parameters
 }
@@ -329,6 +324,33 @@ rcmetar.convert.scale <- function(x, metric, data.type, convert.to="display.scal
         return(transform.function[[convert.to]](x=x, ni=n1))
     }
     transform.function[[convert.to]](x)
+}
+
+rcmetar.transform <- function(data.type, metric) {
+    switch(
+        .rcmetar.match.arg(tolower(as.character(data.type)), c("binary", "continuous", "diagnostic"), "data.type"),
+        binary = binary.transform.f(metric),
+        continuous = continuous.transform.f(metric),
+        diagnostic = diagnostic.transform.f(metric)
+    )
+}
+
+rcmetar.transform.by.name <- function(transform.name, metric) {
+    switch(
+        transform.name,
+        binary.transform.f = binary.transform.f(metric),
+        continuous.transform.f = continuous.transform.f(metric),
+        diagnostic.transform.f = diagnostic.transform.f(metric),
+        stop(sprintf("Unknown effect transform '%s'.", transform.name), call.=FALSE)
+    )
+}
+
+rcmetar.numeric.values <- function(value) {
+    if (is.null(value) || !length(value)) return(numeric(0))
+    if (is.numeric(value)) return(as.numeric(value[is.finite(value)]))
+    tokens <- unlist(strsplit(paste(as.character(value), collapse=","), "[,[:space:]]+"))
+    parsed <- suppressWarnings(as.numeric(tokens[nzchar(tokens)]))
+    parsed[is.finite(parsed)]
 }
 
 rcmetar.binary.study.effect <- function(e1, n1, e2=NULL, n2=NULL, two.arm=TRUE, metric="OR", conf.level=95) {
@@ -670,15 +692,70 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
 }
 
 .rcmetar.dispatch.standard <- function(om.data, request) {
-    eval(call(request$method, om.data, request$params))
+    .rcmetar.call.method(request$method, om.data, request$params)
+}
+
+.rcmetar.call.method <- function(method, om.data, params) {
+    switch(
+        method,
+        binary.fixed.inv.var = binary.fixed.inv.var(om.data, params),
+        binary.fixed.mh = binary.fixed.mh(om.data, params),
+        binary.fixed.peto = binary.fixed.peto(om.data, params),
+        binary.random = binary.random(om.data, params),
+        continuous.fixed = continuous.fixed(om.data, params),
+        continuous.random = continuous.random(om.data, params),
+        diagnostic.fixed.inv.var = diagnostic.fixed.inv.var(om.data, params),
+        diagnostic.fixed.mh = diagnostic.fixed.mh(om.data, params),
+        diagnostic.fixed.peto = diagnostic.fixed.peto(om.data, params),
+        diagnostic.random = diagnostic.random(om.data, params),
+        diagnostic.reitsma = diagnostic.reitsma(om.data, params),
+        meta.regression = meta.regression(om.data, params),
+        stop(sprintf("Unknown RCMetaR analysis method '%s'.", method), call.=FALSE)
+    )
+}
+
+.rcmetar.call.overall <- function(method, result) {
+    switch(
+        method,
+        binary.fixed.inv.var = binary.fixed.inv.var.overall(result),
+        binary.fixed.mh = binary.fixed.mh.overall(result),
+        binary.fixed.peto = binary.fixed.peto.overall(result),
+        binary.random = binary.random.overall(result),
+        continuous.fixed = continuous.fixed.overall(result),
+        continuous.random = continuous.random.overall(result),
+        diagnostic.fixed.inv.var = diagnostic.fixed.inv.var.overall(result),
+        diagnostic.fixed.mh = diagnostic.fixed.mh.overall(result),
+        diagnostic.fixed.peto = diagnostic.fixed.peto.overall(result),
+        diagnostic.random = diagnostic.random.overall(result),
+        stop(sprintf("Unknown RCMetaR overall method '%s'.", method), call.=FALSE)
+    )
 }
 
 .rcmetar.dispatch.meta.workflow <- function(om.data, request) {
-    meta.function <- .rcmetar.meta.workflow.function(request$data.type, request$workflow)
-    if (request$data.type == "diagnostic" && request$workflow == "subgroup") {
-        return(eval(call(meta.function, request$method, om.data, request$params, request$selected.cov)))
+    if (request$workflow == "cumulative") {
+        return(switch(request$data.type,
+            binary = cum.ma.binary(request$method, om.data, request$params),
+            continuous = cum.ma.continuous(request$method, om.data, request$params),
+            diagnostic = cum.ma.diagnostic(request$method, om.data, request$params)
+        ))
     }
-    eval(call(meta.function, request$method, om.data, request$params))
+    if (request$workflow == "leave-one-out") {
+        return(switch(request$data.type,
+            binary = loo.ma.binary(request$method, om.data, request$params),
+            continuous = loo.ma.continuous(request$method, om.data, request$params),
+            diagnostic = loo.ma.diagnostic(request$method, om.data, request$params)
+        ))
+    }
+    if (request$workflow == "subgroup") {
+        if (request$data.type == "diagnostic") {
+            return(subgroup.ma.diagnostic(request$method, om.data, request$params, request$selected.cov))
+        }
+        if (request$data.type == "binary") {
+            return(subgroup.ma.binary(request$method, om.data, request$params, request$selected.cov))
+        }
+        return(subgroup.ma.continuous(request$method, om.data, request$params, request$selected.cov))
+    }
+    stop(sprintf("Workflow '%s' is not supported by the typed dispatcher.", request$workflow), call.=FALSE)
 }
 
 .rcmetar.meta.workflow.function <- function(data.type, workflow) {
@@ -809,11 +886,52 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
 
 .rcmetar.method.pretty.names <- function(method) {
     method <- .rcmetar.validate.method.name(method)
-    pretty.function <- paste(method, "pretty.names", sep=".")
-    if (exists(pretty.function, mode="function")) {
-        return(eval(call(pretty.function)))
-    }
-    list(pretty.name=method, description="None provided.")
+    switch(method,
+        binary.fixed.inv.var = binary.fixed.inv.var.pretty.names(),
+        binary.fixed.mh = binary.fixed.mh.pretty.names(),
+        binary.fixed.peto = binary.fixed.peto.pretty.names(),
+        binary.random = binary.random.pretty.names(),
+        continuous.fixed = continuous.fixed.pretty.names(),
+        continuous.random = continuous.random.pretty.names(),
+        diagnostic.fixed.inv.var = diagnostic.fixed.inv.var.pretty.names(),
+        diagnostic.fixed.mh = diagnostic.fixed.mh.pretty.names(),
+        diagnostic.fixed.peto = diagnostic.fixed.peto.pretty.names(),
+        diagnostic.random = diagnostic.random.pretty.names(),
+        diagnostic.reitsma = diagnostic.reitsma.pretty.names(),
+        meta.regression = meta.regression.pretty.names(),
+        list(pretty.name=method, description="None provided.")
+    )
+}
+
+.rcmetar.method.parameters <- function(method) {
+    switch(method,
+        binary.fixed.inv.var = binary.fixed.inv.var.parameters(),
+        binary.fixed.mh = binary.fixed.mh.parameters(),
+        binary.fixed.peto = binary.fixed.peto.parameters(),
+        binary.random = binary.random.parameters(),
+        continuous.fixed = continuous.fixed.parameters(),
+        continuous.random = continuous.random.parameters(),
+        diagnostic.fixed.inv.var = diagnostic.fixed.inv.var.parameters(),
+        diagnostic.fixed.mh = diagnostic.fixed.mh.parameters(),
+        diagnostic.fixed.peto = diagnostic.fixed.peto.parameters(),
+        diagnostic.random = diagnostic.random.parameters(),
+        diagnostic.reitsma = diagnostic.reitsma.parameters(),
+        meta.regression = meta.regression.parameters(),
+        stop(sprintf("Method '%s' does not expose parameters.", method), call.=FALSE)
+    )
+}
+
+.rcmetar.method.feasible <- function(method, om.data, metric) {
+    switch(method,
+        binary.fixed.mh = binary.fixed.mh.is.feasible(om.data, metric),
+        binary.fixed.peto = binary.fixed.peto.is.feasible(om.data, metric),
+        diagnostic.fixed.inv.var = diagnostic.fixed.inv.var.is.feasible(om.data, metric),
+        diagnostic.fixed.mh = diagnostic.fixed.mh.is.feasible(om.data, metric),
+        diagnostic.fixed.peto = diagnostic.fixed.peto.is.feasible(om.data, metric),
+        diagnostic.random = diagnostic.random.is.feasible(om.data, metric),
+        diagnostic.reitsma = diagnostic.reitsma.is.feasible(om.data, metric),
+        TRUE
+    )
 }
 
 .rcmetar.method.supports.inference <- function(method) {

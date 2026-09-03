@@ -43,18 +43,18 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     if (params$fp_plot_lb == "[default]") {
         plot.options$plot.lb <- params$fp_plot_lb
     } else {
-        plot.lb <- eval(parse(text=paste("c(", params$fp_plot_lb, ")", sep="")))
-        plot.options$plot.lb <- eval(call(transform.name, params$measure))$calc.scale(plot.lb, n)
+        plot.lb <- rcmetar.numeric.values(params$fp_plot_lb)
+        plot.options$plot.lb <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.lb, n)
     }
 
     if (params$fp_plot_ub == "[default]")  {
         plot.options$plot.ub <- params$fp_plot_ub
     } else {
-        plot.ub <- eval(parse(text=paste("c(", params$fp_plot_ub, ")", sep="")))
+        plot.ub <- rcmetar.numeric.values(params$fp_plot_ub)
         if (scale.str == "logit") {
           plot.ub <- min(1, plot.ub)
         }
-        plot.options$plot.ub <- eval(call(transform.name, params$measure))$calc.scale(plot.ub, n)
+        plot.options$plot.ub <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.ub, n)
     }
 
     tau2 <- sprintf(digits.str, res$tau2)
@@ -90,13 +90,14 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
 
 
 
-	y.disp <- eval(call(transform.name, params$measure))$display.scale(y, ni=n)
-	lb.disp <- eval(call(transform.name, params$measure))$display.scale(lb, ni=n)
-	ub.disp <- eval(call(transform.name, params$measure))$display.scale(ub, ni=n)
+	transform <- rcmetar.transform.by.name(transform.name, params$measure)
+	y.disp <- transform$display.scale(y, ni=n)
+	lb.disp <- transform$display.scale(lb, ni=n)
+	ub.disp <- transform$display.scale(ub, ni=n)
 
-	y.overall.disp <- eval(call(transform.name, params$measure))$display.scale(y.overall, ni=n)
-	lb.overall.disp <- eval(call(transform.name, params$measure))$display.scale(lb.overall, ni=n)
-	ub.overall.disp <- eval(call(transform.name, params$measure))$display.scale(ub.overall, ni=n)
+	y.overall.disp <- transform$display.scale(y.overall, ni=n)
+	lb.overall.disp <- transform$display.scale(lb.overall, ni=n)
+	ub.overall.disp <- transform$display.scale(ub.overall, ni=n)
 
     y <- c(y, y.overall)
     lb <- c(lb, lb.overall)
@@ -123,8 +124,8 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     plot.range <- calc.plot.range(effects, plot.options)
 
     if (metric.is.log.scale(params$measure)) {
-        plot.range.disp.lower <- eval(call(transform.name, params$measure))$display.scale(plot.range[1])
-        plot.range.disp.upper <- eval(call(transform.name, params$measure))$display.scale(plot.range[2])
+        plot.range.disp.lower <- transform$display.scale(plot.range[1])
+        plot.range.disp.upper <- transform$display.scale(plot.range[2])
     } else {
         plot.range.disp.lower <- plot.range[1]
         plot.range.disp.upper <- plot.range[2]
@@ -141,7 +142,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
 
     if (!is.null(selected.cov)){
         cov.val.str <- paste("om.data@covariates$", selected.cov, sep="")
-        cov.values <- eval(parse(text=cov.val.str))
+        cov.values <- om.data@covariates[[selected.cov]]
         plot.data$covariate <- list(varname = selected.cov,
                                    values = cov.values)
     }
@@ -224,14 +225,14 @@ create.plot.data.overall <- function(om.data, params, res, res.overall){
     if (params$fp_plot_lb == "[default]") {
         plot.options$plot.lb <- params$fp_plot_lb
     } else {
-        plot.lb <- eval(parse(text=paste("c(", params$fp_plot_lb, ")", sep="")))
-        plot.options$plot.lb <- eval(call(transform.name, params$measure))$calc.scale(plot.lb, n)
+        plot.lb <- rcmetar.numeric.values(params$fp_plot_lb)
+        plot.options$plot.lb <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.lb, n)
     }
     if (params$fp_plot_ub == "[default]") {
         plot.options$plot.ub <- params$fp_plot_ub
     } else {
-        plot.ub <- eval(parse(text=paste("c(", params$fp_plot_ub, ")", sep="")))
-        plot.options$plot.ub <- eval(call(transform.name, params$measure))$calc.scale(plot.ub, n)
+        plot.ub <- rcmetar.numeric.values(params$fp_plot_ub)
+        plot.options$plot.ub <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.ub, n)
     }
     if (metric.is.log.scale(params$measure)) {
         plot.options$show.y.axis <- FALSE
@@ -251,9 +252,10 @@ create.plot.data.overall <- function(om.data, params, res, res.overall){
       ub <- c(ub, res[[count]]$ci.ub)
     }
 
-    y.disp <- eval(call(transform.name, params$measure))$display.scale(y, n)
-    lb.disp <- eval(call(transform.name, params$measure))$display.scale(lb, n)
-    ub.disp <- eval(call(transform.name, params$measure))$display.scale(ub, n)
+    transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    y.disp <- transform$display.scale(y, n)
+    lb.disp <- transform$display.scale(lb, n)
+    ub.disp <- transform$display.scale(ub, n)
     effects.disp <- list(y.disp=y.disp, lb.disp=lb.disp, ub.disp=ub.disp)
     plot.data$effects.disp <- effects.disp
 
@@ -269,8 +271,8 @@ create.plot.data.overall <- function(om.data, params, res, res.overall){
     plot.data$effects <- effects
     plot.range <- calc.plot.range(effects, plot.options)
     plot.data$plot.range <- plot.range
-    plot.range.disp.lower <- eval(call(transform.name, params$measure))$display.scale(plot.range[1], n)
-    plot.range.disp.upper <- eval(call(transform.name, params$measure))$display.scale(plot.range[2], n)
+        plot.range.disp.lower <- transform$display.scale(plot.range[1], n)
+        plot.range.disp.upper <- transform$display.scale(plot.range[2], n)
     changed.params <- plot.options$changed.params
     if (plot.options$plot.lb != plot.range.disp.lower) {
         changed.params$fp_plot_lb <- plot.range.disp.lower
@@ -281,7 +283,7 @@ create.plot.data.overall <- function(om.data, params, res, res.overall){
     if (metric.is.log.scale(params$measure)) {
         plot.data$summary.est <- res.overall$b[1]
     } else {
-        plot.data$summary.est <- eval(call(transform.name, params$measure))$display.scale(res.overall$b[1], n)
+        plot.data$summary.est <- transform$display.scale(res.overall$b[1], n)
     }
     plot.data$changed.params <- changed.params
     plot.data
@@ -408,23 +410,24 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     if (params$fp_plot_lb == "[default]") {
         plot.options$plot.lb <- params$fp_plot_lb
     } else {
-        plot.lb <- eval(parse(text=paste("c(", params$fp_plot_lb, ")", sep="")))
-        plot.options$plot.lb <- eval(call(transform.name, params$measure))$calc.scale(plot.lb, n)
+        plot.lb <- rcmetar.numeric.values(params$fp_plot_lb)
+        plot.options$plot.lb <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.lb, n)
     }
     if (params$fp_plot_ub == "[default]") {
         plot.options$plot.ub <- params$fp_plot_ub
     } else {
-        plot.ub <- eval(parse(text=paste("c(", params$fp_plot_ub, ")", sep="")))
-        plot.options$plot.ub <- eval(call(transform.name, params$measure))$calc.scale(plot.ub, n)
+        plot.ub <- rcmetar.numeric.values(params$fp_plot_ub)
+        plot.options$plot.ub <- rcmetar.transform.by.name(transform.name, params$measure)$calc.scale(plot.ub, n)
     }
 
     plot.data <- list(label = labels,
                       types=types,
                       scale = scale.str,
                       options = plot.options)
-    y.disp <- eval(call(transform.name, params$measure))$display.scale(y, n)
-    lb.disp <- eval(call(transform.name, params$measure))$display.scale(lb, n)
-    ub.disp <- eval(call(transform.name, params$measure))$display.scale(ub, n)
+    transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    y.disp <- transform$display.scale(y, n)
+    lb.disp <- transform$display.scale(lb, n)
+    ub.disp <- transform$display.scale(ub, n)
 
     effects.disp <- list(y.disp=y.disp, lb.disp=lb.disp, ub.disp=ub.disp)
     plot.data$effects.disp <- effects.disp
@@ -442,8 +445,8 @@ create.subgroup.plot.data.generic <- function(subgroup.data, params, data.type, 
     plot.data$effects <- effects
     plot.range <- calc.plot.range(effects, plot.options)
     plot.data$plot.range <- plot.range
-    plot.range.disp.lower <- eval(call(transform.name, params$measure))$display.scale(plot.range[1], n)
-    plot.range.disp.upper <- eval(call(transform.name, params$measure))$display.scale(plot.range[2], n)
+        plot.range.disp.lower <- transform$display.scale(plot.range[1], n)
+        plot.range.disp.upper <- transform$display.scale(plot.range[2], n)
     changed.params <- plot.options$changed.params
     if (plot.options$plot.lb != plot.range.disp.lower) {
         changed.params$fp_plot_lb <- plot.range.disp.lower
@@ -547,7 +550,7 @@ set.plot.options <- function(params) {
     } else if (is.vector(params$fp_xticks)) {
         plot.options$xticks <- params$fp_xticks
     } else {
-        plot.options$xticks <- eval(parse(text=paste("c(", params$fp_xticks, ")", sep="")))
+        plot.options$xticks <- rcmetar.numeric.values(params$fp_xticks)
     }
     if (params$fp_show_col1=='TRUE') {
       plot.options$show.study.col <- TRUE

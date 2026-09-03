@@ -177,9 +177,9 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     if (length(params.list) > 0) {
         for (count in 1:length(params.list)) {
             prepared_diagnostic_data <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
-            analysis_result <- eval(call(fnames[count], prepared_diagnostic_data, params.list[[count]]))
+            analysis_result <- .rcmetar.call.method(fnames[count], prepared_diagnostic_data, params.list[[count]])
             analysis_images <- analysis_result$images
-            names(analysis_images) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+            names(analysis_images) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             images <- c(images, analysis_images)
             plot.capabilities[[names(analysis_images)[[1]]]] <- .rcmetar.plot.descriptor.for.kind(
                 "forest",
@@ -187,11 +187,11 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             )
             image.order <- c(image.order, names(analysis_images))
             analysis_plot_paths <- analysis_result$plot_params_paths
-            names(analysis_plot_paths) <- paste(eval(parse(text=paste("pretty.names$measure$", params.list[[count]]$measure,sep=""))), " Forest Plot", sep="")
+            names(analysis_plot_paths) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
             plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
             plot.names <- c(plot.names, analysis_result$plot_names)
             analysis_summary <- list("Summary"=analysis_result$Summary)
-            names(analysis_summary) <- paste(eval(parse(text=paste("pretty.names$measure$",params.list[[count]]$measure,sep=""))), " Summary", sep="")
+            names(analysis_summary) <- paste(pretty.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
 
 		    references <- c(references, analysis_result$References)
 			results <- c(results, analysis_summary)
@@ -236,7 +236,7 @@ diagnostic.fixed.inv.var <- function(diagnostic.data, params){
         model.title <- paste("Diagnostic Fixed-Effect Model - Inverse Variance (k = ", res$k, ")", sep="")
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.fixed.inv.var.pretty.names()
-        pretty.metric <- eval(parse(text=paste("pretty.names$measure$", params$measure,sep="")))
+        pretty.metric <- pretty.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
           summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }
@@ -344,7 +344,7 @@ diagnostic.fixed.mh <- function(diagnostic.data, params){
         model.title <- "Diagnostic Fixed-Effect Model - Mantel-Haenszel"
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.fixed.mh.pretty.names()
-        pretty.metric <- eval(parse(text=paste("pretty.names$measure$", params$measure,sep="")))
+        pretty.metric <- pretty.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
           summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }
@@ -444,7 +444,7 @@ diagnostic.fixed.peto <- function(diagnostic.data, params){
     model.title <- "Diagnostic Fixed-Effect Model - Peto"
     summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
     pretty.names <- diagnostic.fixed.peto.pretty.names()
-    pretty.metric <- eval(parse(text=paste("pretty.names$measure$", params$measure,sep="")))
+    pretty.metric <- pretty.metric.name(as.character(params$measure))
     for (count in 1:length(summary.disp$table.titles)) {
       summary.disp$table.titles[count] <- paste(" ", pretty.metric, " -", summary.disp$table.titles[count], sep="")
     }
@@ -548,7 +548,7 @@ diagnostic.random <- function(diagnostic.data, params){
         model.title <- paste("Diagnostic Random-Effects Model (k = ", res$k, ")", sep="")
         summary.disp <- create.summary.disp(diagnostic.data, params, res, model.title)
         pretty.names <- diagnostic.random.pretty.names()
-        pretty.metric <- eval(parse(text=paste("pretty.names$measure$", params$measure,sep="")))
+        pretty.metric <- pretty.metric.name(as.character(params$measure))
         for (count in 1:length(summary.disp$table.titles)) {
             summary.disp$table.titles[count] <- paste(pretty.metric, " -", summary.disp$table.titles[count], sep="")
         }

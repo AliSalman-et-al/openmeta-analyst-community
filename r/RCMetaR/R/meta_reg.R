@@ -2,17 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 regression.wrapper <- function(data, mods.str, method, level, digits, btt=NULL) {
-	if (!is.null(btt)) {
-		btt.str <- paste("c(",paste(btt,collapse=", "),")", sep="")
-		call_str <- sprintf("rma.uni(yi,vi, mods=%s, data=data, method=\"%s\", level=%f, digits=%d, btt=%s)", mods.str, method, level, digits, btt.str)
-	} else {
-		call_str <- sprintf("rma.uni(yi,vi, mods=%s, data=data, method=\"%s\", level=%f, digits=%d)", mods.str, method, level, digits)
-
-	}
-
-	expr<-parse(text=call_str)
-	res <- eval(expr)
-	res
+	mods.formula <- stats::as.formula(mods.str)
+	rma.args <- list(yi=data$yi, vi=data$vi, mods=mods.formula, data=data,
+	                 method=method, level=level, digits=digits)
+	if (!is.null(btt)) rma.args$btt <- btt
+	do.call(metafor::rma.uni, rma.args)
 }
 
 make.mods.str <-function(mods) {
@@ -295,8 +289,7 @@ g.meta.regression <- function(
 	reg.equation.str <- sprintf("Regression model equation: %s", reg.equation)
 	Summary <- paste(Summary, reg.equation.str, sep="\n")
 
-	model.formula.str <- paste("yi", mods.str)
-	model.formula <- eval(model.formula.str)
+	model.formula <- stats::as.formula(paste("yi", mods.str))
 	more.output <- reg.output.helper(theData=data, rma.results=res, model.formula=model.formula, digits=digits)
 	pre.summary <- ""
 	for (name in names(more.output)) {
@@ -865,8 +858,7 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
 binary.fixed.meta.regression <- function(reg.data, params){
     cov.data <- array(dim=c(length(reg.data@y), length(cov.names)), dimnames=list(NULL, cov.names))
     for (cov.name in cov.names) {
-       cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-       cov.vals <- eval(parse(text=cov.val.str))
+       cov.vals <- reg.data@covariates[[cov.name]]
        cov.data[,cov.name] <- cov.vals
     }
     inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), ncol(cov.data) + 1)
@@ -890,8 +882,7 @@ binary.fixed.meta.regression <- function(reg.data, params){
 }
 
 random.meta.regression <- function(reg.data, params, cov.name){
-    cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-    cov.vals <- eval(parse(text=cov.val.str))
+    cov.vals <- reg.data@covariates[[cov.name]]
     inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), 2)
     res<-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
                                 level=params$conf.level, digits=params$digits,
@@ -929,8 +920,7 @@ categorical.meta.regression <- function(reg.data, params, cov.names) {
   cov.data <- array()
   var.names <- NULL
   for (cov.name in cov.names) {
-       cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-       groups <- eval(parse(text=cov.val.str))
+       groups <- reg.data@covariates[[cov.name]]
        group.list <- unique(groups)
        design_matrix_block <- array(dim=c(length(reg.data@y), length(group.list)-1), dimnames=list(NULL, group.list[-1]))
        for (group in group.list[-1]) {

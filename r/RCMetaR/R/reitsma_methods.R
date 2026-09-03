@@ -477,9 +477,7 @@ rcmetar.reitsma.draw <- function(plot.data, outpath) {
     }
     axis.ticks <- function(value, limits) {
         if (is.null(value) || !length(value) || identical(as.character(value[[1L]]), "[default]")) return(pretty(limits))
-        parsed <- if (is.numeric(value)) as.numeric(value) else tryCatch(
-            eval(parse(text=paste0("c(", paste(as.character(value), collapse=","), ")"))),
-            error=function(e) numeric(0))
+        parsed <- rcmetar.numeric.values(value)
         parsed <- as.numeric(parsed)
         parsed[is.finite(parsed) & parsed >= limits[[1L]] & parsed <= limits[[2L]]]
     }
@@ -551,10 +549,7 @@ rcmetar.draw.reitsma.coefficient <- function(plot.data, outpath) {
         if (is.null(value) || !length(value) || identical(as.character(value[[1L]]), "[default]")) {
             return(pretty(limits))
         }
-        parsed <- if (is.numeric(value)) as.numeric(value) else tryCatch(
-            eval(parse(text=paste0("c(", paste(as.character(value), collapse=","), ")"))),
-            error=function(e) numeric(0)
-        )
+        parsed <- rcmetar.numeric.values(value)
         parsed <- as.numeric(parsed)
         parsed[is.finite(parsed) & parsed >= limits[[1L]] & parsed <= limits[[2L]]]
     }

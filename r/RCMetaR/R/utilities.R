@@ -426,9 +426,10 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   pVal <- format.p.value.display(res$pval, params$digits)
 
   res.title <- "Model Results"
-  y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$b, ni=n))
-  lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.lb, ni=n))
-  ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(res$ci.ub, ni=n))
+  transform <- rcmetar.transform.by.name(transform.name, params$measure)
+  y.disp <- sprintf(digits.str, transform$display.scale(res$b, ni=n))
+  lb.disp <- sprintf(digits.str, transform$display.scale(res$ci.lb, ni=n))
+  ub.disp <- sprintf(digits.str, transform$display.scale(res$ci.ub, ni=n))
   se <- sprintf(se.digits.str, res$se)
 
   if (res$method=="FE") {
@@ -918,9 +919,10 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
     se <- res[[count]]$se
     digits.str <- paste("%.", display.digits(params), "f", sep="")
     se.digits.str <- paste("%.", display.digits(params, minimum=3L), "f", sep="")
-    y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(y, n=NULL))
-    lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n=NULL))
-    ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n=NULL))
+    transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    y.disp <- sprintf(digits.str, transform$display.scale(y, n=NULL))
+    lb.disp <- sprintf(digits.str, transform$display.scale(lb, n=NULL))
+    ub.disp <- sprintf(digits.str, transform$display.scale(ub, n=NULL))
     se.disp <- sprintf(se.digits.str, se)
 
     pVal <- format.p.value.display(res[[count]]$pval, params$digits)
@@ -965,9 +967,10 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
     se <- res[[count]]$se
     digits.str <- paste("%.", display.digits(params), "f", sep="")
     se.digits.str <- paste("%.", display.digits(params, minimum=3L), "f", sep="")
-    y.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(y, n))
-    lb.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(lb, n))
-    ub.disp <- sprintf(digits.str, eval(call(transform.name, params$measure))$display.scale(ub, n))
+    transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    y.disp <- sprintf(digits.str, transform$display.scale(y, n))
+    lb.disp <- sprintf(digits.str, transform$display.scale(lb, n))
+    ub.disp <- sprintf(digits.str, transform$display.scale(ub, n))
     se.disp <- sprintf(se.digits.str, se)
     if (!display.value.is.missing(res[[count]]$QE)) {
       degf <- res[[count]]$k - 1
@@ -1033,9 +1036,10 @@ calc.ci.bounds <- function(om.data, params, ...) {
 
 write.results.to.file <- function(om.data, params, res, outpath) {
   transform.name <- get.transform.name(om.data)
-  results.df <- data.frame("Summary.estimate" = eval(call(transform.name, params$measure))$display.scale(res$b, n),
-               "Lower.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.lb, n),
-               "Upper.bound" = eval(call(transform.name, params$measure))$display.scale(res$ci.ub, n),
+  transform <- rcmetar.transform.by.name(transform.name, params$measure)
+  results.df <- data.frame("Summary.estimate" = transform$display.scale(res$b, n),
+               "Lower.bound" = transform$display.scale(res$ci.lb, n),
+               "Upper.bound" = transform$display.scale(res$ci.ub, n),
                "p-value" = res$pval)
   write.csv(results.df, file=outpath, row.names=FALSE)
 }
