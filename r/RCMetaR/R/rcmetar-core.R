@@ -751,9 +751,9 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
             return(subgroup.ma.diagnostic(request$method, om.data, request$params, request$selected.cov))
         }
         if (request$data.type == "binary") {
-            return(subgroup.ma.binary(request$method, om.data, request$params, request$selected.cov))
+            return(subgroup.ma.binary(request$method, om.data, request$params))
         }
-        return(subgroup.ma.continuous(request$method, om.data, request$params, request$selected.cov))
+        return(subgroup.ma.continuous(request$method, om.data, request$params))
     }
     stop(sprintf("Workflow '%s' is not supported by the typed dispatcher.", request$workflow), call.=FALSE)
 }
