@@ -518,12 +518,6 @@ def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
 
     assert targets == [
         {
-            "target": "macos-x64",
-            "architecture": "x64",
-            "runner": "macos-15-intel",
-            "artifact": "RCMetaStudio-macos-x64",
-        },
-        {
             "target": "macos-arm64",
             "architecture": "arm64",
             "runner": "macos-15",

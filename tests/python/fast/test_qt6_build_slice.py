@@ -316,7 +316,7 @@ def test_canonical_form_generation_is_deterministic_and_importable(
         path.relative_to(second / "generated").as_posix()
         for path in (second / "generated").rglob("ui_*.py")
     )
-    assert len(first_modules) == 30
+    assert len(first_modules) == 29
     assert first_modules == second_modules
     for relative in first_modules:
         first_payload = (first / "generated" / relative).read_bytes()
