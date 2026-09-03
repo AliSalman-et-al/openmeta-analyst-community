@@ -157,7 +157,6 @@ _DRIVER = textwrap.dedent(
 
 def test_reitsma_release_values_match_public_mada_with_portable_tolerances():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     run_r_driver(_DRIVER)
 
 
@@ -166,7 +165,6 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
     import os, re, sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("RCMS_QT6_BUILD_ROOT", os.path.join(repo_root, "build", "qt6-verification"))
@@ -335,6 +333,5 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
 
 def test_reitsma_headless_adapter_standard_and_meta_regression_match_public_mada():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_HEADLESS_ADAPTER_DRIVER, env=env)

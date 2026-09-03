@@ -536,7 +536,6 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     import sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
     sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
@@ -615,7 +614,6 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("RCMS_STUB_BACKEND", None)
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         env["R_LIBS"] = (
             r_lib if not existing_r_libs
@@ -803,7 +801,6 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("RCMS_STUB_BACKEND", None)
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
@@ -958,17 +955,13 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
 
 def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_ADVANCED_RCMetaR_DRIVER, env=env)
 
 
 def test_inprocess_rpy2_backend_contract():
-    # Force the real in-process backend: the surrounding test suite sets
-    # RCMS_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
-    # env and require the real rpy2 path instead.
+    # Require the real in-process rpy2 path in this integration driver.
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = run_python_driver(_DRIVER, env=env)
     combined_output = result.stdout + result.stderr
@@ -978,7 +971,6 @@ def test_inprocess_rpy2_backend_contract():
 
 def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     run_python_driver(_RCHAR_UTF8_DRIVER, env=env)
@@ -986,12 +978,10 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
 
 def test_r_null_result_sections_are_omitted_before_formatting():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     run_python_driver(_NULL_RESULT_DRIVER, env=env)
 
 
 def test_RCMetaR_summary_capture_uses_formatted_print_methods():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_SUMMARY_PRINT_DRIVER, env=env)

@@ -532,7 +532,6 @@ print("COMPACT_LAYOUT=" + json.dumps(payload), flush=True)
             {
                 "QT_QPA_PLATFORM": "offscreen",
                 "QT_SCALE_FACTOR": scale_factor,
-                "RCMS_STUB_BACKEND": "1",
                 "PYTHONPATH": os.pathsep.join(
                     [
                         str(ROOT / "src"),

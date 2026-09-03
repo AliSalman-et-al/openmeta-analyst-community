@@ -11,7 +11,6 @@ pytestmark = pytest.mark.qsettings
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports

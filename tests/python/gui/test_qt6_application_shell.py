@@ -111,7 +111,6 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["QT_FATAL_WARNINGS"] = "1"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = os.environ.get(
         "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6")
     )

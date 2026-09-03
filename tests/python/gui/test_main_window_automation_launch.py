@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, cast
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 import pytest
 from rc_metastudio import automation
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -5403,11 +5402,9 @@ def test_load_r_libraries_runs_against_explicit_test_bridge():
     ]
 
 
-def test_stub_backend_exposes_data_entry_imputation_methods():
-    # Regression for GitHub #48: the maintained PyQt6 path plants a stub r_bridge,
-    # and data-entry dialogs call these methods during construction. The no-R
-    # stub must expose them, returning a benign "couldn't impute" result rather
-    # than crashing.
+def test_explicit_test_backend_exposes_data_entry_imputation_methods():
+    # The narrow test backend seam must expose the data-entry methods used by
+    # dialogs without replacing the production rpy2 module.
     from rc_metastudio import r_backend
 
     r_backend.install_r_backend()
@@ -5439,10 +5436,9 @@ def test_stub_backend_exposes_data_entry_imputation_methods():
     )
 
 
-def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
-    # Regression for GitHub #48: opening these dialogs from a study row used to
-    # crash when the stubbed r_bridge lacked imputation entry points. With the
-    # pure-Python no-R stub they must still construct without a live backend.
+def test_data_entry_dialogs_construct_with_explicit_test_backend(monkeypatch):
+    # Dialog construction uses the explicitly injected test backend seam and
+    # does not require a live R installation.
     import copy
 
     app, window = automation.start_automation()

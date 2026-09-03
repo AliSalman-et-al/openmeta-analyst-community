@@ -13,7 +13,6 @@ from rc_metastudio import analysis_dataset
 
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from test_types import key_click, required, wait
@@ -1033,7 +1032,6 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
 """
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
     environment["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src")])
     completed = subprocess.run(

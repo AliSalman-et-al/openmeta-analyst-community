@@ -866,7 +866,6 @@ def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
 def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -936,7 +935,6 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
 def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -997,7 +995,6 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
 def test_headless_diagnostic_metric_overrides_stale_method_parameters(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -1080,7 +1077,6 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
 def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 

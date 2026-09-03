@@ -13,7 +13,6 @@ _DRIVER = textwrap.dedent(
     import os, sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
 
@@ -133,7 +132,6 @@ _DRIVER = textwrap.dedent(
 
 def test_reitsma_result_sections_and_cells_are_display_safe():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_DRIVER, env=env)
 
@@ -143,7 +141,6 @@ _REAL_REITSMA_DRIVER = textwrap.dedent(
     import os, re, sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
 
@@ -213,6 +210,5 @@ _REAL_REITSMA_DRIVER = textwrap.dedent(
 
 def test_real_reitsma_result_data_frames_parse_without_index_errors():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_REAL_REITSMA_DRIVER, env=env)

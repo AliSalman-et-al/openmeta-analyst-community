@@ -275,7 +275,6 @@ def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
     events = []
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setenv("RCMS_REQUIRE_IN_PROCESS_RPY2", "1")
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     import rc_metastudio
 
     monkeypatch.delattr(rc_metastudio, "r_bridge", raising=False)
