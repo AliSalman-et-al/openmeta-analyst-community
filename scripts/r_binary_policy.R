@@ -48,6 +48,24 @@ load_rcms_r_binary_policy <- function(repo_root, python = Sys.getenv("RCMS_POLIC
   )
 }
 
+policy_sha256 <- function(policy, path) {
+  output <- system2(
+    policy$python,
+    c(shQuote(policy$helper), "--sha256", shQuote(path)),
+    stdout = TRUE,
+    stderr = TRUE
+  )
+  status <- attr(output, "status")
+  if (!is.null(status) && status != 0L) {
+    stop("Could not calculate retained binary archive SHA256: ", paste(output, collapse = "\n"))
+  }
+  digest <- trimws(output)
+  if (length(digest) != 1L || !grepl("^[0-9a-f]{64}$", digest)) {
+    stop("Could not calculate retained binary archive SHA256")
+  }
+  digest
+}
+
 rcms_policy_platform <- function(policy, sysname = Sys.info()[["sysname"]], arch = R.version$arch) {
   matches <- Filter(
     function(record) identical(record$system, sysname) && identical(record$arch, arch),

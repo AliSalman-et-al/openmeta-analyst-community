@@ -780,6 +780,39 @@ if (!"transitive" %in% installed_packages) {{
   stop("globally available transitive dependency was not installed into the target library")
 }}
 
+archive_dir <- tempfile()
+dir.create(archive_dir)
+archive_evidence <- tempfile()
+Sys.setenv(RCMS_R_PACKAGE_ARCHIVE_DIR = archive_dir, RCMS_R_BINARY_EVIDENCE = archive_evidence)
+archive_policy <- binary_policy
+archive_policy$normal_packages <- "root"
+archive_db <- matrix("", nrow = 1, ncol = 3,
+  dimnames = list("root", c("Depends", "Imports", "LinkingTo")))
+installed_packages <- character()
+retained_archives <- character()
+install_rcms_binary_packages(
+  archive_policy,
+  {json.dumps(library)},
+  database = archive_db,
+  download_binary = function(packages, destdir, ...) {{
+    archive <- file.path(destdir, "root_1.0.zip")
+    writeBin(charToRaw("retained root archive"), archive)
+    matrix(c("root", archive), nrow = 1)
+  }},
+  install_binary = function(packages, ...) {{
+    retained_archives <<- packages
+    installed_packages <<- "root"
+  }},
+  installed_in_target = function() installed_packages,
+  package_loadable = function(package) package %in% installed_packages
+)
+if (!identical(basename(retained_archives), "root_1.0.zip")) stop("retained archive was not passed to binary installer")
+archive_lines <- readLines(archive_evidence)
+if (!any(grepl("root_1.0.zip=sha256:876e271c21d2211a48f258bcf036d820d3df0464e65392e9be84424ffa1f147c", archive_lines, fixed = TRUE))) {{
+  stop("retained archive SHA256 evidence was not emitted")
+}}
+Sys.unsetenv("RCMS_R_PACKAGE_ARCHIVE_DIR")
+
 installed_packages <- "root"
 evidence <- tempfile()
 Sys.setenv(RCMS_R_BINARY_EVIDENCE = evidence)
