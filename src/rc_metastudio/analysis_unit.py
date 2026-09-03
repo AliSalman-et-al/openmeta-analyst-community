@@ -2,17 +2,41 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Analysis values and group data for one study outcome and follow-up."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal, NewType
+import uuid
+
 from rc_metastudio import meta_globals
 
 BINARY = meta_globals.BINARY
 CONTINUOUS = meta_globals.CONTINUOUS
 DIAGNOSTIC = meta_globals.DIAGNOSTIC
+StableIdentity = NewType("StableIdentity", str)
+EffectSource = Literal["entered", "derived_preview", "analysis"]
+
+
+def _new_identity() -> StableIdentity:
+    return StableIdentity(uuid.uuid4().hex)
+
+
+@dataclass(frozen=True, slots=True)
+class EffectEstimate:
+    """One immutable effect value crossing an explicit authority boundary."""
+
+    estimate: float | None
+    lower: float | None
+    upper: float | None
+    standard_error: float | None = None
 
 
 class AnalysisUnit:
     """Store one outcome at one follow-up, potentially across several groups."""
 
-    def __init__(self, outcome, raw_data=None, group_names=None):
+    def __init__(
+        self, outcome, raw_data=None, group_names=None, stable_id=None
+    ):
         """Create the analysis unit for one study outcome and follow-up.
 
         ``raw_data`` contains one list per group. Each list follows the raw-data
@@ -20,6 +44,7 @@ class AnalysisUnit:
         """
         self.is_diagnostic = outcome.data_type == DIAGNOSTIC
         self.outcome = outcome
+        self.stable_id = stable_id or _new_identity()
 
         if group_names is None and not self.is_diagnostic:
             group_names = meta_globals.DEFAULT_GROUP_NAMES
@@ -42,6 +67,9 @@ class AnalysisUnit:
         raw_data = raw_data or [[""] * self.raw_data_length for _ in group_names]
 
         self.effects = {}
+        self.entered_effects = self.effects
+        self.derived_effect_previews = {}
+        self.analysis_effects = {}
 
         if self.outcome.data_type == BINARY:
             for effect in (
@@ -75,6 +103,60 @@ class AnalysisUnit:
             "display_lower": None,
             "display_upper": None,
         }
+
+    @staticmethod
+    def _effect_entry(store, effect, group_comparison):
+        return store.setdefault(effect, {}).setdefault(
+            group_comparison,
+            {
+                "est": None,
+                "lower": None,
+                "upper": None,
+                "SE": None,
+            },
+        )
+
+    def set_effect_for_source(
+        self,
+        source: EffectSource,
+        effect: str,
+        group_comparison: str,
+        estimate: float | None,
+        lower: float | None = None,
+        upper: float | None = None,
+        standard_error: float | None = None,
+    ) -> None:
+        """Store a value without conflating entered, preview, and analysis data."""
+        stores = {
+            "entered": self.entered_effects,
+            "derived_preview": self.derived_effect_previews,
+            "analysis": self.analysis_effects,
+        }
+        entry = self._effect_entry(stores[source], effect, group_comparison)
+        entry.update(
+            {
+                "est": estimate,
+                "lower": lower,
+                "upper": upper,
+                "SE": standard_error,
+            }
+        )
+
+    def get_effect_for_source(
+        self, source: EffectSource, effect: str, group_comparison: str
+    ) -> EffectEstimate:
+        stores = {
+            "entered": self.entered_effects,
+            "derived_preview": self.derived_effect_previews,
+            "analysis": self.analysis_effects,
+        }
+        entry = stores[source].get(effect, {}).get(group_comparison, {})
+        return EffectEstimate(
+            entry.get("est"),
+            entry.get("lower"),
+            entry.get("upper"),
+            entry.get("SE"),
+        )
 
     def _add_effect_entries_for_group(self, new_group):
         group_names = list(self.groups)
@@ -363,6 +445,7 @@ class AnalysisUnit:
 
     def set_raw_data_for_group(self, group_name, raw_data):
         self.groups[group_name].raw_data = raw_data
+        self.derived_effect_previews.clear()
 
     def get_raw_data_for_groups(self, groups):
         if len(groups) == 1:
@@ -383,7 +466,8 @@ class AnalysisUnit:
 
 
 class Group:
-    def __init__(self, id, name, raw_data):
+    def __init__(self, id, name, raw_data, stable_id=None):
         self.id = id
         self.name = name
         self.raw_data = raw_data
+        self.stable_id = stable_id or _new_identity()

@@ -41,6 +41,7 @@ class Dataset:
         self.studies = []
         self.is_diagnostic = is_diagnostic
         self.follow_ups_by_outcome = {}
+        self.follow_up_stable_ids_by_outcome = {}
 
         self.notes = ""
 
@@ -75,6 +76,9 @@ class Dataset:
     def change_outcome_name(self, old_outcome_name, new_outcome_name):
         self.follow_ups_by_outcome[new_outcome_name] = self.follow_ups_by_outcome.pop(
             old_outcome_name
+        )
+        self.follow_up_stable_ids_by_outcome[new_outcome_name] = (
+            self.follow_up_stable_ids_by_outcome.pop(old_outcome_name)
         )
         for study in self.studies:
             study.analysis_units_by_outcome[new_outcome_name] = (
@@ -202,6 +206,7 @@ class Dataset:
         follow_up = "first"
         self.follow_ups_by_outcome[outcome.name] = two_way_dict.TwoWayDict()
         self.follow_ups_by_outcome[outcome.name][0] = follow_up
+        self.follow_up_stable_ids_by_outcome[outcome.name] = {follow_up: _new_stable_id()}
 
         for study in self.studies:
             study.add_outcome(outcome, follow_up, group_names=current_group_names)
@@ -210,6 +215,7 @@ class Dataset:
         if outcome_name is None:
             return
         self.follow_ups_by_outcome.pop(outcome_name)
+        self.follow_up_stable_ids_by_outcome.pop(outcome_name, None)
         for study in self.studies:
             study.remove_outcome(outcome_name)
 
@@ -260,6 +266,9 @@ class Dataset:
         next_index = previous_index + 1
 
         self.follow_ups_by_outcome[outcome.name][next_index] = follow_up_name
+        self.follow_up_stable_ids_by_outcome.setdefault(outcome.name, {})[
+            follow_up_name
+        ] = _new_stable_id()
 
         for study in self.studies:
             study.add_follow_up_to_outcome(
@@ -272,6 +281,9 @@ class Dataset:
         )
 
         self.follow_ups_by_outcome[outcome_name].pop(follow_up_index)
+        self.follow_up_stable_ids_by_outcome.get(outcome_name, {}).pop(
+            follow_up_name, None
+        )
         for study in self.studies:
             study.remove_follow_up_from_outcome(outcome_name, follow_up_name)
 
@@ -304,6 +316,12 @@ class Dataset:
             )
         follow_up_key = self.follow_ups_by_outcome[outcome].get_key(old_name)
         self.follow_ups_by_outcome[outcome][follow_up_key] = new_name
+        stable_id = self.follow_up_stable_ids_by_outcome.get(outcome, {}).pop(
+            old_name, _new_stable_id()
+        )
+        self.follow_up_stable_ids_by_outcome.setdefault(outcome, {})[new_name] = (
+            stable_id
+        )
 
     def get_follow_up_names(self):
         follow_up_names = []
@@ -316,6 +334,12 @@ class Dataset:
 
     def get_follow_up_names_for_outcome(self, outcome):
         return list(self.follow_ups_by_outcome[outcome].values())
+
+    def get_follow_up_stable_id(self, outcome, follow_up):
+        """Return identity independent of the editable follow-up label."""
+        return self.follow_up_stable_ids_by_outcome.setdefault(outcome, {}).setdefault(
+            follow_up, _new_stable_id()
+        )
 
     def analysis_unit_has_edge_between_groups(self, analysis_unit, groups):
         comp_str = "-".join(groups)
@@ -519,11 +543,16 @@ class Dataset:
             return _cmp(study_a_val, study_b_val)
 
 
+def _new_stable_id() -> str:
+    return uuid.uuid4().hex
+
+
 class Study:
     """Store a study's metadata, covariates, and analysis units."""
 
-    def __init__(self, id, name="", year=None, include=True):
+    def __init__(self, id, name="", year=None, include=True, stable_id=None):
         self.id = id
+        self.stable_id = stable_id or _new_stable_id()
         self.year = year
         self.name = name
 
@@ -593,8 +622,9 @@ class Study:
 class Outcome:
     """Holds a few fields that define outcomes."""
 
-    def __init__(self, name, data_type, links=None, sub_type=None):
+    def __init__(self, name, data_type, links=None, sub_type=None, stable_id=None):
         self.name = name
+        self.stable_id = stable_id or _new_stable_id()
         self.data_type = data_type
         self.links = links
         self.sub_type = sub_type

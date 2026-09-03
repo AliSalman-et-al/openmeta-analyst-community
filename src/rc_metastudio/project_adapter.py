@@ -255,6 +255,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         for item in outcome_items
     }
     dataset.follow_ups_by_outcome = {}
+    dataset.follow_up_stable_ids_by_outcome = {}
     for item in outcome_items:
         outcome_name = _text(item["name"], "outcome name")
         mapping = two_way_dict.TwoWayDict()
@@ -263,6 +264,11 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         ):
             mapping[index] = _optional_text(follow_up, "follow-up")
         dataset.follow_ups_by_outcome[outcome_name] = mapping
+        dataset.follow_up_stable_ids_by_outcome[outcome_name] = {
+            follow_up: f"{outcome_name}:{index}"
+            for index, follow_up in enumerate(mapping.values())
+            if follow_up is not None
+        }
 
     covariate_items = [
         _object(item, "covariate")
