@@ -52,7 +52,7 @@ def _valid_bundle(root: Path) -> None:
             encoding="utf-8",
         )
         captures = {}
-        for name in ("results", "network"):
+        for name in ("results",):
             path = root / f"{name}-{slug}.png"
             width = native_results_smoke.logical_extent_to_physical_pixels(100.0, scale)
             height = native_results_smoke.logical_extent_to_physical_pixels(80.0, scale)
@@ -84,11 +84,6 @@ def _valid_bundle(root: Path) -> None:
             "captures": captures,
             "device_pixel_ratio": scale,
             "navigation": ["Meta-Analysis Summary", "Forest Plot", "References"],
-            "network": {
-                "follow_up": "12 months",
-                "item_count": 1,
-                "outcome": "Mortality",
-            },
             "plot_artifact": artifact.name,
             "plot_artifact_sha256": _sha256(artifact),
             "plot_artifact_size": artifact.stat().st_size,
@@ -141,7 +136,6 @@ def test_native_results_evidence_rejects_invalid_numeric_types_ranges_and_mismat
         ("excess-attempts", ("captures", "results", "attempts"), 6),
         ("string-ratio", ("plot_ratio",), "2.0"),
         ("float-artifact-size", ("plot_artifact_size",), 1.0),
-        ("bool-item-count", ("network", "item_count"), True),
         ("bool-pixel-width", ("captures", "results", "pixel_size", 0), True),
         ("float-pixel-width", ("captures", "results", "pixel_size", 0), 100.0),
         ("negative-pixel-width", ("captures", "results", "pixel_size", 0), -1),

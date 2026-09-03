@@ -51,7 +51,6 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
                 "Mortality", "week 4"
             ),
             "follow_ups": dataset.get_follow_up_names(),
-            "network_nodes": dataset.get_network("Mortality", "week 4")[0],
         }))
         """
     )
@@ -59,7 +58,6 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
         "all_groups": ["tx A", "tx B", "tx C", "tx D"],
         "fu_groups": ["tx A", "tx B", "tx C", "tx D"],
         "follow_ups": ["baseline", "week 4", "week 8"],
-        "network_nodes": ["tx A", "tx B", "tx C", "tx D"],
     }
 
     for seed in ("1", "2"):

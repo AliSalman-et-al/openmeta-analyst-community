@@ -63,9 +63,6 @@ TOP_LEVEL_FORM_INVENTORY = {
         ("analysis_setup_dialog.py", "AnalysisSetupDialog", "TRANSACTIONAL"),
     ),
     "main_window.ui": (("main_window.py", "MainWindow", "MAIN"),),
-    "network_view_dialog.ui": (
-        ("network_view_dialog.py", "NetworkViewDialog", "NETWORK_VIEW"),
-    ),
     "new_covariate_dialog.ui": (
         ("add_new_dialogs.py", "AddCovariateDialog", "TRANSACTIONAL"),
     ),

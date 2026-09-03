@@ -26,7 +26,6 @@ def test_r_backend_installs_stub_backend(monkeypatch):
 
     assert r_bridge is sys.modules["rc_metastudio.r_bridge"]
     assert hasattr(r_bridge, "get_r_library_paths")
-    assert hasattr(r_bridge, "dataset_to_simple_network")
     assert r_bridge.get_analysis_plot_capabilities("binary", "method") == []
     assert r_bridge.get_r_library_paths() == []
     assert r_bridge.get_r_version_string() is None
@@ -54,7 +53,5 @@ def test_r_backend_installs_stub_backend(monkeypatch):
     with pytest.raises(TypeError):
         r_bridge.continuous_effect_for_study(1, 2)
 
-    with pytest.raises(r_bridge.AnalysisBackendUnavailableError):
-        r_bridge.dataset_to_simple_network(object())
     assert r_bridge.set_confidence_level(95) == 95.0
     assert legacy_qt4_name not in sys.modules

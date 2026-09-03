@@ -167,14 +167,8 @@ class RLibraryLoader:
     def load_rcmetar(self):
         return self._load_r_lib("RCMetaR")
 
-    def load_igraph(self):
-        return self._load_r_lib("igraph")
-
     def load_grid(self):
         return self._load_r_lib("grid")
-
-    def load_gemtc(self):
-        return self._load_r_lib("gemtc")
 
     def _load_r_lib(self, name, expected_version=None):
         try:
@@ -478,42 +472,6 @@ def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
     return r_object_to_python(capabilities)
 
 
-def _analysis_output_path(filename):
-    from rc_metastudio import settings
-
-    return settings.analysis_output_path(filename)
-
-
-@serialized_r_call
-def draw_network(edge_list, unconnected_vertices, network_path=None):
-    """Draw a treatment network from adjacent pairs in ``edge_list``."""
-    network_path = _strip_wrapping_quotes(
-        network_path or _analysis_output_path("network.png")
-    )
-    if len(edge_list) > 0:
-        edge_matrix = execute_r_function(
-            "matrix", _r_character_vector(edge_list), ncol=2, byrow=True
-        )
-        graph = execute_r_function("graph.edgelist", edge_matrix, directed=False)
-    else:
-        graph = execute_r_function("graph.empty")
-
-    if len(unconnected_vertices) > 0:
-        graph = execute_r_function(
-            "add.vertices",
-            graph,
-            len(unconnected_vertices),
-            name=_r_character_vector(unconnected_vertices),
-        )
-    ro.globalenv["g"] = graph
-    execute_r_function("png", network_path)
-    execute_r_string(
-        "plot(g, vertex.label=V(g)$name, layout=layout.circle, vertex.size=25, asp=.3, margin=-.05)"
-    )
-    execute_r_string("dev.off()")
-    return network_path
-
-
 @serialized_r_call
 def dataset_to_simple_continuous_r_object(
     table_model, var_name="tmp_obj", covs_to_include=None, studies=None
@@ -623,115 +581,6 @@ def dataset_to_simple_binary_r_object(
     r_obj = execute_r_function("rcmetar.create.binary.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
     return r_obj
-
-
-@serialized_r_call
-def dataset_to_simple_network(
-    table_model,
-    var_name="tmp_obj",
-    studies=None,
-    data_type=None,
-    outcome=None,
-    follow_up=None,
-    network_path=None,
-):
-    """This converts a DatasetTableModel to an mtc.network R object as described
-    in the getmc documentation for mtc.network
-    """
-    network_path = network_path or _analysis_output_path("network.png")
-    if data_type not in (BINARY, CONTINUOUS):
-        raise ValueError("Given data type: '%s' is unknown." % str(data_type))
-
-    if studies is None:
-        # we will exclude studies later on if they do not have full raw_data
-        studies = table_model.get_studies(only_if_included=False)
-
-    group_names = table_model.dataset.get_group_names_for_outcome_follow_up(
-        outcome, follow_up
-    )
-    groups_to_include = []
-    for group in group_names:
-        for study in studies:
-            analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
-            raw_data = analysis_unit.get_raw_data_for_group(group)
-            if not _data_blank_or_none(*raw_data):
-                groups_to_include.append(group)
-                break
-
-    descriptions = groups_to_include
-    treatments = {
-        "id": [x.replace(" ", "_") for x in descriptions],  # ids, ""
-        "description": descriptions,
-    }
-    ro.globalenv["treatments"] = _r_function("data.frame")(
-        **{
-            "id": _r_character_vector(treatments["id"]),
-            "description": _r_character_vector(treatments["description"]),
-        }
-    )
-
-    if data_type == BINARY:
-        data = {"study": [], "treatment": [], "responders": [], "sampleSize": []}
-    else:
-        data = {
-            "study": [],
-            "treatment": [],
-            "mean": [],
-            "std.dev": [],
-            "sampleSize": [],
-        }
-
-    for study in studies:
-        # analysis_unit = table_model.get_analysis_unit(study=study, outcome=outcome, follow_up=follow_up):
-        analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
-
-        for treatment_id, group_name in zip(
-            treatments["id"], treatments["description"]
-        ):
-            raw_data = analysis_unit.get_raw_data_for_group(group_name)
-            if _data_blank_or_none(*raw_data):  # make sure raw data is full
-                continue
-            if data_type == BINARY:
-                responders, sample_size = raw_data
-                data["responders"].append(responders)
-                data["sampleSize"].append(sample_size)
-            elif data_type == CONTINUOUS:
-                sample_size, mean, std_dev = raw_data
-                data["mean"].append(mean)
-                data["std.dev"].append(std_dev)
-                data["sampleSize"].append(sample_size)
-            data["study"].append(study.id)
-            data["treatment"].append(treatment_id)
-    data_frame_kwargs = {
-        "study": _r_numeric_vector(data["study"]),
-        "treatment": _r_character_vector(data["treatment"]),
-        "sampleSize": _r_numeric_vector(data["sampleSize"]),
-    }
-    if data_type == BINARY:
-        data_frame_kwargs["responders"] = _r_numeric_vector(data["responders"])
-    else:
-        data_frame_kwargs["mean"] = _r_numeric_vector(data["mean"])
-        data_frame_kwargs["std.dev"] = _r_numeric_vector(data["std.dev"])
-    ro.globalenv["data"] = _r_function("data.frame")(**data_frame_kwargs)
-
-    make_network_r_str = (
-        'network <- mtc.network(data, description="MEWANTFOOD", treatments=treatments)'
-    )
-    execute_r_string(make_network_r_str)
-
-    # plot the network and return path to the image
-    execute_r_function("png", network_path)
-    execute_r_string("plot(network)")
-    execute_r_string("dev.off()")
-
-    return network_path
-
-
-def _strip_wrapping_quotes(value):
-    value = str(value)
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-        return value[1:-1]
-    return value
 
 
 def _data_blank_or_none(*args):

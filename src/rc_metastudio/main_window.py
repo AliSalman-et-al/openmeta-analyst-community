@@ -35,7 +35,7 @@ else:
 from rc_metastudio import dataset_table_view
 from rc_metastudio import dataset_table_model
 from rc_metastudio import meta_globals
-from rc_metastudio.meta_globals import DEFAULT_DATASET_NAME, NETWORK_ANALYSIS_DISABLED
+from rc_metastudio.meta_globals import DEFAULT_DATASET_NAME
 from rc_metastudio import analysis_dataset
 from rc_metastudio import app_error_handler
 from rc_metastudio import r_backend
@@ -68,7 +68,6 @@ from rc_metastudio import subgroup_analysis_dialog
 from rc_metastudio import edit_dialog
 from rc_metastudio import edit_name_dialogs
 from rc_metastudio import covariate_type_dialog
-from rc_metastudio import network_view_dialog
 from rc_metastudio import confidence_level_dialog
 from rc_metastudio import main_wizard
 from rc_metastudio import about_legal_dialog
@@ -306,10 +305,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         load_settings()
         self.populate_open_recent_menu()
 
-        if NETWORK_ANALYSIS_DISABLED:
-            self.action_view_network.setEnabled(False)
-        else:
-            self.action_view_network.setEnabled(False)
 
     def createPopupMenu(self):
         return None
@@ -814,7 +809,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             )
 
             _connect_action(self.action_edit, self.edit_dataset)
-            _connect_action(self.action_view_network, self.view_network)
             _connect_action(self.action_add_covariate, self.add_covariate)
 
             _connect_action(self.action_meta_regression, self.meta_reg)
@@ -1150,10 +1144,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.model.try_to_update_outcomes()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
-
-    def view_network(self):
-        view_window = network_view_dialog.NetworkViewDialog(self.model, parent=self)
-        view_window.show()
 
     def analysis(self, results: AnalysisResult):
         try:

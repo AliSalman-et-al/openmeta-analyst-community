@@ -35,7 +35,6 @@ class WindowRole(str, Enum):
     MAIN = "main"
     RESULTS = "results"
     EDIT_DATASET = "edit_dataset"
-    NETWORK_VIEW = "network_view_dialog"
     WORKFLOW = "workflow"
     TRANSACTIONAL = "transactional"
     CONFIDENCE_LEVEL = "confidence_level"
@@ -72,9 +71,6 @@ WINDOW_POLICIES = {
         WindowArchetype.WORKSPACE, FirstUseBehavior.MAXIMIZED, 1.00, False
     ),
     WindowRole.EDIT_DATASET: WindowPolicy(
-        WindowArchetype.WORKSPACE, FirstUseBehavior.SCREEN_FRACTION, 0.80, False
-    ),
-    WindowRole.NETWORK_VIEW: WindowPolicy(
         WindowArchetype.WORKSPACE, FirstUseBehavior.SCREEN_FRACTION, 0.80, False
     ),
     WindowRole.WORKFLOW: WindowPolicy(

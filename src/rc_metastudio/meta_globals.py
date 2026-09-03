@@ -29,7 +29,6 @@ CALC_NUM_DIGITS = 4
 
 VERSION = "0.3.1"
 
-NETWORK_ANALYSIS_DISABLED = True
 DEFAULT_DATASET_NAME = "untitled_dataset"
 
 # Supported metrics are part of the application contract. R methods operate on
@@ -113,7 +112,7 @@ TYPE_TO_STR_DICT = {
 }
 
 # enumeration of meta-analytic types
-VANILLA, NETWORK = range(2)
+VANILLA = 0
 
 EMPTY_VALS = ("", None)  # these indicate an empty row/cell
 

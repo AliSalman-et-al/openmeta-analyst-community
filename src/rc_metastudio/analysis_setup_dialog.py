@@ -626,26 +626,6 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self.accent_color.setText(text)
         self.color_btn.setStyleSheet("background-color: %s;" % text)
 
-    def run_network_analysis(self):
-        bar = progress_dialog.AnalysisProgressDialog(self)
-        bar.show()
-        try:
-            if self.data_type not in ["binary", "continuous"]:
-                raise ValueError(
-                    "Network Analysis can currently only be done with binary or continuous data"
-                )
-
-            r_bridge.dataset_to_simple_network(
-                table_model=self.model,
-                var_name="tmp_obj",
-                data_type=None,
-                outcome=None,
-                follow_up=None,
-                network_path=analysis_output_path("network.png"),
-            )
-        finally:
-            progress_dialog.hide_once(bar)
-
     def run_ma(self):
         self._run_analysis(
             lambda: analysis_adapter.execute_analysis_requests(

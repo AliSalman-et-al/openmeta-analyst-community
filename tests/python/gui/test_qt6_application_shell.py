@@ -173,7 +173,6 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
             window.action_paste,
             window.action_auto_fit_columns,
             window.action_edit,
-            window.action_view_network,
             window.action_add_covariate,
             window.action_meta_regression,
             window.action_subgroup_ma,

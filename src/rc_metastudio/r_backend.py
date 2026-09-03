@@ -182,13 +182,7 @@ class _StubRLibraryLoader:
     def load_rcmetar(self) -> None:
         return None
 
-    def load_igraph(self) -> None:
-        return None
-
     def load_grid(self) -> None:
-        return None
-
-    def load_gemtc(self) -> None:
         return None
 
 
@@ -222,7 +216,6 @@ class _StubRBridgeModule(types.ModuleType):
     dataset_to_simple_binary_r_object: _BackendCallable
     dataset_to_simple_continuous_r_object: _BackendCallable
     dataset_to_simple_diagnostic_r_object: _BackendCallable
-    dataset_to_simple_network: _BackendCallable
     get_available_methods: _BackendCallable
     get_params: _BackendCallable
     get_method_description: _BackendCallable
@@ -268,7 +261,6 @@ class _StubRBridgeModule(types.ModuleType):
         self.dataset_to_simple_binary_r_object = _analysis_unavailable
         self.dataset_to_simple_continuous_r_object = _analysis_unavailable
         self.dataset_to_simple_diagnostic_r_object = _analysis_unavailable
-        self.dataset_to_simple_network = _analysis_unavailable
         self.get_available_methods = _analysis_unavailable
         self.get_params = _analysis_unavailable
         self.get_method_description = _analysis_unavailable

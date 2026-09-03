@@ -184,21 +184,10 @@ def load_R_libraries(app, splash=None, phase_callback=None):
     rloader.load_rcmetar()
     _emit_automation_phase(phase_callback, "r-library:RCMetaR:complete")
 
-    _status("Loading igraph\n............")
-    _emit_automation_phase(phase_callback, "r-library:igraph:start")
-    rloader.load_igraph()
-    _emit_automation_phase(phase_callback, "r-library:igraph:complete")
-
     _status("Loading grid\n................")
     _emit_automation_phase(phase_callback, "r-library:grid:start")
     rloader.load_grid()
     _emit_automation_phase(phase_callback, "r-library:grid:complete")
-
-    from rc_metastudio import main_window
-
-    if not main_window.NETWORK_ANALYSIS_DISABLED:
-        _status("Loading gemtc\n...................")
-        rloader.load_gemtc()
 
 
 def start():

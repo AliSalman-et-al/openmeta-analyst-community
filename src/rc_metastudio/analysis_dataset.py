@@ -322,26 +322,6 @@ class Dataset:
     def get_follow_up_names_for_outcome(self, outcome):
         return list(self.follow_ups_by_outcome[outcome].values())
 
-    def get_network(self, outcome, time_point):
-        node_list = []
-        adjacency_list = []
-        for study in self.studies:
-            analysis_unit = study.analysis_units_by_outcome[outcome][time_point]
-            group_names = analysis_unit.get_group_names()
-            for g1 in group_names:
-                node_list.append(g1)
-                for g2 in [group for group in group_names if group != g1]:
-                    if (
-                        self.analysis_unit_has_edge_between_groups(
-                            analysis_unit, [g1, g2]
-                        )
-                        and (g1, g2) not in adjacency_list
-                        and (g2, g1) not in adjacency_list
-                    ):
-                        adjacency_list.append((g1, g2))
-
-        return (_unique_in_first_seen_order(node_list), adjacency_list)
-
     def analysis_unit_has_edge_between_groups(self, analysis_unit, groups):
         comp_str = "-".join(groups)
         for effect in analysis_unit.get_effect_names():

@@ -262,7 +262,6 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
             expected_first_use = {
                 "EDIT_DATASET": "screen_fraction",
                 "MAIN": "maximized",
-                "NETWORK_VIEW": "screen_fraction",
                 "RESULTS": "maximized",
             }.get(surface["role"], "content_preferred")
             if surface["first_use_behavior"] != expected_first_use:

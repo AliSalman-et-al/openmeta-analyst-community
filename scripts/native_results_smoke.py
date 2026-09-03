@@ -1,4 +1,4 @@
-"""Exercise Results, SVG, plot actions, and Network View on native Qt6."""
+"""Exercise Results, SVG, and plot actions on native Qt6."""
 
 from __future__ import annotations
 
@@ -267,26 +267,10 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
             "styleable": True,
         }:
             raise ValueError("native Results evidence has the wrong plot descriptor")
-        network = record.get("network")
-        if not isinstance(network, dict):
-            raise ValueError("native Results evidence has malformed Network View state")
-        item_count = _strict_int(
-            network.get("item_count"), "network item count", minimum=0
-        )
-        if {
-            "follow_up": network.get("follow_up"),
-            "item_count": item_count,
-            "outcome": network.get("outcome"),
-        } != {
-            "follow_up": "12 months",
-            "item_count": 1,
-            "outcome": "Mortality",
-        }:
-            raise ValueError("native Results evidence has the wrong Network View state")
         ratio = _strict_number(record.get("plot_ratio"), "plot ratio", minimum=0.01)
         _require_close(ratio, 2.0, "plot ratio")
         captures = record.get("captures")
-        if not isinstance(captures, dict) or set(captures) != {"results", "network"}:
+        if not isinstance(captures, dict) or set(captures) != {"results"}:
             raise ValueError("native Results evidence capture set is incomplete")
         dpr_values = [scale_factor, device_pixel_ratio]
         for capture in captures.values():
@@ -433,7 +417,7 @@ def _native_device_pixel_ratio(repo_root: Path) -> float:
 
 def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-    from PyQt6 import QtCore, QtGui, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
@@ -441,7 +425,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     from rc_metastudio import r_backend
 
     r_backend.install_stub_r_bridge()
-    from rc_metastudio import app_error_handler, network_view_dialog, results_window
+    from rc_metastudio import app_error_handler, results_window
     from rc_metastudio.analysis_results import parse_analysis_result
 
     evidence_root.mkdir(parents=True, exist_ok=True)
@@ -487,37 +471,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             }
         )
     )
-    network_image = evidence_root / ("network-source-%s.png" % slug)
-    source = QtGui.QImage(640, 320, QtGui.QImage.Format.Format_ARGB32)
-    source.fill(QtGui.QColor("white"))
-    if not source.save(str(network_image), "PNG"):
-        raise RuntimeError("failed to create Network View smoke artifact")
-
-    class Model:
-        current_outcome_name = "Mortality"
-        dataset = type(
-            "Dataset",
-            (),
-            {
-                "get_outcome_names": staticmethod(lambda: ["Mortality"]),
-                "get_follow_up_names": staticmethod(lambda: ["12 months"]),
-            },
-        )()
-
-        def get_current_follow_up_name(self) -> str:
-            return "12 months"
-
-        def get_outcome_type(self, _outcome: Any, get_str: bool = False) -> str:
-            return "binary"
-
-    setattr(
-        network_view_dialog.r_bridge,
-        "dataset_to_simple_network",
-        lambda **_kwargs: str(network_image),
-    )
-    network = network_view_dialog.NetworkViewDialog(Model())
     results_image = evidence_root / ("results-%s.png" % slug)
-    network_capture = evidence_root / ("network-%s.png" % slug)
     try:
         available = app.primaryScreen().availableGeometry()
         results.setGeometry(
@@ -528,7 +482,6 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         )
         results.showNormal()
         results.show()
-        network.show()
         for _ in range(3):
             app.processEvents()
         if results.isMaximized():
@@ -557,22 +510,11 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             if item is None:
                 raise RuntimeError("native Results navigation contains a missing item")
             navigation.append(item.text(0))
-        if network._network_pixmap_item is None:
-            raise RuntimeError("native Network View has no scene item")
         results_capture = _capture_window(app, results, results_image)
-        network_capture_record = _capture_window(app, network, network_capture)
         record = {
-            "captures": {
-                "network": network_capture_record,
-                "results": results_capture,
-            },
+            "captures": {"results": results_capture},
             "device_pixel_ratio": float(results.devicePixelRatioF()),
             "navigation": navigation,
-            "network": {
-                "follow_up": network.follow_up_combo_box.currentText(),
-                "item_count": len(network.scene.items()),
-                "outcome": network.outcome_combo_box.currentText(),
-            },
             "plot_artifact": svg.name,
             "plot_artifact_sha256": _sha256(svg),
             "plot_artifact_size": svg.stat().st_size,
@@ -589,7 +531,6 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
     finally:
-        network.close()
         results.close()
         QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
         app.processEvents()

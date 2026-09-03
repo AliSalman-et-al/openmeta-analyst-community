@@ -89,9 +89,6 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/main_window.ui"): Path(
         "rc_metastudio/ui_main_window.py"
     ),
-    Path("src/rc_metastudio/forms/network_view_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_network_view_dialog.py"
-    ),
     Path("src/rc_metastudio/forms/new_covariate_dialog.ui"): Path(
         "rc_metastudio/forms/ui_new_covariate_dialog.py"
     ),
