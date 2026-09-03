@@ -15,6 +15,50 @@
     "src/rc_metastudio/*domain*.py": ["PyQt6", "rpy2"],
     "src/rc_metastudio/workspace_*.py": ["PyQt6", "rpy2"]
   },
+  "complexity_exceptions": {
+    "scripts/code_health.py": {
+      "tracked_paths": "walks Git's NUL-delimited inventory and applies independent path predicates",
+      "python_metrics": "combines two analyzers while preserving per-function identity",
+      "history_for_path": "parses Git's commit/numstat stream across three time windows",
+      "python_import_graph": "boundary parser must classify imports, relative modules, and policy violations",
+      "gate": "combines independent cycle, import, and changed-function gates",
+      "build_evidence": "assembles the versioned evidence document from independent measurements"
+    },
+    "scripts/delivery.py": {
+      "verify": "validates every immutable release stage and its digest chain"
+    },
+    "scripts/native_analysis_smoke.py": {
+      "main": "ships one end-to-end packaged analysis scenario"
+    },
+    "scripts/native_calculator_smoke.py": {
+      "_run_main": "drives the packaged calculator through its required UI and backend lifecycle"
+    },
+    "scripts/native_remaining_surfaces_smoke.py": {
+      "_capture_surface": "captures each independent packaged surface with fail-closed diagnostics"
+    },
+    "scripts/native_results_smoke.py": {
+      "validate_evidence": "validates the complete packaged results evidence contract",
+      "_run_scale": "runs each supported packaged scale with isolated evidence"
+    },
+    "scripts/r_dependency_policy.py": {
+      "load_policy": "normalizes the two-target dependency manifest and validates all required fields"
+    },
+    "scripts/resolve_macos_package_target.py": {
+      "load_target": "validates the single supported native target and its dependency record"
+    },
+    "src/rc_metastudio/analysis_dataset.py": {
+      "cmp_studies": "orders heterogeneous study rows using the released comparison contract"
+    },
+    "src/rc_metastudio/analysis_unit.py": {
+      "__init__": "constructs one validated domain unit for all supported data families"
+    },
+    "src/rc_metastudio/project_adapter.py": {
+      "project_to_dataset": "decodes and validates every released dataset family before live mutation"
+    },
+    "src/rc_metastudio/publication_bias.py": {
+      "__post_init__": "validates the immutable small-study request's cross-field contract"
+    }
+  },
   "gates": {
     "max_changed_cyclomatic": 15,
     "max_changed_cognitive": 20,

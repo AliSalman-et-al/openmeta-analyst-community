@@ -67,6 +67,7 @@ class HealthConfig(TypedDict):
     r_suffixes: list[str]
     exclude_globs: list[str]
     forbidden_imports: dict[str, list[str]]
+    complexity_exceptions: dict[str, dict[str, str]]
     gates: GateConfig
 
 
@@ -340,9 +341,11 @@ def changed_lines(root: Path, base: str, head: str) -> dict[str, set[int]]:
 def gate(metrics: list[FunctionMetric], changed: dict[str, set[int]], config: HealthConfig, cycle_list: list[list[str]], baseline_cycles: list[list[str]], forbidden: list[str], baseline_forbidden: list[str]) -> dict[str, object]:
     limits = config["gates"]
     changed_functions = [metric for metric in metrics if any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set()))]
+    exceptions = config.get("complexity_exceptions", {})
     violations = [
         metric.as_dict()
         for metric in changed_functions
+        if metric.name not in exceptions.get(metric.path, {})
         if metric.cyclomatic > limits["max_changed_cyclomatic"]
         or metric.cognitive > limits["max_changed_cognitive"]
         or metric.nesting > limits["max_changed_nesting"]
@@ -361,6 +364,10 @@ def gate(metrics: list[FunctionMetric], changed: dict[str, set[int]], config: He
         "failures": failures,
         "changed_functions": [metric.as_dict() for metric in changed_functions],
         "complexity_violations": violations,
+        "complexity_exceptions": {
+            path: names for path, names in sorted(exceptions.items())
+            if any(metric.path == path for metric in changed_functions)
+        },
         "new_cycles": new_cycles,
         "forbidden_imports": forbidden,
         "new_forbidden_imports": new_forbidden,
