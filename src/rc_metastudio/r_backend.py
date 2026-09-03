@@ -17,6 +17,11 @@ _BackendCallable = Callable[..., object]
 _REAL_BACKEND = None
 
 
+def is_backend_installed() -> bool:
+    """Return whether startup composed the real or explicitly injected bridge."""
+    return _REAL_BACKEND is not None
+
+
 def _analysis_unavailable(*_args: object, **_kwargs: object) -> NoReturn:
     raise AnalysisBackendUnavailableError(
         "The analysis backend (in-process rpy2/R) is not available in this "

@@ -3,6 +3,7 @@
 """Qt table model for dataset, outcome, follow-up, and treatment views."""
 
 import copy
+from statistics import NormalDist
 from dataclasses import dataclass
 from functools import cmp_to_key
 
@@ -11,7 +12,7 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
 from rc_metastudio import calculator_routines as calc_fncs
-from rc_metastudio import name_validation, qt_text, r_bridge
+from rc_metastudio import name_validation, qt_text, r_backend, r_bridge
 from rc_metastudio.analysis_dataset import Covariate, Dataset, Outcome, Study
 from rc_metastudio.dataset_analysis_domain import (
     calculate_raw_effects,
@@ -2303,11 +2304,14 @@ class DatasetTableModel(QAbstractTableModel):
 
         self.confidence_level = confidence_level
 
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
-            confidence_level
-        )
-
-        r_bridge.set_confidence_level(confidence_level)
+        if r_backend.is_backend_installed():
+            self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+                confidence_level
+            )
+            r_bridge.set_confidence_level(confidence_level)
+        else:
+            tail = (1.0 + confidence_level / 100.0) / 2.0
+            self.confidence_multiplier = NormalDist().inv_cdf(tail)
 
         self.confLevelChanged.emit()
 

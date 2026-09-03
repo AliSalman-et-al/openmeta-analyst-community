@@ -17,7 +17,6 @@ prepare_generated_ui_imports()
 
 from rc_metastudio import meta_globals, r_backend
 
-r_backend.install_r_backend()
 from rc_metastudio import adaptive_window, app_error_handler, qt6_resources, settings
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
@@ -160,6 +159,7 @@ def _emit_automation_phase(phase_callback, phase):
 
 def load_R_libraries(app, splash=None, phase_callback=None):
     """Loads the R libraries while updating the splash screen"""
+    r_backend.install_r_backend()
     from rc_metastudio import r_bridge
 
     def _status(message):

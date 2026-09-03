@@ -85,7 +85,6 @@ def test_maintained_entry_point_reuses_one_native_application_and_closes_shell(q
 def test_console_entry_point_launches_real_shell_and_exits_cleanly():
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = os.environ.get(
         "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6")
     )

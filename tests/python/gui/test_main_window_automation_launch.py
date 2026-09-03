@@ -474,7 +474,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             )
 
     assert family_counts == {
-        "icons/actions": 23,
+            "icons/actions": 22,
         "icons/analyses": 6,
         "icons/analyses/compact": 6,
         "icons/dataset-types": 8,
@@ -482,7 +482,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
         "icons/dataset-types/light": 8,
         "icons/table": 1,
     }
-    assert len(resources) == 60
+    assert len(resources) == 59
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
@@ -5374,11 +5374,8 @@ def test_about_legal_and_welcome_links_show_current_project_information():
         os.chdir(REPO_ROOT)
 
 
-def test_load_r_libraries_runs_against_stub_bridge():
-    # Regression: the frozen maintained build has no Qt4 binding, so r_backend.install_r_backend()
-    # plants the stub r_bridge used as the milestone-1 R bridge. The real launch
-    # path (start -> load_R_libraries) calls get_r_library_paths() + RLibraryLoader, which
-    # must all exist on the stub or the app crashes before the GUI ever shows.
+def test_load_r_libraries_runs_against_explicit_test_bridge():
+    # The test bridge is installed explicitly at this narrow integration seam.
     from rc_metastudio import launch
     from rc_metastudio import r_backend
 
@@ -5401,8 +5398,6 @@ def test_load_r_libraries_runs_against_stub_bridge():
         "r-library:metafor:complete",
         "r-library:RCMetaR:start",
         "r-library:RCMetaR:complete",
-        "r-library:igraph:start",
-        "r-library:igraph:complete",
         "r-library:grid:start",
         "r-library:grid:complete",
     ]
