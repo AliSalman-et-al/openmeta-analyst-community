@@ -27,6 +27,18 @@ def test_request_freezes_typed_test_ids_and_serializes_wire_names():
     )
     assert request.to_mapping()["tests"] == ["harbord"]
     assert "options" not in request.to_mapping()
+
+
+def test_small_study_request_has_versioned_semantic_identity():
+    first = SmallStudyEffectsRequest.create(
+        data_type="binary", metric="OR", selected_tests=["harbord"]
+    )
+    second = SmallStudyEffectsRequest.create(
+        data_type="binary", metric="OR", selected_tests=["harbord"]
+    )
+
+    assert first.version == 1
+    assert first.semantic_id == second.semantic_id
     with pytest.raises(ValueError, match="unsupported small-study effects test"):
         SmallStudyEffectsRequest.create(
             data_type="binary", metric="OR", selected_tests=("not-a-test",)

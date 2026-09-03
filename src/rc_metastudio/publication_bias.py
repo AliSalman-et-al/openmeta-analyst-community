@@ -12,6 +12,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
+import json
 from typing import Literal, TypeAlias, TypeVar
 
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
@@ -289,8 +291,13 @@ class SmallStudyEffectsRequest:
     test_specs: tuple[AsymmetryTestSpec, ...] = ()
     sensitivity_specs: tuple[SensitivitySpec, ...] = ()
     pooled_display: PooledDisplaySpec = PooledDisplaySpec()
+    version: int = 1
 
     def __post_init__(self) -> None:
+        if self.version != 1:
+            raise ValueError(
+                "unsupported small-study effects request version: %s" % self.version
+            )
         if self.data_type not in ("binary", "continuous", "diagnostic"):
             raise ValueError(
                 f"unsupported small-study effects data family: {self.data_type!r}"
@@ -489,6 +496,15 @@ class SmallStudyEffectsRequest:
         if self.correction_policy is not None:
             result["correction.policy"] = self.correction_policy.value
         return result
+
+    @property
+    def semantic_id(self) -> str:
+        """Stable identity for the statistical request, independent of titles."""
+        return hashlib.sha256(
+            json.dumps(
+                self.to_mapping(), sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
 
 
 @dataclass(frozen=True)
