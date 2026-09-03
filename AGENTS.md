@@ -19,7 +19,7 @@ If something can be simple, make it simple.
 - Bold changes are fine when they make the system substantially simpler or better. Don't preserve bad decisions just because they're already there.
 - Be careful with destructive actions. If I didn't ask you to delete data, rewrite history, or destroy something difficult to recover, don't casually do it.
 - Tests are useful when they test behavior that matters. Don't produce test slop.
-- Don't add endless smoke tests, duplicate tests, or "regression tests" whose only purpose is to preserve something we intentionally removed.
+- Don't add endless smoke tests, duplicate tests, tautological tests, or "regression tests" whose only purpose is to preserve something we intentionally removed.
 - Test important behavior, edge cases, and bugs worth preventing. Don't test implementation details just to make coverage numbers go up.
 - Comments should explain things that aren't obvious from the code: why something exists, important constraints, weird behavior, or how an API is meant to be used.
 - Don't comment every line. If the code needs a paragraph explaining what every statement does, the code probably needs fixing.
