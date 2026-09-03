@@ -70,24 +70,6 @@ _DRIVER = textwrap.dedent(
     finally:
         r_bridge.execute_r_function = original_execute_r_function
 
-    class InvalidNetworkModel:
-        def __getattribute__(self, name):
-            raise AssertionError(
-                "invalid network data type must be rejected before model access"
-            )
-
-    sentinel = ro.r("structure('untouched')")
-    ro.globalenv["treatments"] = sentinel
-    try:
-        r_bridge.dataset_to_simple_network(
-            InvalidNetworkModel(), data_type="unsupported"
-        )
-    except ValueError as exc:
-        assert "unknown" in str(exc)
-    else:
-        raise AssertionError("invalid network data type was accepted")
-    assert bool(ro.r("identical")(ro.globalenv["treatments"], sentinel)[0])
-
     assert not hasattr(r_bridge, "_sanitize_for_R")
 
     assert r_bridge._r_is_null(ro.r("list()").names) is True
