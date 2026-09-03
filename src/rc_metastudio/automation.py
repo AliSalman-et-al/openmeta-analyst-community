@@ -39,9 +39,10 @@ from rc_metastudio.launch import (
     load_R_libraries,
 )
 
-PACKAGED_SUMMARY_SHA256 = (
-    "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933"
-)
+PACKAGED_SUMMARY_SHA256_BY_SAMPLE = {
+    "amino.rcms": "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0",
+    "BCG.rcms": "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933",
+}
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
 ADAPTIVE_LAYOUT_EVIDENCE_LOG_ENV = "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG"
 NATIVE_FILE_DIALOG_OBSERVE_DELAY_MS = 250
@@ -1264,6 +1265,7 @@ def start_package_runtime_probe(output_path):
 def _exercise_packaged_project_workflow(app, meta, sample_path):
     from rc_metastudio import project_format
 
+    expected_summary_sha256 = _expected_packaged_summary_sha256(sample_path)
     model = meta.tableView.model()
     study_index = model.index(0, model.NAME)
     edited_name = "Packaged Smoke – München"
@@ -1305,7 +1307,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         if not model.setData(raw_index, numeric_text):
             raise SystemExit("Packaged smoke rejected %s numeric input." % locale_name)
         result = _assert_standard_binary_summary_is_formatted(meta)
-        identity = _packaged_result_identity(result)
+        identity = _packaged_result_identity(result, expected_summary_sha256)
         _write_automation_smoke_log(
             "packaged-workflow:analysis-%s-complete" % locale_name
         )
@@ -1343,7 +1345,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
     if reopened.data(reopened_index, QtCore.Qt.ItemDataRole.DisplayRole) != edited_name:
         raise SystemExit("Packaged smoke save/reopen lost the representative edit.")
     reopened_identity = _packaged_result_identity(
-        _assert_standard_binary_summary_is_formatted(meta)
+        _assert_standard_binary_summary_is_formatted(meta), expected_summary_sha256
     )
     if reopened_identity["raw_summary_sha256"] != variants[1]["raw_summary_sha256"]:
         raise SystemExit("Reopened packaged analysis changed result text.")
@@ -1355,7 +1357,7 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
         "representative_edit": True,
         "real_r_analysis": True,
         "result_text": True,
-        "expected_normalized_summary_sha256": PACKAGED_SUMMARY_SHA256,
+        "expected_normalized_summary_sha256": expected_summary_sha256,
         "raw_summary_sha256": reopened_identity["raw_summary_sha256"],
         "normalized_summary_sha256": reopened_identity["normalized_summary_sha256"],
         "svg_sha256": reopened_identity["svg_sha256"],
@@ -1368,19 +1370,29 @@ def _exercise_packaged_project_workflow(app, meta, sample_path):
     }
 
 
-def _packaged_result_identity(result):
+def _expected_packaged_summary_sha256(sample_path):
+    sample_name = Path(sample_path).name
+    try:
+        return PACKAGED_SUMMARY_SHA256_BY_SAMPLE[sample_name]
+    except KeyError as exc:
+        raise SystemExit(
+            "Unsupported packaged smoke sample: %s" % sample_name
+        ) from exc
+
+
+def _packaged_result_identity(result, expected_summary_sha256):
     summary = result.get("texts", {}).get("Summary", "").replace("\r\n", "\n")
     raw_summary_sha256 = hashlib.sha256(summary.encode("utf-8")).hexdigest()
     normalized_summary = normalize_packaged_summary_identity(summary)
     normalized_summary_sha256 = hashlib.sha256(
         normalized_summary.encode("utf-8")
     ).hexdigest()
-    if normalized_summary_sha256 != PACKAGED_SUMMARY_SHA256:
+    if normalized_summary_sha256 != expected_summary_sha256:
         raise SystemExit(
             "Packaged summary identity mismatch: %s != %s. Normalized summary: %r"
             % (
                 normalized_summary_sha256,
-                PACKAGED_SUMMARY_SHA256,
+                expected_summary_sha256,
                 normalized_summary,
             )
         )

@@ -39,9 +39,11 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-EXPECTED_SUMMARY_SHA256 = (
-    "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933"
-)
+EXPECTED_SUMMARY_SHA256_BY_SAMPLE = {
+    "amino.rcms": "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0",
+    "BCG.rcms": "2cb1cb0b867b7280a8843f633a9a040f7810d4c9e0ab91ff6333d8110fc41933",
+}
+EXPECTED_SUMMARY_SHA256 = EXPECTED_SUMMARY_SHA256_BY_SAMPLE["BCG.rcms"]
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
 MAX_ARCHIVE_MEMBERS = 30_000
@@ -1346,6 +1348,9 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
     locale_variants = workflows.get("locale_variants", [])
     sample_projects = workflows.get("sample_projects", {})
     sample_records = sample_projects.get("projects", [])
+    expected_summary_sha256 = EXPECTED_SUMMARY_SHA256_BY_SAMPLE.get(
+        workflows.get("converted_sample")
+    )
     if not (
         evidence.get("passed") is True
         and not evidence.get("failures")
@@ -1361,14 +1366,15 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
             )
         )
         and workflows.get("converted_sample") == "BCG.rcms"
+        and expected_summary_sha256 is not None
         and workflows.get("expected_normalized_summary_sha256")
-        == EXPECTED_SUMMARY_SHA256
-        and workflows.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+        == expected_summary_sha256
+        and workflows.get("normalized_summary_sha256") == expected_summary_sha256
         and _valid_sha256(workflows.get("raw_summary_sha256"))
         and _valid_sha256_map(workflows.get("svg_sha256"))
         and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
         and all(
-            item.get("normalized_summary_sha256") == EXPECTED_SUMMARY_SHA256
+            item.get("normalized_summary_sha256") == expected_summary_sha256
             and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
             for item in locale_variants
         )
