@@ -29,9 +29,6 @@ jobs:
           - target: windows-x64
             runner: windows-2025
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            runner: macos-15-intel
-            artifact: RCMetaStudio-macos-x64.zip
           - target: macos-arm64
             runner: macos-15
             artifact: RCMetaStudio-macos-arm64.zip
@@ -62,7 +59,7 @@ jobs:
           if ($releaseSet.trust_profile -ne 'unsigned-community') { throw "Candidate trust profile is $($releaseSet.trust_profile), expected unsigned-community." }
           if ($releaseSet.version -ne $env:EXPECTED_VERSION) { throw "Candidate version is $($releaseSet.version), expected $env:EXPECTED_VERSION." }
           if ($releaseSet.source.commit -ne $env:EXPECTED_SOURCE_SHA) { throw "Candidate source is $($releaseSet.source.commit), expected $env:EXPECTED_SOURCE_SHA." }
-          if (($releaseSet.release_targets -join ',') -ne 'windows-x64,macos-x64,macos-arm64') { throw "Candidate release targets must contain all three native targets." }
+          if (($releaseSet.release_targets -join ',') -ne 'windows-x64,macos-arm64') { throw "Candidate release targets must contain exactly Windows x64 and Apple silicon macOS." }
       - name: Expand unsigned Windows artifact
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -165,8 +162,6 @@ jobs:
         include:
           - target: windows-x64
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            artifact: RCMetaStudio-macos-x64.zip
           - target: macos-arm64
             artifact: RCMetaStudio-macos-arm64.zip
     runs-on: ubuntu-latest
@@ -234,8 +229,8 @@ jobs:
           test "$(jq -r .trust_profile "$manifest")" = unsigned-community
           test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
           test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
-          for target in windows-x64 macos-x64 macos-arm64; do
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-arm64"]'
+          for target in windows-x64 macos-arm64; do
             root="release/targets/community-$target"
             for stage in assembled unsigned-qualified verified attested; do
               python scripts/delivery.py attach --manifest "$manifest" --result "$root/records/$target.$stage.json"
@@ -243,12 +238,12 @@ jobs:
           done
           python scripts/delivery.py verify --manifest "$manifest"
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
-          for target in windows-x64 macos-x64 macos-arm64; do
+          for target in windows-x64 macos-arm64; do
             root="release/targets/community-$target"
             cp "$root/RCMetaStudio-$target.zip" release/
             cp "$root/$target.cdx.json" release/
           done
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
       - name: Publish clearly labeled immutable unsigned RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -263,4 +258,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned community builds.\n\nWindows x64, macOS Intel x64, and macOS Apple Silicon artifacts were built once on native runners, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested. The immutable unsigned artifacts are suitable inputs for a future no-rebuild signing stage.'
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned community builds.\n\nWindows x64 and Apple silicon macOS artifacts were built once on native runners, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested. The immutable unsigned artifacts are suitable inputs for a future no-rebuild signing stage.'

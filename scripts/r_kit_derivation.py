@@ -90,7 +90,7 @@ def record(
 def kit_r_shared_library(kit: Path, target: str) -> Path:
     if target == "windows-x64":
         return (kit / "runtime" / "bin" / "x64" / "R.dll").resolve(strict=True)
-    if target in {"macos-x64", "macos-arm64"}:
+    if target == "macos-arm64":
         return (kit / "runtime" / "R").resolve(strict=True)
     raise ValueError(f"unsupported R integration-kit target: {target}")
 

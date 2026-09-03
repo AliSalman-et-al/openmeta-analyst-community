@@ -25,12 +25,10 @@ RPY2_ROBJECTS_VERSION = "3.6.5"
 PYTHON_VERSION = "3.11.9"
 TARGETS = {
     "windows-x64": ("Windows", "x86_64", None),
-    "macos-x64": ("Darwin", "x86_64", "13.0"),
     "macos-arm64": ("Darwin", "arm64", "14.0"),
 }
 OFFICIAL_R_URLS = {
     "windows-x64": "https://cloud.r-project.org/bin/windows/base/R-4.6.1-win.exe",
-    "macos-x64": "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
     "macos-arm64": "https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg",
 }
 WINDOWS_R_SHA256 = "c5424c40cd70ef85765a55d2ff96bb602b5f30ed536938ff004f14db5db3c2df"
@@ -38,7 +36,6 @@ WINDOWS_R_SIGNER_SUBJECT = "CN=Martyn Plummer, O=Martyn Plummer, S=West Midlands
 WINDOWS_R_SIGNER_THUMBPRINT = "f356fc6cd245d722f4a82697473da5995cb42975"
 PPM_CONTRIB_PATHS = {
     "windows-x64": "bin/windows/contrib/4.6",
-    "macos-x64": "bin/macosx/big-sur-x86_64/contrib/4.6",
     "macos-arm64": "bin/macosx/sonoma-arm64/contrib/4.6",
 }
 PPM_REPOSITORY = "https://packagemanager.posit.co/cran/2026-07-16"

@@ -19,7 +19,6 @@ The workflow reports the package-native methods supported by `meta` 8.5-0 and th
 Download the latest release from [GitHub Releases](https://github.com/AliSalman-et-al/rc-metastudio/releases):
 
 - Windows x64: `RCMetaStudio-windows-x64.zip`
-- Intel Mac: `RCMetaStudio-macos-x64.dmg`
 - Apple silicon Mac: `RCMetaStudio-macos-arm64.dmg`
 
 On Windows, extract the archive and run `RCMetaStudio.exe`.

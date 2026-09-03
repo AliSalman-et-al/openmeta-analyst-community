@@ -27,14 +27,6 @@
       "artifact": "RCMetaStudio-windows-x64.zip",
       "signing_profile": "authenticode"
     },
-    "macos-x64": {
-      "runner": "macos-15-intel",
-      "os": "macos",
-      "architecture": "x86_64",
-      "candidate_artifact": "RCMetaStudio-macos-x64.zip",
-      "artifact": "RCMetaStudio-macos-x64.dmg",
-      "signing_profile": "developer-id-notarized"
-    },
     "macos-arm64": {
       "runner": "macos-15",
       "os": "macos",

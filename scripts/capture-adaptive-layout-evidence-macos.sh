@@ -2,7 +2,7 @@
 set -euo pipefail
 
 package="${1:?package ZIP is required}"
-output="${2:-artifacts/controlled-layout-evidence/macos-x64}"
+output="${2:-artifacts/controlled-layout-evidence/macos-arm64}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 package="$(cd "$(dirname "$package")" && pwd)/$(basename "$package")"
 output="$repo_root/$output"

@@ -25,7 +25,7 @@ def main() -> int:
     parser.add_argument("--qualification-root", type=Path, required=True)
     parser.add_argument("--ppm-root", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--target", choices=("macos-x64", "macos-arm64"), required=True)
+    parser.add_argument("--target", choices=("macos-arm64",), required=True)
     parser.add_argument("--official-r-url", required=True)
     parser.add_argument("--official-r-sha256", required=True)
     parser.add_argument("--ppm-contrib-path", required=True)

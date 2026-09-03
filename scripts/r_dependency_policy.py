@@ -13,12 +13,6 @@ POLICY_REPOSITORY = "https://packagemanager.posit.co/cran/2026-07-16"
 EXPECTED_R_VERSION = "4.6.1"
 EXPECTED_PLATFORMS = {
     "windows-x64": ("Windows", "x86_64", "win.binary", "bin/windows/contrib/4.6"),
-    "macos-x64": (
-        "Darwin",
-        "x86_64",
-        "mac.binary.big-sur-x86_64",
-        "bin/macosx/big-sur-x86_64/contrib/4.6",
-    ),
     "macos-arm64": (
         "Darwin",
         "aarch64",
@@ -73,7 +67,7 @@ def load_policy(manifest_path: Path) -> dict:
     platforms = policy.get("platforms")
     if not isinstance(platforms, dict) or set(platforms) != set(EXPECTED_PLATFORMS):
         raise PolicyError(
-            "binary package platforms must be Windows x64 and both macOS architectures"
+            "binary package platforms must be Windows x64 and Apple silicon macOS"
         )
     for target, expected in EXPECTED_PLATFORMS.items():
         record = platforms.get(target)

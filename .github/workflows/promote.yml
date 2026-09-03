@@ -40,12 +40,12 @@ jobs:
           test -n "$manifest"
           test "$(jq -r .channel "$manifest")" = rc
           test "$(jq -r .trust_profile "$manifest")" = macos-trusted
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-arm64"]'
           mapfile -t assets < <(find promotion -maxdepth 1 -type f -printf '%f\n' | sort)
-          expected=(RCMetaStudio-macos-arm64.dmg RCMetaStudio-macos-x64.dmg RCMetaStudio-windows-x64.zip SHA256SUMS macos-arm64.cdx.json macos-x64.cdx.json release-set-rc.json windows-x64.cdx.json)
+          expected=(RCMetaStudio-macos-arm64.dmg RCMetaStudio-windows-x64.zip SHA256SUMS macos-arm64.cdx.json release-set-rc.json windows-x64.cdx.json)
           test "${assets[*]}" = "${expected[*]}"
           (cd promotion && sha256sum --check SHA256SUMS)
-          for artifact in promotion/RCMetaStudio-windows-x64.zip promotion/RCMetaStudio-macos-*.dmg; do gh attestation verify "$artifact" --repo "${{ github.repository }}"; done
+          for artifact in promotion/RCMetaStudio-windows-x64.zip promotion/RCMetaStudio-macos-arm64.dmg; do gh attestation verify "$artifact" --repo "${{ github.repository }}"; done
           source_sha="$(jq -r .source.commit "$manifest")"
           git fetch origin "refs/tags/$RC_TAG:refs/tags/$RC_TAG"
           test "$(git rev-list -n 1 "$RC_TAG")" = "$source_sha"
@@ -70,6 +70,6 @@ jobs:
           else
             tag_args=(--target "$source_sha")
           fi
-          gh release create "$STABLE_TAG" promotion/RCMetaStudio-windows-x64.zip promotion/RCMetaStudio-macos-*.dmg promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json "${tag_args[@]}" --title "$title" --notes "$notes"
+          gh release create "$STABLE_TAG" promotion/RCMetaStudio-windows-x64.zip promotion/RCMetaStudio-macos-arm64.dmg promotion/*.cdx.json promotion/SHA256SUMS promotion/release-set-stable.json "${tag_args[@]}" --title "$title" --notes "$notes"
       - name: Prove promotion preserved artifact bytes
         run: (cd promotion && sha256sum --check SHA256SUMS)

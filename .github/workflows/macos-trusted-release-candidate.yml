@@ -45,9 +45,9 @@ jobs:
           test "$(jq -r .trust_profile "$manifest")" = macos-trusted
           test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
           test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-arm64"]'
           artifacts="$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" --paginate --jq '.artifacts[] | select(.expired == false) | .name')"
-          for required in release-set-initial candidate-windows-x64 candidate-macos-x64 candidate-macos-arm64; do
+          for required in release-set-initial candidate-windows-x64 candidate-macos-arm64; do
             grep -Fx "$required" <<<"$artifacts"
           done
           git fetch origin master --depth=1
@@ -123,10 +123,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: macos-x64
-            runner: macos-15-intel
-            candidate_artifact: RCMetaStudio-macos-x64.zip
-            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
             runner: macos-15
             candidate_artifact: RCMetaStudio-macos-arm64.zip
@@ -218,10 +214,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: macos-x64
-            runner: macos-15-intel
-            candidate_artifact: RCMetaStudio-macos-x64.zip
-            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
             runner: macos-15
             candidate_artifact: RCMetaStudio-macos-arm64.zip
@@ -362,8 +354,6 @@ jobs:
         include:
           - target: windows-x64
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            artifact: RCMetaStudio-macos-x64.dmg
           - target: macos-arm64
             artifact: RCMetaStudio-macos-arm64.dmg
     runs-on: ubuntu-latest
@@ -422,11 +412,6 @@ jobs:
         with:
           name: macos-trusted-windows-x64
           path: release/targets/macos-trusted-windows-x64
-      - name: Download attested Intel macOS artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: macos-trusted-macos-x64
-          path: release/targets/macos-trusted-macos-x64
       - name: Download attested Apple Silicon artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -442,8 +427,8 @@ jobs:
           test "$(jq -r .trust_profile "$manifest")" = macos-trusted
           test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
           test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
-          for target in windows-x64 macos-x64 macos-arm64; do
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-arm64"]'
+          for target in windows-x64 macos-arm64; do
             root="release/targets/macos-trusted-$target"
             if [ "$target" = windows-x64 ]; then
               stages=(assembled unsigned-qualified verified attested)
@@ -456,13 +441,13 @@ jobs:
           done
           python scripts/delivery.py verify --manifest "$manifest"
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
-          for target in windows-x64 macos-x64 macos-arm64; do
+          for target in windows-x64 macos-arm64; do
             root="release/targets/macos-trusted-$target"
             if [ "$target" = windows-x64 ]; then extension=zip; else extension=dmg; fi
             cp "$root/RCMetaStudio-$target.$extension" release/
             cp "$root/$target.cdx.json" release/
           done
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.dmg --files release/RCMetaStudio-macos-arm64.dmg --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-arm64.dmg --files release/windows-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
       - name: Publish immutable macOS-trusted RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -477,4 +462,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-windows-x64.zip release/RCMetaStudio-macos-*.dmg release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** macOS DMGs are Developer ID signed, notarized, and stapled; Windows is unsigned.\n\nThe Intel and Apple Silicon disk images passed final mounted-artifact smoke and Gatekeeper verification. Windows bytes remain explicitly unsigned. All three artifacts were promoted from one immutable candidate without rebuilding.'
+          gh release create "$TAG" release/RCMetaStudio-windows-x64.zip release/RCMetaStudio-macos-arm64.dmg release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** The Apple silicon macOS DMG is Developer ID signed, notarized, and stapled; Windows is unsigned. Both artifacts were promoted from one immutable candidate without rebuilding.'

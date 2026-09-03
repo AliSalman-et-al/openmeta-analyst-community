@@ -175,9 +175,6 @@ jobs:
           - target: windows-x64
             runner: windows-latest
             platform: windows
-          - target: macos-x64
-            runner: macos-15-intel
-            platform: macos
           - target: macos-arm64
             runner: macos-15
             platform: macos

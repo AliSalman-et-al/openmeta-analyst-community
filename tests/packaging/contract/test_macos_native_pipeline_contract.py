@@ -16,16 +16,12 @@ TARGETS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TARGETS)
 
 
-def test_shared_target_manifest_defines_both_native_macos_builds():
-    x64 = TARGETS.load_target("x64")
+def test_shared_target_manifest_defines_apple_silicon_macos_build():
     arm64 = TARGETS.load_target("arm64")
 
-    assert x64["machine"] == "x86_64"
-    assert x64["runner"] == "macos-15-intel"
     assert arm64["machine"] == "arm64"
     assert arm64["runner"] == "macos-15"
-    assert x64["minimum_macos"] == arm64["minimum_macos"] == "14.0"
-    assert x64["r_url"].endswith("R-4.6.1-x86_64.pkg")
+    assert arm64["minimum_macos"] == "14.0"
     assert arm64["r_url"].endswith("R-4.6.1-arm64.pkg")
     assert arm64["r_component_identifier"] == "org.R-project.R.fw.pkg"
     assert arm64["r_sha256"] == (
@@ -45,24 +41,21 @@ def test_target_manifest_rejects_silent_architecture_drift(tmp_path: Path):
         TARGETS.load_target("arm64", path)
 
 
-def test_public_macos_command_accepts_both_architectures_from_the_manifest():
+def test_public_macos_command_accepts_only_apple_silicon_from_the_manifest():
     wrapper = (ROOT / "scripts/package-macos.sh").read_text(encoding="utf-8")
 
     assert "resolve_macos_package_target.py" in wrapper
-    assert "x64|arm64)" in wrapper
-    assert "Issue #342 packages macOS Intel only" not in wrapper
+    assert "arm64)" in wrapper
+    assert "x64|arm64)" not in wrapper
 
 
-def test_reusable_workflow_is_a_two_architecture_native_matrix():
+def test_reusable_workflow_is_an_apple_silicon_native_matrix():
     workflow = load_workflow(".github/workflows/package-target.yml")
     matrix = workflow["jobs"]["package"]["strategy"]["matrix"]["include"]
     assert [
         {key: item[key] for key in ("target", "architecture", "runner")}
         for item in matrix
-    ] == [
-        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
-        {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
-    ]
+    ] == [{"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"}]
 
 
 def test_first_green_gate_uses_the_bcg_packaged_workflow():

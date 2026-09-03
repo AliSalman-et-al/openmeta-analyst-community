@@ -31,12 +31,6 @@
         "pkg_type": "win.binary",
         "contrib_path": "bin/windows/contrib/4.6"
       },
-      "macos-x64": {
-        "system": "Darwin",
-        "r_arch": "x86_64",
-        "pkg_type": "mac.binary.big-sur-x86_64",
-        "contrib_path": "bin/macosx/big-sur-x86_64/contrib/4.6"
-      },
       "macos-arm64": {
         "system": "Darwin",
         "r_arch": "aarch64",

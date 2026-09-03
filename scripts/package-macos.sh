@@ -85,13 +85,13 @@ if [ "$macos_major" -lt 13 ]; then
 fi
 
 case "${architecture:-}" in
-  x64|arm64) ;;
+  arm64) ;;
   "")
-    echo "--architecture x64 or arm64 is required." >&2
+    echo "--architecture arm64 is required." >&2
     exit 2
     ;;
   *)
-    echo "--architecture must be x64 or arm64." >&2
+    echo "--architecture must be arm64." >&2
     exit 2
     ;;
 esac

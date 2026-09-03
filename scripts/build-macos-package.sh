@@ -152,9 +152,9 @@ fi
 
 host_machine="$(uname -m)"
 if [ -z "$architecture" ]; then
-  [ "$host_machine" = "arm64" ] && architecture="arm64" || architecture="x64"
+  architecture="arm64"
 fi
-case "$architecture" in x64|arm64) ;; *) echo "--architecture must be x64 or arm64." >&2; exit 1 ;; esac
+case "$architecture" in arm64) ;; *) echo "--architecture arm64 is required." >&2; exit 1 ;; esac
 target_python="$(command -v python3 || true)"
 [ -n "$target_python" ] || { echo "macOS packaging requires python3 to resolve its target manifest." >&2; exit 1; }
 eval "$("$target_python" "$repo_root/scripts/resolve_macos_package_target.py" "$architecture" --format shell)"
@@ -923,8 +923,8 @@ PY
   rm -f "$launchservices_pid_path"
 fi
 if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
-  if [ "$architecture" != "x64" ]; then
-    echo "Controlled adaptive-layout evidence is supported only for macOS Intel." >&2
+  if [ "$architecture" != "arm64" ]; then
+    echo "Controlled adaptive-layout evidence is supported only for Apple silicon macOS." >&2
     exit 2
   fi
   step "Capturing controlled native macOS adaptive-layout evidence"

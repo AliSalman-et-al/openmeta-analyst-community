@@ -42,7 +42,7 @@ def load_target(name: str, manifest_path: Path = DEFAULT_MANIFEST) -> dict[str, 
         raise TargetError(f"incomplete macOS package target: {name}")
     if target["delivery_target"] != f"macos-{name}":
         raise TargetError(f"delivery target does not match architecture: {name}")
-    if target["machine"] not in {"x86_64", "arm64"}:
+    if target["machine"] != "arm64":
         raise TargetError(f"unsupported machine for macOS package target: {name}")
     if not str(target["r_url"]).startswith("https://cloud.r-project.org/"):
         raise TargetError("official R package must use the authenticated CRAN origin")
@@ -66,7 +66,7 @@ def shell_lines(target: dict[str, object]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("architecture", choices=("x64", "arm64"))
+    parser.add_argument("architecture", choices=("arm64",))
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--format", choices=("json", "shell"), default="json")
     args = parser.parse_args()
