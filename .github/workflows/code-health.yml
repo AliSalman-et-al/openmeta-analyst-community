@@ -1,0 +1,64 @@
+name: Code health gates
+
+on:
+  push:
+    branches: [master, "rewrite/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  code-health:
+    name: Deterministic code-health baseline and gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11.9
+      - run: uv sync --frozen
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base="$PR_BASE"
+          else
+            base="$PUSH_BASE"
+          fi
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          git cat-file -e "$base^{commit}"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - name: Emit baseline evidence
+        run: >-
+          uv run python scripts/code_health.py
+          --base "${{ steps.base.outputs.sha }}"
+          --head "${{ steps.base.outputs.sha }}"
+          --allow-fail
+          --output artifacts/code-health/baseline.json
+          --report artifacts/code-health/baseline.txt
+      - name: Enforce changed-code gates
+        run: >-
+          uv run python scripts/code_health.py
+          --base "${{ steps.base.outputs.sha }}"
+          --head "$GITHUB_SHA"
+          --output artifacts/code-health/final.json
+          --report artifacts/code-health/final.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: code-health-${{ github.run_id }}
+          path: artifacts/code-health
+          if-no-files-found: error

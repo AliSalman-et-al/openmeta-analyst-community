@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "source_roots": ["src/rc_metastudio", "scripts"],
+  "python_suffixes": [".py"],
+  "r_suffixes": [".R", ".r"],
+  "exclude_globs": [
+    "*/forms/ui_*.py",
+    "*/forms/*_rc.py",
+    "*/__pycache__/*",
+    "build/*",
+    ".venv/*"
+  ],
+  "forbidden_imports": {
+    "src/rc_metastudio/project_*.py": ["PyQt6", "rpy2"],
+    "src/rc_metastudio/*domain*.py": ["PyQt6", "rpy2"],
+    "src/rc_metastudio/workspace_*.py": ["PyQt6", "rpy2"]
+  },
+  "gates": {
+    "max_changed_cyclomatic": 15,
+    "max_changed_cognitive": 20,
+    "max_changed_nesting": 4,
+    "block_new_cycles": true,
+    "block_forbidden_imports": true
+  }
+}

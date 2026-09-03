@@ -27,6 +27,23 @@ uv run python scripts/verify.py fast
 uv run python scripts/verify.py r-stack
 ```
 
+For deterministic complexity, dependency, churn, and hotspot evidence, run the
+locked code-health command against a comparison commit. The command writes
+machine-readable JSON and a short text report; the exit status enforces only
+new cycles, forbidden boundary imports, and changed-function thresholds.
+
+```powershell
+uv run python scripts/code_health.py --base 4aa0740 --head HEAD `
+  --output artifacts/code-health/final.json `
+  --report artifacts/code-health/final.txt
+```
+
+Use the same commit for `--base` and `--head` to capture a baseline snapshot.
+The report records rename-aware 30-, 90-, and 180-day line churn. Hotspots are
+ranked as normalized 180-day churn multiplied by cyclomatic complexity density;
+coupling, cycles, cognitive complexity, maintainability, and defect history are
+reported independently.
+
 Add `--sync` when the environment may be stale. Add `--require-r-evidence` when R is required, or `--skip-r-evidence` when a separate full R run owns that evidence.
 
 During development, run the narrowest relevant test file first. The maintained suites are grouped by execution needs:
