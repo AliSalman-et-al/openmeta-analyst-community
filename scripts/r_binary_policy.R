@@ -43,13 +43,6 @@ load_rcms_r_binary_policy <- function(repo_root, python = Sys.getenv("RCMS_POLIC
         contrib_path = record[["macos_arm64-Contrib-Path"]]
       )
     ),
-    source_exception = list(
-      name = record[["Source-Exception-Name"]],
-      version = record[["Source-Exception-Version"]],
-      url = record[["Source-Exception-URL"]],
-      sha256 = record[["Source-Exception-SHA256"]],
-      dependencies = split_policy_field(record[["Source-Exception-Dependencies"]])
-    ),
     python = python,
     helper = helper
   )
@@ -288,82 +281,4 @@ install_rcms_binary_packages <- function(
     )
   )
   invisible(platform)
-}
-
-policy_sha256 <- function(policy, path) {
-  output <- system2(
-    policy$python,
-    c(shQuote(policy$helper), "--sha256", shQuote(path)),
-    stdout = TRUE,
-    stderr = TRUE
-  )
-  status <- attr(output, "status")
-  if (!is.null(status) && status != 0L) {
-    stop("Could not calculate source exception SHA256: ", paste(output, collapse = "\n"))
-  }
-  trimws(output[[1]])
-}
-
-install_rcms_source_exception <- function(
-  policy,
-  lib,
-  download = utils::download.file,
-  install_source = utils::install.packages,
-  sha256 = function(path) policy_sha256(policy, path)
-) {
-  exception <- policy$source_exception
-  missing_dependencies <- exception$dependencies[
-    !vapply(exception$dependencies, requireNamespace, logical(1), quietly = TRUE)
-  ]
-  if (length(missing_dependencies)) {
-    stop("HSROC source dependencies are missing: ", paste(missing_dependencies, collapse = ", "))
-  }
-  installed <- utils::installed.packages(lib.loc = lib)
-  current <- if (exception$name %in% rownames(installed)) installed[exception$name, "Version"] else NA_character_
-  if (!identical(current, exception$version)) {
-    archive <- Sys.getenv("RCMS_HSROC_ARCHIVE", "")
-    if (!nzchar(archive)) archive <- tempfile(pattern = "HSROC_", fileext = ".tar.gz")
-    if (file.exists(archive)) unlink(archive)
-    dir.create(dirname(archive), recursive = TRUE, showWarnings = FALSE)
-    if (!nzchar(Sys.getenv("RCMS_HSROC_ARCHIVE", ""))) on.exit(unlink(archive), add = TRUE)
-    download(exception$url, archive, mode = "wb", quiet = FALSE)
-    observed <- sha256(archive)
-    if (!identical(observed, exception$sha256)) {
-      stop("HSROC source archive SHA256 mismatch: expected ", exception$sha256, ", found ", observed)
-    }
-    install_source(
-      archive,
-      lib = lib,
-      repos = NULL,
-      type = "source",
-      dependencies = FALSE
-    )
-  }
-  installed <- utils::installed.packages(lib.loc = lib)
-  if (!exception$name %in% rownames(installed)) stop("HSROC source exception was not installed")
-  actual <- installed[exception$name, "Version"]
-  if (!identical(actual, exception$version)) {
-    stop("HSROC installed at version ", actual, ", expected ", exception$version)
-  }
-  if (!requireNamespace(exception$name, quietly = TRUE)) stop("HSROC cannot be loaded after installation")
-  retained_archive <- Sys.getenv("RCMS_HSROC_ARCHIVE", "")
-  if (nzchar(retained_archive) && !file.exists(retained_archive)) {
-    dir.create(dirname(retained_archive), recursive = TRUE, showWarnings = FALSE)
-    download(exception$url, retained_archive, mode = "wb", quiet = FALSE)
-    if (!identical(sha256(retained_archive), exception$sha256)) {
-      stop("Retained HSROC source archive SHA256 mismatch")
-    }
-  }
-  emit_rcms_binary_evidence(
-    "source-exception",
-    c(
-      paste0("package=", exception$name),
-      paste0("version=", exception$version),
-      paste0("url=", exception$url),
-      paste0("sha256=", exception$sha256),
-      "type=source",
-      "repos=NULL",
-      "dependencies=FALSE"
-    )
-  )
 }

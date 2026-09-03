@@ -114,13 +114,38 @@ rcmetar.materialize.svg.property <- function(node, property, value) {
     invisible(node)
 }
 
+rcmetar.sanitize.svg.xml <- function(svg) {
+    # XML 1.0 permits tab, LF, and CR below U+0020, but not the other
+    # control characters or references that graphics devices can occasionally
+    # emit. Filter bytes first: an invalid control byte can survive in an R
+    # character vector with an unknown encoding and evade a character regex.
+    # Remove both forms before libxml2 expands character references.
+    if (!is.raw(svg)) {
+        svg <- charToRaw(svg)
+    }
+    bytes <- as.integer(svg)
+    svg <- rawToChar(svg[!(bytes <= 8L | bytes %in% c(11L, 12L) | bytes >= 14L & bytes <= 31L)])
+    svg <- gsub("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "", svg, perl=TRUE)
+    svg <- gsub("&#0*(?:[0-8]|1[124-9]|2[0-9]|3[01]);", "", svg, perl=TRUE)
+    gsub("&#[xX]0*(?:[0-8]|[bBcC]|[eEfF]|1[0-9a-fA-F]);", "", svg, perl=TRUE)
+}
+
 rcmetar.normalize.svglite.svg <- function(svg.path) {
     compressed <- grepl("[.]svgz$", tolower(svg.path))
-    input <- if (compressed) gzfile(svg.path, open="rt") else file(svg.path, open="rt")
-    svg <- paste(readLines(input, warn=FALSE), collapse="\n")
+    # svglite declares UTF-8. Reading through the native Windows code page can
+    # corrupt non-ASCII labels before libxml2 sees them, especially when R's
+    # requested UTF-8 locale is unavailable.
+    input <- if (compressed) {
+        gzfile(svg.path, open="rb")
+    } else {
+        file(svg.path, open="rb")
+    }
+    svg <- rawToChar(readBin(input, what="raw", n=100000000L))
     close(input)
+    Encoding(svg) <- "bytes"
+    svg <- rcmetar.sanitize.svg.xml(svg)
 
-    document <- xml2::read_xml(svg, options="NOBLANKS")
+    document <- xml2::read_xml(charToRaw(svg), options="NOBLANKS")
     shapes <- xml2::xml_find_all(
         document,
         "//*[local-name()='g' and contains(concat(' ', normalize-space(@class), ' '), ' svglite ')]//*[local-name()='line' or local-name()='polyline' or local-name()='polygon' or local-name()='path' or local-name()='rect' or local-name()='circle']"

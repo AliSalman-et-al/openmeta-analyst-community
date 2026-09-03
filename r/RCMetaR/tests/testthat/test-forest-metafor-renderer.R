@@ -181,6 +181,20 @@ read_png_dimensions <- function(path) {
   )
 }
 
+read_pdf_contract <- function(path) {
+  raw <- readBin(path, what = "raw", n = 100000000L)
+  bytes <- as.integer(raw)
+  ascii <- bytes[(bytes %in% c(9L, 10L, 13L)) | (bytes >= 32L & bytes <= 126L)]
+  text <- rawToChar(as.raw(ascii))
+  page.tokens <- gregexpr("/Type[[:space:]]*/Page([^s]|$)", text, perl = TRUE)[[1L]]
+  list(
+    signature = rawToChar(raw[seq_len(min(length(raw), 5L))]),
+    pages = if (identical(page.tokens, -1L)) 0L else length(page.tokens),
+    has_xref = grepl("startxref", text, fixed = TRUE),
+    has_eof = grepl("%%EOF", text, fixed = TRUE)
+  )
+}
+
 load_saved_plot_data <- function(path) {
   env <- new.env(parent = emptyenv())
   load(paste0(path, ".plotdata"), envir = env)
@@ -235,7 +249,11 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_true(file.exists(pdf_path))
   expect_gt(file.info(pdf_path)$size, 1000)
   expect_false(file.exists(rcmetar.plot.canonical_svg_path(pdf_path)))
-  expect_equal(pdftools::pdf_info(pdf_path)$pages, 1)
+  pdf.contract <- read_pdf_contract(pdf_path)
+  expect_equal(pdf.contract$signature, "%PDF-")
+  expect_equal(pdf.contract$pages, 1)
+  expect_true(pdf.contract$has_xref)
+  expect_true(pdf.contract$has_eof)
 
   expect_true(file.exists(svg_path))
   expect_gt(file.info(svg_path)$size, 1000)
@@ -255,7 +273,11 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_equal(rcmetar.plot.file.extension("journal-forest.svg.gz"), "svgz")
   expect_true(file.exists(contains_png_pdf_path))
   expect_gt(file.info(contains_png_pdf_path)$size, 1000)
-  expect_equal(pdftools::pdf_info(contains_png_pdf_path)$pages, 1)
+  contains.pdf.contract <- read_pdf_contract(contains_png_pdf_path)
+  expect_equal(contains.pdf.contract$signature, "%PDF-")
+  expect_equal(contains.pdf.contract$pages, 1)
+  expect_true(contains.pdf.contract$has_xref)
+  expect_true(contains.pdf.contract$has_eof)
 
   saved_path <- tempfile()
   rcmetar.save.plot.data(bundle, saved_path)
@@ -743,6 +765,34 @@ test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric ax
   rcmetar.draw.forest.plot(bundle, png_path)
   expect_true(file.exists(png_path))
   expect_gt(file.info(png_path)$size, 5000)
+})
+
+test_that("plot axis default placeholders resolve to the metric label", {
+  fixture <- metafor_binary_fixture()
+  res <- rma.uni(
+    yi = fixture$data@y,
+    sei = fixture$data@SE,
+    slab = fixture$data@study.names,
+    method = fixture$params$rm.method,
+    level = fixture$params$conf.level,
+    digits = fixture$params$digits
+  )
+
+  for (placeholder in c(NA_character_, "[default]", "[Default]", "<default>", "default")) {
+    params <- fixture$params
+    if (is.na(placeholder)) {
+      params$fp_xlabel <- NULL
+    } else {
+      params$fp_xlabel <- placeholder
+    }
+    bundle <- rcmetar.regenerate.plot.data(fixture$data, res, params)
+    expect_identical(rcmetar.metafor.xlab(bundle), "Odds Ratio (log scale)")
+  }
+
+  params <- fixture$params
+  params$fp_xlabel <- "Study-defined effect"
+  bundle <- rcmetar.regenerate.plot.data(fixture$data, res, params)
+  expect_identical(rcmetar.metafor.xlab(bundle), "Study-defined effect")
 })
 
 test_that("BMJ Forest Style builds faithful family columns and renders smoke cases", {

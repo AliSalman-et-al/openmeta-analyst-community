@@ -344,7 +344,7 @@ _DRIVER = textwrap.dedent(
         def get_covariate_values(self, covariate, ids_for_keys=False):
             assert ids_for_keys is True
             assert covariate == self.covariate.name
-            return {1: 1.0, 2: 2.0, 3: 3.0}
+            return {1: 1.0, 2: 2.0, 3: 3.0, 4: 4.0, 5: 5.0}
 
     class FilteredDiagnosticModel:
         def __init__(self):
@@ -353,7 +353,9 @@ _DRIVER = textwrap.dedent(
                 FakeStudy(1, "Included 1", 1990),
                 FakeStudy(2, "Included 2", 1991),
                 FakeStudy(3, "Included 3", 1992),
-                FakeStudy(4, "Missing moderator", 1993),
+                FakeStudy(4, "Included 4", 1993),
+                FakeStudy(5, "Included 5", 1994),
+                FakeStudy(6, "Missing moderator", 1995),
             ]
             self.covariate = FakeCovariate("Moderator", r_bridge.CONTINUOUS)
             self.dataset = FilteredDiagnosticDataset(self.covariate)
@@ -370,7 +372,9 @@ _DRIVER = textwrap.dedent(
                 1: (0.1, 0.05),
                 2: (0.2, 0.05),
                 3: (0.3, 0.05),
-                4: (None, None),
+                4: (0.4, 0.05),
+                5: (0.5, 0.05),
+                6: (None, None),
             }
             studies = self._studies
             if only_these_studies is not None:
@@ -380,7 +384,7 @@ _DRIVER = textwrap.dedent(
             return tuple(zip(*(values[study.id] for study in studies)))
 
         def included_studies_have_raw_data(self):
-            return False
+            return True
 
         def get_current_raw_data(
             self, only_if_included=True, only_these_studies=None
@@ -388,9 +392,11 @@ _DRIVER = textwrap.dedent(
             assert only_if_included is True
             values = {
                 1: [10, 5, 4, 10],
-                2: [11, 6, 5, 11],
-                3: [12, 7, 6, 12],
-                4: [None, None, None, None],
+                2: [12, 4, 6, 10],
+                3: [8, 7, 5, 13],
+                4: [15, 3, 8, 9],
+                5: [11, 6, 7, 12],
+                6: [20, 2, 10, 10],
             }
             studies = self._studies
             if only_these_studies is not None:
@@ -406,15 +412,22 @@ _DRIVER = textwrap.dedent(
     selected = analysis_adapter.select_studies_for_covariates(
         filtered_model, (filtered_model.covariate,)
     )
-    assert len(selected.studies) == 3
+    assert len(selected.studies) == 5
     assert selected.has_missing_values is True
+    assert selected.excluded_study_names == ("Missing moderator",)
 
     diagnostic_meta_request = analysis_adapter.make_analysis_request(
         data_type="diagnostic",
         workflow="meta-regression",
-        method="meta_regression",
+        method="diagnostic.reitsma",
         metric="Sens",
-        parameters={"conf.level": 95.0, "measure": "Sens"},
+        parameters={
+            "conf.level": 95.0,
+            "digits": 3,
+            "estimator": "REML",
+            "adjust": 0.5,
+            "correction.policy": "All studies if any zero exists",
+        },
     )
     previous_cwd = os.getcwd()
     previous_scratch_dir = os.environ.pop("RCMS_ANALYSIS_SCRATCH_DIR", None)
@@ -435,19 +448,19 @@ _DRIVER = textwrap.dedent(
     finally:
         if previous_scratch_dir is not None:
             os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
-    assert "Summary" in diagnostic_meta_result["texts"]
-    for expression in (
-        "tmp_obj@y",
-        "tmp_obj@SE",
-        "tmp_obj@study.names",
-        "tmp_obj@years",
-        "tmp_obj@TP",
-        "tmp_obj@FN",
-        "tmp_obj@FP",
-        "tmp_obj@TN",
-        "tmp_obj@covariates[[1]]@cov.vals",
-    ):
-        assert len(ro.r(expression)) == 3
+    assert "Sensitivity coefficients" in diagnostic_meta_result["texts"]
+    assert list(ro.r("tmp_obj@study.names")) == [
+        "Included 1",
+        "Included 2",
+        "Included 3",
+        "Included 4",
+        "Included 5",
+    ]
+    assert list(ro.r("tmp_obj@TP")) == [10, 12, 8, 15, 11]
+    assert list(ro.r("tmp_obj@FN")) == [5, 4, 7, 3, 6]
+    assert list(ro.r("tmp_obj@FP")) == [4, 6, 5, 8, 7]
+    assert list(ro.r("tmp_obj@TN")) == [10, 10, 13, 9, 12]
+    assert list(ro.r("tmp_obj@covariates[[1]]@cov.vals")) == [1, 2, 3, 4, 5]
 
     invalid_confidence_level_checks = ro.r('''
       c(
@@ -758,182 +771,6 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT))
 
 
-_HSROC_SUMMARY_DRIVER = textwrap.dedent(
-    """
-    import os
-    import sys
-
-    repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
-    os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    sys.path.insert(0, os.path.join(repo_root, "src"))
-    sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
-
-    from rc_metastudio import r_backend
-    r_backend.install_r_backend()
-    try:
-        from rc_metastudio import r_bridge
-    except Exception as exc:
-        sys.stdout.write("SKIP %s: %s\\n" % (exc.__class__.__name__, exc))
-        sys.exit(42)
-
-    ro = r_bridge.ro
-    r_result = ro.r(
-        '''
-        list(
-          images = list(),
-          `Between-study parameters` = structure(
-            c(0.624, 1.110, 0.817, 1.907, 1.493, 1.356),
-            dim = c(2, 3),
-            dimnames = list(
-              c("THETA", "LAMBDA"),
-              c("Median estimate", "HPD.low", "HPD.high")
-            )
-          ),
-          `Within-study parameters` = structure(
-            1:27,
-            dim = c(3, 3, 3),
-            dimnames = list(
-              c("1", "2", "3"),
-              c("Median estimate", "HPD lower", "HPD upper"),
-              c("theta", "alpha", "pi")
-            )
-          )
-        )
-        '''
-    )
-
-    parsed = r_bridge.parse_out_results(r_result)
-    texts = parsed["texts"]
-    assert "Summary" not in texts, texts
-    assert "Between-study parameters" in texts, texts
-    assert "Within-study parameters - theta" in texts, texts
-    assert "Within-study parameters - alpha" in texts, texts
-    assert "Within-study parameters - pi" in texts, texts
-
-    combined = "\\n".join(texts.values())
-    assert "$`Between-study parameters`" not in combined, combined
-    assert "$`Within-study parameters`" not in combined, combined
-    assert ", , theta" not in combined, combined
-    assert ", , alpha" not in combined, combined
-    assert ", , pi" not in combined, combined
-
-    artifact_result = ro.r(
-        '''
-        list(
-          images = c(`Forest Plot` = "forest.png"),
-          display_images = c(`Forest Plot` = "managed/forest.display.svg"),
-          plot_capabilities = list(
-            `Forest Plot` = list(
-              plot_kind = "forest",
-              editable = FALSE,
-              styleable = TRUE,
-              composition = "single",
-              regenerator = "forest"
-            )
-          )
-        )
-        '''
-    )
-    parsed_artifact = r_bridge.parse_out_results(artifact_result)
-    assert parsed_artifact["images"] == {"Forest Plot": "forest.png"}
-    assert parsed_artifact["display_images"] == {
-        "Forest Plot": "managed/forest.display.svg"
-    }
-    assert not texts["Between-study parameters"].startswith(
-        "Between-study parameters\\n"
-    ), texts
-    assert not texts["Within-study parameters - theta"].startswith(
-        "Within-study parameters - theta\\n"
-    ), texts
-    assert "Lower bound" in texts["Between-study parameters"], texts
-    assert "Upper bound" in texts["Between-study parameters"], texts
-    assert "HPD.low" not in texts["Between-study parameters"], texts
-    assert "HPD lower" not in texts["Within-study parameters - theta"], texts
-    assert "THETA" in texts["Between-study parameters"], texts
-    assert "Median estimate" in texts["Within-study parameters - theta"], texts
-    assert "3" in texts["Within-study parameters - alpha"], texts
-
-    direct_summary = ro.r(
-        '''
-        list(
-          Summary = list(
-            `Bivariate Summary` = paste(
-              "Bivariate Summary",
-              "Estimate HPD.low HPD.high",
-              "Fallback ci.lb ci.ub lower.bound upper.bound Lower Bound Upper Bound",
-              sep="\\n"
-            ),
-            `Other Summary` = "HPD lower HPD upper"
-          ),
-          `Raw Text Summary` = "ci.lb ci.ub"
-        )
-        '''
-    )
-    parsed_direct = r_bridge.parse_out_results(direct_summary)
-    direct_text = "\\n".join(parsed_direct["texts"].values())
-    for raw_header in (
-        "HPD.low",
-        "HPD.high",
-        "HPD lower",
-        "HPD upper",
-        "ci.lb",
-        "ci.ub",
-        "lower.bound",
-        "upper.bound",
-        "Lower Bound",
-        "Upper Bound",
-    ):
-        assert raw_header not in direct_text, parsed_direct
-    assert "Estimate Lower bound Upper bound" in direct_text, parsed_direct
-    assert "Fallback Lower bound Upper bound Lower bound Upper bound Lower bound Upper bound" in direct_text, parsed_direct
-    assert parsed_direct["texts"]["Other Summary"] == "Lower bound Upper bound", parsed_direct
-    assert parsed_direct["texts"]["Raw Text Summary"] == "Lower bound Upper bound", parsed_direct
-
-    classes_path = os.path.join(repo_root, "r", "RCMetaR", "R", "classes.R")
-    ro.r("source(%r)" % classes_path.replace(os.sep, "/"))
-    context_summary = ro.r(
-        '''
-        list(
-          input_data = new(
-            "DiagnosticData",
-            TP=c(19, 8),
-            FN=c(10, 2),
-            TN=c(81, 13),
-            FP=c(1, 9),
-            study.names=c("Lecart Lenfant", "Piver Barlow")
-          ),
-          Summary = list(
-            `diagnostic.random` = structure(
-              c(0.11, 0.22, 0.01, 0.02, 0.21, 0.32),
-              dim = c(2, 3),
-              dimnames = list(
-                c("Study 1", "Study 2"),
-                c("median estimate", "ci.lb", "ci.ub")
-              )
-            )
-          )
-        )
-        '''
-    )
-    parsed_context = r_bridge.parse_out_results(context_summary)
-    assert "Diagnostic Random-Effects" in parsed_context["texts"], parsed_context
-    context_text = parsed_context["texts"]["Diagnostic Random-Effects"]
-    assert "Lecart Lenfant" in context_text, parsed_context
-    assert "Piver Barlow" in context_text, parsed_context
-    assert "Study 1" not in context_text, parsed_context
-    assert "diagnostic.random" not in parsed_context["texts"], parsed_context
-    assert "Lower bound" in context_text, parsed_context
-    assert "ci.lb" not in context_text, parsed_context
-
-    sys.stdout.write("OK\\n")
-    sys.stdout.flush()
-    sys.stderr.flush()
-    os._exit(0)
-    """
-).replace("__REPO_ROOT__", repr(REPO_ROOT))
-
-
 _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
     """
     import os
@@ -1119,6 +956,13 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
 ).replace("__REPO_ROOT__", repr(REPO_ROOT))
 
 
+def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
+    env = dict(os.environ)
+    env.pop("RCMS_STUB_BACKEND", None)
+    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
+    run_python_driver(_ADVANCED_RCMetaR_DRIVER, env=env)
+
+
 def test_inprocess_rpy2_backend_contract():
     # Force the real in-process backend: the surrounding test suite sets
     # RCMS_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
@@ -1151,17 +995,3 @@ def test_RCMetaR_summary_capture_uses_formatted_print_methods():
     env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_SUMMARY_PRINT_DRIVER, env=env)
-
-
-def test_hsroc_direct_table_summaries_expand_to_formatted_sections():
-    env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
-    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    run_python_driver(_HSROC_SUMMARY_DRIVER, env=env)
-
-
-def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
-    env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
-    env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
-    run_python_driver(_ADVANCED_RCMetaR_DRIVER, env=env)

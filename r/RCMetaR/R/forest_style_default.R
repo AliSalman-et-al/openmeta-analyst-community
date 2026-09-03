@@ -172,7 +172,7 @@ rcmetar.default.ilab.for.data <- function(om.data, params, res=NULL) {
 
 rcmetar.default.xlab <- function(bundle) {
     params <- bundle$params
-    if (!is.null(params$fp_xlabel) && params$fp_xlabel != "[default]") {
+    if (!rcmetar.is.plot.default.text(params$fp_xlabel)) {
         return(as.character(params$fp_xlabel))
     }
     label <- pretty.metric.name(as.character(params$measure))

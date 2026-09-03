@@ -26,8 +26,7 @@ def test_known_analysis_method_keys_have_user_facing_labels():
         "diagnostic.fixed.mh",
         "diagnostic.fixed.peto",
         "diagnostic.random",
-        "diagnostic.hsroc",
-        "diagnostic.bivariate.ml",
+        "diagnostic.reitsma",
         "meta.regression",
     ]
 
@@ -53,14 +52,14 @@ def test_available_method_labels_are_normalized_without_changing_method_keys():
     methods = {
         "binary.random": "binary.random",
         "Continuous Random-Effects": "continuous.random",
-        "diagnostic.bivariate.ml": "diagnostic.bivariate.ml",
+        "Reitsma bivariate model": "diagnostic.reitsma",
         "Binary Fixed-Effect Mantel Haenszel": "binary.fixed.mh",
     }
 
     assert normalize_available_method_labels(methods) == {
         "Binary Random-Effects": "binary.random",
         "Continuous Random-Effects": "continuous.random",
-        "Bivariate (Maximum Likelihood)": "diagnostic.bivariate.ml",
+        "Reitsma bivariate model": "diagnostic.reitsma",
         "Binary Fixed-Effect Mantel-Haenszel": "binary.fixed.mh",
     }
 
@@ -85,11 +84,11 @@ def test_parameter_value_labels_hide_internal_codes_without_changing_values():
 
 
 def test_parameter_labels_hide_internal_names_when_metadata_is_missing():
-    assert parameter_display_label("theta.lower") == "Accuracy Prior Lower Bound"
-    assert parameter_display_label("theta.upper") == "Accuracy Prior Upper Bound"
-    assert parameter_display_label("lambda.lower") == "Threshold Prior Lower Bound"
-    assert parameter_display_label("num.iters") == "Number of Iterations"
     assert parameter_display_label("conf.level") == "Confidence Level"
+    assert parameter_display_label("adjust") == "Correction Factor"
+    assert parameter_display_label("digits") == "Decimal Places"
+    assert parameter_display_label("estimator") == "Estimator"
+    assert parameter_display_label("correction.policy") == "Correction Policy"
     assert parameter_display_label("rm.method") == "Random-Effects Method"
     assert parameter_display_label("inference.method") == "Inference Method"
 

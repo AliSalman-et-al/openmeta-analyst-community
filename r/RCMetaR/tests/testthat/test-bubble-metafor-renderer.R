@@ -96,6 +96,17 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
   expect_true(all(file.exists(paste0(plot.path, c(".data", ".params", ".res")))))
 })
 
+test_that("bubble plot interval legend follows the configured confidence level", {
+  bundle <- list(
+    params = list(conf.level = 90, bp_show_prediction_interval = TRUE)
+  )
+
+  expect_equal(
+    RCMetaR:::rcmetar.bubble.legend.labels(bundle),
+    c("Studies", "Regression line", "90% CI", "90% PI")
+  )
+})
+
 test_that("meta-regression bubble plot redraws reject legacy non-metafor payloads", {
   fixture <- bubble_binary_fixture("default")
   legacy.plot.data <- list(

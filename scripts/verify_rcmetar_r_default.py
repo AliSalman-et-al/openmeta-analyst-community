@@ -184,7 +184,6 @@ dir.create(lib, recursive = TRUE, showWarnings = FALSE)
 source(file.path(repo_root, "scripts", "r_binary_policy.R"), local = TRUE)
 policy <- load_rcms_r_binary_policy(repo_root)
 install_rcms_binary_packages(policy, lib)
-install_rcms_source_exception(policy, lib)
 """
     with tempfile.TemporaryDirectory(prefix="RCMetaR-default-r-install-") as temp_name:
         install_script = Path(temp_name) / "install-default-r-deps.R"

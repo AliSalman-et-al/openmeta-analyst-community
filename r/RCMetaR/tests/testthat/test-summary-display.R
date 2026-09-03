@@ -1,6 +1,6 @@
-summary_display_fixture <- function(res.overrides = list()) {
+summary_display_fixture <- function(res.overrides = list(), conf.level = 95) {
   params <- list(
-    conf.level = 95,
+    conf.level = conf.level,
     digits = 3,
     measure = "OR",
     rm.method = "DL",
@@ -38,9 +38,9 @@ summary_display_fixture <- function(res.overrides = list()) {
   RCMetaR:::create.summary.disp(data, params, res, "Binary Random-Effects Model\n\nMetric: Odds Ratio")
 }
 
-subgroup_display_fixture <- function(with.missing.values = FALSE) {
+subgroup_display_fixture <- function(with.missing.values = FALSE, conf.level = 95) {
   params <- list(
-    conf.level = 95,
+    conf.level = conf.level,
     digits = 3,
     measure = "OR"
   )
@@ -81,9 +81,9 @@ subgroup_display_fixture <- function(with.missing.values = FALSE) {
   RCMetaR:::create.subgroup.display(res, c("Early", "Late"), params, "Subgroup Analysis", "binary")
 }
 
-overall_display_fixture <- function() {
+overall_display_fixture <- function(conf.level = 95) {
   params <- list(
-    conf.level = 95,
+    conf.level = conf.level,
     digits = 3,
     measure = "OR"
   )
@@ -125,7 +125,7 @@ next_non_empty_line <- function(lines, line) {
 
 expect_values_inside_header_columns <- function(header, values, labels) {
   starts <- vapply(labels, function(label) regexpr(label, header, fixed = TRUE)[1], integer(1))
-  value.matches <- gregexpr("[^ ]+", values, perl = TRUE)[[1]]
+  value.matches <- gregexpr("\\S+", values, perl = TRUE)[[1]]
   value.lengths <- attr(value.matches, "match.length")
 
   expect_equal(length(value.matches), length(labels))
@@ -142,7 +142,33 @@ expect_values_inside_header_columns <- function(header, values, labels) {
 }
 
 test_that("ordinary numeric display never applies p-value threshold notation", {
-  expect_equal(round.display(c(-0.809, -0.0004, 0.0004, 0.809), 3), c("-0.809", "-0.000", "0.000", "0.809"))
+  expect_equal(RCMetaR:::round.display(c(-0.809, -0.0004, 0.0004, 0.809), 3), c("-0.809", "-0.000", "0.000", "0.809"))
+})
+
+test_that("zero subgroup z-values remain visible", {
+  expect_identical(RCMetaR:::g.round.display.zval(0, 3), "0.000")
+
+  display <- RCMetaR:::create.subgroup.display(
+    list(
+      list(
+        b = 0,
+        ci.lb = -0.1,
+        ci.ub = 0.1,
+        se = 0.05,
+        pval = 1,
+        zval = 0,
+        k = 3,
+        QE = 1,
+        QEp = 0.3,
+        I2 = 0
+      )
+    ),
+    "All studies",
+    list(conf.level = 95, digits = 3, measure = "OR"),
+    "Subgroup Analysis",
+    "binary"
+  )
+  expect_identical(unname(display$arrays$arr1[2, 8]), "0.000")
 })
 
 test_that("display precision policy favors readable estimates without weakening p-values", {
@@ -201,7 +227,7 @@ test_that("summary display uses readable labels and aligned columns", {
   heterogeneity.header <- first_line_after(rendered, "Heterogeneity")
   heterogeneity.values <- next_non_empty_line(rendered, heterogeneity.header)
 
-  model.labels <- c("Estimate", "Lower bound", "Upper bound", "p-value")
+  model.labels <- c("Estimate", "Lower bound (95% CI)", "Upper bound (95% CI)", "p-value")
   heterogeneity.labels <- c("\u03c4\u00b2", "Q(df=12)", "Het. p-value", "I\u00b2")
   expect_values_inside_header_columns(model.header, model.values, model.labels)
   expect_values_inside_header_columns(heterogeneity.header, heterogeneity.values, heterogeneity.labels)
@@ -253,7 +279,7 @@ test_that("overall display leaves unavailable p-values blank", {
   expect_equal(overall[3, 6], "0.277")
 })
 
-regression_display_fixture <- function(method = "REML", inference.method = "z") {
+regression_display_fixture <- function(method = "REML", inference.method = "z", conf.level = 95) {
   t.inference <- inference.method %in% c("t", "knha", "adhoc")
   display <- RCMetaR:::create.regression.display(
     list(
@@ -279,7 +305,7 @@ regression_display_fixture <- function(method = "REML", inference.method = "z") 
       QE = 30.7331,
       QEp = 0.0012
     ),
-    list(digits = 3, measure = "OR", inference.method = inference.method),
+    list(digits = 3, measure = "OR", inference.method = inference.method, conf.level = conf.level),
     list(
       cov.display.col = c("intercept", "latitude"),
       levels.display.col = character(0),
@@ -294,6 +320,55 @@ regression_display_fixture <- function(method = "REML", inference.method = "z") 
   )
   display
 }
+
+test_that("result tables identify their configured confidence level", {
+  summary <- summary_display_fixture(conf.level = 90)
+  expect_equal(
+    unname(summary$arrays$arr1[1, 2:3]),
+    c("Lower bound (90% CI)", "Upper bound (90% CI)")
+  )
+
+  overall <- overall_display_fixture(conf.level = 90)
+  expect_equal(
+    unname(overall$arrays$arr1[1, 3:4]),
+    c("Lower bound (90% CI)", "Upper bound (90% CI)")
+  )
+
+  subgroup <- subgroup_display_fixture(conf.level = 90)
+  expect_equal(
+    unname(subgroup$arrays$arr1[1, 4:5]),
+    c("Lower bound (90% CI)", "Upper bound (90% CI)")
+  )
+
+  regression <- regression_display_fixture(conf.level = 90)
+  expect_equal(
+    unname(regression$arrays[[3]][1, 3:4]),
+    c("Lower bound (90% CI)", "Upper bound (90% CI)")
+  )
+})
+
+test_that("adjusted means use the configured confidence labels for indexed values", {
+  display <- RCMetaR:::adjusted_means_display(
+    list(
+      b = matrix(c(0.1, 0.2), ncol = 1),
+      vb = diag(c(0.01, 0.02))
+    ),
+    list(conf.level = 90, digits = 3, measure = "MD"),
+    list(
+      n.levels = 2,
+      factor.n.levels = 2,
+      levels.display.col = c("", "A", "B"),
+      studies.display.col = c("", "3", "4"),
+      n.cont.covs = 0
+    )
+  )
+
+  expect_equal(
+    unname(display$arrays$arr1[1, 4:5]),
+    c("Lower bound (90% CI)", "Upper bound (90% CI)")
+  )
+  expect_equal(unname(display$arrays$arr1[2:3, 4]), c("-0.064", "0.015"))
+})
 
 test_that("meta-regression summary reports model, coefficients, heterogeneity, and tests", {
   display <- regression_display_fixture()

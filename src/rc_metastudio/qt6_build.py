@@ -56,9 +56,6 @@ CANONICAL_FORMS = {
     Path("src/rc_metastudio/forms/continuous_data_dialog.ui"): Path(
         "rc_metastudio/forms/ui_continuous_data_dialog.py"
     ),
-    Path("src/rc_metastudio/forms/meta_regression_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_meta_regression_dialog.py"
-    ),
     Path("src/rc_metastudio/forms/publication_bias_dialog.ui"): Path(
         "rc_metastudio/forms/ui_publication_bias_dialog.py"
     ),

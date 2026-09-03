@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
-from test_types import key_click, required
+from test_types import key_click, key_clicks, required
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
 from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.plot_text import normalize_plot_text_value
 
 pytestmark = pytest.mark.qsettings
 
@@ -56,6 +57,18 @@ def _dispose(widget, qapp):
     widget.close()
     widget.deleteLater()
     qapp.processEvents()
+
+
+@pytest.mark.parametrize(
+    "placeholder",
+    ["", "[default]", "[Default]", "<default>", "(default)", "default"],
+)
+def test_untouched_plot_default_placeholder_is_unset(placeholder):
+    assert normalize_plot_text_value(placeholder) is None
+
+
+def test_edited_plot_default_placeholder_remains_user_text():
+    assert normalize_plot_text_value("[default]", was_edited=True) == "[default]"
 
 
 def test_qtsvg_renders_materialized_default_black_plot_stroke():
@@ -442,6 +455,7 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
     qapp, tmp_path
 ):
     from rc_metastudio import adaptive_window
+
     _use_isolated_settings(tmp_path)
     dialog = plot_editor_dialog.EditPlotDialog({}, "forest.png")
     try:
@@ -465,6 +479,93 @@ def test_plot_editor_is_screen_bounded_transactional_dialog_with_fixed_actions(
             dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok),
             "ok button",
         ).isVisible()
+    finally:
+        _dispose(dialog, qapp)
+
+
+def test_sroc_plot_editor_keeps_dynamic_controls_inside_scrollable_content(
+    qapp, tmp_path
+):
+    _use_isolated_settings(tmp_path)
+    dialog = plot_editor_dialog.EditPlotDialog({}, "sroc.svg", plot_type="sroc")
+    try:
+        high_font = QtGui.QFont(dialog.font())
+        high_font.setPointSize(18)
+        dialog.setFont(high_font)
+        dialog.resize(600, 450)
+        dialog.show()
+        qapp.processEvents()
+        sroc_options = dialog.findChild(QtWidgets.QWidget, "sroc_options")
+        assert sroc_options is not None
+        assert dialog.content_scroll.isAncestorOf(sroc_options)
+        assert dialog.content_layout.indexOf(sroc_options) >= 0
+        assert dialog.content_scroll.viewport().height() > 0
+        assert dialog.content_scroll.verticalScrollBar().maximum() > 0
+        assert dialog.content_scroll.isAncestorOf(dialog.buttonBox) is False
+    finally:
+        _dispose(dialog, qapp)
+
+
+def test_reitsma_coefficient_editor_hides_inapplicable_forest_controls(qapp):
+    from rc_metastudio import plot_editor_dialog
+
+    dialog = plot_editor_dialog.EditPlotDialog(
+        {
+            "reitsma.coefficient.scale": "Sensitivity",
+            "reitsma.moderator.coding": {"quality": {"reference": "A"}},
+            "fp_xlabel": "Odds ratio",
+            "fp_plot_lb": "0.5",
+            "fp_plot_ub": "3",
+            "fp_xticks": "0.5, 1, 2, 3",
+        },
+        "coefficients.svg",
+    )
+    try:
+        assert not dialog.groupBox.isVisible()
+        assert not dialog.default_panel.isVisible()
+        params = dialog.plot_params()
+        assert params["reitsma.coefficient.scale"] == "Sensitivity"
+        assert params["reitsma.moderator.coding"]["quality"]["reference"] == "A"
+        assert params["fp_xlabel"] == "Odds ratio"
+    finally:
+        dialog.close()
+        qapp.processEvents()
+
+
+@pytest.mark.parametrize(
+    "plot_type, parameter_name",
+    [("forest", "fp_xlabel"), ("regression", "bp_xlabel"), ("sroc", "fp_xlabel")],
+)
+def test_plot_editor_omits_unedited_default_axis_label_sentinel(
+    qapp, tmp_path, plot_type, parameter_name
+):
+    _use_isolated_settings(tmp_path)
+    dialog = plot_editor_dialog.EditPlotDialog(
+        {parameter_name: "[default]"}, "plot.svg", plot_type=plot_type
+    )
+    try:
+        assert dialog.x_lbl_le.text() == ""
+        assert dialog.plot_params()[parameter_name] is None
+        dialog.x_lbl_le.setFocus()
+        key_clicks(dialog.x_lbl_le, "Specific axis label")
+        assert dialog.plot_params()[parameter_name] == "Specific axis label"
+    finally:
+        _dispose(dialog, qapp)
+
+
+def test_sroc_plot_editor_uses_acronym_safe_browse_title(qapp, tmp_path, monkeypatch):
+    _use_isolated_settings(tmp_path)
+    dialog = plot_editor_dialog.EditPlotDialog({}, "sroc.svg", plot_type="sroc")
+    titles = []
+
+    monkeypatch.setattr(
+        plot_editor_dialog.QFileDialog,
+        "getSaveFileName",
+        lambda _parent, title, *_args: (titles.append(title) or ("", "")),
+    )
+    try:
+        dialog.save_btn.click()
+        assert titles == ["Save SROC Plot Image"]
     finally:
         _dispose(dialog, qapp)
 
@@ -609,6 +710,49 @@ def test_results_window_regenerates_each_supported_export_format(
     )
     try:
         window.save_image_as(artifact, format=extension)
+        assert calls == [
+            ("load", f"{artifact.params_path}.plotdata"),
+            ("generate", str(tmp_path / f"export.{extension}")),
+        ]
+    finally:
+        _dispose(window, qapp)
+
+
+@pytest.mark.parametrize("extension", ["pdf", "png", "tiff", "svg"])
+def test_results_window_exports_sroc_with_format_specific_default_name(
+    qapp, tmp_path, monkeypatch, extension
+):
+    _use_isolated_settings(tmp_path)
+    window = results_window.ResultsWindow(_empty_results())
+    calls = []
+    defaults = []
+    artifact = results_window.PlotArtifact(
+        "SROC",
+        str(tmp_path / "sroc.svg"),
+        _plot_capability(plot_kind="sroc", regenerator="sroc"),
+        params_path=str(tmp_path / "sroc-params"),
+    )
+    monkeypatch.setattr(
+        results_window.r_bridge,
+        "load_in_r",
+        lambda path: calls.append(("load", path)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        results_window.r_bridge,
+        "generate_sroc_plot",
+        lambda path: calls.append(("generate", path)),
+        raising=False,
+    )
+
+    def choose_path(_parent, _title, default_path, *_args):
+        defaults.append(default_path)
+        return str(tmp_path / "export"), ""
+
+    monkeypatch.setattr(results_window.QFileDialog, "getSaveFileName", choose_path)
+    try:
+        window.save_image_as(artifact, format=extension)
+        assert defaults == [f"sroc.{extension}"]
         assert calls == [
             ("load", f"{artifact.params_path}.plotdata"),
             ("generate", str(tmp_path / f"export.{extension}")),
@@ -804,87 +948,31 @@ def test_plot_color_chooser_is_named_described_and_keyboard_focusable(qapp, tmp_
         _dispose(dialog, qapp)
 
 
-def test_plot_save_path_browser_is_accessible_and_keyboard_operable_for_all_editors(
-    qapp, tmp_path, monkeypatch
-):
-
+def test_plot_editor_keeps_scratch_plot_path_internal(qapp, tmp_path):
     _use_isolated_settings(tmp_path)
-    selections = iter(
-        (
-            (str(tmp_path / "forest-selected.svg"), ""),
-            (str(tmp_path / "regression-selected.png"), ""),
-        )
-    )
-    calls = []
-
-    def choose_path(parent, title, initial_path, file_filter):
-        calls.append((parent.plot_type, title, initial_path, file_filter))
-        return next(selections)
-
-    monkeypatch.setattr(
-        plot_editor_dialog.QFileDialog, "getSaveFileName", choose_path
-    )
-    for plot_type in ("forest", "regression"):
+    for plot_type, prefix in (("forest", "fp"), ("regression", "bp")):
         initial = str(tmp_path / f"{plot_type}-initial.svg")
-        prefix = "bp" if plot_type == "regression" else "fp"
         dialog = plot_editor_dialog.EditPlotDialog(
             {f"{prefix}_outpath": initial}, "", plot_type=plot_type
         )
-        applied = QtTest.QSignalSpy(dialog.applied)
         try:
-            dialog.show()
-            dialog.save_btn.setFocus()
-            qapp.processEvents()
-            assert dialog.save_btn.accessibleName() == "Browse save image path"
-            assert "file chooser" in dialog.save_btn.accessibleDescription().lower()
-            assert dialog.save_btn.toolTip() == "Browse for the plot image save path"
-            assert dialog.save_btn.focusPolicy() == QtCore.Qt.FocusPolicy.StrongFocus
-            assert dialog.save_btn.hasFocus()
-            key_click(dialog.save_btn, QtCore.Qt.Key.Key_Space)
-            qapp.processEvents()
-            assert dialog.image_path.text() == str(
-                tmp_path
-                / f"{plot_type}-selected.{'svg' if plot_type == 'forest' else 'png'}"
-            )
-            assert len(applied) == 0
-        finally:
-            _dispose(dialog, qapp)
-    assert [call[0] for call in calls] == ["forest", "regression"]
-    assert calls[0][1] == "Save Forest Plot Image"
-    assert calls[1][1] == "Save Regression Plot Image"
-    assert [call[2] for call in calls] == [
-        str(tmp_path / "forest-initial.svg"),
-        str(tmp_path / "regression-initial.svg"),
-    ]
-    assert all(
-        call[3] == plot_editor_dialog.PLOT_EDITOR_SAVE_FILTER for call in calls
-    )
-
-
-def test_plot_save_path_browser_cancellation_never_mutates_or_applies(
-    qapp, tmp_path, monkeypatch
-):
-
-    _use_isolated_settings(tmp_path)
-    monkeypatch.setattr(
-        plot_editor_dialog.QFileDialog,
-        "getSaveFileName",
-        lambda *_args, **_kwargs: ("", ""),
-    )
-    for plot_type in ("forest", "regression"):
-        initial = str(tmp_path / f"{plot_type}-initial.svg")
-        prefix = "bp" if plot_type == "regression" else "fp"
-        dialog = plot_editor_dialog.EditPlotDialog(
-            {f"{prefix}_outpath": initial}, "", plot_type=plot_type
-        )
-        applied = QtTest.QSignalSpy(dialog.applied)
-        try:
-            dialog.save_btn.click()
-            qapp.processEvents()
             assert dialog.image_path.text() == initial
-            assert len(applied) == 0
+            assert dialog.label_3.isHidden()
+            assert dialog.image_path.isHidden()
+            assert dialog.save_btn.isHidden()
+            assert dialog.plot_params()[f"{prefix}_outpath"] == initial
         finally:
             _dispose(dialog, qapp)
+
+
+def test_plot_editor_path_remains_available_to_internal_plot_parameters(qapp, tmp_path):
+    _use_isolated_settings(tmp_path)
+    initial = str(tmp_path / "forest-initial.svg")
+    dialog = plot_editor_dialog.EditPlotDialog({"fp_outpath": initial}, "")
+    try:
+        assert dialog.plot_params()["fp_outpath"] == initial
+    finally:
+        _dispose(dialog, qapp)
 
 
 @pytest.mark.parametrize(

@@ -36,6 +36,19 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
     )
 
 
+def test_native_evidence_records_absolute_scale_when_qt_uses_native_multiplier(
+    monkeypatch,
+):
+    from rc_metastudio import adaptive_layout_evidence
+
+    monkeypatch.setenv("QT_SCALE_FACTOR", "1.2")
+    monkeypatch.setenv("RCMS_ADAPTIVE_LAYOUT_SCALE", "1.5")
+    assert adaptive_layout_evidence._requested_scale_factor() == "1.5"
+
+    monkeypatch.delenv("RCMS_ADAPTIVE_LAYOUT_SCALE")
+    assert adaptive_layout_evidence._requested_scale_factor() == "1.2"
+
+
 def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
     from rc_metastudio import adaptive_layout_evidence
 
@@ -128,6 +141,127 @@ def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
 
     assert result.cacheKey() == painted.cacheKey()
     assert len(calls) == 3
+
+
+def test_native_frame_capture_targets_window_frame_not_desktop(
+    qapp, monkeypatch
+):
+    from rc_metastudio import adaptive_layout_evidence
+
+    painted = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
+    painted.fill(adaptive_layout_evidence.QtGui.QColor("white"))
+    painter = adaptive_layout_evidence.QtGui.QPainter(painted)
+    painter.fillRect(20, 20, 100, 40, adaptive_layout_evidence.QtGui.QColor("blue"))
+    painter.end()
+
+    class Handle:
+        def frameMargins(self):
+            return adaptive_layout_evidence.QtCore.QMargins(5, 7, 9, 11)
+
+    class Window:
+        def windowHandle(self):
+            return Handle()
+
+        def winId(self):
+            return 42
+
+        def frameGeometry(self):
+            return adaptive_layout_evidence.QtCore.QRect(100, 200, 140, 89)
+
+    class Screen:
+        def __init__(self):
+            self.arguments = None
+
+        def grabWindow(self, *arguments):
+            self.arguments = arguments
+            return painted
+
+    screen = Screen()
+    result = adaptive_layout_evidence._grab_native_frame(screen, Window())
+
+    assert result.cacheKey() == painted.cacheKey()
+    assert screen.arguments == (42, -5, -7, 140, 89)
+
+
+def test_native_frame_capture_fails_closed_on_persistent_blank_frame(
+    qapp, monkeypatch
+):
+    from rc_metastudio import adaptive_layout_evidence
+
+    blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
+    blank.fill(adaptive_layout_evidence.QtGui.QColor("black"))
+    calls = []
+
+    class Window:
+        def update(self):
+            pass
+
+        def repaint(self):
+            pass
+
+        def objectName(self):
+            return "MainWindow"
+
+        def windowTitle(self):
+            return "Main Window"
+
+    def grab(_screen, _window):
+        calls.append(True)
+        return blank
+
+    monkeypatch.setattr(adaptive_layout_evidence, "_grab_native_frame", grab)
+
+    with pytest.raises(RuntimeError, match="remained blank after 3"):
+        adaptive_layout_evidence._grab_painted_native_frame(
+            qapp, object(), Window(), attempts=3
+        )
+
+    assert len(calls) == 3
+
+
+def test_native_frame_requests_a_fresh_client_paint_before_each_native_grab(
+    qapp, monkeypatch
+):
+    from rc_metastudio import adaptive_layout_evidence
+
+    blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
+    blank.fill(adaptive_layout_evidence.QtGui.QColor("white"))
+    painted = adaptive_layout_evidence.QtGui.QPixmap(blank.size())
+    painted.fill(adaptive_layout_evidence.QtGui.QColor("white"))
+    painter = adaptive_layout_evidence.QtGui.QPainter(painted)
+    painter.fillRect(20, 20, 100, 40, adaptive_layout_evidence.QtGui.QColor("blue"))
+    painter.end()
+
+    class Window:
+        def __init__(self):
+            self.ready = False
+            self.events = []
+
+        def update(self):
+            self.events.append("update")
+
+        def repaint(self):
+            self.events.append("repaint")
+            self.ready = True
+
+        def objectName(self):
+            return "MainWindow"
+
+        def windowTitle(self):
+            return "Main Window"
+
+    window = Window()
+
+    def grab(_screen, _window):
+        window.events.append("grab")
+        return painted if window.ready else blank
+
+    monkeypatch.setattr(adaptive_layout_evidence, "_grab_native_frame", grab)
+
+    result = adaptive_layout_evidence._grab_painted_native_frame(qapp, object(), window)
+
+    assert result.cacheKey() == painted.cacheKey()
+    assert window.events == ["update", "repaint", "grab"]
 
 
 def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(

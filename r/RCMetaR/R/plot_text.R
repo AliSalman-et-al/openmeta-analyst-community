@@ -3,6 +3,14 @@
 
 rcmetar.plot.text.input.limit <- 80L
 
+rcmetar.is.plot.default.text <- function(value) {
+    if (is.null(value) || length(value) == 0L || is.na(value[[1L]])) {
+        return(TRUE)
+    }
+    tolower(trimws(as.character(value[[1L]]))) %in%
+        c("", "[default]", "<default>", "(default)", "default")
+}
+
 rcmetar.limit.plot.input.text <- function(value, limit=rcmetar.plot.text.input.limit) {
     if (is.null(value) || length(value) == 0 || is.na(value[[1]]) ||
             identical(value[[1]], "[default]")) {
@@ -28,6 +36,11 @@ rcmetar.truncate.plot.display.text <- function(value, limit=72L) {
 }
 
 rcmetar.normalize.plot.text.params <- function(params, limit=rcmetar.plot.text.input.limit) {
+    for (name in c("fp_xlabel", "bp_xlabel")) {
+        if (name %in% names(params) && rcmetar.is.plot.default.text(params[[name]])) {
+            params[[name]] <- NULL
+        }
+    }
     for (name in c("fp_col1_str", "fp_col2_str", "fp_col3_str", "fp_col4_str", "fp_xlabel")) {
         value <- params[[name]]
         if (!is.null(value) && length(value) > 0 && !is.na(value[[1]]) &&

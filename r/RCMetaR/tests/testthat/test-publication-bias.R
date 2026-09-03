@@ -1,3 +1,67 @@
+test_that("publication-bias display helpers emit trimmed, readable values", {
+  expect_identical(
+    vapply(c(0, 1.2, 10000, NA_real_), RCMetaR:::.small.study.number, character(1)),
+    c("0", "1.200", "10000", "Not available")
+  )
+  expect_identical(
+    vapply(c(0.015, 0.0004, NA_real_), RCMetaR:::.small.study.p.value, character(1)),
+    c("0.015", "< 0.001", "not available")
+  )
+  expect_identical(RCMetaR:::.small.study.exact.number(0.015), "0.015")
+  expect_identical(RCMetaR:::.small.study.integer(10), "10")
+  expect_identical(RCMetaR:::.small.study.text(NA_character_), "Not available")
+})
+
+test_that("publication-bias confidence level controls intervals and labels", {
+  expect_equal(RCMetaR:::.small.study.meta.level(90), .9)
+  expect_error(
+    RCMetaR:::.small.study.confidence.level(list(conf.level=numeric())),
+    "finite percentage"
+  )
+  expect_identical(RCMetaR:::.small.study.confidence.label(90, short=TRUE), "90% CI")
+  expect_identical(RCMetaR:::.small.study.confidence.label(90), "90% confidence interval")
+
+  test <- list(method="classical-egger", role="primary", usable.studies=10,
+               p.value=.2, statistic=1, coefficient=1, standard.error=.1,
+               df=9, intercept=1, se.intercept=.1,
+               model="multiplicative Egger regression")
+  rendered <- RCMetaR:::.small.study.tests.text(list(test), confidence.level=90)
+  expect_match(rendered, "90% CI", fixed=TRUE)
+  expect_false(grepl("95% CI", rendered, fixed=TRUE))
+  pooled <- list(TE.common=0.2, lower.common=-0.1, upper.common=.5,
+                 TE.random=.3, lower.random=-.2, upper.random=.8)
+  pooled.text <- RCMetaR:::.small.study.pooled.text(pooled, "MD", 90)
+  expect_match(pooled.text, "90% confidence interval", fixed=TRUE)
+  expect_false(grepl("95% confidence interval", pooled.text, fixed=TRUE))
+
+  extrapolated <- RCMetaR:::.small.study.extrapolation(
+    list(`classical-egger`=test), list(extrapolation=TRUE, conf.level=90), "MD"
+  )
+  expected.lower <- 1 - stats::qt(.95, 9) * .1
+  expect_match(extrapolated$Extrapolation, "90% CI", fixed=TRUE)
+  expect_match(extrapolated$Extrapolation, RCMetaR:::.small.study.number(expected.lower), fixed=TRUE)
+  expect_false(grepl("95% CI", extrapolated$Extrapolation, fixed=TRUE))
+})
+
+test_that("publication-bias text sections do not expose missing-value artifacts", {
+  test <- list(
+    method = "classical-egger", role = "primary", usable.studies = NA_real_,
+    p.value = NA_real_, statistic = NA_real_, coefficient = NA_real_,
+    model = "multiplicative Egger regression", package = "meta",
+    package.version = "8.5-0", predictor = "SE", weighting = "inverse variance",
+    inference = "t-based test", df = NA_real_, call = "meta::metabias(...)"
+  )
+  rendered <- paste(
+    RCMetaR:::.small.study.tests.text(list(test)),
+    RCMetaR:::.small.study.method.details(list(test)),
+    sep = "\n"
+  )
+  expect_match(rendered, "Studies: Not available", fixed = TRUE)
+  expect_match(rendered, "Exact p-value: Not available", fixed = TRUE)
+  expect_false(grepl("(^|[[:space:]])(NA|NaN|Inf|NULL)([[:space:]]|$)", rendered))
+  expect_false(grepl("\\[1\\]", rendered))
+})
+
 test_that("generic entered effects produce one ordered ordinary funnel result", {
   testthat::skip_if_not_installed("meta")
   testthat::skip_if_not_installed("metafor")
@@ -12,7 +76,7 @@ test_that("generic entered effects produce one ordered ordinary funnel result", 
   result <- rcmetar.run.small.study.effects(
     data,
     list(data.type="continuous", metric="MD", funnels="ordinary",
-         tests=character(), conf.level=95)
+         tests=character(), conf.level=90)
   )
 
   expect_equal(names(result)[1:6], c(
@@ -21,6 +85,7 @@ test_that("generic entered effects produce one ordered ordinary funnel result", 
   ))
   expect_match(result$Warning, "No single result proves or rules out publication bias")
   expect_match(result$`Data and eligibility`, "Studies analyzed: 4")
+  expect_match(result$`Pooled comparison`, "90% confidence interval", fixed=TRUE)
   expect_match(result$`Methods not applicable`, "Classical Egger test")
   expect_match(result$`Method details`, "No formal method details are available.")
   expect_equal(result$eligibility$`data.type`, "continuous")
@@ -304,6 +369,9 @@ test_that("generic guardrails expose hard minimum and automatic k guard", {
     tests=c("classical-egger"), conf.level=95))
   expect_false(hard$eligibility$methods[[1]]$available)
   expect_match(hard$eligibility$methods[[1]]$reason, "fewer than 3")
+  expect_match(hard$Warning, "No formal asymmetry test was run", fixed=TRUE)
+  expect_match(hard$Warning, "at least 3 usable studies", fixed=TRUE)
+  expect_match(hard$Warning, "2 usable studies were available", fixed=TRUE)
 
   disabled <- rcmetar.run.small.study.effects(make_data(4), list(
     data.type="continuous", metric="MD", funnels="ordinary",
@@ -311,8 +379,15 @@ test_that("generic guardrails expose hard minimum and automatic k guard", {
   expect_false(disabled$eligibility$methods[[1]]$available)
   expect_match(disabled$eligibility$methods[[1]]$reason, "below 10")
   expect_match(disabled$Failures, "below 10")
-  expect_length(disabled$eligibility$`precision.range`, 2)
-  expect_true(any(grepl("precision range", disabled$eligibility$warnings, ignore.case=TRUE)))
+  expect_match(disabled$Warning, "No formal asymmetry test was run", fixed=TRUE)
+  expect_match(disabled$Warning, "at least 10 usable studies", fixed=TRUE)
+  expect_match(disabled$Warning, "4 usable studies were available", fixed=TRUE)
+  expect_equal(sum(gregexpr("Observed standard-error range", disabled$Warning, fixed=TRUE)[[1L]] > 0), 1L)
+  expect_length(disabled$eligibility$`standard.error.range`, 2)
+  expect_true(any(grepl("standard-error range", disabled$eligibility$warnings, ignore.case=TRUE)))
+  expect_true(any(grepl("analysis summary", disabled$eligibility$warnings, ignore.case=TRUE)))
+  expect_match(disabled$`Data and eligibility`, "Observed standard-error range: \\[0\\.1, 0\\.13\\]", fixed=FALSE)
+  expect_match(disabled$Warning, "the exact range is reported in the analysis summary", fixed=TRUE)
 
   automatic <- rcmetar.run.small.study.effects(make_data(4), list(
     data.type="continuous", metric="MD", funnels="ordinary",
@@ -348,7 +423,9 @@ test_that("binary OR routes Harbord at low tau and Rucker AS+RE above the rule o
   expect_equal(low.result$eligibility$`package.versions`[["meta"]], "8.5-0")
   expect_true(low.result$eligibility$methods[[1]]$available)
   expect_identical(low.result$eligibility$methods[[1]]$role, "primary")
+  expect_true(low.result$eligibility$methods[[2]]$available)
   expect_identical(low.result$eligibility$methods[[2]]$role, "sensitivity")
+  expect_identical(low.result$eligibility$methods[[2]]$reason, "")
   expect_identical(low.result$tests.data$harbord$package, "meta")
   expect_match(low.result$tests.data$harbord$call, "method.bias='Harbord'")
   expect_false(grepl("correction.policy", low.result$tests.data$harbord$call, fixed=TRUE))
@@ -383,6 +460,7 @@ test_that("binary OR routes Harbord at low tau and Rucker AS+RE above the rule o
   expect_match(high.result$eligibility$methods[[1]]$reason, "above 0.1")
   expect_true(high.result$eligibility$methods[[2]]$available)
   expect_identical(high.result$eligibility$methods[[2]]$role, "primary")
+  expect_identical(high.result$eligibility$methods[[2]]$reason, "")
   expect_match(high.result$`Data and eligibility`, "Primary test: R\u00fccker AS+RE test", fixed=TRUE)
   expect_identical(high.result$tests.data$`rucker-as-re`$package, "meta")
   expect_match(high.result$tests.data$`rucker-as-re`$call, "sm='ASD'")

@@ -43,23 +43,22 @@ from rc_metastudio.analysis_method_labels import (
     parameter_value_display_label,
 )
 from rc_metastudio.plot_defaults import apply_default_forest_arm_labels
-from rc_metastudio.plot_text import apply_plot_text_input_limits
+from rc_metastudio.plot_text import (
+    apply_plot_text_input_limits,
+    plot_parameter_text_value,
+)
 from rc_metastudio.meta_globals import (
-    ANALYSIS_COUNT_MAX,
     ANALYSIS_DIGITS_MAX,
     ANALYSIS_DIGITS_MIN,
     ANALYSIS_NON_NEGATIVE_FLOAT_PARAMS,
-    ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS,
     ANALYSIS_NUMERIC_MAX,
     ANALYSIS_NUMERIC_MIN,
-    ANALYSIS_POSITIVE_INTEGER_PARAMS,
     CONFIDENCE_LEVEL_DISPLAY_MAX,
     CONTINUOUS,
     DIAGNOSTIC_METRIC_GROUPS,
     ONE_ARM_METRICS,
     check_plot_bound,
     seems_sane,
-    validate_analysis_count,
     validate_analysis_digits,
     validate_analysis_float,
     validate_confidence_level,
@@ -85,11 +84,10 @@ PLOT_STYLE_DEFAULT_COLORS = {
 }
 
 COUNT_BASED_DIAGNOSTIC_METHODS = {
-    "diagnostic.bivariate.ml",
-    "diagnostic.hsroc",
+    "diagnostic.reitsma",
 }
 
-SHARED_DIAGNOSTIC_PARAMS = ("conf.level", "digits", "adjust", "to")
+SHARED_DIAGNOSTIC_PARAMS = ("conf.level", "digits", "adjust", "correction.policy", "estimator")
 
 ParameterKind = Literal["enum", "float", "int", "string"]
 
@@ -217,6 +215,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         super(AnalysisSetupDialog, self).__init__(parent)
         self.setupUi(self)
+        self._hide_internal_plot_path_controls()
         self._layout_reflow_pending = False
         self._layout_reflow_timer = QtCore.QTimer(self)
         self._layout_reflow_timer.setSingleShot(True)
@@ -291,8 +290,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             ),
             "digits": _normalize_parameter_definition("digits", "int", 2, None),
             "adjust": _normalize_parameter_definition("adjust", "float", 0.5, None),
-            "to": _normalize_parameter_definition(
-                "to", ["only0", "all"], "only0", None
+            "correction.policy": _normalize_parameter_definition(
+                "correction.policy", ["Studies with any zero cell", "All studies if any zero exists", "None"], "All studies if any zero exists", None
+            ),
+            "estimator": _normalize_parameter_definition(
+                "estimator", ["REML", "ML"], "REML", None
             ),
         }
         self._shared_diagnostic_widgets = []
@@ -311,6 +313,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
+
+    def _hide_internal_plot_path_controls(self):
+        """Keep generated output paths out of the researcher-facing form."""
+        for widget in (self.label_3, self.image_path, self.save_btn):
+            widget.hide()
 
     def sizeHint(self):
         """Include the scroll body's content width in first-use negotiation."""
@@ -489,11 +496,17 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         )
 
         if selection.has_missing_values:
+            excluded = ", ".join(selection.excluded_study_names)
+            excluded_text = (
+                "\nThe following studies will be excluded: %s" % excluded
+                if excluded
+                else ""
+            )
             choice = QMessageBox.warning(
                 self,
                 "Missing Covariate Values",
                 "Some studies do not have values for the selected covariates. "
-                "Run the regression without those studies?",
+                "%s\nRun the regression without those studies?" % excluded_text,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if choice == QMessageBox.StandardButton.No:
@@ -501,20 +514,28 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         metric = self.model.current_effect
         if self.data_type == "diagnostic":
-            metric = (
-                "Sens"
-                if self.sensitivity_radio.isChecked()
-                else "Spec"
-                if self.specificity_radio.isChecked()
-                else "DOR"
-            )
+            if self.is_meta_regression:
+                # Reitsma is a joint raw-count model. Sensitivity is only the
+                # representative metric required by the typed request; both
+                # modeled sides are always returned.
+                metric = "Sens"
+            else:
+                metric = (
+                    "Sens"
+                    if self.sensitivity_radio.isChecked()
+                    else "Spec"
+                    if self.specificity_radio.isChecked()
+                    else "DOR"
+                )
         add_plot_params(self)
         parameters = copy.deepcopy(self.current_param_vals)
         parameters["measure"] = metric
+        if self.data_type == "diagnostic" and self.is_meta_regression:
+            parameters["joint.metrics"] = "Sens,Spec"
         request = analysis_adapter.make_analysis_request(
             data_type=self.data_type,
             workflow="meta-regression",
-            method="meta_regression",
+            method="diagnostic.reitsma" if self.data_type == "diagnostic" else "meta_regression",
             metric=metric,
             parameters=parameters,
         )
@@ -789,13 +810,13 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         # Preserve the method order returned by the backend.
         method_names = list(self.available_method_d.keys())
 
-        # Hide bivariate diagnostic methods when sensitivity and specificity
+        # Hide the joint Reitsma method when sensitivity and specificity
         # cannot both be estimated from the selected effects.
-        biv_ml_name = "Bivariate (Maximum Likelihood)"
+        reitsma_name = "Reitsma bivariate model"
         if self.data_type == "diagnostic" and not self.is_meta_regression:
-            for biv_method in (biv_ml_name, "HSROC"):
-                method_function = self.available_method_d.get(biv_method)
-                should_remove_bivariate_method = (
+            for reitsma_method in (reitsma_name,):
+                method_function = self.available_method_d.get(reitsma_method)
+                should_remove_reitsma_method = (
                     metric != "Sens"
                     or self.analysis_type is not None
                     or not (
@@ -807,8 +828,8 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                         and not self.model.included_studies_have_raw_data()
                     )
                 )
-                if biv_method in method_names and should_remove_bivariate_method:
-                    method_names.remove(biv_method)
+                if reitsma_method in method_names and should_remove_reitsma_method:
+                    method_names.remove(reitsma_method)
             # Fix for issue # 175
             if all(metric in self.diagnostic_metrics for metric in ("lr", "dor")):
                 peto_method = "Diagnostic Fixed-Effect Peto"
@@ -817,14 +838,14 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         method_names.sort(reverse=True)
 
-        # default to bivariate method for diagnostic
+        # default to Reitsma for joint diagnostic analysis
         if (
             self.data_type == "diagnostic"
             and not self.is_meta_regression
-            and biv_ml_name in method_names
+            and reitsma_name in method_names
         ):
-            method_names.remove(biv_ml_name)
-            method_names.insert(0, biv_ml_name)
+            method_names.remove(reitsma_name)
+            method_names.insert(0, reitsma_name)
 
         signals_were_blocked = cbo_box.blockSignals(True)
         try:
@@ -909,7 +930,12 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
     def _parameter_label(self, spec):
         label = QLabel(parameter_display_label(spec.name, spec.metadata))
-        label.setToolTip(parameter_description(spec.name, spec.metadata))
+        description = parameter_description(spec.name, spec.metadata)
+        if spec.name == "estimator" and description == "No description provided.":
+            description = (
+                "REML: restricted maximum likelihood; ML: maximum likelihood."
+            )
+        label.setToolTip(description)
         return label
 
     def _create_parameter_control(self, spec, target):
@@ -938,10 +964,6 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             control = QSpinBox()
             if spec.name == "digits":
                 control.setRange(ANALYSIS_DIGITS_MIN, ANALYSIS_DIGITS_MAX)
-            elif spec.name in ANALYSIS_POSITIVE_INTEGER_PARAMS:
-                control.setRange(1, ANALYSIS_COUNT_MAX)
-            elif spec.name in ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS:
-                control.setRange(0, ANALYSIS_COUNT_MAX)
             else:
                 control.setRange(-2147483648, 2147483647)
             control.setCorrectionMode(
@@ -952,9 +974,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                     validate_analysis_digits(spec.default)
                     if spec.name == "digits"
                     else (
-                        validate_analysis_count(spec.name, spec.default)
-                        if _is_count_analysis_param(spec.name)
-                        else _coerce_integer_default(spec.name, spec.default)
+                        _coerce_integer_default(spec.name, spec.default)
                     )
                 )
                 control.setValue(value)
@@ -1210,7 +1230,19 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         # Reflect the selected method in the dialog labels.
         window_title, method_label = "", ""
-        if self._combined_diagnostic:
+        if self.is_meta_regression:
+            # Diagnostic Reitsma meta-regression always models both sides.
+            # The legacy univariate effect radios would otherwise advertise a
+            # DOR request that still dispatches to the joint model.
+            self.diagnostic_regression_group.hide()
+            # Reitsma meta-regression estimates its joint random-effects model
+            # directly.  The legacy fixed/random-effects selector is not a
+            # parameter of this model and must not remain visible or imply
+            # that fixed effects can be requested.
+            self.regression_model_group.hide()
+            window_title = "Reitsma Meta-Regression"
+            method_label = "Reitsma bivariate model"
+        elif self._combined_diagnostic:
             window_title = "Method & Parameters"
             method_label = diagnostic_metric_group_display_label("sens_spec")
         elif self.sens_spec:
@@ -1224,6 +1256,13 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
         self.setWindowTitle(QtCore.QCoreApplication.translate("Dialog", window_title))
         self.method_lbl.setText(method_label)
+        if self.data_type == "diagnostic" and not self._combined_diagnostic:
+            # Keep the truthful diagnostic label visible without letting its
+            # preferred width starve the method selector on narrow screens.
+            self.method_lbl.setWordWrap(True)
+            self.method_lbl.setSizePolicy(
+                QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+            )
 
 
 def _dispose_progress(progress):
@@ -1239,12 +1278,6 @@ def _reset_r_working_dir_safely():
         pass
 
 
-def _is_count_analysis_param(name):
-    return name in (
-        ANALYSIS_POSITIVE_INTEGER_PARAMS | ANALYSIS_NON_NEGATIVE_INTEGER_PARAMS
-    )
-
-
 def _coerce_integer_default(name: str, value: object) -> int:
     """Convert a persisted integer default after validating its concrete type."""
     if not isinstance(value, (str, bytes, bytearray, int, float)):
@@ -1253,7 +1286,7 @@ def _coerce_integer_default(name: str, value: object) -> int:
 
 
 def _is_integer_analysis_param(name):
-    return name == "digits" or _is_count_analysis_param(name)
+    return name == "digits"
 
 
 def _display_svg_path(output_path):
@@ -1274,7 +1307,7 @@ def add_plot_params(specs_form):
                 ),
                 "bp_accent_color": _text_value(specs_form.accent_color),
                 "bp_point_size_multiplier": specs_form.point_size_multiplier.value(),
-                "bp_xlabel": _text_value(specs_form.x_lbl_le),
+                "bp_xlabel": _plot_axis_label_value(specs_form.x_lbl_le),
                 "bp_xticks": _validated_plot_ticks(specs_form.x_ticks_le),
                 "bp_plot_lb": _validated_plot_bound(specs_form.plot_lb_le),
                 "bp_plot_ub": _validated_plot_bound(specs_form.plot_ub_le),
@@ -1299,7 +1332,9 @@ def add_plot_params(specs_form):
     specs_form.current_param_vals["fp_col3_str"] = _text_value(specs_form.col3_str_edit)
     specs_form.current_param_vals["fp_show_col4"] = specs_form.show_4.isChecked()
     specs_form.current_param_vals["fp_col4_str"] = _text_value(specs_form.col4_str_edit)
-    specs_form.current_param_vals["fp_xlabel"] = _text_value(specs_form.x_lbl_le)
+    specs_form.current_param_vals["fp_xlabel"] = _plot_axis_label_value(
+        specs_form.x_lbl_le
+    )
     forest_outpath = _text_value(specs_form.image_path)
     specs_form.current_param_vals["fp_outpath"] = forest_outpath
     specs_form.current_param_vals["fp_display_path"] = _display_svg_path(forest_outpath)
@@ -1349,6 +1384,12 @@ def _validated_plot_ticks(widget):
     return value if value != "[default]" and seems_sane(value) else "[default]"
 
 
+def _plot_axis_label_value(widget):
+    """Return an axis label without leaking an untouched form placeholder."""
+    value = plot_parameter_text_value(widget)
+    return None if value is None else qt_text.to_native_text(value)
+
+
 def _normalized_plot_style(style):
     style = str(_scalar_plot_param(style) or "default").strip().lower()
     return style if style in PLOT_STYLE_LABELS else "default"
@@ -1379,12 +1420,24 @@ def _diagnostic_analysis_requests(specs_form):
     missing_metrics = []
 
     ordered_metrics = ["Sens", "Spec", "NLR", "PLR", "DOR"]
-    for diagnostic_metric in [
+    configured = [
         metric
         for metric in ordered_metrics
         if metric in specs_form.diagnostic_analysis_details
-    ]:
-        details = specs_form.diagnostic_analysis_details[diagnostic_metric]
+    ]
+    # Sensitivity and specificity are one Reitsma request.  The pair is a
+    # request-only joint metric and is never persisted as a project effect.
+    joint = None
+    if "Sens" in configured and "Spec" in configured:
+        sens_details = specs_form.diagnostic_analysis_details["Sens"]
+        spec_details = specs_form.diagnostic_analysis_details["Spec"]
+        if sens_details and spec_details and sens_details[0] == spec_details[0] == "diagnostic.reitsma":
+            joint = (sens_details[0], sens_details[1])
+            configured = [metric for metric in configured if metric not in ("Sens", "Spec")]
+
+    pending = [("Sens", joint)] if joint is not None else []
+    pending.extend((metric, specs_form.diagnostic_analysis_details[metric]) for metric in configured)
+    for diagnostic_metric, details in pending:
         if details is None:
             missing_metrics.append(diagnostic_metric)
             continue
@@ -1415,6 +1468,8 @@ def _diagnostic_analysis_requests(specs_form):
 
         # update the metric
         param_vals["measure"] = diagnostic_metric
+        if joint is not None and diagnostic_metric == "Sens":
+            param_vals["joint.metrics"] = "Sens,Spec"
 
         method_names.append(method)
         list_of_param_vals.append(param_vals)

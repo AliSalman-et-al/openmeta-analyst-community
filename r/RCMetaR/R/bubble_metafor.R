@@ -23,8 +23,7 @@ rcmetar.create.metafor.bubble.bundle <- function(
         cov.name=NULL,
         cov.values=NULL,
         fitted.line=NULL) {
-    if (!is.null(params$bp_xlabel) && length(params$bp_xlabel) > 0 &&
-            !is.na(params$bp_xlabel[[1]]) && !identical(params$bp_xlabel[[1]], "[default]")) {
+    if (!rcmetar.is.plot.default.text(params$bp_xlabel)) {
         params$bp_xlabel <- rcmetar.limit.plot.input.text(params$bp_xlabel)
     }
     if (is.null(cov.name)) {
@@ -38,8 +37,7 @@ rcmetar.create.metafor.bubble.bundle <- function(
     sei <- if (is(reg.data, "OMData")) reg.data@SE else sqrt(reg.data$vi)
     scale.str <- if (!is.null(params$measure)) get.scale(params) else g.get.scale(params$measure)
     xlabel <- as.character(cov.name)
-    if (!is.null(params$bp_xlabel) && length(params$bp_xlabel) > 0 &&
-            !is.na(params$bp_xlabel[1]) && !identical(params$bp_xlabel[1], "[default]") &&
+    if (!rcmetar.is.plot.default.text(params$bp_xlabel) &&
             nzchar(as.character(params$bp_xlabel[1]))) {
         xlabel <- as.character(params$bp_xlabel[1])
     }
@@ -271,6 +269,21 @@ rcmetar.bubble.compact.args <- function(args) {
     args[!vapply(args, is.null, logical(1))]
 }
 
+rcmetar.bubble.legend.labels <- function(bundle) {
+    level <- if (!is.null(bundle$params$conf.level) && length(bundle$params$conf.level)) {
+        suppressWarnings(as.numeric(bundle$params$conf.level[[1]]))
+    } else {
+        NA_real_
+    }
+    if (!length(level) || !is.finite(level) || level <= 0 || level >= 100) level <- 95
+    level <- trimws(formatC(level, format="fg", digits=4))
+    labels <- c("Studies", "Regression line", paste0(level, "% CI"))
+    if (rcmetar.bubble.param.is.true(bundle, "bp_show_prediction_interval", FALSE)) {
+        labels <- c(labels, paste0(level, "% PI"))
+    }
+    labels
+}
+
 rcmetar.bubble.draw.legend <- function(bundle, style.args) {
     if (!rcmetar.bubble.param.is.true(bundle, "bp_show_legend", FALSE)) {
         return(invisible(NULL))
@@ -279,14 +292,13 @@ rcmetar.bubble.draw.legend <- function(bundle, style.args) {
     x.span <- diff(usr[1:2])
     x <- usr[[2]] + 0.012 * x.span
     y <- usr[[4]]
-    labels <- c("Studies", "Regression line", "95% CI")
+    labels <- rcmetar.bubble.legend.labels(bundle)
     lty <- c(NA, "solid", style.args$lty[[2]])
     lwd <- c(NA, style.args$lwd, style.args$lwd)
     pch <- c(style.args$pch, NA, NA)
     col <- c(style.args$col, style.args$lcol, style.args$lcol)
     pt.bg <- c(style.args$bg, NA, NA)
     if (rcmetar.bubble.param.is.true(bundle, "bp_show_prediction_interval", FALSE)) {
-        labels <- c(labels, "95% PI")
         lty <- c(lty, style.args$lty[[3]])
         lwd <- c(lwd, style.args$lwd)
         pch <- c(pch, NA)

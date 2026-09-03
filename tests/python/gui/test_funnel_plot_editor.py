@@ -25,7 +25,9 @@ def _params(kind):
 
 
 def test_funnel_editor_preserves_statistical_params_and_updates_presentation(qapp):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     try:
         dialog.point_size_spin.setValue(2.0)
         dialog.point_color_edit.setText("#123456")
@@ -47,7 +49,9 @@ def test_funnel_editor_preserves_statistical_params_and_updates_presentation(qap
 def test_funnel_editor_supports_visual_presets_symbols_and_color_picker(
     qapp, monkeypatch
 ):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     monkeypatch.setattr(
         funnel_plot_editor_dialog.QColorDialog,
         "getColor",
@@ -71,13 +75,21 @@ def test_funnel_editor_supports_visual_presets_symbols_and_color_picker(
 
 
 def test_funnel_editor_disables_inapplicable_controls_by_kind(qapp):
-    contour = FunnelPlotEditorDialog(_params("contour"), "contour.png", plot_type="contour_funnel")
-    deeks = FunnelPlotEditorDialog(_params("deeks"), "deeks.png", plot_type="deeks_funnel")
-    trimfill = FunnelPlotEditorDialog(_params("trimfill"), "trimfill.png", plot_type="trimfill_funnel")
+    contour = FunnelPlotEditorDialog(
+        _params("contour"), "contour.png", plot_type="contour_funnel"
+    )
+    deeks = FunnelPlotEditorDialog(
+        _params("deeks"), "deeks.png", plot_type="deeks_funnel"
+    )
+    trimfill = FunnelPlotEditorDialog(
+        _params("trimfill"), "trimfill.png", plot_type="trimfill_funnel"
+    )
     try:
         assert contour.contour_levels_edit.isEnabled()
         assert not contour.sampling_region_check.isEnabled()
-        assert deeks.label_policy_combo.findText("Outside pseudo-confidence region") == -1
+        assert (
+            deeks.label_policy_combo.findText("Outside pseudo-confidence region") == -1
+        )
         assert not deeks.sampling_confidence_spin.isEnabled()
         assert deeks.regression_visible_check.isEnabled()
         assert trimfill.kind_label.text() == "Funnel kind: trimfill"
@@ -89,9 +101,7 @@ def test_funnel_editor_disables_inapplicable_controls_by_kind(qapp):
 
 def test_funnel_editor_rejects_kind_descriptor_mismatch(qapp):
     try:
-        FunnelPlotEditorDialog(
-            _params("trimfill"), "ordinary.png", plot_type="funnel"
-        )
+        FunnelPlotEditorDialog(_params("trimfill"), "ordinary.png", plot_type="funnel")
     except ValueError as error:
         assert "does not match" in str(error)
     else:
@@ -109,9 +119,7 @@ def test_funnel_editor_reads_persisted_second_plot_settings_by_index(qapp):
             "funnel.ylab": ["one", "two"],
         }
     )
-    dialog = FunnelPlotEditorDialog(
-        params, "contour.png", plot_type="contour_funnel"
-    )
+    dialog = FunnelPlotEditorDialog(params, "contour.png", plot_type="contour_funnel")
     try:
         assert dialog.point_size_spin.value() == 2.0
         assert dialog.label_policy_combo.currentText() == "All"
@@ -135,9 +143,13 @@ def test_funnel_editor_prefers_persisted_output_path_on_reopen(qapp, tmp_path):
 
 
 def test_funnel_editor_apply_then_ok_does_not_regenerate_twice(qapp):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     applied = []
-    dialog.applied.connect(lambda: (applied.append(True), dialog.mark_commit_succeeded()))
+    dialog.applied.connect(
+        lambda: (applied.append(True), dialog.mark_commit_succeeded())
+    )
     try:
         apply_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Apply)
         ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
@@ -153,9 +165,13 @@ def test_funnel_editor_apply_then_ok_does_not_regenerate_twice(qapp):
 
 
 def test_funnel_editor_ok_commits_new_change_and_closes(qapp):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     applied = []
-    dialog.applied.connect(lambda: (applied.append(True), dialog.mark_commit_succeeded()))
+    dialog.applied.connect(
+        lambda: (applied.append(True), dialog.mark_commit_succeeded())
+    )
     try:
         dialog.point_size_spin.setValue(2.0)
         ok_button = dialog.button_box.button(QDialogButtonBox.StandardButton.Ok)
@@ -168,7 +184,9 @@ def test_funnel_editor_ok_commits_new_change_and_closes(qapp):
 
 
 def test_funnel_editor_ok_commits_combo_only_change(qapp):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     applied = []
     dialog.applied.connect(
         lambda: (applied.append(dialog.plot_params()), dialog.mark_commit_succeeded())
@@ -186,7 +204,9 @@ def test_funnel_editor_ok_commits_combo_only_change(qapp):
 
 
 def test_funnel_editor_failed_commit_stays_dirty_and_open(qapp):
-    dialog = FunnelPlotEditorDialog(_params("ordinary"), "ordinary.png", plot_type="funnel")
+    dialog = FunnelPlotEditorDialog(
+        _params("ordinary"), "ordinary.png", plot_type="funnel"
+    )
     dialog.applied.connect(dialog.mark_commit_failed)
     try:
         dialog.point_size_spin.setValue(2.0)
@@ -210,7 +230,8 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     image_path = tmp_path / "funnel.png"
     image_path.write_bytes(b"old image")
     artifact = results_window.PlotArtifact(
-        "Ordinary Funnel Plot", str(image_path),
+        "Ordinary Funnel Plot",
+        str(image_path),
         {"plot_kind": "funnel", "regenerator": "funnel"},
         params_path=str(base),
     )
@@ -219,7 +240,9 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     regenerate_count = [0]
 
     def write_params(params, **kwargs):
-        Path(kwargs["outpath"]).write_text(repr(sorted(params.items())), encoding="utf-8")
+        Path(kwargs["outpath"]).write_text(
+            repr(sorted(params.items())), encoding="utf-8"
+        )
 
     def regenerate(_params_path, output_path=None):
         regenerate_count[0] += 1
@@ -240,7 +263,8 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     )
     dialog = FunnelPlotEditorDialog(
         {"funnel.kind": "ordinary", "funnel.point.size": 1.0},
-        str(image_path), plot_type="funnel",
+        str(image_path),
+        plot_type="funnel",
     )
     try:
         dialog.point_size_spin.setValue(2.0)
@@ -260,7 +284,8 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
 
 def test_funnel_editor_rejects_svgz_output_path(qapp):
     artifact = results_window.PlotArtifact(
-        "Ordinary Funnel Plot", "funnel.png",
+        "Ordinary Funnel Plot",
+        "funnel.png",
         {"plot_kind": "funnel", "regenerator": "funnel"},
         params_path="funnel",
     )

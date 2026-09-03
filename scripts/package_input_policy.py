@@ -60,6 +60,7 @@ PACKAGE_INPUT_PATTERNS = (
     "scripts/r_dependency_policy.py",
     "scripts/build_qt6.py",
     "scripts/verify_rcmetar_r_stack.py",
+    "scripts/verify_reitsma_visual_qa.R",
     "scripts/r_verification_support.py",
     "scripts/validate_rcmetar_r_manifests.py",
     "scripts/verify_golden_compatibility.py",

@@ -19,6 +19,7 @@ from rc_metastudio import meta_globals, r_backend
 
 r_backend.install_r_backend()
 from rc_metastudio import adaptive_window, app_error_handler, qt6_resources, settings
+
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
 
@@ -252,7 +253,6 @@ def start():
         return app.exec()
     finally:
         _dispose_new_top_levels(app, baseline_ids)
-
 
 
 def _create_interactive_shell(app, meta_factory, r_loader):

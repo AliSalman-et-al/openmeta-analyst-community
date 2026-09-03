@@ -443,12 +443,9 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "stderr": "",
         }
     ).encode()
-    hsroc_payload = b"fixture HSROC source archive"
     rcmetar_payload = b"fixture RCMetaR source archive"
     signing_payload = b'{"identity":"ad-hoc","phase":"signing"}\n'
     post_sign_payload = b'{"identity":"ad-hoc","phase":"post-final-outer-codesign"}\n'
-    hsroc_sha = hashlib.sha256(hsroc_payload).hexdigest()
-    inspector.DIRECT_R_HSROC_SHA256 = hsroc_sha
     payload_by_relative = {
         relative: (
             runner
@@ -463,8 +460,6 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             if label == "signing_inventory"
             else post_sign_payload
             if label == "post_sign_native_inventory"
-            else hsroc_payload
-            if label == "hsroc_source_archive"
             else rcmetar_payload
             if label == "rcmetar_source_archive"
             else f"evidence:{relative}\n".encode()
@@ -491,14 +486,6 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         "ppm_archives": ppm_archives,
         "rpy2_api_bridge_source_sha256": "b" * 64,
         "inputs": inputs,
-        "hsroc_source_exception": {
-            "name": "HSROC",
-            "version": "2.1.9",
-            "install_type": "source",
-            "url": inspector.DIRECT_R_HSROC_URL,
-            "sha256": hsroc_sha,
-            "archive": {"sha256": hsroc_sha, "size": len(hsroc_payload)},
-        },
         "rcmetar_source": {
             "name": "RCMetaR",
             "version": "0.2.0",
@@ -562,12 +549,12 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         ):
             inspector.validate_direct_build_manifest(manifest, target="macos-x64")
         manifest["ppm_archives"] = ppm_archives
-        manifest["hsroc_source_exception"]["archive"]["sha256"] = "0" * 64
+        manifest["rcmetar_source"]["archive"]["sha256"] = "0" * 64
         with pytest.raises(
-            inspector.MacOSDeploymentInspectionError, match="HSROC source provenance"
+            inspector.MacOSDeploymentInspectionError, match="RCMetaR source provenance"
         ):
             inspector.validate_direct_build_manifest(manifest, target="macos-x64")
-        manifest["hsroc_source_exception"]["archive"]["sha256"] = hsroc_sha
+        manifest["rcmetar_source"]["archive"]["sha256"] = hashlib.sha256(rcmetar_payload).hexdigest()
         adapter_payload = payload_by_relative[
             inspector.DIRECT_BUILD_INPUT_MEMBERS["adapter_script"]
         ]

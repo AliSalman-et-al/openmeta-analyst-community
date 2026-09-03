@@ -40,7 +40,7 @@ EXPECTED_VERSIONS = {
     "pyinstaller": "6.21.0",
 }
 EXPECTED_SUMMARY_SHA256 = (
-    "f83aafec6de6b2ba65e0fdc9def3c47e8deb9cb86ad6a990adf962e79b9d18b5"
+    "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0"
 )
 MAX_FILES = 25_000
 MAX_BYTES = 3_000_000_000
@@ -76,12 +76,6 @@ DIRECT_R_OFFICIAL_INPUTS = {
     },
 }
 DIRECT_R_PPM_SNAPSHOT = "https://packagemanager.posit.co/cran/2026-07-16"
-DIRECT_R_HSROC_URL = (
-    "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz"
-)
-DIRECT_R_HSROC_SHA256 = (
-    "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874"
-)
 DIRECT_BUILD_INPUT_MEMBERS = {
     "adapter_script": "qualification/embedded-r-adapter.py",
     "pre_normalization_audit": "qualification/direct-r-pre-normalization-audit.json",
@@ -95,7 +89,6 @@ DIRECT_BUILD_INPUT_MEMBERS = {
     "post_sign_native_inventory": "qualification/post-sign-native-inventory.json",
     "signing_inventory": "qualification/ad-hoc-signing-inventory.json",
     "ppm_archive_inventory": "qualification/ppm-archive-inventory.json",
-    "hsroc_source_archive": "qualification/HSROC_2.1.9.tar.gz",
     "rcmetar_source_archive": "qualification/RCMetaR-0.2.0-source.tar.gz",
     "r_runtime_profile": "qualification/embedded-r-runtime-profile.json",
     "runtime_probe": "qualification/runtime-probe.json",
@@ -1488,26 +1481,6 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
             raise MacOSDeploymentInspectionError(
                 "direct-build PPM archive lacks package, version, or authoritative URL"
             )
-    hsroc = payload.get("hsroc_source_exception")
-    if (
-        not isinstance(hsroc, dict)
-        or {
-            key: hsroc.get(key)
-            for key in ("name", "version", "install_type", "url", "sha256")
-        }
-        != {
-            "name": "HSROC",
-            "version": "2.1.9",
-            "install_type": "source",
-            "url": DIRECT_R_HSROC_URL,
-            "sha256": DIRECT_R_HSROC_SHA256,
-        }
-        or not isinstance(hsroc.get("archive"), dict)
-        or hsroc["archive"].get("sha256") != DIRECT_R_HSROC_SHA256
-    ):
-        raise MacOSDeploymentInspectionError(
-            "direct-build manifest has invalid HSROC source provenance"
-        )
     rcmetar = payload.get("rcmetar_source")
     if (
         not isinstance(rcmetar, dict)
@@ -1525,7 +1498,7 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has invalid RCMetaR source provenance"
         )
-    for source_archive in (hsroc["archive"], rcmetar["archive"]):
+    for source_archive in (rcmetar["archive"],):
         if (
             not valid_sha256(source_archive.get("sha256"))
             or not isinstance(source_archive.get("size"), int)
@@ -1535,10 +1508,7 @@ def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
             raise MacOSDeploymentInspectionError(
                 "direct-build manifest has an invalid source archive record"
             )
-    if (
-        hsroc["archive"] != inputs["hsroc_source_archive"]
-        or rcmetar["archive"] != inputs["rcmetar_source_archive"]
-    ):
+    if rcmetar["archive"] != inputs["rcmetar_source_archive"]:
         raise MacOSDeploymentInspectionError(
             "direct-build source archives differ from their embedded input records"
         )

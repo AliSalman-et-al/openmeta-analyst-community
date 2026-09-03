@@ -40,7 +40,7 @@ def test_eligibility_parser_requires_the_dotted_rcmetar_schema():
             "metric": "OR",
             "usable.studies": 4,
             "raw.data.available": True,
-            "precision.range": [0.1, 0.4],
+            "standard.error.range": [0.1, 0.4],
             "package.versions": {"meta": "8.5-0"},
             "warnings": [],
             "methods": [
@@ -71,7 +71,7 @@ def test_eligibility_parser_rejects_incomplete_wire_entries():
                 "metric": "MD",
                 "usable.studies": 4,
                 "raw.data.available": False,
-                "precision.range": [0.1, 0.4],
+                "standard.error.range": [0.1, 0.4],
                 "package.versions": {"meta": "8.5-0"},
                 "warnings": [],
                 "methods": [{"method": "classical-egger"}],
@@ -86,7 +86,7 @@ def test_eligibility_parser_normalizes_scalarized_single_method_mapping():
             "metric": "DOR",
             "usable.studies": 4,
             "raw.data.available": True,
-            "precision.range": [0.1, 0.4],
+            "standard.error.range": [0.1, 0.4],
             "package.versions": {"meta": "8.5-0"},
             "warnings": "one warning",
             "methods": {
@@ -176,9 +176,7 @@ def test_contour_plot_spec_serializes_presentation_controls_without_options_bag(
         (FunnelStyle.BMJ, 18, "#6B58A6"),
     ],
 )
-def test_funnel_style_variants_serialize_the_shared_visual_preset(
-    style, symbol, color
-):
+def test_funnel_style_variants_serialize_the_shared_visual_preset(style, symbol, color):
     wire = SmallStudyEffectsRequest.create(
         data_type="continuous", metric="MD", style=style
     ).to_mapping()
@@ -213,7 +211,10 @@ def test_publication_bias_action_is_exposed_for_the_release():
 def test_publication_bias_icons_are_funnel_plot_glyphs_without_warning_symbols():
     for relative_path, center in (
         ("src/rc_metastudio/images/icons/analyses/publication-bias.svg", "M24 7v35"),
-        ("src/rc_metastudio/images/icons/analyses/compact/publication-bias.svg", "M10 3v15"),
+        (
+            "src/rc_metastudio/images/icons/analyses/compact/publication-bias.svg",
+            "M10 3v15",
+        ),
     ):
         svg = (ROOT / relative_path).read_text(encoding="utf-8")
         assert center in svg

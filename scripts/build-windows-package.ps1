@@ -346,12 +346,16 @@ function Invoke-PackagedAdaptiveLayoutEvidence {
         QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG
+        RCMS_ADAPTIVE_LAYOUT_SCALE = $env:RCMS_ADAPTIVE_LAYOUT_SCALE
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
     }
     try {
         Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "API"
+        $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
+        $baselineDpr = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $baselineDpr) { throw "Could not read packaged baseline DPR for adaptive-layout evidence." }
         foreach ($scale in @(
             @{ Value = "1.0"; Directory = "scale-100" },
             @{ Value = "1.5"; Directory = "scale-150" }
@@ -359,7 +363,8 @@ function Invoke-PackagedAdaptiveLayoutEvidence {
             $outputDir = Join-Path $evidenceRoot $scale.Directory
             $logPath = Join-Path $outputDir "automation-adaptive-layout-evidence.log"
             New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-            $env:QT_SCALE_FACTOR = $scale.Value
+            $env:RCMS_ADAPTIVE_LAYOUT_SCALE = $scale.Value
+            $env:QT_SCALE_FACTOR = ([double]$scale.Value / [double]$baselineDpr).ToString("0.############", [Globalization.CultureInfo]::InvariantCulture)
             $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $logPath
             $quotedOutputDir = '"{0}"' -f $outputDir
             $quotedSamplePath = '"{0}"' -f $samplePath
@@ -494,7 +499,7 @@ function Copy-RRuntime {
 function Test-RDependencyPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','meta','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -604,7 +609,7 @@ function Invoke-StrictRDependencyPolicy {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('HSROC','meta','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -699,7 +704,7 @@ function Install-BundledRPackages {
 
     Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('HSROC','meta','RCMetaR','metafor','lme4','pdftools','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('HSROC')) != '2.1.9') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local RCMetaR install." }

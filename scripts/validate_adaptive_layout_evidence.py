@@ -121,7 +121,7 @@ def _validate_scenario_semantics(record: dict[str, Any]) -> tuple[int, int, int,
         _fail("%s is not a native-frame capture" % name)
     if (
         record.get("capture_method")
-        != "QScreen.grabWindow(desktop); physical frame crop"
+        != "QScreen.grabWindow(window); native frame capture"
     ):
         _fail("%s has an unexpected capture method" % name)
     probe = record.get("client_paint_probe_pixel_size")

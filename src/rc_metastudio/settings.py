@@ -822,7 +822,9 @@ def get_r_tmp_path(normalize=False):
     """Return the managed analysis scratch directory."""
     override_path = os.environ.get(ANALYSIS_SCRATCH_ENV_VAR)
     r_tmp_path = (
-        override_path if override_path else os.path.join(get_base_path(), "r_tmp")
+        override_path
+        if override_path
+        else os.path.join(get_base_path(), "r_tmp", "process-%s" % os.getpid())
     )
     if normalize:
         r_tmp_path = str(QDir.toNativeSeparators(r_tmp_path))

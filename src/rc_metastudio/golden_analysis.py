@@ -423,7 +423,7 @@ def curated_golden_bundles(root_dir=None):
             "id": "amino-binary-meta-regression",
             "dataset": "amino.rcms",
             "data_family": "binary",
-            "method": "meta_regression",
+            "method": "meta.regression",
             "metric": "OR",
             "parameters": binary_regression_params,
             "tolerances": DEFAULT_TOLERANCES,
@@ -431,7 +431,7 @@ def curated_golden_bundles(root_dir=None):
             "artifacts": {"Regression Plot": _analysis_output_path("reg.png")},
             "case": headless_analysis.HeadlessAnalysisCase(
                 sample("amino.rcms"),
-                None,
+                "meta.regression",
                 binary_regression_params,
                 metric="OR",
                 data_type=meta_globals.BINARY,
@@ -445,7 +445,7 @@ def curated_golden_bundles(root_dir=None):
             "id": "continuous-meta-regression",
             "dataset": "continuous.rcms",
             "data_family": "continuous",
-            "method": "meta_regression",
+            "method": "meta.regression",
             "metric": "SMD",
             "parameters": continuous_regression_params,
             "tolerances": DEFAULT_TOLERANCES,
@@ -453,7 +453,7 @@ def curated_golden_bundles(root_dir=None):
             "artifacts": {"Regression Plot": _analysis_output_path("reg.png")},
             "case": headless_analysis.HeadlessAnalysisCase(
                 sample("continuous.rcms"),
-                None,
+                "meta.regression",
                 continuous_regression_params,
                 metric="SMD",
                 data_type=meta_globals.CONTINUOUS,
@@ -983,7 +983,8 @@ def _parse_summary(text):
     values = {}
     number = r"(?:<\s*)?-?\d+(?:\.\d+)?"
     model = re.search(
-        r"Estimate\s+Lower bound\s+Upper bound.*?\n\s*(%s)\s+(%s)\s+(%s)\s+(?:%s\s+)?(%s)"
+        r"Estimate\s+Lower bound(?:\s+\([^)]*\))?\s+"
+        r"Upper bound(?:\s+\([^)]*\))?.*?\n\s*(%s)\s+(%s)\s+(%s)\s+(?:%s\s+)?(%s)"
         % (number, number, number, number, number),
         text,
         re.S,

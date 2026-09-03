@@ -49,3 +49,35 @@ test_that("normalized svglite defaults support compressed SVG artifacts", {
   line <- xml2::xml_find_first(document, "//*[local-name()='line']")
   expect_equal(xml2::xml_attr(line, "stroke"), "#000000")
 })
+
+test_that("SVG normalization removes XML 1.0-invalid control characters", {
+  svg.path <- tempfile(fileext = ".svg")
+  bytes <- c(
+    charToRaw("<svg xmlns='http://www.w3.org/2000/svg'><text>bad"),
+    as.raw(4),
+    charToRaw("&#x4;char</text></svg>")
+  )
+  writeBin(bytes, svg.path)
+
+  expect_silent(rcmetar.normalize.svglite.svg(svg.path))
+  normalized.bytes <- readBin(svg.path, what = "raw", n = file.info(svg.path)$size)
+  expect_false(any(as.integer(normalized.bytes) == 4L))
+  expect_silent(xml2::read_xml(svg.path))
+  expect_match(paste(readLines(svg.path, warn = FALSE), collapse = ""), "badchar", fixed = TRUE)
+})
+
+test_that("SVG normalization reads declared UTF-8 independently of the native locale", {
+  svg.path <- tempfile(fileext = ".svg")
+  svg <- paste0(
+    "<?xml version='1.0' encoding='UTF-8'?>",
+    "<svg xmlns='http://www.w3.org/2000/svg'><text>",
+    "Between-study τ² and I²",
+    "</text></svg>"
+  )
+  writeBin(charToRaw(enc2utf8(svg)), svg.path)
+
+  expect_silent(rcmetar.normalize.svglite.svg(svg.path))
+  document <- xml2::read_xml(svg.path)
+  expect_equal(xml2::xml_text(xml2::xml_find_first(document, "//*[local-name()='text']")),
+               "Between-study τ² and I²")
+})

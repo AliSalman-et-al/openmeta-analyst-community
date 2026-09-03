@@ -104,8 +104,8 @@ NULL
 #' Diagnostic test accuracy analysis functions
 #'
 #' Functions for diagnostic test accuracy meta-analysis. RCMetaR supports
-#' univariate fixed-effect and random-effects analyses, bivariate mixed models,
-#' HSROC analyses, SROC plotting, and predictive-value calculations.
+#' univariate fixed-effect and random-effects analyses, Reitsma bivariate
+#' models, SROC plotting, and predictive-value calculations.
 #'
 #' @section Analysis entry points:
 #' \describe{
@@ -113,8 +113,7 @@ NULL
 #'   \item{\code{diagnostic.fixed.mh()}}{Runs a fixed-effect Mantel-Haenszel diagnostic analysis.}
 #'   \item{\code{diagnostic.fixed.peto()}}{Runs a fixed-effect Peto diagnostic analysis.}
 #'   \item{\code{diagnostic.random()}}{Runs a random-effects diagnostic analysis.}
-#'   \item{\code{diagnostic.hsroc()}}{Runs the HSROC sampler-backed diagnostic workflow.}
-#'   \item{\code{diagnostic.bivariate.ml()}}{Runs the bivariate maximum-likelihood diagnostic workflow.}
+#'   \item{\code{diagnostic.reitsma()}}{Runs the mada 0.5.12 Reitsma bivariate diagnostic workflow.}
 #' }
 #'
 #' @section Study-level calculations:
@@ -128,8 +127,6 @@ NULL
 #' \code{append.image.order()} preserves plot ordering in result payloads.
 #'
 #' @section Plot and predictive-value helpers:
-#' \code{create.sroc.plot.data()},
-#' \code{plot.bivariate()}, \code{bivariate.dx.test()},
 #' \code{compute.ppv()}, \code{compute.npv()}, and
 #' \code{plot.ppv.npv.by.prev()} build diagnostic displays.
 #'
@@ -138,48 +135,11 @@ NULL
 #' \code{rcmetar.method.references("rma.uni.random")},
 #' \code{rcmetar.method.references("rma.mh")},
 #' \code{rcmetar.method.references("rma.peto")},
-#' \code{rcmetar.method.references("hsroc")}, and
-#' \code{rcmetar.method.references("diagnostic.bivariate")} for the
+#' \code{rcmetar.method.references("reitsma")} for the
 #' statistical method citations used in result payloads.
 #'
-#' @aliases adjust.raw.data append.image.order bivariate.dx.test compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv create.sroc.plot.data diagnostic.bivariate.ml diagnostic.bivariate.ml.is.feasible diagnostic.bivariate.ml.parameters diagnostic.bivariate.ml.pretty.names diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.hsroc diagnostic.hsroc.is.feasible diagnostic.hsroc.ml.is.feasible diagnostic.hsroc.parameters diagnostic.hsroc.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.bivariate plot.ppv.npv.by.prev
+#' @aliases adjust.raw.data append.image.order compute.diag.point.estimates compute.diagnostic.terms compute.npv compute.ppv diagnostic.fixed.inv.var diagnostic.fixed.inv.var.is.feasible diagnostic.fixed.inv.var.overall diagnostic.fixed.inv.var.parameters diagnostic.fixed.inv.var.pretty.names diagnostic.fixed.mh diagnostic.fixed.mh.is.feasible diagnostic.fixed.mh.overall diagnostic.fixed.mh.parameters diagnostic.fixed.mh.pretty.names diagnostic.fixed.peto diagnostic.fixed.peto.is.feasible diagnostic.fixed.peto.overall diagnostic.fixed.peto.parameters diagnostic.fixed.peto.pretty.names diagnostic.random diagnostic.random.is.feasible diagnostic.random.overall diagnostic.random.parameters diagnostic.random.pretty.names diagnostic.reitsma diagnostic.reitsma.is.feasible diagnostic.reitsma.meta.regression diagnostic.reitsma.parameters diagnostic.reitsma.pretty.names diagnostic.transform.f get.res.for.one.diag.study multiple.diagnostic plot.ppv.npv.by.prev
 #' @name RCMetaR-diagnostic-methods
-NULL
-
-#' HSROC recovery, validation, and display helpers
-#'
-#' Support functions used by \code{diagnostic.hsroc()} to run the HSROC sampler,
-#' validate generated chain files, recover from nonconverged runs, repair summary
-#' intervals, and convert generated PDF plots into displayable images.
-#'
-#' @section Sampler output:
-#' \code{hsroc.required.chain.files()} lists expected sampler output files.
-#' \code{hsroc.read.chain.samples()} reads binary or text sampler output.
-#' \code{hsroc.chain.validation.error()} returns a human-readable validation
-#' message or \code{NULL}. \code{run.hsroc.with.recovery()} retries failed or
-#' invalid sampler runs in a retry directory.
-#'
-#' @section Summary repair:
-#' \code{hsroc.retained.iterations()} computes retained iterations after
-#' burn-in and thinning. \code{hsroc.retained.chain.samples()} extracts retained
-#' samples across chain directories. \code{hsroc.hpd.interval()} computes HPD
-#' intervals when \pkg{coda} is available and falls back to quantile intervals.
-#' \code{hsroc.repair.summary()} and
-#' \code{hsroc.validate.summary.intervals()} repair and validate HSROC summary
-#' tables before they are returned to the caller.
-#'
-#' @section Plot paths:
-#' \code{hsroc.rasterize.pdf()}, \code{hsroc.display.image.path()},
-#' \code{hsroc.path.in.out.dir()}, \code{hsroc.stock.pdf.plots()},
-#' \code{hsroc.display.images()}, and \code{hsroc.summary.path.argument()}
-#' handle file paths and plot conversions for the UI.
-#'
-#' @section References:
-#' See \code{rcmetar.method.references("hsroc")} for the HSROC statistical
-#' method citations used in result payloads.
-#'
-#' @aliases hsroc.chain.validation.error hsroc.display.image.path hsroc.display.images hsroc.hpd.interval hsroc.nonconverged.try.error hsroc.path.in.out.dir hsroc.rasterize.pdf hsroc.read.chain.samples hsroc.repair.summary hsroc.required.chain.files hsroc.retained.chain.samples hsroc.retained.iterations hsroc.retry.out.dir hsroc.stock.pdf.plots hsroc.summary.path.argument hsroc.validate.summary.intervals run.hsroc.with.recovery
-#' @name RCMetaR-hsroc-helpers
 NULL
 
 #' Sequential, subgroup, leave-one-out, and bootstrap analyses

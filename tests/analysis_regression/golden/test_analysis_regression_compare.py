@@ -795,6 +795,37 @@ Heterogeneity
     }
 
 
+def test_golden_summary_parser_reads_researcher_facing_confidence_headers():
+    with _import_legacy_golden_modules() as (golden_analysis, _, _):
+        parsed = golden_analysis._parse_summary(
+            """Continuous Random-Effects Model
+
+Metric: Standardized Mean Difference
+
+Model Results
+ Estimate  Lower bound (95% CI)  Upper bound (95% CI)  Std. error  p-value
+ 0.358                    0.152                 0.565       0.105  < 0.001
+
+Heterogeneity
+ t²     Q(df=5)  Het. p-value     I²
+ 0.037   11.914         0.036  58.0%
+"""
+        )
+
+    assert parsed == {
+        "estimate": 0.358,
+        "lower_bound": 0.152,
+        "upper_bound": 0.565,
+        "standard_error": 0.105,
+        "p_value": 0.001,
+        "tau_squared": 0.037,
+        "q": 11.914,
+        "heterogeneity_df": 5.0,
+        "heterogeneity_p_value": 0.036,
+        "i_squared": 58.0,
+    }
+
+
 def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
     with _import_legacy_golden_modules() as (golden_analysis, _, _):
         plot = tmp_path / "forest.png"
@@ -1023,7 +1054,7 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
         ]
         case = headless_analysis.HeadlessAnalysisCase(
             str(tmp_path / "diagnostic.rcms"),
-            ["diagnostic.random", "diagnostic.bivariate.ml"],
+            ["diagnostic.random", "diagnostic.reitsma"],
             parameters,
             metric="Sens",
             data_type=meta_globals.DIAGNOSTIC,
@@ -1033,7 +1064,7 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
 
         assert backend.runs == [
             (
-                ["diagnostic.random", "diagnostic.bivariate.ml"],
+                ["diagnostic.random", "diagnostic.reitsma"],
                 [
                     {"measure": "Sens", "conf.level": 95.0},
                     {"measure": "Sens", "conf.level": 90.0},

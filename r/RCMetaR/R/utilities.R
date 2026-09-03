@@ -177,14 +177,13 @@ rcmetar.method.references <- function(method) {
       "Bootstrap confidence intervals: DiCiccio, T. J., & Efron, B. (1996). Bootstrap confidence intervals. Statistical Science, 11(3), 189-228.",
       "Bootstrap methods: Efron, B., & Tibshirani, R. (1993). An Introduction to the Bootstrap. Chapman & Hall."
     ),
-    "hsroc"=c(
-      "HSROC model: Rutter, C. M., & Gatsonis, C. A. (2001). A hierarchical regression approach to meta-analysis of diagnostic accuracy evaluations. Statistics in Medicine, 20(19), 2865-2884.",
-      "HSROC without a gold standard: Dendukuri, N., Schiller, I., Joseph, L., & Pai, M. (2012). Bayesian meta-analysis of the accuracy of a test for tuberculosis pleuritis in the absence of a gold-standard reference. Biometrics. doi:10.1111/j.1541-0420.2012.01773.x"
-    ),
-    "diagnostic.bivariate"=c(
+    "reitsma"=c(
       "Bivariate diagnostic meta-analysis: Reitsma, J. B., Glas, A. S., Rutjes, A. W., Scholten, R. J., Bossuyt, P. M., & Zwinderman, A. H. (2005). Bivariate analysis of sensitivity and specificity produces informative summary measures in diagnostic reviews. Journal of Clinical Epidemiology, 58(10), 982-990.",
       "Diagnostic accuracy model unification: Harbord, R. M., Deeks, J. J., Egger, M., Whiting, P., & Sterne, J. A. (2006). A unification of models for meta-analysis of diagnostic accuracy studies. Biostatistics, 8(2), 239-251.",
-      "Fitting engine reference: Bates, D., Maechler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. Journal of Statistical Software, 67(1), 1-48. doi:10.18637/jss.v067.i01."
+      "Statistical implementation: Doebler, P. (2025). mada: Meta-Analysis of Diagnostic Accuracy, version 0.5.12."
+    ),
+    "rutter.gatsonis"=c(
+      "Equivalent SROC parameterization: Rutter, C. M., & Gatsonis, C. A. (2001). A hierarchical regression approach to meta-analysis of diagnostic accuracy evaluations. Statistics in Medicine, 20(19), 2865-2884."
     )
   )
 
@@ -371,18 +370,36 @@ format.p.value.display <- function(value, digits) {
   formatted
 }
 
+display.confidence.level <- function(params=NULL) {
+  level <- if (!is.null(params) && !is.null(params$conf.level) && length(params$conf.level)) {
+    suppressWarnings(as.numeric(params$conf.level[[1]]))
+  } else {
+    NA_real_
+  }
+  if (!length(level) || !is.finite(level) || level <= 0 || level >= 100) 95 else level
+}
+
+display.confidence.interval.labels <- function(params=NULL) {
+  level <- trimws(formatC(display.confidence.level(params), format="fg", digits=4))
+  c(paste0("Lower bound (", level, "% CI)"), paste0("Upper bound (", level, "% CI)"))
+}
+
 g.round.display.zval <- function(x, digits) {
   if (display.value.is.missing(x)) {
     return("")
   }
   digits.str <- paste("%.", digits, "f", sep="")
-  x.disp <- c()
+  x.disp <- round.display(x, digits)
 
-  x.disp[x < 0 && abs(x) < 10^(-digits)] <- paste(">","-",10^(-digits)," & <0",sep="")
-  x.disp[x < 0 && abs(x) >= 10^(-digits)] <- sprintf(digits.str, x[x < 0 && abs(x)>=10^(-digits)])
+  negative.small <- is.finite(x) & x < 0 & abs(x) < 10^(-digits)
+  negative <- is.finite(x) & x < 0 & abs(x) >= 10^(-digits)
+  x.disp[negative.small] <- paste(">","-",10^(-digits)," & <0",sep="")
+  x.disp[negative] <- sprintf(digits.str, x[negative])
 
-  x.disp[x>0 && x < 10^(-digits)] <- paste("< ", 10^(-digits), sep="")
-  x.disp[x>0 && x >= 10^(-digits)] <- sprintf(digits.str, x[x>0 && x>=10^(-digits)])
+  positive.small <- is.finite(x) & x > 0 & x < 10^(-digits)
+  positive <- is.finite(x) & x > 0 & x >= 10^(-digits)
+  x.disp[positive.small] <- paste("< ", 10^(-digits), sep="")
+  x.disp[positive] <- sprintf(digits.str, x[positive])
   x.disp
 }
 
@@ -427,7 +444,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
   het.title <- "Heterogeneity"
 
   if (scale.str == "log" || scale.str == "logit" || scale.str == "arcsine") {
-    res.col.labels <- c("Estimate", "Lower bound", "Upper bound","p-value")
+    res.col.labels <- c("Estimate", display.confidence.interval.labels(params), "p-value")
     res.col.vals <- c(y.disp, lb.disp, ub.disp, pVal)
     res.array <- rbind(res.col.labels, res.col.vals)
     estCalc <- sprintf(digits.str, res$b)
@@ -445,7 +462,7 @@ create.summary.disp <- function(om.data, params, res, model.title) {
     table.titles <- c(res.title, het.title)
     notes <- c(calc.note)
   } else {
-    col.labels <- c("Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
+    col.labels <- c("Estimate", display.confidence.interval.labels(params), "Std. error", "p-value")
     col.vals <- c(y.disp, lb.disp, ub.disp, se, pVal)
     res.array <- rbind(col.labels, col.vals)
     arrays = list(arr1=res.array, arr2=het.array)
@@ -593,22 +610,23 @@ create.regression.display <- function(res, params, display.data) {
   digits.str <- paste("%.", result.digits, "f", sep="")
   inference.method <- rcmetar.inference.method(params)
   t.inference <- inference.method %in% c("t", "knha", "adhoc")
+  ci.labels <- display.confidence.interval.labels(params)
 
   if (n.factor.covs == 0) {
     col.labels <- if (bootstrap.type == "boot.meta.reg") {
-      c("Covariate", "Estimate", "Lower bound", "Upper bound")
+      c("Covariate", "Estimate", ci.labels)
     } else if (t.inference) {
-      c("Covariate", "Estimate", "Lower bound", "Upper bound", "Std. error", "t", "df", "p-value")
+      c("Covariate", "Estimate", ci.labels, "Std. error", "t", "df", "p-value")
     } else {
-      c("Covariate", "Estimate", "Lower bound", "Upper bound", "Std. error", "z", "p-value")
+      c("Covariate", "Estimate", ci.labels, "Std. error", "z", "p-value")
     }
   } else {
     col.labels <- if (bootstrap.type == "boot.meta.reg") {
-      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound")
+      c("Covariate", "Level", "Studies", "Estimate", ci.labels)
     } else if (t.inference) {
-      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "t", "df", "p-value")
+      c("Covariate", "Level", "Studies", "Estimate", ci.labels, "Std. error", "t", "df", "p-value")
     } else {
-      c("Covariate", "Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "z", "p-value")
+      c("Covariate", "Level", "Studies", "Estimate", ci.labels, "Std. error", "z", "p-value")
     }
   }
 
@@ -670,8 +688,8 @@ create.regression.display <- function(res, params, display.data) {
 
   reg.array[2:n.rows, "Covariate"] <- cov.display.col
   reg.array[2:n.rows, "Estimate"] <- coeffs.tmp
-  reg.array[2:n.rows, "Lower bound"] <- lbs.tmp
-  reg.array[2:n.rows, "Upper bound"] <- ubs.tmp
+  reg.array[2:n.rows, ci.labels[[1]]] <- lbs.tmp
+  reg.array[2:n.rows, ci.labels[[2]]] <- ubs.tmp
   if (bootstrap.type != "boot.meta.reg") {
     reg.array[2:n.rows, "Std. error"] <- se.tmp
     reg.array[2:n.rows, if (t.inference) "t" else "z"] <- statistics.tmp
@@ -850,11 +868,12 @@ adjusted_means_display <- function(res, params, display.data) {
   ci.lb.disp <- display.scale(ci.lb, params$measure)
   ci.ub.disp <- display.scale(ci.ub, params$measure)
 
+  ci.labels <- display.confidence.interval.labels(params)
   adj.array <- array(
     dim=c(n.levels + 1, 6),
-    dimnames=list(NULL, c("Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error"))
+    dimnames=list(NULL, c("Level", "Studies", "Estimate", ci.labels, "Std. error"))
   )
-  adj.array[1,] <- c("Level", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error")
+  adj.array[1,] <- c("Level", "Studies", "Estimate", ci.labels, "Std. error")
   level.start <- display.data$n.cont.covs + 2
   level.end <- level.start + n.levels - 1
   if (length(levels.display.col) < level.end || length(studies.display.col) < level.end) {
@@ -863,8 +882,8 @@ adjusted_means_display <- function(res, params, display.data) {
   adj.array[2:(n.levels + 1), "Level"] <- levels.display.col[level.start:level.end]
   adj.array[2:(n.levels + 1), "Studies"] <- studies.display.col[level.start:level.end]
   adj.array[2:(n.levels + 1), "Estimate"] <- sprintf(digits.str, estimates.disp)
-  adj.array[2:(n.levels + 1), "Lower bound"] <- sprintf(digits.str, ci.lb.disp)
-  adj.array[2:(n.levels + 1), "Upper bound"] <- sprintf(digits.str, ci.ub.disp)
+  adj.array[2:(n.levels + 1), ci.labels[[1]]] <- sprintf(digits.str, ci.lb.disp)
+  adj.array[2:(n.levels + 1), ci.labels[[2]]] <- sprintf(digits.str, ci.ub.disp)
   adj.array[2:(n.levels + 1), "Std. error"] <- sprintf(se.digits.str, se)
 
   metric.name <- pretty.metric.name(as.character(params$measure))
@@ -890,7 +909,7 @@ create.overall.display <- function(res, study.names, params, model.title, data.t
   scale.str <- get.scale(params)
   overall.array <- array(dim=c(length(study.names) + 1, 6))
 
-  overall.array[1,] <- c("Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value")
+  overall.array[1,] <- c("Studies", "Estimate", display.confidence.interval.labels(params), "Std. error", "p-value")
 
   for (count in 1:length(res)) {
     y <- res[[count]]$b
@@ -935,7 +954,7 @@ create.subgroup.display <- function(res, study.names, params, model.title, data.
 
   n <- length(study.names)
 
-  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", "Lower bound", "Upper bound", "Std. error", "p-value", "z-value")
+  subgroup.array[1,] <- c("Subgroups", "Studies", "Estimate", display.confidence.interval.labels(params), "Std. error", "p-value", "z-value")
   het.array[1,] <- c("Studies", "Q (df)",
                "Het. p-value", "I\u00b2")
   for (count in 1:length(study.names)) {

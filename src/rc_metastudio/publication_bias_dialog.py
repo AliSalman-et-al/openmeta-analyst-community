@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QSizePolicy
 
 from rc_metastudio import adaptive_window, app_error_handler, r_bridge
 from rc_metastudio.meta_globals import ALL_METRIC_NAMES, ONE_ARM_METRICS
@@ -42,18 +42,32 @@ _TEST_LABELS = {
     "deeks": "Deeks",
 }
 
+# Publication-bias method names and eligibility explanations are researcher-
+# facing prose.  Keep enough logical width for those labels at high DPI while
+# allowing the adaptive-window policy to clamp the preferred size to a small
+# screen.
+PUBLICATION_BIAS_MIN_WIDTH = 560
+PUBLICATION_BIAS_PREFERRED_WIDTH = 700
 
-class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog):
+
+class PublicationBiasDialog(
+    QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog
+):
     """Configure methods and plots while RCMetaR chooses eligible tests."""
 
     def __init__(self, model, parent=None):
         super().__init__(parent)
         self.model = model
         self.setupUi(self)
+        self._configure_scroll_surfaces()
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setModal(True)
-        self.correction_policy_combo.addItems([policy.value for policy in CorrectionPolicy])
-        self.trim_fill_estimator_combo.addItems([item.value for item in TrimAndFillEstimator])
+        self.correction_policy_combo.addItems(
+            [policy.value for policy in CorrectionPolicy]
+        )
+        self.trim_fill_estimator_combo.addItems(
+            [item.value for item in TrimAndFillEstimator]
+        )
         self.trim_fill_side_combo.addItems([item.value for item in TrimAndFillSide])
         self.trim_fill_model_combo.addItems([item.value for item in TrimAndFillModel])
         confidence_level = getattr(self.model, "get_confidence_level", lambda: 95.0)()
@@ -85,14 +99,42 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         self.button_box.accepted.connect(
             app_error_handler.safe_slot(self.run, parent=self)
         )
-        adaptive_window.register_adaptive_window(
+        self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
+        # Install the readable-width contract after registration.  The shared
+        # helper also changes the layout constraint to preserve this explicit
+        # minimum across native QDialog's show-time adjustSize pass.
+        adaptive_window.set_content_preferred_width(
+            self,
+            PUBLICATION_BIAS_MIN_WIDTH,
+            PUBLICATION_BIAS_PREFERRED_WIDTH,
+        )
+        self._layout_controller.request_content_refit()
+
+    def _configure_scroll_surfaces(self):
+        """Keep form content readable without a second horizontal viewport."""
+        for scroll_area, content in (
+            (self.methods_scroll, self.methods_scroll_content),
+            (self.plots_scroll, self.plots_scroll_content),
+        ):
+            scroll_area.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            scroll_area.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
+            scroll_area.setWidgetResizable(True)
+            content.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+            )
 
     def _preview_request(self) -> SmallStudyEffectsRequest:
         data_type = str(self.model.get_current_outcome_type())
         metric = "DOR" if data_type == "diagnostic" else str(self.model.current_effect)
-        correction_applicable = data_type in {"binary", "diagnostic"} and metric not in ONE_ARM_METRICS
+        correction_applicable = (
+            data_type in {"binary", "diagnostic"} and metric not in ONE_ARM_METRICS
+        )
         return SmallStudyEffectsRequest.create(
             data_type=data_type,
             metric=metric,
@@ -204,10 +246,14 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         raw_data_available = bool(
             self._eligibility_report and self._eligibility_report.raw_data_available
         )
-        correction_applicable = str(self.model.get_current_outcome_type()) in {
-            "binary",
-            "diagnostic",
-        } and metric not in ONE_ARM_METRICS
+        correction_applicable = (
+            str(self.model.get_current_outcome_type())
+            in {
+                "binary",
+                "diagnostic",
+            }
+            and metric not in ONE_ARM_METRICS
+        )
         correction_enabled = correction_applicable and raw_data_available
         self.correction_policy_combo.setEnabled(correction_enabled)
         self.correction_group.setVisible(correction_enabled)
@@ -227,7 +273,9 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         metric = "DOR" if data_type == "diagnostic" else str(self.model.current_effect)
         selected_tests = [
             item.method
-            for item in (self._eligibility_report.methods if self._eligibility_report else ())
+            for item in (
+                self._eligibility_report.methods if self._eligibility_report else ()
+            )
             if item.available
         ]
         labels = {
@@ -251,7 +299,9 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
             selected_tests=selected_tests,
             selected_funnels=funnels,
             label_policy=labels[self.label_policy_combo.currentText()],
-            sampling_confidence_level=float(self.sampling_confidence_combo.currentText()),
+            sampling_confidence_level=float(
+                self.sampling_confidence_combo.currentText()
+            ),
             include_tau2=self.include_tau2_check.isChecked(),
             point_size=float(self.point_size_spin.value()),
             reference_line_visible=self.reference_line_check.isChecked(),
@@ -289,6 +339,8 @@ class PublicationBiasDialog(QDialog, _ui_publication_bias_dialog.Ui_PublicationB
         except Exception as error:  # noqa: BLE001 - Qt boundary remains recoverable
             self.failure_label.setText(str(error))
             self.failure_label.setVisible(True)
-            app_error_handler.handle_exception(type(error), error, error.__traceback__, parent=self)
+            app_error_handler.handle_exception(
+                type(error), error, error.__traceback__, parent=self
+            )
             if run_button is not None:
                 run_button.setEnabled(True)

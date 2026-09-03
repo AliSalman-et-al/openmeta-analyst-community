@@ -218,6 +218,25 @@ def test_content_refit_requests_are_local_and_coalesced(qapp):
     assert len(refits) == 1
 
 
+def test_content_refit_preserves_explicit_minimum_size_contract(qapp):
+    from rc_metastudio import adaptive_window
+
+    dialog = _dialog_with_content("Short")
+    controller = adaptive_window.register_adaptive_window(
+        dialog,
+        adaptive_window.WindowRole.TRANSACTIONAL,
+        available_geometry_provider=lambda _window: QtCore.QRect(0, 0, 800, 600),
+    )
+    try:
+        dialog.setMinimumWidth(560)
+        controller.request_content_refit()
+        qapp.processEvents()
+
+        assert dialog.width() >= 560
+    finally:
+        dialog.close()
+
+
 def test_visible_transactional_content_refit_preserves_placement(qapp):
     from rc_metastudio import adaptive_window
 

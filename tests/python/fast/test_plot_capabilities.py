@@ -107,6 +107,8 @@ def test_option_groups_are_keyed_by_explicit_plot_kind():
     assert "columns" not in plot_capabilities.option_groups("subgroup_forest")
     assert "regression" in plot_capabilities.option_groups("regression")
     assert "funnel" in plot_capabilities.option_groups("trimfill_funnel")
+    assert "axis" in plot_capabilities.option_groups("reitsma_coefficient")
+    assert "columns" not in plot_capabilities.option_groups("reitsma_coefficient")
 
 
 def test_regenerator_is_resolved_from_a_safe_registry():

@@ -198,7 +198,10 @@ record(
     workflow = "subgroup"
   )
 )
-record("diagnostic meta-regression factor covariate", rcmetar.run.analysis(multi_fixture$data, list(method = "meta.regression", params = base_params("Sens"), workflow = "meta-regression")))
+diagnostic_meta_regression_params <- base_params("Sens")
+diagnostic_meta_regression_params$cov_name <- "quality"
+diagnostic_meta_regression_params$estimator <- "REML"
+record("diagnostic meta-regression factor covariate", rcmetar.run.analysis(multi_fixture$data, list(method = "diagnostic.reitsma", params = diagnostic_meta_regression_params, workflow = "meta-regression")))
 
 cat("\nSUMMARY\n")
 cat("Passed:", length(passes), "\n")

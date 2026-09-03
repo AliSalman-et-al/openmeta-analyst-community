@@ -6,6 +6,8 @@ RC MetaStudio is an open-source desktop application for performing and reviewing
 
 It supports standard, cumulative, leave-one-out, subgroup, meta-regression, and diagnostic analyses. You can inspect results, create forest and bubble plots, export plots as PDF, PNG, SVG, or TIFF, and save your work in an `.rcms` project.
 
+Diagnostic analyses retain univariate sensitivity, specificity, likelihood-ratio, and diagnostic-odds-ratio methods. Count-based joint sensitivity/specificity analyses use the `mada` 0.5.12 Reitsma bivariate model, with editable and exportable SROC confidence/prediction geometry. Additive continuous and categorical diagnostic meta-regression reports separate sensitivity and specificity coefficient plots.
+
 ## Small-study effects analysis
 
 Choose **Publication Bias** after at least two included studies to open the guided small-study effects analysis. “Publication Bias” is the navigation label; the analysis reports associations between study size or precision and observed effects and does not provide a bias-present or bias-absent verdict. RCMetaR computes method-specific eligibility from the included study set and shows the exact reason when a procedure or required input is unavailable. Ordinary and contour-enhanced funnels are presentation artifacts that can be edited and regenerated from the saved run. Diagnostic odds ratios use the separate Deeks effective-sample-size funnel.
@@ -36,6 +38,6 @@ See [Maintaining RC MetaStudio](docs/maintaining.md) for setup, verification, an
 
 ## License and provenance
 
-RC MetaStudio is developed by Research Consultancy (RC) and maintained by Ali Salman and RC MetaStudio contributors. It is derived from the Original OpenMeta[Analyst] Project.
+RC MetaStudio is developed by Research Consultancy (RC) and maintained by Ali Salman and RC MetaStudio contributors. It is derived from the original OpenMeta[Analyst] project.
 
 The project is distributed under the GNU General Public License, version 3 or later, where permitted by the original GPL-2.0-or-later grant covering derived portions. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for the full terms, provenance, warranty, and affiliation disclaimer.

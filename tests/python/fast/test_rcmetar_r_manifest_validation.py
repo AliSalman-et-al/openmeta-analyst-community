@@ -170,6 +170,76 @@ def test_r_verifiers_preserve_symlinked_python_identity(monkeypatch, tmp_path):
         assert captured["env"]["RCMS_POLICY_PYTHON"] == expected_python
 
 
+def test_full_r_stack_explicit_pytest_runner_uses_supplied_python():
+    python = str(REPO_ROOT / ".venv" / "Scripts" / "python.exe")
+
+    assert stack_verifier.bridge_test_command(python, "pytest") == [
+        python,
+        "-m",
+        "pytest",
+        str(Path("tests") / "r_stack"),
+    ]
+
+
+def test_full_r_stack_default_runner_uses_supplied_python_not_ambient_uv():
+    python = str(REPO_ROOT / ".venv" / "Scripts" / "python.exe")
+
+    assert stack_verifier.bridge_test_command(python, "uv") == [
+        python,
+        "-m",
+        "pytest",
+        str(Path("tests") / "r_stack"),
+    ]
+
+
+def test_reitsma_visual_release_gate_forces_installed_package_mode(monkeypatch, tmp_path):
+    captured = []
+
+    def capture_run(command, *, cwd, env):
+        captured.append((command, cwd, env))
+
+    monkeypatch.setattr(stack_verifier, "run", capture_run)
+    monkeypatch.setattr(
+        stack_verifier,
+        "_read_reitsma_visual_manifest",
+        lambda _output: ([], {"schema_version": 1, "descriptors": {}}),
+    )
+    base_env = {"R_LIBS": str(tmp_path / "installed-library")}
+    stack_verifier.verify_reitsma_visual_evidence(
+        REPO_ROOT, Path("Rscript"), base_env, tmp_path
+    )
+
+    assert len(captured) == 2
+    for command, cwd, env in captured:
+        assert Path(command[1]) == stack_verifier.R_REITSMA_VISUAL_QA
+        assert cwd == REPO_ROOT
+        assert env["RCMS_REITSMA_VISUAL_QA_MODE"] == "installed"
+        assert env["RCMS_REITSMA_VISUAL_QA_LIBRARY"] == base_env["R_LIBS"]
+
+
+def test_reitsma_visual_installed_mode_does_not_fallback_to_workspace_pkgload(tmp_path):
+    rscript = shutil.which("Rscript")
+    if rscript is None:
+        pytest.skip("Rscript is unavailable")
+
+    env = os.environ.copy()
+    env["RCMS_REITSMA_VISUAL_QA_MODE"] = "installed"
+    env["RCMS_REITSMA_VISUAL_QA_LIBRARY"] = str(tmp_path / "missing-r-library")
+    env["RCMS_REITSMA_VISUAL_QA_LOAD_ONLY"] = "1"
+    result = subprocess.run(
+        [rscript, str(REPO_ROOT / "scripts" / "verify_reitsma_visual_qa.R"), str(tmp_path / "output")],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "installed-package mode requires" in result.stdout
+
+
 LEGACY_ALIAS_PATTERN = re.compile(
     r"^([A-Za-z][A-Za-z0-9._]*)\s*<-\s*([A-Za-z][A-Za-z0-9._]*)\s*$", re.MULTILINE
 )
@@ -189,6 +259,7 @@ RCMetaR_PUBLIC_EXPORTS = {
     "rcmetar.diagnostic.study.effects",
     "rcmetar.draw.forest.plot",
     "rcmetar.draw.regression.plot",
+    "rcmetar.draw.sroc.plot",
     "rcmetar.get.mult.from.conf.level",
     "rcmetar.graphics.off",
     "rcmetar.impute.binary",
@@ -242,18 +313,7 @@ def test_RCMetaR_r_manifests_validate():
     assert policy["normal_install_type"] == "binary"
     assert policy["source_fallback"] is False
     assert len(policy["required_normal_packages"]) == 57
-    assert policy["source_exceptions"] == [
-        {
-            "name": "HSROC",
-            "version": "2.1.9",
-            "url": "https://cran.r-project.org/src/contrib/Archive/HSROC/HSROC_2.1.9.tar.gz",
-            "sha256": "5476fa76d7723717e203925a1da442813e3645790ef9b633a145cbc04a08b874",
-            "dependencies": ["lattice", "coda", "MASS", "MCMCpack"],
-            "install_type": "source",
-            "repos": None,
-            "dependencies_install": False,
-        }
-    ]
+    assert policy["source_exceptions"] == []
 
 
 def test_meta_is_pinned_directly_and_transitive_statistics_packages_stay_in_closure():
@@ -268,7 +328,7 @@ def test_meta_is_pinned_directly_and_transitive_statistics_packages_stay_in_clos
     assert {"meta", "metabook", "CompQuadForm"} <= set(
         policy["required_normal_packages"]
     )
-    assert [item["name"] for item in policy["source_exceptions"]] == ["HSROC"]
+    assert policy["source_exceptions"] == []
     for package in ("metabook", "CompQuadForm"):
         assert package not in direct
         assert app[package]["source"] == "cran"
@@ -278,9 +338,11 @@ def test_manifest_rejects_wrong_meta_pin(tmp_path):
     root = copy_manifest_config(tmp_path)
     manifest_path = root / DEPENDENCY_MANIFEST
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    next(item for item in manifest["direct_RCMetaR_dependencies"] if item["name"] == "meta")[
-        "installed_version"
-    ] = "8.5.0"
+    next(
+        item
+        for item in manifest["direct_RCMetaR_dependencies"]
+        if item["name"] == "meta"
+    )["installed_version"] = "8.5.0"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     result = run_validator(root)
@@ -342,29 +404,6 @@ def test_manifest_records_empty_direct_build_dependency_scope(tmp_path):
     assert "empty_scope_rationale.build" in result.stderr
 
 
-def test_cran_archive_dependencies_must_pin_exact_versions(tmp_path):
-    root = copy_manifest_config(tmp_path)
-    manifest_path = root / DEPENDENCY_MANIFEST
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for dependency in manifest["direct_RCMetaR_dependencies"]:
-        if dependency["name"] == "HSROC":
-            dependency["installed_version"] = "latest-compatible"
-            break
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
-    result = run_validator(root)
-
-    assert result.returncode == 1
-    assert "archived CRAN packages must declare an exact version" in result.stderr
-
-    manifest = json.loads((REPO_ROOT / DEPENDENCY_MANIFEST).read_text(encoding="utf-8"))
-    manifest["binary_package_policy"]["source_exceptions"][0]["sha256"] = "0" * 64
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    result = run_validator(root)
-    assert result.returncode == 1
-    assert "sole pinned source exception" in result.stderr
-
-
 def test_installed_version_report_parses_rscript_output(monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "validate_RCMetaR_r_manifests", VALIDATOR
@@ -375,24 +414,24 @@ def test_installed_version_report_parses_rscript_output(monkeypatch):
 
     def fake_run(command, text, stdout, stderr, check):
         assert command[:2] == ["Rscript", "-e"]
-        assert command[3:] == ["R", "metafor", "HSROC"]
+        assert command[3:] == ["R", "metafor", "mada"]
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout="R\t4.6.0\nR\t4.6.0\nmetafor\t4.9-17\nHSROC\tNA\n",
+            stdout="R\t4.6.0\nR\t4.6.0\nmetafor\t4.9-17\nmada\t0.5.12\n",
             stderr="",
         )
 
     monkeypatch.setattr(validator.subprocess, "run", fake_run)
 
-    report = validator.report_installed_versions("Rscript", ["R", "metafor", "HSROC"])
+    report = validator.report_installed_versions("Rscript", ["R", "metafor", "mada"])
 
     assert report == {
         "r_version": "4.6.0",
         "packages": {
             "R": "4.6.0",
             "metafor": "4.9-17",
-            "HSROC": None,
+            "mada": "0.5.12",
         },
     }
 
@@ -452,164 +491,7 @@ def test_default_r_dependency_install_uses_script_file_and_archive_triples(
     source = captured["source"]
     assert "r_binary_policy.R" in source
     assert "install_rcms_binary_packages" in source
-    assert "install_rcms_source_exception" in source
-
-
-def test_native_r_binary_policy_fails_closed_without_source_fallback(tmp_path):
-    rscript = shutil.which("Rscript")
-    if rscript is None and sys.platform == "win32":
-        candidate = Path("C:/Program Files/R/R-4.6.1/bin/Rscript.exe")
-        rscript = str(candidate) if candidate.is_file() else None
-    assert rscript is not None, (
-        "Rscript 4.6.1 is required by the Fast verification environment"
-    )
-
-    checked_installer = subprocess.run(
-        [rscript, str(REPO_ROOT / "scripts" / "install-rcmetar-source.R")],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert checked_installer.returncode != 0
-    assert "requires exactly SOURCE and LIBRARY arguments" in checked_installer.stderr
-
-    helper = (REPO_ROOT / "scripts" / "r_binary_policy.R").as_posix()
-    root = REPO_ROOT.as_posix()
-    library = tmp_path.as_posix()
-    r_code = f"""
-source({json.dumps(helper)})
-policy <- load_rcms_r_binary_policy({json.dumps(root)})
-expect_error <- function(expression, pattern) {{
-  error <- tryCatch({{ force(expression); NULL }}, error = identity)
-  if (is.null(error) || !grepl(pattern, conditionMessage(error), fixed = TRUE)) {{
-    stop("Expected error containing '", pattern, "'")
-  }}
-}}
-expect_error(assert_rcms_binary_runtime(policy, r_version = "4.6.0"), "requires R 4.6.1")
-expect_error(assert_rcms_binary_runtime(policy, arch = "unsupported"), "Unsupported R binary target")
-expect_error(assert_rcms_binary_runtime(policy, pkg_type = "source"), "Unexpected native R binary type")
-
-empty_db <- matrix(character(), nrow = 0, ncol = 3,
-  dimnames = list(character(), c("Depends", "Imports", "LinkingTo")))
-install_called <- FALSE
-expect_error(
-  install_rcms_binary_packages(
-    policy,
-    {json.dumps(library)},
-    database = empty_db,
-    install_binary = function(...) {{ install_called <<- TRUE }}
-  ),
-  "Required native R binaries unavailable"
-)
-if (install_called) stop("missing binary preflight attempted an install")
-
-platform <- assert_rcms_binary_runtime(policy)
-archive_extension <- rcms_binary_archive_extension(platform)
-one_archive <- tempfile(fileext = paste0(".", archive_extension))
-file.create(one_archive)
-one_row_no_dimnames <- matrix(c("root", one_archive), nrow = 1L)
-if (!identical(normalize_rcms_downloaded_archives(one_row_no_dimnames, 1L, platform), one_archive)) {{
-  stop("one-row download result without dimnames was not normalized positionally")
-}}
-two_archives <- c(
-  tempfile(fileext = paste0(".", archive_extension)),
-  tempfile(fileext = paste0(".", archive_extension))
-)
-file.create(two_archives)
-multi_row <- matrix(c("root", two_archives[[1]], "transitive", two_archives[[2]]), nrow = 2L, byrow = TRUE)
-if (!identical(normalize_rcms_downloaded_archives(multi_row, 2L, platform), two_archives)) {{
-  stop("multi-row download result was not normalized positionally")
-}}
-expect_error(
-  normalize_rcms_downloaded_archives(matrix(c("missing", tempfile()), nrow = 1L), 1L, platform),
-  "PPM retained binary archive is missing"
-)
-mismatched_extension <- if (identical(archive_extension, "zip")) ".tgz" else ".zip"
-mismatched_archive <- tempfile(fileext = mismatched_extension)
-file.create(mismatched_archive)
-expect_error(
-  normalize_rcms_downloaded_archives(
-    matrix(c("wrong-format", mismatched_archive), nrow = 1L), 1L, platform
-  ),
-  paste0("non-.", archive_extension, " archive")
-)
-
-binary_type <- NULL
-binary_dependencies <- NULL
-installed_packages <- "root"
-globally_available_packages <- c("root", "transitive")
-binary_policy <- policy
-binary_policy$normal_packages <- "root"
-binary_db <- matrix("", nrow = 2, ncol = 3,
-  dimnames = list(c("root", "transitive"), c("Depends", "Imports", "LinkingTo")))
-binary_db["root", "Imports"] <- "transitive"
-install_rcms_binary_packages(
-  binary_policy,
-  {json.dumps(library)},
-  database = binary_db,
-  install_binary = function(packages, lib, dependencies, type) {{
-    binary_type <<- type
-    binary_dependencies <<- dependencies
-    installed_packages <<- union(installed_packages, packages)
-  }},
-  installed_in_target = function() installed_packages,
-  package_loadable = function(package) package %in% installed_packages
-)
-if (!identical(binary_type, "binary")) stop("ordinary package install was not binary-only")
-if (!identical(binary_dependencies, FALSE)) stop("closure install attempted dependency resolution")
-if (!"transitive" %in% installed_packages) {{
-  stop("globally available transitive dependency was not installed into the target library")
-}}
-
-installed_packages <- "root"
-evidence <- tempfile()
-Sys.setenv(RCMS_R_BINARY_EVIDENCE = evidence)
-expect_error(
-  install_rcms_binary_packages(
-    binary_policy,
-    {json.dumps(library)},
-    database = binary_db,
-    install_binary = function(...) NULL,
-    installed_in_target = function() installed_packages,
-    package_loadable = function(package) package %in% globally_available_packages
-  ),
-  "Complete binary closure missing from target library"
-)
-if (file.exists(evidence) && file.info(evidence)$size > 0) {{
-  stop("incomplete target-local closure emitted cacheable evidence")
-}}
-Sys.unsetenv("RCMS_R_BINARY_EVIDENCE")
-
-tamper_policy <- policy
-tamper_policy$source_exception$dependencies <- "stats"
-source_called <- FALSE
-expect_error(
-  install_rcms_source_exception(
-    tamper_policy,
-    {json.dumps(library)},
-    download = function(url, destination, ...) writeBin(charToRaw("tampered"), destination),
-    install_source = function(...) {{ source_called <<- TRUE }},
-    sha256 = function(path) paste(rep("0", 64), collapse = "")
-  ),
-  "SHA256 mismatch"
-)
-if (source_called) stop("digest mismatch attempted the HSROC source install")
-"""
-    env = dict(os.environ)
-    env["RCMS_POLICY_PYTHON"] = sys.executable
-    env["RCMS_CRAN_REPO"] = "https://packagemanager.posit.co/cran/2026-07-16"
-    policy_test = tmp_path / "native-binary-policy-test.R"
-    policy_test.write_text(r_code, encoding="utf-8")
-    result = subprocess.run(
-        [rscript, str(policy_test)],
-        cwd=REPO_ROOT,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert "install_rcms_source_exception" not in source
 
 
 def test_default_r_verifier_resolves_rscript_from_r_home(tmp_path):
@@ -749,14 +631,13 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
     assert parse_packages(fields["Depends"]) == {"R"}
     assert parse_packages(fields["Imports"]) == {
         "boot",
+        "ellipse",
         "grDevices",
         "graphics",
-        "HSROC",
-        "lme4",
+        "mada",
         "meta",
         "methods",
         "metafor",
-        "pdftools",
         "rsvg",
         "stats",
         "svglite",
@@ -764,7 +645,7 @@ def test_RCMetaR_description_declares_only_direct_package_dependencies():
         "utils",
         "xml2",
     }
-    assert parse_packages(fields["Suggests"]) == {"coda", "roxygen2", "testthat"}
+    assert parse_packages(fields["Suggests"]) == {"roxygen2", "testthat"}
     assert "igraph" not in fields["Imports"]
     assert "Hmisc" not in fields["Imports"]
     assert "exportPattern" not in RCMetaR_NAMESPACE.read_text(encoding="utf-8")
@@ -779,7 +660,7 @@ def test_RCMetaR_namespace_exports_only_core_interface():
         not {
             "binary.random",
             "binary.random.parameters",
-            "diagnostic.hsroc.pretty.names",
+            "diagnostic.reitsma.pretty.names",
             "forest.plot",
             "gimpute.cont.data",
             "set.global.conf.level",
@@ -793,3 +674,138 @@ def test_RCMetaR_namespace_preserves_s4_classes_explicitly():
     actual_classes = namespace_entries("exportClasses")
 
     assert actual_classes == expected_classes
+def test_native_r_binary_policy_fails_closed_without_source_fallback(tmp_path):
+    rscript = shutil.which("Rscript")
+    if rscript is None and sys.platform == "win32":
+        candidate = Path("C:/Program Files/R/R-4.6.1/bin/Rscript.exe")
+        rscript = str(candidate) if candidate.is_file() else None
+    assert rscript is not None, (
+        "Rscript 4.6.1 is required by the Fast verification environment"
+    )
+
+    checked_installer = subprocess.run(
+        [rscript, str(REPO_ROOT / "scripts" / "install-rcmetar-source.R")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert checked_installer.returncode != 0
+    assert "requires exactly SOURCE and LIBRARY arguments" in checked_installer.stderr
+
+    helper = (REPO_ROOT / "scripts" / "r_binary_policy.R").as_posix()
+    root = REPO_ROOT.as_posix()
+    library = tmp_path.as_posix()
+    r_code = f"""
+source({json.dumps(helper)})
+policy <- load_rcms_r_binary_policy({json.dumps(root)})
+expect_error <- function(expression, pattern) {{
+  error <- tryCatch({{ force(expression); NULL }}, error = identity)
+  if (is.null(error) || !grepl(pattern, conditionMessage(error), fixed = TRUE)) {{
+    stop("Expected error containing '", pattern, "'")
+  }}
+}}
+expect_error(assert_rcms_binary_runtime(policy, r_version = "4.6.0"), "requires R 4.6.1")
+expect_error(assert_rcms_binary_runtime(policy, arch = "unsupported"), "Unsupported R binary target")
+expect_error(assert_rcms_binary_runtime(policy, pkg_type = "source"), "Unexpected native R binary type")
+
+empty_db <- matrix(character(), nrow = 0, ncol = 3,
+  dimnames = list(character(), c("Depends", "Imports", "LinkingTo")))
+install_called <- FALSE
+expect_error(
+  install_rcms_binary_packages(
+    policy,
+    {json.dumps(library)},
+    database = empty_db,
+    install_binary = function(...) {{ install_called <<- TRUE }}
+  ),
+  "Required native R binaries unavailable"
+)
+if (install_called) stop("missing binary preflight attempted an install")
+
+platform <- assert_rcms_binary_runtime(policy)
+archive_extension <- rcms_binary_archive_extension(platform)
+one_archive <- tempfile(fileext = paste0(".", archive_extension))
+file.create(one_archive)
+one_row_no_dimnames <- matrix(c("root", one_archive), nrow = 1L)
+if (!identical(normalize_rcms_downloaded_archives(one_row_no_dimnames, 1L, platform), one_archive)) {{
+  stop("one-row download result without dimnames was not normalized positionally")
+}}
+two_archives <- c(
+  tempfile(fileext = paste0(".", archive_extension)),
+  tempfile(fileext = paste0(".", archive_extension))
+)
+file.create(two_archives)
+multi_row <- matrix(c("root", two_archives[[1]], "transitive", two_archives[[2]]), nrow = 2L, byrow = TRUE)
+if (!identical(normalize_rcms_downloaded_archives(multi_row, 2L, platform), two_archives)) {{
+  stop("multi-row download result was not normalized positionally")
+}}
+expect_error(
+  normalize_rcms_downloaded_archives(matrix(c("missing", tempfile()), nrow = 1L), 1L, platform),
+  "PPM retained binary archive is missing"
+)
+mismatched_extension <- if (identical(archive_extension, "zip")) ".tgz" else ".zip"
+mismatched_archive <- tempfile(fileext = mismatched_extension)
+file.create(mismatched_archive)
+expect_error(
+  normalize_rcms_downloaded_archives(
+    matrix(c("wrong-format", mismatched_archive), nrow = 1L), 1L, platform
+  ),
+  paste0("non-.", archive_extension, " archive")
+)
+
+binary_type <- NULL
+binary_dependencies <- NULL
+installed_packages <- "root"
+globally_available_packages <- c("root", "transitive")
+binary_policy <- policy
+binary_policy$normal_packages <- "root"
+binary_db <- matrix("", nrow = 2, ncol = 3,
+  dimnames = list(c("root", "transitive"), c("Depends", "Imports", "LinkingTo")))
+binary_db["root", "Imports"] <- "transitive"
+install_rcms_binary_packages(
+  binary_policy,
+  {json.dumps(library)},
+  database = binary_db,
+  install_binary = function(packages, lib, dependencies, type) {{
+    binary_type <<- type
+    binary_dependencies <<- dependencies
+    installed_packages <<- union(installed_packages, packages)
+  }},
+  installed_in_target = function() installed_packages,
+  package_loadable = function(package) package %in% installed_packages
+)
+if (!identical(binary_type, "binary")) stop("ordinary package install was not binary-only")
+if (!identical(binary_dependencies, FALSE)) stop("closure install attempted dependency resolution")
+if (!"transitive" %in% installed_packages) {{
+  stop("globally available transitive dependency was not installed into the target library")
+}}
+
+installed_packages <- "root"
+evidence <- tempfile()
+Sys.setenv(RCMS_R_BINARY_EVIDENCE = evidence)
+expect_error(
+  install_rcms_binary_packages(
+    binary_policy,
+    {json.dumps(library)},
+    database = binary_db,
+    install_binary = function(...) NULL,
+    installed_in_target = function() installed_packages,
+    package_loadable = function(package) package %in% globally_available_packages
+  ),
+  "Complete binary closure missing from target library"
+)
+if (file.exists(evidence) && file.info(evidence)$size > 0) {{
+  stop("incomplete target-local closure emitted cacheable evidence")
+}}
+Sys.unsetenv("RCMS_R_BINARY_EVIDENCE")
+"""
+    env = dict(os.environ)
+    env["RCMS_POLICY_PYTHON"] = sys.executable
+    env["RCMS_CRAN_REPO"] = "https://packagemanager.posit.co/cran/2026-07-16"
+    policy_test = tmp_path / "native-binary-policy-test.R"
+    policy_test.write_text(r_code, encoding="utf-8")
+    result = subprocess.run(
+        [rscript, str(policy_test)], cwd=REPO_ROOT, env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

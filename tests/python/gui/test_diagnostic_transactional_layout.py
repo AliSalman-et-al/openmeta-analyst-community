@@ -546,7 +546,7 @@ def test_direct_effect_validation_is_complete_and_reachable_with_large_font(
 @pytest.mark.parametrize(
     ("model", "selected"),
     [
-        (FakeDiagnosticModel(raw_available=True), ["sens", "spec", "dor", "lr"]),
+        (FakeDiagnosticModel(raw_available=True), ["sens", "spec"]),
         (
             FakeDiagnosticModel(entered_effects=("Sens", "Spec")),
             ["sens", "spec"],
@@ -576,6 +576,15 @@ def test_diagnostic_metric_availability_preserves_workflow_and_explains_limits(
             assert "All diagnostic metrics are available" in (
                 dialog.availability_label.text()
             )
+            # The joint Sensitivity/Specificity path is the default, while
+            # univariate DOR/LR remain explicit, available requests.
+            assert dialog.chk_box_lr.isEnabled()
+            assert dialog.chk_box_dor.isEnabled()
+            assert not dialog.chk_box_lr.isChecked()
+            assert not dialog.chk_box_dor.isChecked()
+            dialog.chk_box_lr.setChecked(True)
+            dialog.chk_box_dor.setChecked(True)
+            assert dialog.get_selected_metrics() == ["sens", "spec", "dor", "lr"]
         else:
             assert "Likelihood Ratio: Requires complete TP/FN/FP/TN counts" in (
                 dialog.availability_label.text()

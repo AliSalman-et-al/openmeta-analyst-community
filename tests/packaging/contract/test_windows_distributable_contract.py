@@ -341,6 +341,14 @@ def test_package_policy_covers_direct_release_call_graph():
     assert not missing, f"unclassified direct package inputs: {missing}"
 
 
+def test_reitsma_visual_qa_is_a_package_qualification_input():
+    policy = _load_package_input_policy()
+
+    assert policy.requires_package_qualification(
+        ["scripts/verify_reitsma_visual_qa.R"]
+    )
+
+
 def test_package_workflow_builds_path_aware_artifacts():
     workflow = load_workflow(".github", "workflows", "package-verification.yml")
     target = load_workflow(".github", "workflows", "package-target.yml")
@@ -479,19 +487,21 @@ def test_shared_r_dependency_installer_is_used_by_packagers():
 
     assert "load_rcms_r_binary_policy" in installer
     assert "install_rcms_binary_packages" in installer
-    assert "install_rcms_source_exception" in installer
+    assert "install_rcms_source_exception" not in installer
     assert 'type = "binary"' in policy_runtime
-    assert 'type = "source"' in policy_runtime
+    assert 'type = "source"' not in policy_runtime
     assert 'type = "both"' not in policy_runtime
     assert "available.packages" in policy_runtime
     assert "Required native R binaries unavailable" in policy_runtime
     assert 'install.packages.compile.from.source = "never"' in policy_runtime
-    assert "HSROC source archive SHA256 mismatch" in policy_runtime
-    assert "HSROC 2.1.9 must be the sole pinned source exception" in policy_loader
+    assert "HSROC" not in policy_runtime
+    assert "HSROC" not in policy_loader
     assert "meta" in windows["text"]
     assert "getElement(packageDescription('meta'), 'Version')" in windows["text"]
     assert "meta" in macos["text"]
     assert "getElement(packageDescription('meta'), 'Version')" in macos["text"]
+    assert "packageVersion('mada')" in windows["text"]
+    assert "packageVersion('mada')" in macos["text"]
     assert "https://packagemanager.posit.co/cran/2026-07-16" in policy_loader
     assert {
         "Invoke-StrictRDependencyPolicy",
@@ -676,8 +686,8 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
         "a.binaries = [entry for entry in a.binaries if not "
         "is_windows_system_runtime(entry)]"
     ) in spec
-    assert 'str(generated_package)' not in spec
-    assert 'str(generated_forms)' not in spec
+    assert "str(generated_package)" not in spec
+    assert "str(generated_forms)" not in spec
     assert (
         'excludes=["PyQt5", "PySide2", "PySide6", "qtpy", "_rinterface_cffi_abi"]'
         in spec

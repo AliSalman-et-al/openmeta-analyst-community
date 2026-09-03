@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 def main() -> int:
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
