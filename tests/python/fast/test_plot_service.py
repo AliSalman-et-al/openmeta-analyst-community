@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rc_metastudio import r_bridge
+from rc_metastudio import plot_service, r_bridge
 from rc_metastudio.plot_service import PlotService, PlotServiceError
 
 
@@ -73,6 +73,7 @@ def test_apply_funnel_edits_rolls_back_persisted_params_on_failure(tmp_path, mon
     Path(f"{params_path}.res").write_text("res")
     persisted = Path(f"{params_path}.params")
     persisted.write_text("original")
+
     def update(_params, *, outpath, **_kwargs):
         Path(outpath).write_text("updated")
 
@@ -96,6 +97,52 @@ def test_apply_funnel_edits_rolls_back_persisted_params_on_failure(tmp_path, mon
         )
 
     assert persisted.read_text() == "original"
+
+
+def test_funnel_rollback_failure_keeps_original_render_error(tmp_path, monkeypatch):
+    params_path = tmp_path / "funnel"
+    Path(f"{params_path}.data").write_text("data")
+    Path(f"{params_path}.res").write_text("res")
+    persisted = Path(f"{params_path}.params")
+    persisted.write_text("original")
+    bridge = plot_service.r_bridge
+    original_copyfile = plot_service.shutil.copyfile
+    copy_count = 0
+
+    def copyfile(source, target):
+        nonlocal copy_count
+        copy_count += 1
+        if copy_count == 4:
+            raise OSError("rollback failed")
+        return original_copyfile(source, target)
+
+    monkeypatch.setattr(
+        "rc_metastudio.plot_service.shutil.copyfile", copyfile
+    )
+    monkeypatch.setattr(
+        bridge,
+        "update_plot_params",
+        lambda _params, *, outpath, **_kwargs: Path(outpath).write_text("updated"),
+    )
+
+    def fail_to_regenerate(*_args, **_kwargs):
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(
+        bridge,
+        "regenerate_small_study_effects_funnel",
+        fail_to_regenerate,
+    )
+
+    with pytest.raises(RuntimeError, match="render failed") as raised:
+        PlotService().apply_edits(
+            regenerator="funnel",
+            params_path=str(params_path),
+            updated_params={"funnel.outpath": str(tmp_path / "edited.png")},
+            output_path=str(tmp_path / "edited.png"),
+        )
+
+    assert raised.value.__notes__ == ["Plot parameter rollback failed: rollback failed"]
 
 
 @pytest.mark.parametrize(

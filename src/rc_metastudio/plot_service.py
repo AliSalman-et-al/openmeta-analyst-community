@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Callable, Protocol, cast
 
 from rc_metastudio import r_bridge
 from rc_metastudio.analysis_results import PlotRegenerator
@@ -58,7 +58,7 @@ class PlotService:
     """Apply plot edits and render exports without leaking R into the UI."""
 
     def __init__(self, bridge: PlotBackend | None = None) -> None:
-        self.bridge = bridge or r_bridge
+        self.bridge = bridge if bridge is not None else cast(PlotBackend, r_bridge)
 
     def load_params(self, params_path: str) -> dict[str, object] | None:
         """Load persisted plot parameters, returning ``None`` when unavailable."""
@@ -67,7 +67,12 @@ class PlotService:
             return None
         if not isinstance(params, Mapping):
             raise PlotServiceError("R returned invalid plot parameters")
-        return dict(params)
+        result: dict[str, object] = {}
+        for key, value in params.items():
+            if not isinstance(key, str):
+                raise PlotServiceError("R returned invalid plot parameter names")
+            result[key] = value
+        return result
 
     def apply_edits(
         self,

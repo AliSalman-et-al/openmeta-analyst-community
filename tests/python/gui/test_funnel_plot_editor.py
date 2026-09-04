@@ -241,7 +241,6 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
         params_path=str(base),
     )
     window = results_window.ResultsWindow(empty_analysis_result())
-    window._refresh_plot_item = lambda *args: None
     regenerate_count = [0]
 
     def write_params(params, **kwargs):
