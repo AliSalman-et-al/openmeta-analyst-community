@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rc_metastudio import project_format
+from rc_metastudio import project_adapter
 from rc_metastudio.project_format import load_project
 from rc_metastudio.workspace_session import WorkspaceSession
 
@@ -120,3 +121,43 @@ def test_save_marks_only_successfully_written_snapshot_clean(tmp_path: Path) -> 
     saved = load_project(destination).project
     assert isinstance(saved["dataset"], dict)
     assert saved["dataset"]["title"] == "Saved"
+
+
+def test_live_runtime_identity_survives_checkpoint_and_save(tmp_path: Path) -> None:
+    document = load_project(ROOT / "sample_projects" / "continuous.rcms")
+    session = WorkspaceSession(document)
+    runtime = session.runtime
+    assert runtime is not None
+    dataset = runtime.dataset
+
+    dataset.title = "Live identity"
+    session.update_live_state(
+        project_adapter.RuntimeProject(
+            dataset=dataset,
+            model_state=runtime.model_state,
+            restored_selection=runtime.restored_selection,
+        )
+    )
+    session.checkpoint()
+    assert session.runtime is not None
+    assert session.runtime.dataset is dataset
+    assert session.can_undo
+
+    destination = tmp_path / "identity.rcms"
+    session.save(destination)
+    assert session.runtime is not None
+    assert session.runtime.dataset is dataset
+    assert load_project(destination).project == session.project
+
+
+def test_open_installs_and_adopts_the_same_runtime_object() -> None:
+    source = ROOT / "sample_projects" / "amino.rcms"
+    session = WorkspaceSession(
+        load_project(ROOT / "sample_projects" / "continuous.rcms")
+    )
+    installed = []
+
+    session.open(source, install=installed.append)
+
+    assert installed
+    assert session.runtime is installed[0]

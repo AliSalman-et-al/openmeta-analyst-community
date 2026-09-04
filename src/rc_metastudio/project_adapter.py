@@ -31,6 +31,45 @@ class RuntimeProject:
     restored_selection: bool
 
 
+def runtime_project_to_document(runtime: RuntimeProject) -> ProjectDocument:
+    """Serialize the live runtime graph at a project-format boundary."""
+    dataset = runtime.dataset
+    model_state = runtime.model_state
+    outcome = model_state.get("current_outcome_name")
+    follow_up = None
+    if isinstance(outcome, str):
+        follow_ups = dataset.follow_ups_by_outcome.get(outcome, {})
+        follow_up_index = model_state.get("current_follow_up_index")
+        if isinstance(follow_up_index, int):
+            follow_up = follow_ups.get(follow_up_index)
+    raw_groups = model_state.get("current_groups")
+    groups = (
+        [item for item in raw_groups if isinstance(item, str)]
+        if isinstance(raw_groups, list)
+        else []
+    )
+    raw_confidence = model_state.get("confidence_level", 95.0)
+    confidence = (
+        float(raw_confidence) if isinstance(raw_confidence, (int, float)) else 95.0
+    )
+    if not dataset.get_outcome_names():
+        outcome = None
+        follow_up = None
+        groups = []
+        model_effect = None
+    else:
+        model_effect = model_state.get("current_effect")
+    state: JsonObject = {
+        "schema_version": 1,
+        "active_outcome": outcome if isinstance(outcome, str) else None,
+        "active_follow_up": follow_up,
+        "active_groups": groups,
+        "active_effect": model_effect if isinstance(model_effect, str) else None,
+        "confidence_level": confidence,
+    }
+    return ProjectDocument(1, dataset_to_project(dataset), state)
+
+
 class ProjectStateModel(Protocol):
     """Workspace fields that are durable in a project archive."""
 
@@ -272,7 +311,9 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             sub_type=_optional_text(item["sub_type"], "outcome subtype"),
             stable_id=f"outcome:{index}",
         )
-        dataset.outcomes_by_id[outcomes[outcome_name].stable_id] = outcomes[outcome_name]
+        dataset.outcomes_by_id[outcomes[outcome_name].stable_id] = outcomes[
+            outcome_name
+        ]
     for item in outcome_items:
         outcome_name = _text(item["name"], "outcome name")
         follow_up_labels = [
@@ -281,12 +322,13 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         ]
         outcome_id = outcomes[outcome_name].stable_id
         follow_up_ids = [
-            f"{outcome_id}:follow-up:{index}"
-            for index in range(len(follow_up_labels))
+            f"{outcome_id}:follow-up:{index}" for index in range(len(follow_up_labels))
         ]
         follow_up_ids_by_label = {
             follow_up: stable_id
-            for follow_up, stable_id in zip(follow_up_labels, follow_up_ids, strict=True)
+            for follow_up, stable_id in zip(
+                follow_up_labels, follow_up_ids, strict=True
+            )
             if follow_up is not None and stable_id is not None
         }
         dataset.follow_ups_by_outcome_id[outcomes[outcome_name].stable_id] = {
@@ -376,7 +418,9 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
                     values = _object(values_value, "effect values")
-                    unit.entered_effects[metric][comparison].update(copy.deepcopy(values))
+                    unit.entered_effects[metric][comparison].update(
+                        copy.deepcopy(values)
+                    )
             study.add_analysis_unit(unit)
         dataset.studies.append(study)
     return dataset

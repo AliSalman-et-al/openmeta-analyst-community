@@ -122,22 +122,6 @@ def _format_open_project_error(file_path, exception):
     )
 
 
-def _document_from_model(model):
-    state = project_adapter.model_to_state(model)
-    if not model.dataset.get_outcome_names():
-        state.update(
-            active_outcome=None,
-            active_follow_up=None,
-            active_groups=[],
-            active_effect=None,
-        )
-    return project_format.ProjectDocument(
-        1,
-        project_adapter.dataset_to_project(model.dataset),
-        state,
-    )
-
-
 def _qt_dialog_path(value):
     value = value[0] if isinstance(value, tuple) else value
     return qt_text.to_native_text(value)
@@ -273,9 +257,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.cl_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
 
-        self.new_dataset()
-
         self.workspace = WorkspaceSession()
+        self.new_dataset()
 
         self.tableView.setModel(self.model)
         self.tableView.setItemDelegate(dataset_table_view.StudyDelegate(self.tableView))
@@ -448,22 +431,19 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         existing_model = getattr(self, "model", None)
         if existing_model is not None:
             if use_undo_framework:
-                original_dataset = copy.deepcopy(existing_model.dataset)
-                old_state_dict = self.tableView.model().get_state()
-
-                def undo_f():
-                    return self.set_model(original_dataset, old_state_dict)
-
-                def redo_f():
-                    return self.set_model(data_model)
-
-                edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-                self._commit_model_operation(edit_command.redo)
+                self._commit_model_operation(lambda: self.set_model(data_model))
             else:  # CSV import manages its own undo boundary.
                 self.set_model(data_model)
         else:
             self.model = dataset_table_model.DatasetTableModel(dataset=data_model)
             self.disable_menu_options_that_require_dataset()
+            self.workspace.update_live_state(
+                project_adapter.RuntimeProject(
+                    dataset=self.model.dataset,
+                    model_state=self.model.get_state(),
+                    restored_selection=False,
+                )
+            )
         self.out_path = None
 
     def _notify_user_that_data_is_unsaved(self):
@@ -705,47 +685,30 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
         try:
-            document = _document_from_model(self.model)
+            runtime = project_adapter.RuntimeProject(
+                dataset=self.model.dataset,
+                model_state=self.model.get_state(),
+                restored_selection=self.model.current_outcome_name is not None,
+            )
         except project_adapter.ProjectAdapterError:
             self.workspace.mark_dirty()
         else:
-            if self.workspace.document is None:
-                self.workspace.new(document)
-                self.workspace.mark_dirty()
-            elif document != self.workspace.document:
-                self.workspace.replace(document)
+            self.workspace.update_live_state(runtime)
+
     def record_workspace_change(self, before, after):
-        """Publish one adapter edit as one immutable workspace change."""
-        before_document = (
-            before
-            if isinstance(before, project_format.ProjectDocument)
-            else project_format.ProjectDocument(1, *before)
-        )
-        after_document = (
-            after
-            if isinstance(after, project_format.ProjectDocument)
-            else project_format.ProjectDocument(1, *after)
-        )
-        if self.workspace.document is None:
-            self.workspace.new(before_document)
-        if before_document == after_document:
+        """Publish the already-mutated session-owned graph as one change."""
+        if before == after:
             return
-        self.workspace.replace(after_document)
+        self.data_dirtied()
+        self.workspace.checkpoint()
 
     def _commit_model_operation(self, operation):
         """Run one already validated UI operation as one workspace change."""
+        self.workspace.begin_change()
         try:
-            before = _document_from_model(self.model)
-        except project_adapter.ProjectAdapterError:
-            before = None
-        operation()
-        try:
-            after = _document_from_model(self.model)
-        except project_adapter.ProjectAdapterError:
-            after = None
-        if before is not None and after is not None:
-            if self.workspace.document != after:
-                self.record_workspace_change(before, after)
+            operation()
+        finally:
+            self.workspace.end_change()
 
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
@@ -859,24 +822,29 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def undo(self):
         if self.workspace.undo():
-            document = self.workspace.document
-            if document is not None:
-                self._install_workspace_document(document)
+            runtime = self.workspace.runtime
+            if runtime is not None:
+                self._install_workspace_runtime(runtime)
 
     def redo(self):
         if self.workspace.redo():
-            document = self.workspace.document
-            if document is not None:
-                self._install_workspace_document(document)
+            runtime = self.workspace.runtime
+            if runtime is not None:
+                self._install_workspace_runtime(runtime)
 
     def _install_workspace_document(self, document):
+        self._install_workspace_runtime(
+            project_adapter.document_to_runtime_project(document)
+        )
+
+    def _install_workspace_runtime(self, runtime):
+        target_digest = self.workspace.runtime_digest
         current = self.tableView.currentIndex()
         position = (current.row(), current.column()) if current.isValid() else None
         previous_model = self.model
         observers = self.__dict__.setdefault("_workspace_model_observers", [])
         if previous_model not in observers:
             observers.append(previous_model)
-        runtime = project_adapter.document_to_runtime_project(document)
         self._set_model_adapter(
             runtime.dataset,
             runtime.model_state,
@@ -888,12 +856,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         for observer in observers:
             observer.dataset = self.model.dataset
             observer.set_state(runtime.model_state)
+        self.workspace.update_live_state(runtime)
+        self.workspace.checkpoint(expected_digest=target_digest)
         self.out_path = str(self.workspace.path) if self.workspace.path else None
         if position is not None:
             self.tableView.setCurrentIndex(self.model.index(*position))
 
     def edit_dataset(self):
-        current_dataset = copy.deepcopy(self.model.dataset)
+        current_dataset = self.workspace.snapshot().dataset
         edit_window = edit_dialog.EditDialog(current_dataset, parent=self)
 
         if edit_window.exec():
@@ -933,16 +903,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 new_state_dict["current_groups"] = meta_globals.DEFAULT_GROUP_NAMES
             modified_dataset = edit_window.dataset
 
-            def redo_f():
-                return self.set_model(modified_dataset, new_state_dict)
-
-            original_dataset = copy.deepcopy(self.model.dataset)
-
-            def undo_f():
-                return self.set_model(original_dataset, old_state_dict)
-
-            edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self._commit_model_operation(edit_command.redo)
+            self._commit_model_operation(
+                lambda: self.set_model(modified_dataset, new_state_dict)
+            )
 
     def populate_metrics_menu(self, metric_to_check=None):
         """Populates the `metric` sub-menu with available metrics for the
@@ -1489,7 +1452,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _install_open_document(self, document):
         """Adapt a validated session document into the live Qt model."""
-        runtime = project_adapter.document_to_runtime_project(document)
+        runtime = document
         previous_model = self.model
         previous_current = self.tableView.currentIndex()
         current_cell = (
@@ -1511,10 +1474,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 preserve_state_selection=runtime.restored_selection,
                 recalculate_outcomes=False,
             )
-            # Keep the adapter/session boundary exercised while the session
-            # still owns the open transaction. A successful open below resets
-            # this provisional snapshot as a document boundary.
-            self.data_dirtied()
         except Exception:
             self._restore_failed_open(previous_model, current_cell, selected_cells)
             raise
@@ -1557,7 +1516,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self._commit_model_operation(delete_command.redo)
 
     def change_covariate_type(self, covariate):
-        current_dataset = copy.deepcopy(self.model.dataset)
+        current_dataset = self.workspace.snapshot().dataset
         # keep the current study order, because we're going to sort the studies
         # on the change_cov_form but we want to revert to the ordering
         # they came in with when we're done.
@@ -1583,16 +1542,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             old_state_dict = self.tableView.model().get_state()
             new_state_dict = copy.deepcopy(old_state_dict)
 
-            def redo_f():
-                return self.set_model(modified_dataset, new_state_dict)
-
-            original_dataset = copy.deepcopy(self.model.dataset)
-
-            def undo_f():
-                return self.set_model(original_dataset, old_state_dict)
-
-            edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self._commit_model_operation(edit_command.redo)
+            self._commit_model_operation(
+                lambda: self.set_model(modified_dataset, new_state_dict)
+            )
 
     def rename_covariate(self, covariate):
         orig_cov_name = copy.copy(covariate.name)
@@ -1814,21 +1766,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if not destination.lower().endswith(".rcms"):
             destination += ".rcms"
 
-        try:
-            document = _document_from_model(self.model)
-        except Exception as e:
-            app_error_handler.log_exception(type(e), e, e.__traceback__)
-            QMessageBox.critical(
-                self,
-                "Could Not Save Project",
-                "RC MetaStudio could not save %s.\n\nDetails: %s: %s"
-                % (destination, e.__class__.__name__, e),
-            )
-            return False
-
         durability_error = None
         try:
-            self.workspace.save(destination, document=document)
+            self.data_dirtied()
+            self.workspace.save(destination)
         except project_format.ProjectDurabilityError as e:
             durability_error = e
         except Exception as e:
@@ -1880,46 +1821,27 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         elif path == "csv_import":
             csv_data = wizard_data["csv_data"]
 
-            # Back-up original dataset
-            original_dataset = copy.deepcopy(self.model.dataset)
-            old_state_dict = self.tableView.model().get_state()
+            def import_csv() -> None:
+                self._make_new_dataset_and_setup_spreadsheet(dataset_info)
+                ImportCsvCommand(
+                    imported_data=csv_data["data"],
+                    main_form=self,
+                    covariate_names=csv_data["covariate_names"],
+                    covariate_types=csv_data["covariate_types"],
+                ).redo()
 
-            self._make_new_dataset_and_setup_spreadsheet(dataset_info)
-
-            new_dataset = copy.deepcopy(self.model.dataset)
-            new_state_dict = self.tableView.model().get_state()
-
-            imported_data = csv_data["data"]
-            # Note: may want at some point to access the headers provided in the CSV;
-            #     these are accessible at csv_data['headers'] and
-            covariate_names = csv_data["covariate_names"]
-            covariate_types = csv_data["covariate_types"]
-
-            importcsv_command = ImportCsvCommand(
-                original_dataset=original_dataset,
-                old_state_dict=old_state_dict,
-                new_dataset=new_dataset,
-                new_state_dict=new_state_dict,
-                imported_data=imported_data,
-                main_form=self,
-                covariate_names=covariate_names,
-                covariate_types=covariate_types,
-            )
-            self._commit_model_operation(importcsv_command.redo)
+            self._commit_model_operation(import_csv)
 
 
 class ImportCsvCommand:
     def __init__(
         self,
-        original_dataset=None,
-        old_state_dict=None,
-        new_dataset=None,
-        new_state_dict=None,
         main_form=None,
         imported_data=None,
         covariate_names=None,
         covariate_types=None,
         description="Import a CSV file",
+        **_legacy_snapshots,
     ):
         if main_form is None:
             raise ValueError("CSV import requires a main form")
@@ -1928,32 +1850,13 @@ class ImportCsvCommand:
         self.covariate_types = list(covariate_types or [])
         self.main_form: MainWindow = main_form
 
-        self.original_dataset = original_dataset
-        self.old_state_dict = old_state_dict
-        self.new_dataset = new_dataset
-        self.new_state_dict = new_state_dict
-
-        self.new_dataset_has_imported_data = False
-
     def redo(self):
-        if (
-            self.new_dataset_has_imported_data
-        ):  # already imported once before, this is a real 'redo'
-            self.main_form.set_model(self.new_dataset, self.new_state_dict)
-        else:  # this a first run
-            self._import_data_into_new_dataset()
-            self.new_dataset = copy.deepcopy(self.main_form.model.dataset)
-            self.new_state_dict = self.main_form.tableView.model().get_state()
-            self.new_dataset_has_imported_data = True
+        self._import_data_into_new_dataset()
 
     def undo(self):
-        self.main_form.set_model(self.original_dataset, self.old_state_dict)
-        self.main_form.model.reset_model()
-        QApplication.processEvents()
+        self.main_form.undo()
 
     def _import_data_into_new_dataset(self):
-        self.main_form.set_model(self.new_dataset, self.new_state_dict)
-
         num_rows = len(self.imported_data)
         if num_rows == 0:
             return
