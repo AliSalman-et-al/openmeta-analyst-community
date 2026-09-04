@@ -274,6 +274,21 @@ rcmetar.metafor.plot.fields <- function(om.data, params, y, lb, ub, sample.sizes
     plot.options <- set.plot.options(params)
     transform.name <- get.transform.name(om.data)
     transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    if (params$fp_plot_lb == "[default]") {
+        plot.options$plot.lb <- params$fp_plot_lb
+    } else {
+        plot.lb <- rcmetar.numeric.values(params$fp_plot_lb)
+        plot.options$plot.lb <- transform$calc.scale(plot.lb, ni=sample.sizes)
+    }
+    if (params$fp_plot_ub == "[default]") {
+        plot.options$plot.ub <- params$fp_plot_ub
+    } else {
+        plot.ub <- rcmetar.numeric.values(params$fp_plot_ub)
+        if (get.scale(params) == "logit") {
+            plot.ub <- min(1, plot.ub)
+        }
+        plot.options$plot.ub <- transform$calc.scale(plot.ub, ni=sample.sizes)
+    }
     y <- as.numeric(y)
     lb <- as.numeric(lb)
     ub <- as.numeric(ub)
