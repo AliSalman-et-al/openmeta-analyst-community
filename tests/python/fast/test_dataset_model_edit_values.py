@@ -20,6 +20,13 @@ from rc_metastudio import analysis_dataset
 from rc_metastudio import meta_globals
 
 
+def _derived_effect_and_ci(analysis_unit, metric, group_comparison):
+    value = analysis_unit.get_effect_for_source(
+        "derived_preview", metric, group_comparison
+    )
+    return value.estimate, value.lower, value.upper
+
+
 def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drift():
     model = _diagnostic_model_with_empty_cells()
     model.dataset.add_covariate(
@@ -660,7 +667,7 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
         None,
         None,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Spec", group_comparison) == (
         0.95,
         0.88,
         0.99,
@@ -702,12 +709,12 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
     assert model.setData(model.index(0, model.RAW_DATA[0]), "30") is True
 
     assert errors == []
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
         0.750,
         0.588,
         0.873,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Spec", group_comparison) == (
         0.988,
         0.919,
         0.998,
@@ -854,7 +861,7 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
     assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is False
 
     assert analysis_unit.groups[group_comparison].raw_data == [19.0, 10.0, 1.0, 81.0]
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
         0.66,
         0.50,
         0.80,

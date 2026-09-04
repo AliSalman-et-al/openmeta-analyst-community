@@ -397,7 +397,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == (
             model_before.get_raw_data_for_groups(dialog.current_groups)
         )
-        assert dialog.analysis_unit.effects == model_before.effects
+        assert dialog.analysis_unit.entered_effects == model_before.entered_effects
         assert window.workspace.is_dirty is dirty_before
         assert dialog.result() == 0
         assert ok.isEnabled()

@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, MutableMapping
 from dataclasses import dataclass
 import copy
 from typing import Literal, NewType
@@ -31,28 +30,6 @@ class EffectEstimate:
     lower: float | None
     upper: float | None
     standard_error: float | None = None
-
-
-class _EnteredEffectsView(MutableMapping):
-    """Compatibility mapping that forwards legacy ``effects`` access."""
-
-    def __init__(self, unit: "AnalysisUnit"):
-        self._unit = unit
-
-    def __getitem__(self, key):
-        return self._unit.entered_effects[key]
-
-    def __setitem__(self, key, value):
-        self._unit.entered_effects[key] = value
-
-    def __delitem__(self, key):
-        del self._unit.entered_effects[key]
-
-    def __iter__(self) -> Iterator:
-        return iter(self._unit.entered_effects)
-
-    def __len__(self):
-        return len(self._unit.entered_effects)
 
 
 class AnalysisUnit:
@@ -127,21 +104,6 @@ class AnalysisUnit:
     @property
     def groups_by_id(self):
         return self._groups_by_id
-
-    @property
-    def effects(self):
-        """Compatibility view of manually entered effects.
-
-        New code should select an authority explicitly with
-        :meth:`get_effect_for_source`.  Keeping this read/write view avoids
-        breaking the v1 application model while ensuring calculated previews
-        never appear as entered data.
-        """
-        return _EnteredEffectsView(self)
-
-    @effects.setter
-    def effects(self, value):
-        self.entered_effects = value
 
     @property
     def groups(self):
@@ -269,7 +231,7 @@ class AnalysisUnit:
             one_arm_metrics = meta_globals.CONTINUOUS_ONE_ARM_METRICS
         elif self.outcome.data_type == DIAGNOSTIC:
             for effect in meta_globals.DIAGNOSTIC_METRICS:
-                self.effects[effect][new_group] = self._new_effect_entry()
+                self.entered_effects[effect][new_group] = self._new_effect_entry()
             return
         else:
             return
@@ -280,9 +242,9 @@ class AnalysisUnit:
                     "-".join((new_group, group)),
                     "-".join((group, new_group)),
                 ):
-                    self.effects[effect][group_comparison] = self._new_effect_entry()
+                    self.entered_effects[effect][group_comparison] = self._new_effect_entry()
         for effect in one_arm_metrics:
-            self.effects[effect][new_group] = self._new_effect_entry()
+            self.entered_effects[effect][new_group] = self._new_effect_entry()
 
     def calculate_se_if_possible(
         self,
@@ -313,16 +275,16 @@ class AnalysisUnit:
         return None
 
     def set_effect(self, effect, group_comparison, value):
-        self.effects[effect][group_comparison]["est"] = value
+        self.entered_effects[effect][group_comparison]["est"] = value
 
     def set_lower(self, effect, group_comparison, lower):
-        self.effects[effect][group_comparison]["lower"] = lower
+        self.entered_effects[effect][group_comparison]["lower"] = lower
 
     def set_upper(self, effect, group_comparison, upper):
-        self.effects[effect][group_comparison]["upper"] = upper
+        self.entered_effects[effect][group_comparison]["upper"] = upper
 
     def set_standard_error(self, effect, group_comparison, se):
-        self.effects[effect][group_comparison]["SE"] = se
+        self.entered_effects[effect][group_comparison]["SE"] = se
 
     def set_display_effect(self, effect, group_comparison, value):
         self._store_for_read(effect, group_comparison)[effect][group_comparison][
@@ -533,10 +495,10 @@ class AnalysisUnit:
         )
 
     def get_group_strings(self, effect):
-        return list(self.effects[effect].keys())
+        return list(self.entered_effects[effect].keys())
 
     def get_effect_names(self):
-        return list(self.effects.keys())
+        return list(self.entered_effects.keys())
 
     def add_group(self, name, raw_data=None, stable_id=None):
         if not self.groups:

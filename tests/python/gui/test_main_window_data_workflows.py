@@ -16,6 +16,13 @@ from test_types import key_click, required
 REPO_ROOT = os.getcwd()
 
 
+def _derived_effect_and_ci(analysis_unit, metric, group_comparison):
+    value = analysis_unit.get_effect_for_source(
+        "derived_preview", metric, group_comparison
+    )
+    return value.estimate, value.lower, value.upper
+
+
 def test_data_table_return_moves_vertically_from_selected_cells():
     from PyQt6 import QtCore
 
@@ -1051,12 +1058,12 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
         group_comparison = model.get_current_group_comparison()
         assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
-        assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+        assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
             0.750,
             0.588,
             0.873,
         )
-        assert analysis_unit.get_entered_effect_and_ci("PLR", group_comparison) == (
+        assert _derived_effect_and_ci(analysis_unit, "PLR", group_comparison) == (
             61.5,
             8.8,
             431.0,

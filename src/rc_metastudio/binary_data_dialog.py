@@ -493,7 +493,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def _populate_effect_data(self):
         available_effects = set(
-            str(effect) for effect in self.analysis_unit.effects.keys()
+            str(effect) for effect in self.analysis_unit.entered_effects.keys()
         )
         metric_family = (
             BINARY_ONE_ARM_METRICS

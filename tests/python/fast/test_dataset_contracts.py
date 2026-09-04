@@ -23,7 +23,7 @@ def _dataset(data_type=analysis_dataset.DIAGNOSTIC):
         groups[0] if data_type == analysis_dataset.DIAGNOSTIC else "-".join(groups)
     )
     effect = "Sens" if data_type == analysis_dataset.DIAGNOSTIC else "OR"
-    unit.effects[effect][effect_group]["est"] = 0.75
+    unit.entered_effects[effect][effect_group]["est"] = 0.75
     return dataset
 
 
@@ -45,7 +45,7 @@ def test_copy_preserves_and_isolates_the_complete_dataset_graph():
     cloned.studies[0].name = "Changed study"
     cloned_unit = cloned.studies[0].analysis_units_by_outcome["Outcome"]["first"]
     cloned_unit.groups[cloned_unit.get_group_names()[0]].raw_data[0] = 99
-    cloned_unit.effects["Sens"][cloned_unit.get_group_names()[0]]["est"] = 0.2
+    cloned_unit.entered_effects["Sens"][cloned_unit.get_group_names()[0]]["est"] = 0.2
 
     source_unit = source.studies[0].analysis_units_by_outcome["Outcome"]["first"]
     assert source.summary["data_type"] == "diagnostic"
@@ -53,7 +53,7 @@ def test_copy_preserves_and_isolates_the_complete_dataset_graph():
     assert source.covariates[0].name == "Region"
     assert source.studies[0].name == "Study 1"
     assert source_unit.groups[source_unit.get_group_names()[0]].raw_data[0] == 3
-    assert source_unit.effects["Sens"][source_unit.get_group_names()[0]]["est"] == 0.75
+    assert source_unit.entered_effects["Sens"][source_unit.get_group_names()[0]]["est"] == 0.75
 
 
 def test_group_deletion_is_a_no_op_for_empty_datasets():
@@ -71,12 +71,12 @@ def test_rename_group_preserves_effects_when_the_name_contains_a_hyphen():
     original_groups = unit.get_group_names()
     dataset.change_group_name(original_groups[0], "Usual-care")
     pair_key = "-".join(("Usual-care", original_groups[1]))
-    unit.effects["OR"][pair_key]["est"] = 0.75
+    unit.entered_effects["OR"][pair_key]["est"] = 0.75
 
     dataset.change_group_name("Usual-care", "Control")
 
     renamed_key = "-".join(("Control", original_groups[1]))
     assert unit.get_group_names() == [original_groups[1], "Control"]
     assert unit.groups["Control"].name == "Control"
-    assert unit.effects["OR"][renamed_key]["est"] == 0.75
-    assert pair_key not in unit.effects["OR"]
+    assert unit.entered_effects["OR"][renamed_key]["est"] == 0.75
+    assert pair_key not in unit.entered_effects["OR"]

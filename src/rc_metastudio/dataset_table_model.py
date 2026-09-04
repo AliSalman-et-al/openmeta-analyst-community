@@ -1077,7 +1077,7 @@ class DatasetTableModel(QAbstractTableModel):
             or self.current_outcome_name is None
         ):
             return
-        effect = self.get_current_analysis_unit_for_study(index.row()).effects[
+        effect = self.get_current_analysis_unit_for_study(index.row()).entered_effects[
             self.current_effect
         ][self.get_current_group_comparison()]
         if not target.study.manually_excluded:
