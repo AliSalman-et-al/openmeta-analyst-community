@@ -426,7 +426,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             2.0,
         ]
         assert any(payload.get("mean") == 95.5 for payload in r_payloads)
-        assert table.undoStack.count() == 1
+        assert window.workspace.can_undo
         assert window.current_data_unsaved is True
 
         window.undo()
@@ -572,7 +572,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             21.0,
         ]
         assert any(payload.get("TP") == 13 for payload in r_payloads)
-        assert table.undoStack.count() == 1
+        assert window.workspace.can_undo
         assert window.current_data_unsaved is True
 
         window.undo()
@@ -1036,7 +1036,7 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         )
         assert model.dataset.studies[0].include is True
         assert model.dataset.studies[0].manually_excluded is False
-        assert table.undoStack.count() == 1
+        assert window.workspace.can_undo
         assert window.current_data_unsaved is True
 
         window.undo()

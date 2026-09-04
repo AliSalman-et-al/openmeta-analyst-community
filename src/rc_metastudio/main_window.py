@@ -253,6 +253,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     def __setattr__(self, name, value):
         if name == _WORKSPACE_DIRTY_TEST_NAME and "workspace" in self.__dict__:
             if value:
+                self.workspace.mark_dirty()
                 self.workspace_is_dirty = True
             elif self.workspace.document is not None:
                 self.workspace.mark_saved()
@@ -891,10 +892,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             document = _document_from_model(self.model)
             if self.workspace.document is None:
                 self.workspace.new(document)
+                self.workspace.mark_dirty()
             elif document != self.workspace.document:
                 self.workspace.replace(document)
             self.workspace_is_dirty = self.workspace.is_dirty
         else:
+            self.workspace.mark_dirty()
             self.workspace_is_dirty = True
 
     def record_workspace_change(self, before, after):
@@ -1034,6 +1037,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.tableView.undoStack.redo()
 
     def _install_workspace_document(self, document):
+        current = self.tableView.currentIndex()
+        position = (current.row(), current.column()) if current.isValid() else None
         runtime = project_adapter.document_to_runtime_project(document)
         self.set_model(
             runtime.dataset,
@@ -1043,6 +1048,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         )
         self.out_path = str(self.workspace.path) if self.workspace.path else None
         self.workspace_is_dirty = self.workspace.is_dirty
+        if position is not None:
+            self.tableView.setCurrentIndex(self.model.index(*position))
+
+    def restore_workspace_after_failed_edit(self, was_dirty):
+        """Reconcile the session after an adapter rejected a partial paste."""
+        if self.model.dataset.get_outcome_names():
+            self.workspace.new(_document_from_model(self.model))
+            if was_dirty:
+                self.workspace.mark_dirty()
+            self.workspace_is_dirty = self.workspace.is_dirty
 
     def edit_dataset(self):
         current_dataset = copy.deepcopy(self.model.dataset)

@@ -59,6 +59,7 @@ class WorkspaceSession:
             reconstruct_analysis_dataset(self._document)
         self._history: list[WorkspaceChange] = []
         self._redo: list[WorkspaceChange] = []
+        self._forced_dirty = False
         self._saved_digest = (
             _document_digest(self._document) if self._document is not None else None
         )
@@ -82,8 +83,8 @@ class WorkspaceSession:
     @property
     def is_dirty(self) -> bool:
         if self._document is None:
-            return False
-        return _document_digest(self._document) != self._saved_digest
+            return self._forced_dirty
+        return self._forced_dirty or _document_digest(self._document) != self._saved_digest
 
     @property
     def can_undo(self) -> bool:
@@ -127,6 +128,7 @@ class WorkspaceSession:
         self._history.clear()
         self._redo.clear()
         self._saved_digest = _document_digest(candidate)
+        self._forced_dirty = False
         loaded = self.document
         if loaded is None:
             raise RuntimeError("workspace replacement unexpectedly produced no document")
@@ -140,6 +142,7 @@ class WorkspaceSession:
         self._history.clear()
         self._redo.clear()
         self._saved_digest = _document_digest(document)
+        self._forced_dirty = False
 
     def save(self, path: str | Path | None = None) -> Path:
         if self._document is None:
@@ -150,12 +153,18 @@ class WorkspaceSession:
         save_project(destination, self._document.project, self._document.state)
         self._path = destination
         self._saved_digest = _document_digest(self._document)
+        self._forced_dirty = False
         return destination
 
     def mark_saved(self) -> None:
         if self._document is None:
             raise ValueError("cannot mark an empty workspace as saved")
         self._saved_digest = _document_digest(self._document)
+        self._forced_dirty = False
+
+    def mark_dirty(self) -> None:
+        """Mark the current document dirty when an adapter changes its view state."""
+        self._forced_dirty = True
 
     def undo(self) -> bool:
         if not self._history or self._document is None:
