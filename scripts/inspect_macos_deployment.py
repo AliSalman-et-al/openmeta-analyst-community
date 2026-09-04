@@ -836,19 +836,20 @@ def _validate_r_product_profile(r: dict) -> None:
         )
 
 
-def _r_profile_flags_ok(policy: object, png: dict) -> bool:
+def _r_profile_flags_ok(policy: object, png: dict[str, object]) -> bool:
+    size = png.get("size")
     return (
-        isinstance(policy, dict)
+        _string_keyed_dict(policy)
         and policy.get("tcltk_available") is False
         and policy.get("tcltk_loaded") is False
         and policy.get("aqua") is True
         and policy.get("bitmap_type") == "quartz"
-        and isinstance(png.get("size"), int)
-        and png["size"] > 0
+        and isinstance(size, int)
+        and size > 0
     )
 
 
-def _r_profile_png_ok(png: dict) -> bool:
+def _r_profile_png_ok(png: dict[str, object]) -> bool:
     return _valid_sha256(png.get("sha256"))
 
 
@@ -1627,17 +1628,24 @@ def _workflow_samples_valid(sample_projects: dict, sample_records: object) -> bo
         or not sample_records
     ):
         return False
-    projects = {item.get("project") for item in sample_records}
-    return len(projects) == len(sample_records) and all(
-        _valid_sample_record(item) for item in sample_records
+    typed_records: list[dict[str, object]] = []
+    for item in sample_records:
+        if not _string_keyed_dict(item):
+            return False
+        typed_records.append(item)
+    projects = {item.get("project") for item in typed_records}
+    return len(projects) == len(typed_records) and all(
+        _valid_sample_record(item) for item in typed_records
     )
 
 
 def _valid_sample_record(item: object) -> bool:
+    if not _string_keyed_dict(item):
+        return False
+    project = item.get("project")
     return (
-        isinstance(item, dict)
-        and isinstance(item.get("project"), str)
-        and item.get("project", "").endswith(".rcms")
+        isinstance(project, str)
+        and project.endswith(".rcms")
         and _valid_sha256(item.get("sha256"))
         and _valid_sha256(item.get("semantic_sha256"))
         and item.get("opened_in_packaged_application") is True
@@ -1705,13 +1713,10 @@ def _validate_direct_input_inventory(payload: dict) -> tuple[dict, list[dict]]:
 
 
 def _valid_direct_record(record: object) -> bool:
-    return (
-        isinstance(record, dict)
-        and _valid_sha256(record.get("sha256"))
-        and isinstance(record.get("size"), int)
-        and not isinstance(record.get("size"), bool)
-        and record["size"] >= 0
-    )
+    if not _string_keyed_dict(record) or not _valid_sha256(record.get("sha256")):
+        return False
+    size = record.get("size")
+    return isinstance(size, int) and not isinstance(size, bool) and size >= 0
 
 
 def _validate_direct_ppm_records(ppm_archives: list[dict]) -> None:
@@ -1770,7 +1775,7 @@ def _validate_rcmetar_provenance(payload: dict, source_commit: str, inputs: dict
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has invalid RCMetaR source provenance"
         )
-    archive = rcmetar["archive"]
+    archive = rcmetar.get("archive")
     if not _valid_direct_archive_record(archive):
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has an invalid source archive record"
@@ -1781,10 +1786,14 @@ def _validate_rcmetar_provenance(payload: dict, source_commit: str, inputs: dict
         )
 
 
-def _valid_rcmetar_source(rcmetar: object, source_commit: str) -> bool:
+def _valid_rcmetar_source(
+    rcmetar: object, source_commit: str
+) -> TypeGuard[dict[str, object]]:
+    if not _string_keyed_dict(rcmetar):
+        return False
+    archive = rcmetar.get("archive")
     return (
-        isinstance(rcmetar, dict)
-        and rcmetar.get("name") == "RCMetaR"
+        rcmetar.get("name") == "RCMetaR"
         and rcmetar.get("version") == "0.2.0"
         and rcmetar.get("url")
         == "https://github.com/ResearchConsultancy/rc-metastudio/tree/"
@@ -1792,17 +1801,20 @@ def _valid_rcmetar_source(rcmetar: object, source_commit: str) -> bool:
         + "/r/RCMetaR"
         and rcmetar.get("source_commit") == source_commit
         and _valid_sha256(rcmetar.get("archive_sha256"))
-        and isinstance(rcmetar.get("archive"), dict)
-        and rcmetar["archive"].get("sha256") == rcmetar.get("archive_sha256")
+        and _string_keyed_dict(archive)
+        and archive.get("sha256") == rcmetar.get("archive_sha256")
     )
 
 
-def _valid_direct_archive_record(archive: dict) -> bool:
+def _valid_direct_archive_record(archive: object) -> bool:
+    if not _string_keyed_dict(archive):
+        return False
+    size = archive.get("size")
     return (
         _valid_sha256(archive.get("sha256"))
-        and isinstance(archive.get("size"), int)
-        and not isinstance(archive.get("size"), bool)
-        and archive["size"] > 0
+        and isinstance(size, int)
+        and not isinstance(size, bool)
+        and size > 0
     )
 
 
@@ -1835,8 +1847,10 @@ def _is_native_runner(runner: dict, architecture: str) -> bool:
         and runner.get("uname_system") == "Darwin"
         and runner.get("uname_machine") == architecture
         and runner.get("python_machine") == architecture
-        and runner.get("macos_version")
-        and runner.get("macos_build")
+        and isinstance(runner.get("macos_version"), str)
+        and bool(runner.get("macos_version"))
+        and isinstance(runner.get("macos_build"), str)
+        and bool(runner.get("macos_build"))
     )
 
 
@@ -1929,7 +1943,8 @@ def _signature_identity_valid(signature: dict) -> bool:
         and signature.get("team_id") == "VZLD955F6P"
         and isinstance(signature.get("signer"), str)
         and "Developer ID Installer:" in signature["signer"]
-        and signature.get("certificate")
+        and isinstance(signature.get("certificate"), str)
+        and bool(signature.get("certificate"))
     )
 
 

@@ -308,12 +308,7 @@ def _audit_order(source: str, sections: list[tuple[str, object]], categories: se
         rank = {title.lower(): index for index, title in enumerate(_PUBLICATION_ORDER)}
         expected = sorted(comparable, key=lambda title: rank.get(title.lower(), len(rank)))
     else:
-        try:
-            from rc_metastudio.result_sections import order_text_sections
-
-            expected = [title for title, _value in order_text_sections(sections)]
-        except (ImportError, ValueError):
-            expected = comparable
+        expected = comparable
     if comparable != expected:
         return [
             _finding(
