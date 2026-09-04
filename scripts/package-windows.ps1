@@ -2,7 +2,6 @@ param(
     [switch]$RecreateVenv,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
-    [switch]$CaptureAdaptiveLayoutEvidence,
     [switch]$RunRegistryStateRoundTripTest
 )
 
@@ -302,7 +301,6 @@ try {
     $buildArgs = @{ RRuntimeRoot = $rHome }
     if ($SkipClean) { $buildArgs.SkipClean = $true }
     if ($SkipSmoke) { $buildArgs.SkipSmoke = $true }
-    if ($CaptureAdaptiveLayoutEvidence) { $buildArgs.CaptureAdaptiveLayoutEvidence = $true }
     & (Join-Path $repoRoot "scripts\build-windows-package.ps1") @buildArgs
     if ($LASTEXITCODE -ne 0) { throw "Windows package build failed." }
     Write-Step "Windows package complete; the authoritative version determines its artifact name."

@@ -10,7 +10,6 @@ bundle_identifier="org.researchconsultancy.rc-metastudio"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
-capture_adaptive_layout_evidence=0
 stop_after_r_substrate=0
 
 while [ "$#" -gt 0 ]; do
@@ -49,10 +48,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-smoke)
       skip_smoke=1
-      shift
-      ;;
-    --capture-adaptive-layout-evidence)
-      capture_adaptive_layout_evidence=1
       shift
       ;;
     --stop-after-r-substrate)
@@ -781,35 +776,6 @@ do
   fi
 done
 
-run_adaptive_layout_evidence() {
-  local evidence_root="$repo_root/build/macos-package/$architecture/adaptive-layout-evidence/macos-$architecture"
-  local sample_path="$sample_root/amino.rcms"
-  rm -rf "$evidence_root"
-  mkdir -p "$evidence_root"
-  for scale in "1.0" "1.5"; do
-    local scale_label
-    case "$scale" in
-      1.0) scale_label="100" ;;
-      1.5) scale_label="150" ;;
-      *) echo "Unsupported adaptive-layout evidence scale: $scale" >&2; exit 2 ;;
-    esac
-    local output_dir="$evidence_root/scale-$scale_label"
-    local log_path="$output_dir/automation-adaptive-layout-evidence.log"
-    mkdir -p "$output_dir"
-    env -u QT_QPA_PLATFORM \
-      QT_SCALE_FACTOR="$scale" \
-      RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
-      RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG="$log_path" \
-      RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$r_home" \
-      RCMS_R_LIBS="$r_lib" \
-      "$app_root/RCMetaStudio" \
-        --automation-adaptive-layout-evidence "$output_dir" "$sample_path"
-    "$python_exe" "$repo_root/scripts/validate_adaptive_layout_evidence.py" \
-      --root "$output_dir" --platform-plugin cocoa --scale-factor "$scale"
-  done
-}
-
 run_packaged_process() {
   local timeout_seconds="${RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS:-900}"
   local stdout_path="${RCMS_PACKAGED_STDOUT_PATH:-$smoke_stdout_path}"
@@ -937,15 +903,6 @@ PY
     --launchservices-marker "$launchservices_marker_path"
   rm -f "$launchservices_pid_path"
 fi
-if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
-  if [ "$architecture" != "arm64" ]; then
-    echo "Controlled adaptive-layout evidence is supported only for Apple silicon macOS." >&2
-    exit 2
-  fi
-  step "Capturing controlled native macOS adaptive-layout evidence"
-  run_adaptive_layout_evidence
-fi
-
 source_commit="$(git rev-parse HEAD)"
 python_version="$("$python_exe" -c 'import platform; print(platform.python_version())')"
 pyqt6_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6"))')"

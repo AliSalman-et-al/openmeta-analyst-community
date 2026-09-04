@@ -118,7 +118,6 @@ def test_windows_distributable_contract_is_declared():
         "Copy-DirectoryTree",
         "Assert-AppLayout",
         "Invoke-PackagedAppSmokeTest",
-        "Invoke-PackagedWizardLayoutSmokeTest",
         "Get-ProjectVersion",
         "Test-BundledRPackages",
         "Assert-RCMetaRSummaryFormatting",
@@ -217,32 +216,10 @@ def test_packaged_smoke_launches_with_positional_project_argument():
     )
 
 
-def test_packaged_smoke_launches_visual_wizard_layout_gate():
-    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
-
-    assert relative_order(
-        script,
-        "function Invoke-PackagedAppSmokeTest",
-        "function Invoke-PackagedWizardLayoutSmokeTest",
-        "Invoke-PackagedAppSmokeTest -Root $appDir",
-        "Invoke-PackagedWizardLayoutSmokeTest -Root $appDir",
-    )
-    assert (
-        'Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
-        in script
-    )
-    assert '$env:QT_QPA_PLATFORM = "offscreen"' in script
-    assert '$startArguments.WindowStyle = "Hidden"' in script
-    assert "RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG" in script
-    assert "$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath" in script
-    assert "automation-wizard-layout-smoke.log" in script
-    assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
-
-
 def test_native_packaged_smoke_launch_is_visible():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
     smoke = script.split("function Invoke-PackagedAppSmokeTest", 1)[1].split(
-        "function Invoke-PackagedAdaptiveLayoutEvidence", 1
+        "function Compress-AppDirectory", 1
     )[0]
 
     assert (

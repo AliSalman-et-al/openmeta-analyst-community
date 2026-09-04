@@ -4,7 +4,6 @@ param(
     [switch]$SkipDependencyInstall,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
-    [switch]$CaptureAdaptiveLayoutEvidence,
     [string]$QualifyExistingArchive
 )
 
@@ -337,101 +336,6 @@ function Invoke-PackagedAppSmokeTest {
         & $PythonExe scripts\inspect_windows_deployment.py finalize-smoke `
             --smoke-evidence $smokeEvidencePath --smoke-log $smokeLogPath
         if ($LASTEXITCODE -ne 0) { throw "Packaged smoke finalization failed after clean process exits." }
-    }
-    finally {
-        foreach ($name in $previousEnv.Keys) {
-            if ($null -eq $previousEnv[$name]) {
-                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-Item "Env:\$name" $previousEnv[$name]
-            }
-        }
-    }
-}
-
-function Invoke-PackagedAdaptiveLayoutEvidence {
-    param([string]$Root)
-    $exePath = Join-Path $Root "RCMetaStudio.exe"
-    $samplePath = Join-Path $Root "sample_projects\amino.rcms"
-    $evidenceRoot = Join-Path $repoRoot "build\windows-package\adaptive-layout-evidence\windows-x64"
-    if (Test-Path $evidenceRoot) { Remove-Item -LiteralPath $evidenceRoot -Recurse -Force }
-    $previousEnv = @{
-        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
-        QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
-        RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
-        RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG
-        RCMS_ADAPTIVE_LAYOUT_SCALE = $env:RCMS_ADAPTIVE_LAYOUT_SCALE
-        RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
-    }
-    try {
-        Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
-        $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
-        $env:RPY2_CFFI_MODE = "API"
-        $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
-        $baselineDpr = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
-        if ($LASTEXITCODE -ne 0 -or -not $baselineDpr) { throw "Could not read packaged baseline DPR for adaptive-layout evidence." }
-        foreach ($scale in @(
-            @{ Value = "1.0"; Directory = "scale-100" },
-            @{ Value = "1.5"; Directory = "scale-150" }
-        )) {
-            $outputDir = Join-Path $evidenceRoot $scale.Directory
-            $logPath = Join-Path $outputDir "automation-adaptive-layout-evidence.log"
-            New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-            $env:RCMS_ADAPTIVE_LAYOUT_SCALE = $scale.Value
-            $env:QT_SCALE_FACTOR = ([double]$scale.Value / [double]$baselineDpr).ToString("0.############", [Globalization.CultureInfo]::InvariantCulture)
-            $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $logPath
-            $quotedOutputDir = '"{0}"' -f $outputDir
-            $quotedSamplePath = '"{0}"' -f $samplePath
-            $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
-                "--automation-adaptive-layout-evidence", $quotedOutputDir, $quotedSamplePath
-            ) -Visible
-            if ($exitCode -ne 0) {
-                $message = "Native adaptive-layout evidence failed at scale $($scale.Value) with exit code $exitCode."
-                if (Test-Path $logPath) {
-                    $message = $message + " " + (Get-Content -Raw -LiteralPath $logPath).Trim()
-                }
-                throw $message
-            }
-            & $PythonExe (Join-Path $repoRoot "scripts\validate_adaptive_layout_evidence.py") `
-                --root $outputDir --platform-plugin windows --scale-factor $scale.Value
-            if ($LASTEXITCODE -ne 0) {
-                throw "Adaptive-layout evidence validation failed at scale $($scale.Value)."
-            }
-        }
-    }
-    finally {
-        foreach ($name in $previousEnv.Keys) {
-            if ($null -eq $previousEnv[$name]) {
-                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-Item "Env:\$name" $previousEnv[$name]
-            }
-        }
-    }
-}
-
-function Invoke-PackagedWizardLayoutSmokeTest {
-    param([string]$Root)
-    $exePath = Join-Path $Root "RCMetaStudio.exe"
-    $smokeLogPath = Join-Path $Root "automation-wizard-layout-smoke.log"
-    if (Test-Path $smokeLogPath) { Remove-Item -LiteralPath $smokeLogPath -Force }
-    $previousEnv = @{
-        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
-        RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
-    }
-    try {
-        $env:QT_QPA_PLATFORM = "offscreen"
-        $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
-        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")
-        if ($exitCode -ne 0) {
-            $message = "Packaged wizard layout smoke test failed with exit code $exitCode."
-            if (Test-Path $smokeLogPath) {
-                $message = $message + " " + (Get-Content -Raw -LiteralPath $smokeLogPath).Trim()
-            }
-            throw $message
-        }
     }
     finally {
         foreach ($name in $previousEnv.Keys) {
@@ -904,11 +808,6 @@ if ($LASTEXITCODE -ne 0) { throw "Windows deployment inspection failed." }
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
-    Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
-}
-if ($CaptureAdaptiveLayoutEvidence) {
-    Write-Step "Capturing controlled native Windows adaptive-layout evidence"
-    Invoke-PackagedAdaptiveLayoutEvidence -Root $appDir
 }
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName

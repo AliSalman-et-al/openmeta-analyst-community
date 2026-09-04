@@ -7,7 +7,6 @@ archive_root_name=""
 recreate_venv=0
 skip_clean=0
 skip_smoke=0
-capture_adaptive_layout_evidence=0
 stop_after_r_substrate=0
 bundle_identifier="org.researchconsultancy.rc-metastudio"
 
@@ -39,10 +38,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-smoke)
       skip_smoke=1
-      shift
-      ;;
-    --capture-adaptive-layout-evidence)
-      capture_adaptive_layout_evidence=1
       shift
       ;;
     --stop-after-r-substrate)
@@ -131,9 +126,6 @@ if [ "$skip_clean" -eq 1 ]; then
 fi
 if [ "$skip_smoke" -eq 1 ]; then
   build_args+=(--skip-smoke)
-fi
-if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
-  build_args+=(--capture-adaptive-layout-evidence)
 fi
 if [ "$stop_after_r_substrate" -eq 1 ]; then
   build_args+=(--stop-after-r-substrate)
