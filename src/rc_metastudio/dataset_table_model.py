@@ -1369,9 +1369,13 @@ class DatasetTableModel(QAbstractTableModel):
     def sort_studies(self, col, reverse):
         if col == self.NAME:
             self._sort_studies_with_cmp("name", reverse)
-        elif col == self.YEAR:
+            self.reset_model()
+            return
+        if col == self.YEAR:
             self._sort_studies_with_cmp("year", reverse)
-        elif col in self.RAW_DATA:
+            self.reset_model()
+            return
+        if col in self.RAW_DATA:
             # need this to dig down to find right analysis_unit and data we're looking for to compare against
             analysis_unit_reference_info = {
                 "outcome_name": self.current_outcome_name,
@@ -1384,14 +1388,16 @@ class DatasetTableModel(QAbstractTableModel):
             self._sort_studies_with_cmp(
                 "raw_data", reverse, analysis_unit_reference_info
             )
-        elif col in self.OUTCOMES:
+            self.reset_model()
+            return
+        if col in self.OUTCOMES:
             self._sort_outcomes_with_display_source(col, reverse)
-
-        # Columns to the right of outcomes are covariates.
-        elif col > self.OUTCOMES[-1]:
+            self.reset_model()
+            return
+        if col > self.OUTCOMES[-1]:
+            # Columns to the right of outcomes are covariates.
             cov = self.get_covariate_for_column(col)
             self._sort_studies_with_cmp(cov.name, reverse)
-
         self.reset_model()
 
     def order_studies(self, ids):
