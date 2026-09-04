@@ -534,10 +534,17 @@ rcmetar.graphics.off <- function() {
     grDevices::graphics.off()
 }
 
-rcmetar.run.analysis <- function(om.data, request) {
+rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list(), workflow="standard",
+                                 selected.cov=NULL, cond.means.data=NULL, stop.at.rma=FALSE) {
     request <- rcmetar.validate.analysis.request(
         om.data=om.data,
-        request=request
+        request=request,
+        method=method,
+        params=params,
+        workflow=workflow,
+        selected.cov=selected.cov,
+        cond.means.data=cond.means.data,
+        stop.at.rma=stop.at.rma
     )
 
     # Reitsma owns the count transformation.  Keep raw TP/FN/FP/TN all the
@@ -568,7 +575,7 @@ rcmetar.run.analysis <- function(om.data, request) {
     .rcmetar.attach.request(result, request)
 }
 
-rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL, version) {
+rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL, version=1) {
     if (length(version) != 1 || !identical(as.integer(version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
     }
@@ -592,10 +599,15 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
     for (i in seq_along(methods)) {
         rcmetar.validate.analysis.request(
             diagnostic.data,
-            method=methods[[i]],
-            params=params.list[[i]],
-            workflow=workflow,
-            selected.cov=selected.cov
+            request=list(
+                version=1L,
+                data_type="diagnostic",
+                metric=as.character(params.list[[i]]$measure %||% "DOR"),
+                method=methods[[i]],
+                params=params.list[[i]],
+                workflow=workflow,
+                selected.cov=selected.cov
+            )
         )
     }
 
@@ -646,9 +658,24 @@ rcmetar.run.permutation <- function(data, method="DL", mods=NULL, level=95, digi
                       exact=exact, retpermdist=retpermdist, ...)
 }
 
-rcmetar.validate.analysis.request <- function(om.data, request) {
-    if (!is.list(request) || is.null(names(request))) {
+rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL, params=list(), workflow="standard",
+                                              selected.cov=NULL, cond.means.data=NULL, stop.at.rma=FALSE) {
+    if (is.null(request)) {
+        request <- list(
+            version=1L,
+            data_type=.rcmetar.data.type(om.data),
+            metric=as.character(params$measure %||% ""),
+            method=method,
+            params=params,
+            workflow=workflow,
+            selected.cov=selected.cov,
+            cond.means.data=cond.means.data,
+            stop.at.rma=stop.at.rma
+        )
+    } else if (!is.list(request) || is.null(names(request))) {
         stop("Analysis request must be a named list.", call.=FALSE)
+    } else {
+        request$version <- request$version %||% 1L
     }
     if (length(request$version) != 1 || !identical(as.integer(request$version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
@@ -707,9 +734,7 @@ rcmetar.validate.analysis.request <- function(om.data, request) {
     }
 
     if (workflow == "subgroup") {
-        selected.cov <- .rcmetar.resolve.selected.cov(
-            om.data, request$selected.cov, params
-        )
+        selected.cov <- .rcmetar.resolve.selected.cov(om.data, request$selected.cov %||% selected.cov, params)
     }
 
     if (!is.null(params$measure) && !identical(as.character(params$measure), metric)) {
@@ -721,9 +746,9 @@ rcmetar.validate.analysis.request <- function(om.data, request) {
         method=method,
         params=params,
         workflow=workflow,
-        selected.cov=request$selected.cov,
-        cond.means.data=request$cond.means.data,
-        stop.at.rma=isTRUE(request$stop.at.rma)
+        selected.cov=request$selected.cov %||% selected.cov,
+        cond.means.data=request$cond.means.data %||% cond.means.data,
+        stop.at.rma=isTRUE(request$stop.at.rma %||% stop.at.rma)
     )
 }
 

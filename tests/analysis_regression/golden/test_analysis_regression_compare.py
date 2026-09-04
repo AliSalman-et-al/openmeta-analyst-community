@@ -973,11 +973,11 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
 
         assert (
-            headless_analysis.run_headless_analysis(binary)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(binary).texts["Summary"]
             == "cumulative:binary.random"
         )
         assert (
-            headless_analysis.run_headless_analysis(continuous)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(continuous).texts["Summary"]
             == "leave-one-out:continuous.random"
         )
         assert [call for call in calls if call[0] == "metric"] == [
@@ -1024,7 +1024,7 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
             data_type=meta_globals.BINARY,
         )
         assert (
-            headless_analysis.run_headless_analysis(explicit_case)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(explicit_case).texts["Summary"]
             == "RR"
         )
         assert explicit_case.parameters == {"measure": "OR"}
@@ -1037,7 +1037,7 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
             data_type=meta_globals.BINARY,
         )
         assert (
-            headless_analysis.run_headless_analysis(restored_case)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(restored_case).texts["Summary"]
             == "OR"
         )
 
@@ -1197,7 +1197,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
             covariates=covariates,
         )
 
-        assert headless_analysis.run_headless_analysis(case)["texts"]["Summary"] == "OR"
+        assert headless_analysis.run_headless_analysis(case).texts["Summary"] == "OR"
         data_call = next(call for call in calls if call[0] == "data")
         assert data_call[1]["include_raw_data"] is False
         assert data_call[1]["studies"] == model.studies

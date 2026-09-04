@@ -748,7 +748,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             '''
         )
-        named_weights = r_bridge.parse_out_results(named_weights_result)["texts"]["Weights"]
+        named_weights = r_bridge.parse_out_results(named_weights_result).texts["Weights"]
         assert named_weights.splitlines()[0].strip() == "Study names  Weights", named_weights
         assert "Alpha Study" in named_weights, named_weights
         assert "Beta Study" in named_weights, named_weights

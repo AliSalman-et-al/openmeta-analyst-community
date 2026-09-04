@@ -1332,7 +1332,9 @@ def _text_section_metadata(sources, producer_sections):
                 "title": supplied["title"]
                 if supplied is not None and child_index == 0
                 else title,
-                "source_key": title,
+                "source_key": supplied["source_key"]
+                if supplied is not None and child_index == 0
+                else title,
             }
         )
     return sections
@@ -1755,6 +1757,22 @@ def _summary_section_name(parent_name, child_name):
 
 
 def _display_section_name(name):
+    stable_titles = {
+        "small-study-warning": "Warning",
+        "small-study-data-eligibility": "Data and eligibility",
+        "small-study-tests": "Tests",
+        "small-study-pooled-comparison": "Pooled comparison",
+        "small-study-references": "References",
+        "small-study-failures": "Failures",
+        "small-study-method-details": "Method details",
+        "small-study-methods-not-applicable": "Methods not applicable",
+        "small-study-extrapolation": "Extrapolation",
+    }
+    if name in stable_titles:
+        return stable_titles[name]
+    if str(name).startswith("small-study.trim-and-fill."):
+        suffix = str(name).rsplit(".", 1)[-1]
+        return "Trim-and-fill " + suffix.title()
     return method_display_label(str(name))
 
 

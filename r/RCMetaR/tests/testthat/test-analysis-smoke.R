@@ -357,7 +357,8 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   result <- rcmetar.run.diagnostic.analyses(
     spec_data,
     c("diagnostic.random", "diagnostic.random"),
-    list(sens_params, spec_params)
+    list(sens_params, spec_params),
+    version=1
   )
 
   expect_analysis_result(result)

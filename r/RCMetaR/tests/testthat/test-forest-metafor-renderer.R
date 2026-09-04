@@ -1521,7 +1521,8 @@ test_that("diagnostic multi-metric workflows save independent metafor forest plo
     result <- rcmetar.run.diagnostic.analyses(
       fixture$data,
       rep("diagnostic.random", length(measures)),
-      params
+      params,
+      version=1
     )
     expected_titles <- paste(
       vapply(measures, pretty.metric.name, character(1)),
@@ -1590,7 +1591,8 @@ test_that("repeated diagnostic workflows keep metric forest plots independent", 
       fixture$data,
       rep("diagnostic.random", length(measures)),
       params,
-      workflow = workflow
+      workflow = workflow,
+      version=1
     )
     expected_names <- paste(
       vapply(measures, pretty.metric.name, character(1)),
