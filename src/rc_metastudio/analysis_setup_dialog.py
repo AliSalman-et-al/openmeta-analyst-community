@@ -33,7 +33,6 @@ from rc_metastudio import (
     plot_capabilities,
     progress_dialog,
     qt_text,
-    r_bridge,
 )
 from rc_metastudio.analysis_method_labels import (
     diagnostic_metric_group_display_label,
@@ -140,11 +139,11 @@ class _DiagnosticMethodPanel(object):
         return self.methods[str(self.combo.currentText())]
 
     def populate(self):
-        r_bridge.dataset_to_simple_diagnostic_r_object(
-            self.owner.model, var_name="tmp_obj"
+        self.owner.analysis_service.prepare_method_dataset(
+            self.owner.model, "diagnostic", var_name="tmp_obj"
         )
         self.methods = normalize_available_method_labels(
-            r_bridge.get_available_methods(
+            self.owner.analysis_service.available_methods(
                 for_data_type="diagnostic",
                 data_obj_name="tmp_obj",
                 metric=self.metric,
@@ -173,10 +172,12 @@ class _DiagnosticMethodPanel(object):
         self.widgets = []
         self.params = {}
         method = self.method
-        definitions, defaults, order, metadata = r_bridge.get_params(method)
+        definitions, defaults, order, metadata = self.owner.analysis_service.parameters(
+            method
+        )
         self.param_box.setTitle(str(self.combo.currentText()))
         description = QLabel(
-            "Description: %s" % r_bridge.get_method_description(method)
+            "Description: %s" % self.owner.analysis_service.method_description(method)
         )
         description.setWordWrap(True)
         self.param_box.layout().addWidget(description, 0, 0, 1, 2)
@@ -211,9 +212,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         diagnostic_analysis_details=None,
         fp_specs_only=False,
         confidence_level=None,
+        analysis_service=None,
     ):
 
         super(AnalysisSetupDialog, self).__init__(parent)
+        self.analysis_service = analysis_service or analysis_adapter.AnalysisService()
         self.setupUi(self)
         self._hide_internal_plot_path_controls()
         self._layout_reflow_pending = False
@@ -462,10 +465,10 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
     def _configure_plot_option_groups(self):
         workflow = self.analysis_type or "standard"
-        capabilities = r_bridge.get_analysis_plot_capabilities(
+        capabilities = self.analysis_service.plot_capabilities(
             self.data_type, self.current_method, workflow=workflow
         )
-        plot_kinds = [capability["plot_kind"] for capability in capabilities]
+        plot_kinds = [str(capability["plot_kind"]) for capability in capabilities]
         groups = frozenset().union(
             *(plot_capabilities.option_groups(plot_kind) for plot_kind in plot_kinds)
         )
@@ -491,7 +494,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             )
             return
 
-        selection = analysis_adapter.select_studies_for_covariates(
+        selection = self.analysis_service.select_studies_for_covariates(
             self.model, selected_covariates
         )
 
@@ -532,7 +535,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         parameters["measure"] = metric
         if self.data_type == "diagnostic" and self.is_meta_regression:
             parameters["joint.metrics"] = "Sens,Spec"
-        request = analysis_adapter.make_analysis_request(
+        request = self.analysis_service.make_request(
             data_type=self.data_type,
             workflow="meta-regression",
             method="diagnostic.reitsma" if self.data_type == "diagnostic" else "meta_regression",
@@ -541,7 +544,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         )
         fixed_effects = self.fixed_effects_radio.isChecked()
         self._run_analysis(
-            lambda: analysis_adapter.execute_meta_regression_request(
+            lambda: self.analysis_service.execute_meta_regression(
                 self.model,
                 selection.studies,
                 tuple(selected_covariates),
@@ -628,7 +631,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
     def run_ma(self):
         self._run_analysis(
-            lambda: analysis_adapter.execute_analysis_requests(
+            lambda: self.analysis_service.execute(
                 self.model, self.analysis_requests()
             ),
             "Sorry, this analysis could not be completed:\n\n%s",
@@ -647,7 +650,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         except Exception as error:
             app_error_handler.log_exception(type(error), error, error.__traceback__)
             QMessageBox.critical(self, "Analysis Failed", failure_message % error)
-            _reset_r_working_dir_safely()
+            self._reset_working_dir_safely()
         finally:
             _dispose_progress(bar)
         try:
@@ -662,6 +665,12 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self._release_owned_connections()
         super().done(result)
         self.deleteLater()
+
+    def _reset_working_dir_safely(self):
+        try:
+            self.analysis_service.reset_working_directory()
+        except Exception:
+            pass
 
     def _release_owned_connections(self) -> None:
         self._disconnect_focus_reveal()
@@ -687,7 +696,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             self.current_param_vals["measure"] = metric
             parameters = copy.deepcopy(self.current_param_vals)
             return (
-                analysis_adapter.make_analysis_request(
+                self.analysis_service.make_request(
                     data_type=self.data_type,
                     workflow=workflow,
                     method=self.current_method,
@@ -699,7 +708,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self.add_current_analysis_details()
         method_names, parameter_values = _diagnostic_analysis_requests(self)
         return tuple(
-            analysis_adapter.make_analysis_request(
+            self.analysis_service.make_request(
                 data_type=self.data_type,
                 workflow=workflow,
                 method=method,
@@ -752,16 +761,16 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         # The backend filters methods against the selected dataset and metric.
         tmp_obj_name = "tmp_obj"
         if self.data_type == "binary":
-            r_bridge.dataset_to_simple_binary_r_object(
-                self.model, var_name=tmp_obj_name
+            self.analysis_service.prepare_method_dataset(
+                self.model, "binary", var_name=tmp_obj_name
             )
         elif self.data_type == "continuous":
-            r_bridge.dataset_to_simple_continuous_r_object(
-                self.model, var_name=tmp_obj_name
+            self.analysis_service.prepare_method_dataset(
+                self.model, "continuous", var_name=tmp_obj_name
             )
         elif self.data_type == "diagnostic":
-            r_bridge.dataset_to_simple_diagnostic_r_object(
-                self.model, var_name=tmp_obj_name
+            self.analysis_service.prepare_method_dataset(
+                self.model, "diagnostic", var_name=tmp_obj_name
             )
 
         self.available_method_d = None
@@ -782,7 +791,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         }
         if self.analysis_type is not None:
             method_query["workflow"] = self.analysis_type
-        self.available_method_d = r_bridge.get_available_methods(**method_query)
+        self.available_method_d = self.analysis_service.available_methods(**method_query)
         self.available_method_d = normalize_available_method_labels(
             self.available_method_d
         )
@@ -865,7 +874,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         current_grid_row = 0
 
         # add the method description
-        method_description = r_bridge.get_method_description(self.current_method)
+        method_description = self.analysis_service.method_description(self.current_method)
 
         self.add_method_description(
             parameter_layout,
@@ -1072,7 +1081,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         # itself maps to a dictionary with a pretty name and description (assuming
         # they were provided for the given param)
         self.current_params, self.current_defaults, self.var_order, self.param_d = (
-            r_bridge.get_params(self.current_method)
+            self.analysis_service.parameters(self.current_method)
         )
 
         for name, definition in self.current_params.items():
@@ -1184,7 +1193,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 )
 
     def _diagnostic_params_for_method(self, method, local_params):
-        definitions, _defaults, _order, _metadata = r_bridge.get_params(method)
+        definitions, _defaults, _order, _metadata = self.analysis_service.parameters(
+            method
+        )
         params = {
             name: value
             for name, value in self.current_param_vals.items()
@@ -1249,13 +1260,6 @@ def _dispose_progress(progress):
     progress_dialog.hide_once(progress)
     progress.close()
     progress.deleteLater()
-
-
-def _reset_r_working_dir_safely():
-    try:
-        r_bridge.reset_r_working_directory()
-    except Exception:
-        pass
 
 
 def _coerce_integer_default(name: str, value: object) -> int:

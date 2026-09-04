@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QSizePolicy
 
-from rc_metastudio import adaptive_window, app_error_handler, r_bridge
+from rc_metastudio import adaptive_window, app_error_handler
 from rc_metastudio.meta_globals import ALL_METRIC_NAMES, ONE_ARM_METRICS
 from rc_metastudio.publication_bias import (
     CorrectionPolicy,
@@ -16,11 +16,10 @@ from rc_metastudio.publication_bias import (
     FunnelStyle,
     LabelPolicy,
     SmallStudyEffectsRequest,
+    SmallStudyEffectsService,
     TrimAndFillEstimator,
     TrimAndFillModel,
     TrimAndFillSide,
-    execute_small_study_effects,
-    parse_eligibility_report,
 )
 
 if TYPE_CHECKING:
@@ -55,9 +54,10 @@ class PublicationBiasDialog(
 ):
     """Configure methods and plots while RCMetaR chooses eligible tests."""
 
-    def __init__(self, model, parent=None):
+    def __init__(self, model, parent=None, analysis_service=None):
         super().__init__(parent)
         self.model = model
+        self.analysis_service = analysis_service or SmallStudyEffectsService()
         self.setupUi(self)
         self._configure_scroll_surfaces()
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
@@ -149,11 +149,7 @@ class PublicationBiasDialog(
     def _populate_context(self):
         request = self._preview_request()
         try:
-            report = parse_eligibility_report(
-                r_bridge.run_small_study_effects(
-                    self.model, request.to_mapping(), preview=True
-                )
-            )
+            report = self.analysis_service.preview(self.model, request)
         except Exception:  # noqa: BLE001 - Qt boundary remains recoverable
             self._eligibility_report = None
             self.context_label.setText(self._context_summary())
@@ -328,7 +324,7 @@ class PublicationBiasDialog(
         self.failure_label.clear()
         self.failure_label.setVisible(False)
         try:
-            result = execute_small_study_effects(self.model, self._request())
+            result = self.analysis_service.execute(self.model, self._request())
             owner = self.parentWidget()
             callback = getattr(owner, "analysis", None)
             if not callable(callback):

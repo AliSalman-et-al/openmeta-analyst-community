@@ -225,8 +225,12 @@ def _text(value: object, field_name: str) -> str:
 
 
 def _analysis_family(value: str) -> AnalysisFamily:
-    if value in ("binary", "continuous", "diagnostic"):
-        return value
+    if value == "binary":
+        return "binary"
+    if value == "continuous":
+        return "continuous"
+    if value == "diagnostic":
+        return "diagnostic"
     raise ValueError(f"unsupported small-study effects data family: {value!r}")
 
 
@@ -702,6 +706,25 @@ def execute_small_study_effects(
 
     result = r_bridge.run_small_study_effects(model, request.to_mapping())
     return parse_analysis_result(result)
+
+
+class SmallStudyEffectsService:
+    """Own the R boundary used by the small-study effects dialog."""
+
+    def preview(
+        self, model: object, request: SmallStudyEffectsRequest
+    ) -> EligibilityReport:
+        from rc_metastudio import r_bridge
+
+        value = r_bridge.run_small_study_effects(
+            model, request.to_mapping(), preview=True
+        )
+        return parse_eligibility_report(value)
+
+    def execute(
+        self, model: object, request: SmallStudyEffectsRequest
+    ) -> AnalysisResult:
+        return execute_small_study_effects(model, request)
 
 
 def regenerate_small_study_effects_funnel(

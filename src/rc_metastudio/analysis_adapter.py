@@ -138,6 +138,93 @@ class StudySelectionResult:
     excluded_study_names: tuple[str, ...] = ()
 
 
+class AnalysisService:
+    """Own the process-global R boundary used by analysis configuration UI."""
+
+    def prepare_method_dataset(
+        self, model: object, data_type: str, *, var_name: str = "tmp_obj"
+    ) -> None:
+        if data_type == "binary":
+            r_bridge.dataset_to_simple_binary_r_object(model, var_name=var_name)
+            return
+        if data_type == "continuous":
+            r_bridge.dataset_to_simple_continuous_r_object(model, var_name=var_name)
+            return
+        if data_type == "diagnostic":
+            r_bridge.dataset_to_simple_diagnostic_r_object(model, var_name=var_name)
+            return
+        raise ValueError(f"unsupported analysis data family: {data_type!r}")
+
+    def available_methods(self, **query: object) -> Mapping[str, str]:
+        return r_bridge.get_available_methods(**query)
+
+    def parameters(self, method: str):
+        return r_bridge.get_params(method)
+
+    def method_description(self, method: str) -> str:
+        return r_bridge.get_method_description(method)
+
+    def plot_capabilities(
+        self, data_type: str, method: str, *, workflow: str
+    ) -> list[Mapping[str, object]]:
+        return r_bridge.get_analysis_plot_capabilities(
+            data_type, method, workflow=workflow
+        )
+
+    def select_studies_for_covariates(
+        self,
+        model: CovariateSelectionModel,
+        selected_covariates: Sequence[analysis_dataset.Covariate],
+    ) -> StudySelectionResult:
+        return select_studies_for_covariates(model, selected_covariates)
+
+    def make_request(
+        self,
+        *,
+        data_type: str,
+        workflow: str | None,
+        method: str,
+        metric: str,
+        parameters: Mapping[str, object],
+    ) -> AnalysisRequest:
+        return make_analysis_request(
+            data_type=data_type,
+            workflow=workflow,
+            method=method,
+            metric=metric,
+            parameters=parameters,
+        )
+
+    def execute(
+        self,
+        model: object,
+        requests: Sequence[AnalysisRequest],
+        selected_covariates: Sequence[analysis_dataset.Covariate] = (),
+    ) -> AnalysisResult:
+        return execute_analysis_requests(model, requests, selected_covariates)
+
+    def execute_meta_regression(
+        self,
+        model: MetaRegressionModel,
+        studies: Sequence[analysis_dataset.Study],
+        selected_covariates: Sequence[analysis_dataset.Covariate],
+        request: AnalysisRequest,
+        fixed_effects: bool,
+        default_confidence_level: AnalysisValue,
+    ) -> AnalysisResult:
+        return execute_meta_regression_request(
+            model,
+            studies,
+            selected_covariates,
+            request,
+            fixed_effects,
+            default_confidence_level,
+        )
+
+    def reset_working_directory(self) -> None:
+        r_bridge.reset_r_working_directory()
+
+
 def select_studies_for_covariates(
     model: CovariateSelectionModel,
     selected_covariates: Sequence[analysis_dataset.Covariate],
@@ -320,7 +407,7 @@ def execute_meta_regression_request(
     selected_covariates: Sequence[analysis_dataset.Covariate],
     request: AnalysisRequest,
     fixed_effects: bool,
-    default_confidence_level: object,
+    default_confidence_level: AnalysisValue,
 ) -> AnalysisResult:
     """Convert the dataset and execute one frozen meta-regression request."""
     conversion_kwargs = {
@@ -343,7 +430,9 @@ def execute_meta_regression_request(
         )
     parameters = request.parameter_values()
     parameters.setdefault("conf.level", default_confidence_level)
-    parameters["rm.method"] = "FE" if fixed_effects else parameters.get("rm.method", "DL")
+    parameters["rm.method"] = (
+        "FE" if fixed_effects else parameters.get("rm.method", "DL")
+    )
     versioned = dict(request.to_mapping())
     versioned["workflow"] = "meta-regression"
     versioned["params"] = parameters
@@ -378,7 +467,9 @@ def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
     if model.included_studies_have_raw_data():
         return False
 
-    joint_methods = [request for request in requests if request.method == "diagnostic.reitsma"]
+    joint_methods = [
+        request for request in requests if request.method == "diagnostic.reitsma"
+    ]
     if joint_methods:
         raise ValueError(
             "Reitsma bivariate model requires complete TP/FN/FP/TN counts; "
@@ -445,7 +536,17 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
             metric_result = _typed_result(run_metric(request))
         except DiagnosticExecutionError as e:
             failures.append((metric, e))
-            cast(dict[str, str], merged_result["texts"])["%s Error" % metric] = str(e)
+            title = "%s Error" % metric
+            cast(dict[str, str], merged_result["texts"])[title] = str(e)
+            cast(list[dict[str, object]], merged_result["sections"]).append(
+                {
+                    "id": "diagnostic.%s.error" % metric.lower(),
+                    "kind": "text",
+                    "order": len(cast(list[object], merged_result["sections"])),
+                    "title": title,
+                    "source_key": title,
+                }
+            )
         else:
             _merge_diagnostic_result(merged_result, metric_result)
 
@@ -459,6 +560,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
 
 def _empty_diagnostic_result() -> dict[str, object]:
     return {
+        "version": 1,
         "texts": {},
         "images": {},
         "display_images": {},
@@ -466,17 +568,22 @@ def _empty_diagnostic_result() -> dict[str, object]:
         "image_params_paths": {},
         "plot_capabilities": {},
         "image_order": [],
+        "sections": [],
     }
 
 
 def _merge_diagnostic_result(
     merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
-    # References are a result-level collection rather than a metric-specific
-    # section.  A plain mapping update would silently discard citations from
-    # every metric except the last successful one.  Merge them first, keeping
-    # producer order and the existing reference formatter's de-duplication
-    # rules; the remaining keyed sections are intentionally metric-scoped.
+    _merge_diagnostic_texts(merged_result, metric_result)
+    _merge_diagnostic_artifacts(merged_result, metric_result)
+    _merge_diagnostic_image_order(merged_result, metric_result)
+    _merge_diagnostic_sections(merged_result, metric_result)
+
+
+def _merge_diagnostic_texts(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
     merged_texts = cast(dict[str, str], merged_result["texts"])
     metric_texts = cast(Mapping[str, str], metric_result.get("texts", {}))
     merged_references = _merge_reference_texts(
@@ -484,35 +591,70 @@ def _merge_diagnostic_result(
     )
     if merged_references:
         merged_texts["References"] = merged_references
+    merged_texts.update(
+        {name: value for name, value in metric_texts.items() if name != "References"}
+    )
 
+
+def _merge_diagnostic_artifacts(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
     for key in (
-        "texts",
         "images",
         "display_images",
         "image_var_names",
         "image_params_paths",
         "plot_capabilities",
     ):
-        if key == "texts":
-            merged_texts.update(
-                {
-                    name: value
-                    for name, value in metric_texts.items()
-                    if name != "References"
-                }
-            )
-        else:
-            cast(dict[str, object], merged_result[key]).update(
-                cast(Mapping[str, object], metric_result.get(key, {}))
-            )
+        cast(dict[str, object], merged_result[key]).update(
+            cast(Mapping[str, object], metric_result.get(key, {}))
+        )
 
+
+def _merge_diagnostic_image_order(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
     image_order = cast(Sequence[str] | None, metric_result.get("image_order"))
-    if image_order:
-        merged_order = cast(list[str] | None, merged_result["image_order"])
-        if merged_order is None:
-            merged_result["image_order"] = list(image_order)
-        else:
-            merged_order.extend(image_order)
+    if not image_order:
+        return
+    merged_order = cast(list[str] | None, merged_result["image_order"])
+    if merged_order is None:
+        merged_result["image_order"] = list(image_order)
+        return
+    merged_order.extend(image_order)
+
+
+def _merge_diagnostic_sections(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
+    merged_texts = cast(dict[str, str], merged_result["texts"])
+    merged_sections = cast(list[dict[str, object]], merged_result["sections"])
+    reference_id = None
+    for section in metric_result.sections:
+        if section.kind == "text" and section.source_key == "References":
+            reference_id = section.semantic_id
+            continue
+        merged_sections.append(
+            {
+                "id": section.semantic_id,
+                "kind": section.kind,
+                "order": len(merged_sections),
+                "title": section.title,
+                "source_key": section.source_key,
+            }
+        )
+    if "References" in merged_texts and not any(
+        section["source_key"] == "References" for section in merged_sections
+    ):
+        merged_sections.append(
+            {
+                "id": reference_id or "diagnostic.references",
+                "kind": "text",
+                "order": len(merged_sections),
+                "title": "References",
+                "source_key": "References",
+            }
+        )
 
 
 def _diagnostic_result_has_successes(result: AnalysisResult) -> bool:

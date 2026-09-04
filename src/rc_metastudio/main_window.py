@@ -36,6 +36,7 @@ from rc_metastudio import dataset_table_model
 from rc_metastudio import meta_globals
 from rc_metastudio.meta_globals import DEFAULT_DATASET_NAME
 from rc_metastudio import analysis_dataset
+from rc_metastudio import analysis_adapter
 from rc_metastudio import app_error_handler
 from rc_metastudio import r_backend
 from rc_metastudio import progress_dialog
@@ -62,6 +63,7 @@ from rc_metastudio.runtime_types import required
 from rc_metastudio import add_new_dialogs
 from rc_metastudio import results_window, analysis_setup_dialog
 from rc_metastudio import publication_bias_dialog
+from rc_metastudio import publication_bias
 from rc_metastudio import diagnostic_metrics_dialog
 from rc_metastudio import subgroup_analysis_dialog
 from rc_metastudio import edit_dialog
@@ -250,6 +252,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.analysis_service = analysis_adapter.AnalysisService()
+        self.small_study_effects_service = publication_bias.SmallStudyEffectsService()
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setupUi(self)
         qt_layout.configure_analysis_menu(self.menuAnalysis)
@@ -714,7 +718,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         form.show()
 
     def publication_bias(self):
-        form = publication_bias_dialog.PublicationBiasDialog(self.model, parent=self)
+        form = publication_bias_dialog.PublicationBiasDialog(
+            self.model,
+            parent=self,
+            analysis_service=self.small_study_effects_service,
+        )
         form.exec()
 
     def data_dirtied(self):
@@ -861,7 +869,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 kwargs["external_params"] = external_params
             if diagnostic_metrics is not None:
                 kwargs["diagnostic_metrics"] = diagnostic_metrics
-            return analysis_setup_dialog.AnalysisSetupDialog(self.model, **kwargs)
+            return analysis_setup_dialog.AnalysisSetupDialog(
+                self.model, analysis_service=self.analysis_service, **kwargs
+            )
         except Exception as e:
             self._show_analysis_specs_error(e)
             return None

@@ -83,6 +83,30 @@ def _plot_capability(
 
 def _analysis_result(payload):
     """Build the complete result contract used by ResultsWindow fixtures."""
+    payload = dict(payload)
+    payload.setdefault("version", 1)
+    if "sections" not in payload:
+        sections = [
+            {
+                "id": f"fixture.text.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(payload.get("texts", {}))
+        ]
+        sections.extend(
+            {
+                "id": f"fixture.image.{index}",
+                "kind": "image",
+                "order": len(sections) + index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(payload.get("images", {}))
+        )
+        payload["sections"] = sections
     return parse_analysis_result(payload)
 
 
@@ -474,7 +498,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             )
 
     assert family_counts == {
-            "icons/actions": 22,
+        "icons/actions": 22,
         "icons/analyses": 6,
         "icons/analyses/compact": 6,
         "icons/dataset-types": 8,
@@ -4534,9 +4558,9 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
     )
     try:
         nav_titles = [
-            required(reitsma_window.nav_tree.topLevelItem(index), "navigation item").text(
-                0
-            )
+            required(
+                reitsma_window.nav_tree.topLevelItem(index), "navigation item"
+            ).text(0)
             for index in range(reitsma_window.nav_tree.topLevelItemCount())
         ]
 

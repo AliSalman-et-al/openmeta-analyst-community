@@ -1010,7 +1010,9 @@ def _execute_versioned_request(
         "workflow": _normalize_rcmetar_workflow(workflow),
     }
     result = execute_r_function(
-        "rcmetar.run.analysis", _r_object_from_symbol(data_name), _to_r_params(normalized)
+        "rcmetar.run.analysis",
+        _r_object_from_symbol(data_name),
+        _to_r_params(normalized),
     )
     ro.globalenv[_r_symbol(res_name)] = result
     return parse_out_results(result)
@@ -1222,108 +1224,46 @@ def generate_forest_plot(file_path, params_name="plot.data"):
 
 @serialized_r_call
 def parse_out_results(result):
-    # ``plot_names`` identifies R plot variables used for graphics manipulation.
-    text_d = {}
-    image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
-    display_image_path_d = {}
-    image_order = None
-    plot_capability_d = {}
-
     if _r_inherits(result, "try-error"):
         raise RuntimeError(_r_error_message(result))
 
-    # Turn result into an ordered stream of display sections.  RCMetaR returns
-    # a named list, but keeping this boundary total makes diagnostics and
-    # future producers safe when they return a scalar, vector, or unnamed list.
-    result_items = _result_items_for_display(result)
-    result = dict(result_items)
+    result = dict(_result_items_for_display(result))
     study_names = _study_names_from_result(result)
+    image_path_d = _r_mapping_or_empty(result.get("images"))
+    display_image_path_d = _r_mapping_or_empty(result.get("display_images"))
+    image_var_name_d = _r_mapping_or_empty(result.get("plot_names"))
+    image_params_paths_d = _r_mapping_or_empty(result.get("plot_params_paths"))
+    plot_capability_d = _r_mapping_or_empty(result.get("plot_capabilities"))
+    producer_sections = _r_section_metadata(result.get("sections"))
+    raw_image_order = result.get("image_order")
+    image_order = (
+        None
+        if raw_image_order is None or _r_is_null(raw_image_order)
+        else list(raw_image_order)
+    )
+    text_d = {}
+    text_sources = {}
 
     for text_n, text in list(result.items()):
-        display_text_n = _display_section_name(text_n)
-        # Optional RCMetaR sections are represented by R NULL when a
-        # procedure is not applicable.  Drop those sections before any
-        # display formatting so the rpy2 NULLType repr cannot leak into the
-        # Results window.
-        if _r_is_null(text):
+        if text_n in _RESULT_METADATA_KEYS or _r_is_null(text):
             continue
-        # Some result sections carry plot names and forest-plot parameter paths.
-        # Diagnostic analyses may return several plot parameter objects, so keep
-        # this branch broad enough to preserve all named plot metadata.
-        if text_n == "images":
-            image_path_d = _r_mapping_or_empty(text)
-        elif text_n == "display_images":
-            display_image_path_d = _r_mapping_or_empty(text)
-        elif text_n == "image_order":
-            image_order = None if _r_is_null(text) else list(text)
-        elif text_n == "plot_names":
-            image_var_name_d = _r_mapping_or_empty(text)
-        elif text_n == "plot_params_paths":
-            image_params_paths_d = _r_mapping_or_empty(text)
-        elif text_n == "plot_capabilities":
-            plot_capability_d = _r_mapping_or_empty(text)
-        elif text_n == "References":
-            text_d[display_text_n] = result_sections.format_references(text)
-        elif text_n in ("weights", "Weights"):
-            text_d["Weights"] = make_weights_str(result)
-        elif text_n in [
-            "res",
-            "res.info",
-            "input_data",
-            "input_params",
-            "eligibility",
-            "tests.data",
-            "Trim-and-fill data",
-        ]:  # skip low-level RCMetaR internals that are not display sections
-            pass
-        elif "gui.ignore" in text_n:
-            pass
-        else:
-            if _is_summary_display(text):
-                text_d[display_text_n] = _format_result_text(
-                    _capture_formatted_summary(text)
-                )
-            elif _is_table_summary(text):
-                text_d.update(
-                    _format_table_summary(display_text_n, text, study_names=study_names)
-                )
-            elif _has_r_names(text):
-                text_d.update(
-                    _format_named_result_summary(
-                        display_text_n, text, study_names=study_names
-                    )
-                )
-            elif _is_r_iterable(text):
-                text_d[display_text_n] = _format_r_vector(
-                    text, field_name=text_n
-                )
-            else:
-                text_d[display_text_n] = _format_r_table_cell(
-                    text, field_name=text_n
-                )
+        _add_result_text(text_d, text_n, text, result, study_names)
+        for index, key in enumerate(key for key in text_d if key not in text_sources):
+            text_sources[key] = (text_n, index)
 
-    sections = [
-        {
-            "id": _result_section_id("text", key),
-            "kind": "text",
-            "order": index,
-            "title": key,
-            "source_key": key,
-        }
-        for index, key in enumerate(text_d)
-    ]
+    sections = _text_section_metadata(text_sources, producer_sections)
     image_offset = len(sections)
     sections.extend(
-        {
-            "id": _result_section_id("image", key),
-            "kind": "image",
-            "order": image_offset + index,
-            "title": key,
-            "source_key": key,
-        }
-        for index, key in enumerate(image_path_d)
+        _image_section_metadata(
+            image_path_d,
+            image_var_name_d,
+            plot_capability_d,
+            producer_sections,
+            image_offset,
+        )
     )
     to_return = {
+        "version": 1,
         "images": image_path_d,
         "display_images": display_image_path_d,
         "image_var_names": image_var_name_d,
@@ -1334,6 +1274,129 @@ def parse_out_results(result):
         "sections": sections,
     }
     return parse_analysis_result(to_return)
+
+
+_RESULT_METADATA_KEYS = frozenset(
+    {
+        "images",
+        "display_images",
+        "image_order",
+        "plot_names",
+        "plot_params_paths",
+        "plot_capabilities",
+        "sections",
+        "res",
+        "res.info",
+        "input_data",
+        "input_params",
+        "eligibility",
+        "tests.data",
+        "Trim-and-fill data",
+    }
+)
+
+
+def _add_result_text(texts, name, value, result, study_names):
+    title = _display_section_name(name)
+    if name == "References":
+        texts[title] = result_sections.format_references(value)
+        return
+    if name in ("weights", "Weights"):
+        texts["Weights"] = make_weights_str(result)
+        return
+    if "gui.ignore" in name:
+        return
+    if _is_summary_display(value):
+        texts[title] = _format_result_text(_capture_formatted_summary(value))
+        return
+    if _is_table_summary(value):
+        texts.update(_format_table_summary(title, value, study_names=study_names))
+        return
+    if _has_r_names(value):
+        texts.update(
+            _format_named_result_summary(title, value, study_names=study_names)
+        )
+        return
+    if _is_r_iterable(value):
+        texts[title] = _format_r_vector(value, field_name=name)
+        return
+    texts[title] = _format_r_table_cell(value, field_name=name)
+
+
+def _text_section_metadata(sources, producer_sections):
+    by_source = {
+        section["source_key"]: section
+        for section in producer_sections
+        if section.get("kind") == "text"
+    }
+    sections = []
+    for order, (title, source) in enumerate(sources.items()):
+        source_key, child_index = source
+        supplied = by_source.get(source_key)
+        semantic_id = (
+            supplied["id"]
+            if supplied is not None
+            else _result_section_id("text", source_key)
+        )
+        if child_index:
+            semantic_id = f"{semantic_id}:{child_index + 1}"
+        sections.append(
+            {
+                "id": semantic_id,
+                "kind": "text",
+                "order": order,
+                "title": supplied["title"]
+                if supplied is not None and child_index == 0
+                else title,
+                "source_key": title,
+            }
+        )
+    return sections
+
+
+def _image_section_metadata(
+    images, variable_names, capabilities, producer_sections, offset
+):
+    by_source = {
+        section["source_key"]: section
+        for section in producer_sections
+        if section.get("kind") == "image"
+    }
+    sections = []
+    used_ids = set()
+    for index, title in enumerate(images):
+        supplied = by_source.get(title)
+        capability = capabilities.get(title, {})
+        semantic_key = variable_names.get(
+            title,
+            variable_names.get(title.lower(), capability.get("plot_kind", "plot")),
+        )
+        semantic_id = (
+            supplied["id"]
+            if supplied is not None
+            else _unique_result_section_id("image", semantic_key, used_ids)
+        )
+        used_ids.add(semantic_id)
+        sections.append(
+            {
+                "id": semantic_id,
+                "kind": "image",
+                "order": offset + index,
+                "title": supplied["title"] if supplied is not None else title,
+                "source_key": title,
+            }
+        )
+    return sections
+
+
+def _unique_result_section_id(kind, source_key, used_ids):
+    semantic_id = _result_section_id(kind, source_key)
+    if semantic_id not in used_ids:
+        return semantic_id
+    suffix = 2
+    while f"{semantic_id}:{suffix}" in used_ids:
+        suffix += 1
+    return f"{semantic_id}:{suffix}"
 
 
 def _result_items_for_display(result):
@@ -1396,6 +1459,24 @@ def _r_mapping_or_empty(r_object):
     return converted if isinstance(converted, Mapping) else {}
 
 
+def _r_section_metadata(r_object):
+    converted = r_object_to_python(r_object)
+    if converted is None:
+        return []
+    if not isinstance(converted, list):
+        raise ValueError("RCMetaR result sections must be a list")
+    sections = []
+    for item in converted:
+        if not isinstance(item, Mapping):
+            raise ValueError("RCMetaR result section must be a mapping")
+        section = {
+            key: value[0] if isinstance(value, list) and len(value) == 1 else value
+            for key, value in item.items()
+        }
+        sections.append(section)
+    return sections
+
+
 def _r_inherits(r_object, class_name):
     try:
         return bool(execute_r_function("inherits", r_object, class_name)[0])
@@ -1440,9 +1521,7 @@ def _format_table_summary(section_name, r_object, title=None, study_names=None):
         return _format_r_array_sections(
             "Summary", section_name, r_object, study_names=study_names
         )
-    return {
-        section_name: _format_r_table_cell(r_object, field_name=section_name)
-    }
+    return {section_name: _format_r_table_cell(r_object, field_name=section_name)}
 
 
 def _is_named_table_summary(r_object):
@@ -1472,7 +1551,9 @@ def _format_named_result_summary(parent_name, r_object, study_names=None):
         if len(names) == 1 and names[0].replace(" ", "") == "MAResults":
             wrapped = list(r_object)[0]
             if _has_r_names(wrapped):
-                return {parent_name: _format_named_value(wrapped, study_names=study_names)}
+                return {
+                    parent_name: _format_named_value(wrapped, study_names=study_names)
+                }
     if _is_named_table_summary(r_object):
         return _format_named_table_summary(
             parent_name, r_object, study_names=study_names
@@ -1549,9 +1630,7 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
             if rendered:
                 sections[section_name] = rendered
         else:
-            sections[section_name] = _format_r_table_cell(
-                item, field_name=name
-            )
+            sections[section_name] = _format_r_table_cell(item, field_name=name)
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
@@ -1571,9 +1650,7 @@ def _format_named_value(r_object, study_names=None):
         if not name or _r_is_null(item):
             continue
         label = _format_summary_label(name)
-        rendered = _format_nested_value(
-            item, study_names=study_names, field_name=name
-        )
+        rendered = _format_nested_value(item, study_names=study_names, field_name=name)
         if not rendered:
             continue
         if "\n" in rendered:
@@ -1609,7 +1686,8 @@ def _format_r_vector(r_object, field_name=None):
         return ""
     if names is not None:
         return "\n".join(
-            "%s: %s" % (
+            "%s: %s"
+            % (
                 _format_summary_label(name),
                 _format_r_table_cell(value, field_name=name),
             )
@@ -1959,8 +2037,8 @@ def _format_result_text(text):
     cleaned_lines = []
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith(("attr(,\"", "[[")):
-            if stripped.startswith(("attr(,\"", "[[")):
+        if not stripped or stripped.startswith(('attr(,"', "[[")):
+            if stripped.startswith(('attr(,"', "[[")):
                 continue
             cleaned_lines.append("")
             continue
@@ -1970,7 +2048,7 @@ def _format_result_text(text):
         if match:
             payload = match.group(1)
             quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
-            if quoted and " ".join(quoted) == payload.replace('"', '').strip():
+            if quoted and " ".join(quoted) == payload.replace('"', "").strip():
                 payload = ", ".join(quoted)
             line = payload
         if stripped.startswith("$"):
@@ -2019,7 +2097,11 @@ def make_weights_str(results):
         return "No study weights available.\n"
     weights = []
     for value in raw_weights:
-        scalar = _r_singleton_to_scalar(value) if _is_r_iterable(value) and len(value) == 1 else value
+        scalar = (
+            _r_singleton_to_scalar(value)
+            if _is_r_iterable(value) and len(value) == 1
+            else value
+        )
         if scalar is None or str(scalar) == "NA":
             weights.append("NA")
         else:

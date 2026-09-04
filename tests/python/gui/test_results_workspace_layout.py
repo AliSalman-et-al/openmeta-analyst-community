@@ -20,11 +20,38 @@ from rc_metastudio import plot_editor_dialog, results_window
 
 
 def _empty_results(summary="Summary text"):
-    return parse_analysis_result({"texts": {"Summary": summary}})
+    return _analysis_result({"texts": {"Summary": summary}})
 
 
 def _analysis_result(payload):
     """Build the complete result contract used by ResultsWindow fixtures."""
+    payload = dict(payload)
+    payload.setdefault("version", 1)
+    text_titles = list(payload.get("texts", {}))
+    image_titles = list(payload.get("images", {}))
+    payload.setdefault(
+        "sections",
+        [
+            {
+                "id": f"fixture.text.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(text_titles)
+        ]
+        + [
+            {
+                "id": f"fixture.image.{index}",
+                "kind": "image",
+                "order": len(text_titles) + index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(image_titles)
+        ],
+    )
     return parse_analysis_result(payload)
 
 
@@ -566,7 +593,7 @@ def test_sroc_plot_editor_uses_acronym_safe_browse_title(qapp, tmp_path, monkeyp
     monkeypatch.setattr(
         plot_editor_dialog.QFileDialog,
         "getSaveFileName",
-        lambda _parent, title, *_args: (titles.append(title) or ("", "")),
+        lambda _parent, title, *_args: titles.append(title) or ("", ""),
     )
     try:
         dialog.save_btn.click()
@@ -608,7 +635,7 @@ def test_results_window_presents_summary_references_and_vector_plot_artifacts(
             required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
+        assert nav_titles == ["Summary", "References", "Forest Plot"]
         svg_items = [
             item
             for item in window.scene.items()

@@ -316,7 +316,11 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self._wrapped_text_items = []
         self.texts = results["texts"]
         self.references_text = next(
-            (section.value for section in results.sections if section.semantic_id == "text:references"),
+            (
+                section.value
+                for section in results.sections
+                if section.semantic_id == "text:references"
+            ),
             None,
         )
 
@@ -341,9 +345,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             if section.kind == "text":
                 self.add_text_section(section.source_key, section.title, section.value)
             elif section.kind == "image":
-                self.add_image_section(
-                    section.source_key, section.title, section.value
-                )
+                self.add_image_section(section.source_key, section.title, section.value)
 
     def add_image_section(self, title, display_title, image):
         params_path = None
@@ -1134,12 +1136,15 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
 def _normalize_results(results: AnalysisResult) -> AnalysisResult:
     normalized: dict[str, object] = {
+        "version": results.version,
         "texts": dict(results["texts"]),
         "images": dict(results["images"]),
         "display_images": dict(results["display_images"]),
         "image_var_names": dict(results["image_var_names"]),
         "image_params_paths": dict(results["image_params_paths"]),
-        "image_order": None if results["image_order"] is None else list(results["image_order"]),
+        "image_order": None
+        if results["image_order"] is None
+        else list(results["image_order"]),
         "plot_capabilities": dict(results["plot_capabilities"]),
         "sections": [
             {
@@ -1155,6 +1160,15 @@ def _normalize_results(results: AnalysisResult) -> AnalysisResult:
 
     if not normalized["texts"] and not normalized["images"]:
         normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE
+        normalized["sections"].append(
+            {
+                "id": "result.none",
+                "kind": "text",
+                "order": 0,
+                "title": "No Results",
+                "source_key": "No Results",
+            }
+        )
 
     return parse_analysis_result(normalized)
 
@@ -1165,6 +1179,7 @@ if __name__ == "__main__":
     from rc_metastudio.analysis_results import empty_analysis_result
 
     test_results: dict[str, object] = {
+        "version": 1,
         "images": {},
         "texts": {},
         "display_images": {},
@@ -1172,6 +1187,7 @@ if __name__ == "__main__":
         "image_params_paths": {},
         "image_order": None,
         "plot_capabilities": {},
+        "sections": [],
     }
     test_results["images"] = {
         "Forest Plot": settings.analysis_output_path("forest.png")
@@ -1180,6 +1196,29 @@ if __name__ == "__main__":
         "Weights": "Study names        Weights\nGonzalez       1993  7.3%\nPrins          1993  6.2%\nGiamarellou    1991  2.1%\nMaller         1993 10.7%\nSturm          1989  2.0%\nMarik          1991 12.2%\nMuijsken       1988  7.5%\nVigano         1992  1.8%\nHansen         1988  5.3%\nDe Vries       1990  6.1%\nMauracher      1989  2.2%\nNordstrom      1990  5.3%\nRozdzinski     1993 10.3%\nTer Braak      1990  8.7%\nTulkens        1988  1.2%\nVan der Auwera 1991  2.0%\nKlastersky     1977  6.0%\nVanhaeverbeek  1993  1.2%\nHollender      1989  1.8%\n",
         "Summary": "Binary Random-Effects Model\n\nMetric: Odds Ratio\n\nModel Results\n Estimate  Lower bound  Upper bound  p-value\n 0.770           0.485        1.222    0.267\n\nHeterogeneity\n    τ²  Q(df=18)  Het. p-value       I²\n 0.378    33.360         0.015  46.000%\n\nCalculation scale: log - estimate: -0.262, lower: -0.724, upper: 0.200, std. error: 0.236\n",
     }
+    test_results["sections"] = [
+        {
+            "id": "result.weights",
+            "kind": "text",
+            "order": 0,
+            "title": "Weights",
+            "source_key": "Weights",
+        },
+        {
+            "id": "result.summary",
+            "kind": "text",
+            "order": 1,
+            "title": "Summary",
+            "source_key": "Summary",
+        },
+        {
+            "id": "plot.forest",
+            "kind": "image",
+            "order": 2,
+            "title": "Forest Plot",
+            "source_key": "Forest Plot",
+        },
+    ]
     test_results["image_var_names"] = {"forest plot": "forest_plot"}
     test_results["image_params_paths"] = {
         "Forest Plot": settings.analysis_output_path("1369769105.72079")

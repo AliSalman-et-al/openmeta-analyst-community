@@ -33,6 +33,24 @@ def _request_kwargs() -> RequestKwargs:
     }
 
 
+def _raw_result(texts: dict[str, str], prefix: str) -> dict[str, object]:
+    return {
+        "version": 1,
+        "texts": texts,
+        "images": {},
+        "sections": [
+            {
+                "id": f"{prefix}.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(texts)
+        ],
+    }
+
+
 @pytest.mark.parametrize("data_type", ["", "unknown", "Binary"])
 def test_analysis_request_rejects_unknown_family(data_type: str) -> None:
     values = _request_kwargs()
@@ -91,10 +109,9 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
     monkeypatch.setattr(
         analysis_adapter,
         "_run_diagnostic_backend",
-        lambda _workflow, _methods, parameter_values: {
-            "texts": {"Spec Summary": parameter_values[0]["measure"]},
-            "images": {},
-        },
+        lambda _workflow, _methods, parameter_values: _raw_result(
+            {"Spec Summary": parameter_values[0]["measure"]}, "diagnostic.spec"
+        ),
     )
     requests = tuple(
         make_analysis_request(
@@ -146,13 +163,14 @@ def test_diagnostic_fallback_merges_references_in_stable_order():
             if request.metric == "Sens"
             else "1. Shared method reference\n2. DOR reference\n"
         )
-        return {"texts": {"Summary": request.metric, "References": references}}
+        return _raw_result(
+            {f"{request.metric} Summary": request.metric, "References": references},
+            f"diagnostic.{request.metric.lower()}",
+        )
 
     result = analysis_adapter._run_diagnostic_methods_per_metric(requests, run_metric)
 
     assert result["texts"]["Spec Error"] == "specificity backend failed"
     assert result["texts"]["References"] == (
-        "1. Shared method reference\n"
-        "2. Sensitivity reference\n"
-        "3. DOR reference\n"
+        "1. Shared method reference\n2. Sensitivity reference\n3. DOR reference\n"
     )
