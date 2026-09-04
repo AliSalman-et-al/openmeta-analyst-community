@@ -1094,14 +1094,7 @@ def _validate_deployment_contract(
         )
     with info_path.open("rb") as stream:
         info = plistlib.load(stream)
-    valid = (
-        info.get("CFBundleExecutable") == "RCMetaStudio"
-        and info.get("CFBundleIdentifier")
-        == "org.researchconsultancy.rc-metastudio"
-        and info.get("LSMinimumSystemVersion") == minimum_macos
-        and info.get("NSHighResolutionCapable") is True
-    )
-    if not valid:
+    if not _valid_bundle_info(info, minimum_macos):
         raise MacOSDeploymentInspectionError(
             f"Info.plist is not the qualified macOS {minimum_macos} bundle contract"
         )
@@ -1111,6 +1104,15 @@ def _validate_deployment_contract(
 def _valid_source_commit(source_commit: str) -> bool:
     return len(source_commit) == 40 and all(
         char in "0123456789abcdef" for char in source_commit
+    )
+
+
+def _valid_bundle_info(info: dict, minimum_macos: str) -> bool:
+    return (
+        info.get("CFBundleExecutable") == "RCMetaStudio"
+        and info.get("CFBundleIdentifier") == "org.researchconsultancy.rc-metastudio"
+        and info.get("LSMinimumSystemVersion") == minimum_macos
+        and info.get("NSHighResolutionCapable") is True
     )
 
 
@@ -1174,59 +1176,81 @@ def _collect_deployment_inventory(
     folded: dict[str, str] = {}
     total_bytes = 0
     for current, directories, filenames in os.walk(app_root, followlinks=False):
-        current_path = Path(current)
-        for name in list(directories):
-            path = current_path / name
-            if path.is_symlink():
-                directories.remove(name)
-                record = _inventory_symlink(path, app_root)
-                records.append(record)
-                total_bytes += record["size"]
-        for name in filenames:
-            path = current_path / name
-            relative = _relative(path, app_root)
-            key = relative.casefold()
-            if key in folded:
-                raise MacOSDeploymentInspectionError(
-                    "deployment contains duplicate/case-colliding paths: "
-                    f"{folded[key]}, {relative}"
-                )
-            folded[key] = relative
-            if path.is_symlink():
-                record = _inventory_symlink(path, app_root)
-                is_native = False
-            else:
-                record, is_native = _inventory_file(
-                    path, app_root, architecture, minimum_macos, r_delivery_kind
-                )
-            records.append(record)
-            if is_native:
-                native_records.append(record)
-            total_bytes += record["size"]
-            if len(records) > MAX_FILES or total_bytes > MAX_BYTES:
-                raise MacOSDeploymentInspectionError(
-                    "deployment exceeds its bounded inventory"
-                )
+        directory_records, directory_bytes = _inventory_directory(
+            Path(current), directories, filenames, app_root, architecture,
+            minimum_macos, r_delivery_kind, folded,
+        )
+        records.extend(directory_records)
+        native_records.extend(
+            record for record in directory_records if "architectures" in record
+        )
+        total_bytes += directory_bytes
+        if len(records) > MAX_FILES or total_bytes > MAX_BYTES:
+            raise MacOSDeploymentInspectionError(
+                "deployment exceeds its bounded inventory"
+            )
     return records, native_records, total_bytes
+
+
+def _inventory_directory(
+    current_path: Path,
+    directories: list[str],
+    filenames: list[str],
+    app_root: Path,
+    architecture: str,
+    minimum_macos: str,
+    r_delivery_kind: str,
+    folded: dict[str, str],
+    
+) -> tuple[list[dict], int]:
+    records: list[dict] = []
+    total_bytes = 0
+    for name in list(directories):
+        path = current_path / name
+        if path.is_symlink():
+            directories.remove(name)
+            record = _inventory_symlink(path, app_root)
+            records.append(record)
+            total_bytes += record["size"]
+    for name in filenames:
+        path = current_path / name
+        relative = _relative(path, app_root)
+        key = relative.casefold()
+        if key in folded:
+            raise MacOSDeploymentInspectionError(
+                "deployment contains duplicate/case-colliding paths: "
+                f"{folded[key]}, {relative}"
+            )
+        folded[key] = relative
+        if path.is_symlink():
+            record = _inventory_symlink(path, app_root)
+            is_native = False
+        else:
+            record, is_native = _inventory_file(
+                path, app_root, architecture, minimum_macos, r_delivery_kind
+            )
+        records.append(record)
+        total_bytes += record["size"]
+    return records, total_bytes
 
 
 def _validate_qt_root_locations(native_records: list[dict], qt_root: str) -> None:
     for record in native_records:
         path = record["path"]
         lowered = path.lower()
-        qt_like = (
-            "/pyqt6/qt6/" in lowered
-            or (".framework/versions/" in lowered and "/qt" in lowered)
-            or (
-                "/plugins/" in lowered
-                and Path(path).name.lower().startswith("libq")
-            )
-            or Path(path).name.lower().startswith("libqt6")
-        )
-        if qt_like and not path.startswith(qt_root + "/"):
+        if _is_qt_payload_path(lowered, path) and not path.startswith(qt_root + "/"):
             raise MacOSDeploymentInspectionError(
                 f"deployment contains a second or displaced Qt payload: {path}"
             )
+
+
+def _is_qt_payload_path(lowered: str, path: str) -> bool:
+    return (
+        "/pyqt6/qt6/" in lowered
+        or (".framework/versions/" in lowered and "/qt" in lowered)
+        or ("/plugins/" in lowered and Path(path).name.lower().startswith("libq"))
+        or Path(path).name.lower().startswith("libqt6")
+    )
 
 
 def _validate_qt_deployment(
@@ -1275,11 +1299,7 @@ def _find_qt_plugins(
     }
     plugin_paths: dict[str, str] = {}
     for label, suffix in required_plugins.items():
-        matches = [
-            record["path"]
-            for record in native_records
-            if record["path"].lower().endswith(suffix)
-        ]
+        matches = [record["path"] for record in native_records if _plugin_matches(record, suffix)]
         if len(matches) != 1:
             raise MacOSDeploymentInspectionError(
                 f"required {label} Qt plugin count is {len(matches)}, expected one"
@@ -1288,12 +1308,20 @@ def _find_qt_plugins(
     tls_plugins = [
         record["path"]
         for record in native_records
-        if "/plugins/tls/" in record["path"].lower()
-        and record["path"].lower().endswith(".dylib")
+        if _is_tls_plugin(record)
     ]
     if not tls_plugins:
         raise MacOSDeploymentInspectionError("deployment contains no Qt TLS plugin")
     return plugin_paths, tls_plugins
+
+
+def _plugin_matches(record: dict, suffix: str) -> bool:
+    return record["path"].lower().endswith(suffix)
+
+
+def _is_tls_plugin(record: dict) -> bool:
+    path = record["path"].lower()
+    return "/plugins/tls/" in path and path.endswith(".dylib")
 
 
 def _deployment_result(
@@ -1446,47 +1474,11 @@ def finalize_smoke_evidence(
     persist: bool = True,
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
-    if evidence.get("failures") or evidence.get("surface_progress"):
-        raise MacOSDeploymentInspectionError(
-            "packaged automation contains failed native observations"
-        )
     log_text = log_path.read_text(encoding="utf-8")
-    if "packaged-workflow:post-close" not in log_text:
-        raise MacOSDeploymentInspectionError(
-            "packaged automation did not emit its post-close marker"
-        )
-    if launchservices_marker is not None:
-        marker = json.loads(launchservices_marker.read_text(encoding="utf-8"))
-        if (
-            marker.get("schema_version") != 1
-            or marker.get("platform_plugin") != "cocoa"
-            or marker.get("project") != "BCG.rcms"
-            or marker.get("post_close") is not True
-            or not isinstance(marker.get("pid"), int)
-        ):
-            raise MacOSDeploymentInspectionError(
-                "normal LaunchServices app entry did not produce its completion marker"
-            )
+    _validate_smoke_basics(evidence, log_text)
+    _validate_launchservices_marker(launchservices_marker)
     validate_packaged_workflow_evidence(evidence)
-    if require_direct_teardown:
-        required_markers = (
-            "packaged-workflow:teardown:close:start",
-            "packaged-workflow:teardown:close:return",
-            "packaged-workflow:teardown:deferred-delete:complete",
-            "packaged-workflow:teardown:top-level-windows:none",
-            "packaged-workflow:teardown:app-quit:start",
-            "packaged-workflow:teardown:app-quit:return",
-            "packaged-workflow:post-close",
-            "packaged-workflow:return",
-            "packaged-workflow:process-exit:0",
-        )
-        positions = [log_text.find(marker) for marker in required_markers]
-        if any(position < 0 for position in positions) or positions != sorted(
-            positions
-        ):
-            raise MacOSDeploymentInspectionError(
-                "direct packaged automation lacks an ordered clean-teardown trace"
-            )
+    _validate_teardown_trace(log_text, require_direct_teardown)
     scale_records = evidence.get("scales", [])
     executed_scales = [
         str(record.get("requested"))
@@ -1495,12 +1487,7 @@ def finalize_smoke_evidence(
     ]
     if require_direct_teardown:
         validate_macos_surface_records(scale_records)
-    if require_direct_teardown and (
-        executed_scales != ["1.25", "1.50", "1.75"] or launchservices_marker is None
-    ):
-        raise MacOSDeploymentInspectionError(
-            "direct packaged automation lacks the required surface or LaunchServices gates"
-        )
+    _validate_surface_gate(executed_scales, launchservices_marker, require_direct_teardown)
     evidence["execution"] = {
         "automation_exit_code": 0,
         "surface_scale_exit_codes": {scale: 0 for scale in executed_scales},
@@ -1516,66 +1503,150 @@ def finalize_smoke_evidence(
     return evidence
 
 
+def _validate_smoke_basics(evidence: dict, log_text: str) -> None:
+    if evidence.get("failures") or evidence.get("surface_progress"):
+        raise MacOSDeploymentInspectionError(
+            "packaged automation contains failed native observations"
+        )
+    if "packaged-workflow:post-close" not in log_text:
+        raise MacOSDeploymentInspectionError(
+            "packaged automation did not emit its post-close marker"
+        )
+
+
+def _validate_launchservices_marker(marker_path: Path | None) -> None:
+    if marker_path is None:
+        return
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    valid = (
+        marker.get("schema_version") == 1
+        and marker.get("platform_plugin") == "cocoa"
+        and marker.get("project") == "BCG.rcms"
+        and marker.get("post_close") is True
+        and isinstance(marker.get("pid"), int)
+    )
+    if not valid:
+        raise MacOSDeploymentInspectionError(
+            "normal LaunchServices app entry did not produce its completion marker"
+        )
+
+
+def _validate_teardown_trace(log_text: str, required: bool) -> None:
+    if not required:
+        return
+    markers = (
+        "packaged-workflow:teardown:close:start",
+        "packaged-workflow:teardown:close:return",
+        "packaged-workflow:teardown:deferred-delete:complete",
+        "packaged-workflow:teardown:top-level-windows:none",
+        "packaged-workflow:teardown:app-quit:start",
+        "packaged-workflow:teardown:app-quit:return",
+        "packaged-workflow:post-close",
+        "packaged-workflow:return",
+        "packaged-workflow:process-exit:0",
+    )
+    positions = [log_text.find(marker) for marker in markers]
+    if any(position < 0 for position in positions) or positions != sorted(positions):
+        raise MacOSDeploymentInspectionError(
+            "direct packaged automation lacks an ordered clean-teardown trace"
+        )
+
+
+def _validate_surface_gate(
+    executed_scales: list[str], marker_path: Path | None, required: bool
+) -> None:
+    if required and (
+        executed_scales != ["1.25", "1.50", "1.75"] or marker_path is None
+    ):
+        raise MacOSDeploymentInspectionError(
+            "direct packaged automation lacks the required surface or LaunchServices gates"
+        )
+
+
 def validate_packaged_workflow_evidence(evidence: dict) -> None:
     workflows = evidence.get("workflows", {})
     locale_variants = workflows.get("locale_variants", [])
     sample_projects = workflows.get("sample_projects", {})
     sample_records = sample_projects.get("projects", [])
-    expected_summary_sha256 = EXPECTED_SUMMARY_SHA256_BY_SAMPLE.get(
+    expected_summary = EXPECTED_SUMMARY_SHA256_BY_SAMPLE.get(
         workflows.get("converted_sample")
     )
-    if not (
-        evidence.get("passed") is True
-        and not evidence.get("failures")
-        and all(
-            workflows.get(key) is True
-            for key in (
-                "automation_entry_point",
-                "representative_edit",
-                "real_r_analysis",
-                "result_text",
-                "save_reopen",
-                "analysis_after_reopen",
-            )
-        )
-        and workflows.get("converted_sample") == "BCG.rcms"
-        and expected_summary_sha256 is not None
-        and workflows.get("expected_normalized_summary_sha256")
-        == expected_summary_sha256
-        and workflows.get("normalized_summary_sha256") == expected_summary_sha256
-        and _valid_sha256(workflows.get("raw_summary_sha256"))
-        and _valid_sha256_map(workflows.get("svg_sha256"))
-        and [item.get("locale") for item in locale_variants] == ["en_US", "de_DE"]
-        and all(
-            item.get("normalized_summary_sha256") == expected_summary_sha256
-            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-            for item in locale_variants
-        )
-        and sample_projects.get("passed") is True
-        and _valid_sha256(sample_projects.get("manifest_sha256"))
-        and isinstance(sample_records, list)
-        and bool(sample_records)
-        and len({item.get("project") for item in sample_records}) == len(sample_records)
-        and all(
-            isinstance(item.get("project"), str)
-            and item.get("project", "").endswith(".rcms")
-            and _valid_sha256(item.get("sha256"))
-            and _valid_sha256(item.get("semantic_sha256"))
-            and item.get("opened_in_packaged_application") is True
-            for item in sample_records
-        )
-    ):
+    valid = (
+        _workflow_header_valid(evidence, workflows, expected_summary)
+        and _workflow_locale_valid(workflows, locale_variants, expected_summary)
+        and _workflow_samples_valid(sample_projects, sample_records)
+    )
+    if not valid:
         raise MacOSDeploymentInspectionError(
             "packaged workflow result evidence is incomplete"
         )
 
 
-def _validate_direct_manifest_identity(payload: dict, target: str) -> str:
+def _workflow_header_valid(
+    evidence: dict, workflows: dict, expected_summary: str | None
+) -> bool:
+    required = (
+        "automation_entry_point",
+        "representative_edit",
+        "real_r_analysis",
+        "result_text",
+        "save_reopen",
+        "analysis_after_reopen",
+    )
+    return all(
+        (
+            evidence.get("passed") is True,
+            not evidence.get("failures"),
+            all(workflows.get(key) is True for key in required),
+            workflows.get("converted_sample") == "BCG.rcms",
+            expected_summary is not None,
+            workflows.get("expected_normalized_summary_sha256") == expected_summary,
+            workflows.get("normalized_summary_sha256") == expected_summary,
+            _valid_sha256(workflows.get("raw_summary_sha256")),
+            _valid_sha256_map(workflows.get("svg_sha256")),
+        )
+    )
+
+
+def _workflow_locale_valid(
+    workflows: dict, locale_variants: list, expected_summary: str | None
+) -> bool:
+    if [item.get("locale") for item in locale_variants] != ["en_US", "de_DE"]:
+        return False
+    return all(
+        item.get("normalized_summary_sha256") == expected_summary
+        and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+        for item in locale_variants
+    )
+
+
+def _workflow_samples_valid(sample_projects: dict, sample_records: object) -> bool:
     if (
-        payload.get("schema_version") != 1
-        or payload.get("kind") != "rc-metastudio-direct-macos-target-build"
-        or payload.get("target") != target
+        sample_projects.get("passed") is not True
+        or not _valid_sha256(sample_projects.get("manifest_sha256"))
+        or not isinstance(sample_records, list)
+        or not sample_records
     ):
+        return False
+    projects = {item.get("project") for item in sample_records}
+    return len(projects) == len(sample_records) and all(
+        _valid_sample_record(item) for item in sample_records
+    )
+
+
+def _valid_sample_record(item: object) -> bool:
+    return (
+        isinstance(item, dict)
+        and isinstance(item.get("project"), str)
+        and item.get("project", "").endswith(".rcms")
+        and _valid_sha256(item.get("sha256"))
+        and _valid_sha256(item.get("semantic_sha256"))
+        and item.get("opened_in_packaged_application") is True
+    )
+
+
+def _validate_direct_manifest_identity(payload: dict, target: str) -> str:
+    if not _valid_direct_manifest_header(payload, target):
         raise MacOSDeploymentInspectionError(
             "direct-build manifest has the wrong identity or target"
         )
@@ -1590,17 +1661,28 @@ def _validate_direct_manifest_identity(payload: dict, target: str) -> str:
             "direct-build manifest has an invalid source commit"
         )
     official_r = payload.get("official_r")
-    valid_upstream = (
+    if not _valid_direct_upstream(payload, official_r, target):
+        raise MacOSDeploymentInspectionError(
+            "direct-build manifest has invalid locked upstream inputs"
+        )
+    return source_commit
+
+
+def _valid_direct_manifest_header(payload: dict, target: str) -> bool:
+    return (
+        payload.get("schema_version") == 1
+        and payload.get("kind") == "rc-metastudio-direct-macos-target-build"
+        and payload.get("target") == target
+    )
+
+
+def _valid_direct_upstream(payload: dict, official_r: object, target: str) -> bool:
+    return (
         isinstance(official_r, dict)
         and official_r == DIRECT_R_OFFICIAL_INPUTS[target]
         and payload.get("ppm_snapshot") == DIRECT_R_PPM_SNAPSHOT
         and _valid_sha256(payload.get("rpy2_api_bridge_source_sha256"))
     )
-    if not valid_upstream:
-        raise MacOSDeploymentInspectionError(
-            "direct-build manifest has invalid locked upstream inputs"
-        )
-    return source_commit
 
 
 def _validate_direct_input_inventory(payload: dict) -> tuple[dict, list[dict]]:
@@ -1616,35 +1698,44 @@ def _validate_direct_input_inventory(payload: dict) -> tuple[dict, list[dict]]:
         )
     records = [*inputs.values(), *ppm_archives]
     for record in records:
-        valid = (
-            isinstance(record, dict)
-            and _valid_sha256(record.get("sha256"))
-            and isinstance(record.get("size"), int)
-            and not isinstance(record.get("size"), bool)
-            and record["size"] >= 0
-        )
-        if not valid:
+        if not _valid_direct_record(record):
             raise MacOSDeploymentInspectionError(
                 "direct-build manifest contains an invalid input record"
             )
     return inputs, ppm_archives
 
 
+def _valid_direct_record(record: object) -> bool:
+    return (
+        isinstance(record, dict)
+        and _valid_sha256(record.get("sha256"))
+        and isinstance(record.get("size"), int)
+        and not isinstance(record.get("size"), bool)
+        and record["size"] >= 0
+    )
+
+
 def _validate_direct_ppm_records(ppm_archives: list[dict]) -> None:
     seen_paths: set[str] = set()
     for record in ppm_archives:
-        path = record.get("path")
-        if not _valid_ppm_path(path, seen_paths):
-            raise MacOSDeploymentInspectionError(
-                "direct-build manifest contains an invalid PPM archive path"
-            )
-        path = cast(str, path)
-        seen_paths.add(path.casefold())
-        package = record.get("package")
-        version = record.get("version")
-        archive_url = record.get("archive_url")
-        if not _valid_ppm_metadata(package, version, archive_url, path):
-            raise MacOSDeploymentInspectionError(
+        _validate_one_ppm_record(record, seen_paths)
+
+
+def _validate_one_ppm_record(record: dict, seen_paths: set[str]) -> None:
+    path = record.get("path")
+    if not _valid_ppm_path(path, seen_paths):
+        raise MacOSDeploymentInspectionError(
+            "direct-build manifest contains an invalid PPM archive path"
+        )
+    path = cast(str, path)
+    seen_paths.add(path.casefold())
+    if not _valid_ppm_metadata(
+        record.get("package"),
+        record.get("version"),
+        record.get("archive_url"),
+        path,
+    ):
+        raise MacOSDeploymentInspectionError(
             "direct-build PPM archive lacks package, version, or authoritative URL"
         )
 
@@ -1676,7 +1767,23 @@ def _valid_ppm_metadata(
 
 def _validate_rcmetar_provenance(payload: dict, source_commit: str, inputs: dict) -> None:
     rcmetar = payload.get("rcmetar_source")
-    valid_source = (
+    if not _valid_rcmetar_source(rcmetar, source_commit):
+        raise MacOSDeploymentInspectionError(
+            "direct-build manifest has invalid RCMetaR source provenance"
+        )
+    archive = rcmetar["archive"]
+    if not _valid_direct_archive_record(archive):
+        raise MacOSDeploymentInspectionError(
+            "direct-build manifest has an invalid source archive record"
+        )
+    if archive != inputs["rcmetar_source_archive"]:
+        raise MacOSDeploymentInspectionError(
+            "direct-build source archives differ from their embedded input records"
+        )
+
+
+def _valid_rcmetar_source(rcmetar: object, source_commit: str) -> bool:
+    return (
         isinstance(rcmetar, dict)
         and rcmetar.get("name") == "RCMetaR"
         and rcmetar.get("version") == "0.2.0"
@@ -1689,25 +1796,15 @@ def _validate_rcmetar_provenance(payload: dict, source_commit: str, inputs: dict
         and isinstance(rcmetar.get("archive"), dict)
         and rcmetar["archive"].get("sha256") == rcmetar.get("archive_sha256")
     )
-    if not valid_source:
-        raise MacOSDeploymentInspectionError(
-            "direct-build manifest has invalid RCMetaR source provenance"
-        )
-    archive = rcmetar["archive"]
-    valid_archive = (
+
+
+def _valid_direct_archive_record(archive: dict) -> bool:
+    return (
         _valid_sha256(archive.get("sha256"))
         and isinstance(archive.get("size"), int)
         and not isinstance(archive.get("size"), bool)
         and archive["size"] > 0
     )
-    if not valid_archive:
-        raise MacOSDeploymentInspectionError(
-            "direct-build manifest has an invalid source archive record"
-        )
-    if archive != inputs["rcmetar_source_archive"]:
-        raise MacOSDeploymentInspectionError(
-            "direct-build source archives differ from their embedded input records"
-        )
 
 
 def validate_direct_build_manifest(payload: dict, *, target: str) -> dict:
@@ -1820,23 +1917,31 @@ def _read_and_validate_archive_provenance(
 
 
 def _validate_official_signature(signature: dict) -> None:
-    valid = (
+    if not _signature_identity_valid(signature) or not _signature_text_valid(signature):
+        raise MacOSDeploymentInspectionError(
+            "official R package signature evidence is invalid"
+        )
+
+
+def _signature_identity_valid(signature: dict) -> bool:
+    return (
         signature.get("schema_version") == 1
         and signature.get("status") == 0
         and signature.get("team_id") == "VZLD955F6P"
         and isinstance(signature.get("signer"), str)
         and "Developer ID Installer:" in signature["signer"]
         and signature.get("certificate")
-        and isinstance(signature.get("status_line"), str)
+    )
+
+
+def _signature_text_valid(signature: dict) -> bool:
+    return (
+        isinstance(signature.get("status_line"), str)
         and signature["status_line"].lower().startswith("signed")
         and isinstance(signature.get("stdout"), str)
         and isinstance(signature.get("stderr"), str)
         and "VZLD955F6P" in signature["stdout"]
     )
-    if not valid:
-        raise MacOSDeploymentInspectionError(
-            "official R package signature evidence is invalid"
-        )
 
 
 def _validate_preflight(preflight: dict, manifest: dict, target: str) -> None:
@@ -1909,20 +2014,29 @@ def _validate_zip_member(info: zipfile.ZipInfo, prefix: str, folded: dict[str, s
 
 def _validate_zip_name(name: str, prefix: str) -> None:
     relative = name[len(prefix) :].rstrip("/")
-    normalized = (
+    if not _valid_zip_prefix(name, prefix):
+        raise MacOSDeploymentInspectionError(f"ZIP contains a non-normalized member: {name}")
+    if not _valid_zip_relative(relative, name, prefix):
+        raise MacOSDeploymentInspectionError(
+            f"ZIP contains traversal or empty components: {name}"
+        )
+
+
+def _valid_zip_prefix(name: str, prefix: str) -> bool:
+    return (
         "\\" not in name
         and not name.startswith("/")
         and unicodedata.normalize("NFC", name) == name
         and name.startswith(prefix)
     )
-    if not normalized:
-        raise MacOSDeploymentInspectionError(f"ZIP contains a non-normalized member: {name}")
-    if name != prefix and (
-        not relative or any(part in {"", ".", ".."} for part in relative.split("/"))
-    ):
-        raise MacOSDeploymentInspectionError(
-            f"ZIP contains traversal or empty components: {name}"
-        )
+
+
+def _valid_zip_relative(relative: str, name: str, prefix: str) -> bool:
+    if name == prefix:
+        return True
+    return bool(relative) and not any(
+        part in {"", ".", ".."} for part in relative.split("/")
+    )
 
 
 def _validate_zip_mode(info: zipfile.ZipInfo) -> None:
@@ -1982,10 +2096,7 @@ def _validate_archive_inventory(
     if not isinstance(records, list) or not records:
         raise MacOSDeploymentInspectionError("deployment manifest has no archive inventory")
     app_prefix = prefix + "RCMetaStudio.app/"
-    app_members = {
-        name[len(app_prefix) :] for name in names if name.startswith(app_prefix)
-    }
-    if app_members != {record.get("path") for record in records}:
+    if not _archive_members_match(names, app_prefix, records):
         raise MacOSDeploymentInspectionError("ZIP app members differ from the inspected inventory")
     info_by_name = {item.filename: item for item in bundle.infolist()}
     for record in records:
@@ -1994,6 +2105,15 @@ def _validate_archive_inventory(
         deployment, records, signing_path, prefix, names
     )
     _validate_archive_delivery(deployment, records, target)
+
+
+def _archive_members_match(
+    names: list[str], app_prefix: str, records: list[dict]
+) -> bool:
+    app_members = {
+        name[len(app_prefix) :] for name in names if name.startswith(app_prefix)
+    }
+    return app_members == {record.get("path") for record in records}
 
 
 def _validate_archive_identity(
@@ -2047,14 +2167,28 @@ def _validate_archive_record(
     info = info_by_name[member]
     mode = info.external_attr >> 16
     if record.get("kind") == "symlink":
-        valid = (
-            stat.S_ISLNK(mode)
-            and stat.S_IMODE(mode) == record.get("mode")
-            and bundle.read(member).decode("utf-8") == record.get("link_target")
-        )
-        if not valid:
-            raise MacOSDeploymentInspectionError(f"ZIP symlink differs from inventory: {member}")
+        _validate_archive_symlink(bundle, member, mode, record)
         return
+    _validate_archive_file(bundle, member, mode, record)
+
+
+def _validate_archive_symlink(
+    bundle: zipfile.ZipFile, member: str, mode: int, record: dict
+) -> None:
+    valid = (
+        stat.S_ISLNK(mode)
+        and stat.S_IMODE(mode) == record.get("mode")
+        and bundle.read(member).decode("utf-8") == record.get("link_target")
+    )
+    if not valid:
+        raise MacOSDeploymentInspectionError(
+            f"ZIP symlink differs from inventory: {member}"
+        )
+
+
+def _validate_archive_file(
+    bundle: zipfile.ZipFile, member: str, mode: int, record: dict
+) -> None:
     digest = hashlib.sha256()
     size = 0
     with bundle.open(member) as stream:
@@ -2198,85 +2332,126 @@ def validate_macos_surface_records(scales: object) -> None:
     if [item.get("requested") for item in typed_scales] != ["1.25", "1.50", "1.75"]:
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
     for item in typed_scales:
-        menu = item.get("native_menu", {})
-        file_dialog = item.get("native_file_dialog", {})
-        critical_dialog = item.get("critical_dialog", {})
-        cleanup = item.get("cleanup", {})
-        accessibility = item.get("accessibility", {})
-        native_accessibility = accessibility.get("native", {})
-        if not (
-            item.get("platform_plugin") == "cocoa"
-            and item.get("locale") == "de_DE"
-            and all(item.get(key) is True for key in ("clipboard", "binary_resources"))
-            and menu.get("is_native") is True
-            and int(menu.get("menu_count", 0)) >= 1
-            and int(menu.get("action_count", 0)) >= 1
-            and file_dialog.get("dont_use_native_dialog") is False
-            and file_dialog.get("window_modality") == "WindowModal"
-            and file_dialog.get("visible_before_cancel") is True
-            and file_dialog.get("cancel_requested") is True
-            and file_dialog.get("finished_signal") is True
-            and file_dialog.get("rejected_signal") is True
-            and file_dialog.get("result") == file_dialog.get("rejected_value") == 0
-            and file_dialog.get("timed_out") is False
-            and file_dialog.get("timeout_ms") == 10_000
-            and critical_dialog.get("dont_use_native_dialog") is False
-            and critical_dialog.get("application_dont_use_native_dialogs") is False
-            and critical_dialog.get("dont_show_on_screen_before_show") is False
-            and critical_dialog.get("dont_show_on_screen_after_show") is True
-            and critical_dialog.get("native_helper_active") is True
-            and critical_dialog.get("window_modality") == "WindowModal"
-            and critical_dialog.get("visible_before_close") is True
-            and critical_dialog.get("critical_icon") is True
-            and critical_dialog.get("finished_signal") is True
-            and critical_dialog.get("result")
-            == critical_dialog.get("accepted_value")
-            == 1
-            and critical_dialog.get("timed_out") is False
-            and critical_dialog.get("timeout_ms") == 5_000
-            and accessibility.get("focus_before") == "packagedAccessibilityControl"
-            and accessibility.get("focus_after_tab")
-            == "packagedKeyboardTraversalTarget"
-            and accessibility.get("accessible_name") == "Packaged accessibility control"
-            and accessibility.get("accessible_description")
-            == "Verifies packaged Qt accessibility metadata."
-            and native_accessibility.get("is_ignored") is False
-            and native_accessibility.get("exposed") is True
-            and native_accessibility.get("role") == "AXButton"
-            and native_accessibility.get("title") == "Packaged accessibility control"
-            and native_accessibility.get("description")
-            == "Verifies packaged Qt accessibility metadata."
-            and native_accessibility.get("source") == "accessibility-tree"
-            and native_accessibility.get("bridge")
-            == "accessibilityAttributeValue:AXChildren"
-            and native_accessibility.get("bridge_supported") is True
-            and int(native_accessibility.get("root_count", 0)) >= 1
-            and cleanup.get("close_accepted") is True
-            and cleanup.get("window_visible") is False
-            and item.get("available_styles")
-            and item.get("active_style")
-            and item.get("tls_backends")
-            and {"jpeg", "svg"} <= set(item.get("image_formats", []))
-            and abs(
-                float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))
+        if not _surface_item_valid(item):
+            raise MacOSDeploymentInspectionError(
+                f"macOS packaged surface evidence is incomplete at {item.get('requested')}"
             )
-            < 1e-9
-            and float(item.get("baseline_device_pixel_ratio", 0)) > 0
-            and abs(
+
+
+def _surface_item_valid(item: dict[str, Any]) -> bool:
+    menu = item.get("native_menu", {})
+    file_dialog = item.get("native_file_dialog", {})
+    critical_dialog = item.get("critical_dialog", {})
+    accessibility = item.get("accessibility", {})
+    return (
+        _surface_basic_controls(item, menu, file_dialog)
+        and _surface_critical_dialog(critical_dialog)
+        and _surface_accessibility(accessibility)
+        and _surface_scale_values(item)
+    )
+
+
+def _surface_basic_controls(item: dict, menu: dict, file_dialog: dict) -> bool:
+    return (
+        item.get("platform_plugin") == "cocoa"
+        and item.get("locale") == "de_DE"
+        and all(item.get(key) is True for key in ("clipboard", "binary_resources"))
+        and _surface_menu_valid(menu)
+        and _surface_file_dialog_valid(file_dialog)
+    )
+
+
+def _surface_menu_valid(menu: dict) -> bool:
+    return (
+        menu.get("is_native") is True
+        and int(menu.get("menu_count", 0)) >= 1
+        and int(menu.get("action_count", 0)) >= 1
+    )
+
+
+def _surface_file_dialog_valid(file_dialog: dict) -> bool:
+    return all(
+        (
+            file_dialog.get("dont_use_native_dialog") is False,
+            file_dialog.get("window_modality") == "WindowModal",
+            file_dialog.get("visible_before_cancel") is True,
+            file_dialog.get("cancel_requested") is True,
+            file_dialog.get("finished_signal") is True,
+            file_dialog.get("rejected_signal") is True,
+            file_dialog.get("result") == file_dialog.get("rejected_value") == 0,
+            file_dialog.get("timed_out") is False,
+            file_dialog.get("timeout_ms") == 10_000,
+        )
+    )
+
+
+def _surface_critical_dialog(critical: dict) -> bool:
+    return all(
+        (
+            critical.get("dont_use_native_dialog") is False,
+            critical.get("application_dont_use_native_dialogs") is False,
+            critical.get("dont_show_on_screen_before_show") is False,
+            critical.get("dont_show_on_screen_after_show") is True,
+            critical.get("native_helper_active") is True,
+            critical.get("window_modality") == "WindowModal",
+            critical.get("visible_before_close") is True,
+            critical.get("critical_icon") is True,
+            critical.get("finished_signal") is True,
+            critical.get("result") == critical.get("accepted_value") == 1,
+            critical.get("timed_out") is False,
+            critical.get("timeout_ms") == 5_000,
+        )
+    )
+
+
+def _surface_accessibility(accessibility: dict) -> bool:
+    native = accessibility.get("native", {})
+    return all(
+        (
+            accessibility.get("focus_before") == "packagedAccessibilityControl",
+            accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget",
+            accessibility.get("accessible_name") == "Packaged accessibility control",
+            accessibility.get("accessible_description")
+            == "Verifies packaged Qt accessibility metadata.",
+            native.get("is_ignored") is False,
+            native.get("exposed") is True,
+            native.get("role") == "AXButton",
+            native.get("title") == "Packaged accessibility control",
+            native.get("description") == "Verifies packaged Qt accessibility metadata.",
+            native.get("source") == "accessibility-tree",
+            native.get("bridge") == "accessibilityAttributeValue:AXChildren",
+            native.get("bridge_supported") is True,
+            int(native.get("root_count", 0)) >= 1,
+        )
+    )
+
+
+def _surface_scale_values(item: dict) -> bool:
+    cleanup = item.get("cleanup", {})
+    return all(
+        (
+            cleanup.get("close_accepted") is True,
+            cleanup.get("window_visible") is False,
+            bool(item.get("available_styles")),
+            bool(item.get("active_style")),
+            bool(item.get("tls_backends")),
+            {"jpeg", "svg"} <= set(item.get("image_formats", [])),
+            abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1)))
+            < 1e-9,
+            float(item.get("baseline_device_pixel_ratio", 0)) > 0,
+            abs(
                 float(item.get("expected_device_pixel_ratio", 0))
                 - float(item.get("baseline_device_pixel_ratio", 0))
                 * float(item.get("requested", -1))
             )
-            < 1e-9
-            and abs(
+            < 1e-9,
+            abs(
                 float(item.get("device_pixel_ratio", 0))
                 - float(item.get("expected_device_pixel_ratio", -1))
             )
-            <= float(item.get("dpr_tolerance", -1))
-        ):
-            raise MacOSDeploymentInspectionError(
-                f"macOS packaged surface evidence is incomplete at {item.get('requested')}"
-            )
+            <= float(item.get("dpr_tolerance", -1)),
+        )
+    )
 
 
 def _validate_extracted_qualification(
@@ -2361,14 +2536,46 @@ def _validate_qualification_artifacts(
     architecture: str,
 ) -> None:
     signing = deployment.get("signing_inventory", {})
-    valid = (
+    if not _qualification_deployment_valid(
+        deployment, signing, target, architecture, signing_inventory
+    ):
+        raise MacOSDeploymentInspectionError(
+            "macOS packaged qualification evidence is incomplete"
+        )
+    if not _qualification_archive_valid(
+        smoke, archive_report, archive, target, expected_embedded
+    ):
+        raise MacOSDeploymentInspectionError(
+            "macOS packaged qualification evidence is incomplete"
+        )
+
+
+def _qualification_deployment_valid(
+    deployment: dict,
+    signing: dict,
+    target: str,
+    architecture: str,
+    signing_inventory: Path,
+) -> bool:
+    return (
         deployment.get("target") == target
         and deployment.get("stack") == EXPECTED_VERSIONS
         and deployment.get("architecture") == architecture
         and deployment.get("qt_dependency_collector") == "PyInstaller"
         and signing.get("path") == "qualification/ad-hoc-signing-inventory.json"
         and signing.get("sha256") == sha256_file(signing_inventory)
-        and smoke.get("execution", {}).get("clean_exit") is True
+    )
+
+
+def _qualification_archive_valid(
+    smoke: dict,
+    archive_report: dict,
+    archive: Path,
+    target: str,
+    expected_embedded: dict[str, str],
+) -> bool:
+    return (
+        smoke.get("execution", {}).get("clean_exit") is True
         and smoke.get("execution", {}).get("launchservices_completion_marker") is True
         and archive_report.get("target") == target
         and archive_report.get("archive_sha256") == sha256_file(archive)
@@ -2376,10 +2583,6 @@ def _validate_qualification_artifacts(
             archive_report.get("embedded_sha256", {}), expected_embedded
         )
     )
-    if not valid:
-        raise MacOSDeploymentInspectionError(
-            "macOS packaged qualification evidence is incomplete"
-        )
 
 
 def _validate_profile(path: Path, architecture: str) -> None:
@@ -2677,111 +2880,125 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _dispatch_command(args: argparse.Namespace) -> None:
-    if args.command == "validate-root":
-        validate_archive_root_name(args.archive_root_name)
-    elif args.command == "inspect":
-        versions = {
-            name: getattr(args, f"{name}_version") for name in EXPECTED_VERSIONS
-        }
-        result = inspect_deployment(
-            args.app_root,
-            versions=versions,
-            source_commit=args.source_commit,
-            runtime_probe=json.loads(
-                args.runtime_probe.read_text(encoding="utf-8")
-            ),
-            locked_qt_root=args.locked_qt_root,
-            signing_inventory_path=args.signing_inventory,
-            target=args.target,
-        )
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-    elif args.command == "finalize-smoke":
-        finalize_smoke_evidence(
-            args.smoke_evidence,
-            args.smoke_log,
-            args.launchservices_marker,
-            require_direct_teardown=args.require_direct_teardown,
-        )
-    elif args.command == "native-graph":
-        args.output.write_text(
-            json.dumps(
-                inspect_unsigned_native_graph(args.app, target=args.target),
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-    elif args.command == "archive":
-        embedded_files = {
-            "qualification/deployment-manifest.json": args.deployment_manifest,
-            "qualification/ad-hoc-signing-inventory.json": args.signing_inventory,
-            "qualification/runtime-probe.json": args.runtime_probe,
-            "qualification/runtime-probe.stdout.log": args.runtime_stdout,
-            "qualification/runtime-probe.stderr.log": args.runtime_stderr,
-            "qualification/embedded-r-runtime-profile.json": args.r_runtime_profile,
-            "qualification/packaged-smoke.json": args.smoke_evidence,
-            "qualification/packaged-smoke.log": args.smoke_log,
-            "qualification/packaged-smoke.stdout.log": args.smoke_stdout,
-            "qualification/packaged-smoke.stderr.log": args.smoke_stderr,
-            "qualification/packaged-smoke.hang-trace.log": args.hang_trace,
-        }
-        if args.launchservices_marker is not None:
-            embedded_files["qualification/launchservices-completion.json"] = (
-                args.launchservices_marker
-            )
-        if args.direct_build_manifest is not None:
-            embedded_files["qualification/direct-r-build-manifest.json"] = (
-                args.direct_build_manifest
-            )
-        else:
-            embedded_files["qualification/r-integration-kit-manifest.json"] = (
-                args.r_integration_kit_manifest
-            )
-        result = inspect_archive(
-            args.archive,
-            archive_root_name=args.archive_root_name,
-            target=args.target,
-            embedded_files=embedded_files,
-        )
-        args.output.write_text(
-            json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+def _dispatch_validate_root(args: argparse.Namespace) -> None:
+    validate_archive_root_name(args.archive_root_name)
+
+
+def _dispatch_inspect(args: argparse.Namespace) -> None:
+    versions = {
+        name: getattr(args, f"{name}_version") for name in EXPECTED_VERSIONS
+    }
+    result = inspect_deployment(
+        args.app_root,
+        versions=versions,
+        source_commit=args.source_commit,
+        runtime_probe=json.loads(args.runtime_probe.read_text(encoding="utf-8")),
+        locked_qt_root=args.locked_qt_root,
+        signing_inventory_path=args.signing_inventory,
+        target=args.target,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _dispatch_finalize(args: argparse.Namespace) -> None:
+    finalize_smoke_evidence(
+        args.smoke_evidence,
+        args.smoke_log,
+        args.launchservices_marker,
+        require_direct_teardown=args.require_direct_teardown,
+    )
+
+
+def _dispatch_native_graph(args: argparse.Namespace) -> None:
+    result = inspect_unsigned_native_graph(args.app, target=args.target)
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _archive_embedded_files(args: argparse.Namespace) -> dict[str, Path]:
+    embedded = {
+        "qualification/deployment-manifest.json": args.deployment_manifest,
+        "qualification/ad-hoc-signing-inventory.json": args.signing_inventory,
+        "qualification/runtime-probe.json": args.runtime_probe,
+        "qualification/runtime-probe.stdout.log": args.runtime_stdout,
+        "qualification/runtime-probe.stderr.log": args.runtime_stderr,
+        "qualification/embedded-r-runtime-profile.json": args.r_runtime_profile,
+        "qualification/packaged-smoke.json": args.smoke_evidence,
+        "qualification/packaged-smoke.log": args.smoke_log,
+        "qualification/packaged-smoke.stdout.log": args.smoke_stdout,
+        "qualification/packaged-smoke.stderr.log": args.smoke_stderr,
+        "qualification/packaged-smoke.hang-trace.log": args.hang_trace,
+    }
+    marker = args.launchservices_marker
+    if marker is not None:
+        embedded["qualification/launchservices-completion.json"] = marker
+    direct_manifest = args.direct_build_manifest
+    if direct_manifest is not None:
+        embedded["qualification/direct-r-build-manifest.json"] = direct_manifest
     else:
-        write_qualification_evidence(
-            target=args.target,
-            **{
-                name: getattr(args, name)
-                for name in (
-                    "archive",
-                    "deployment_manifest",
-                    "runtime_probe",
-                    "smoke_evidence",
-                    "smoke_log",
-                    "smoke_stdout",
-                    "smoke_stderr",
-                    "hang_trace",
-                    "launchservices_marker",
-                    "archive_inspection",
-                    "signing_inventory",
-                    "output",
-                    "r_runtime_profile",
-                    "direct_build_manifest",
-                    "extracted_runtime_probe",
-                    "extracted_deployment_manifest",
-                    "extracted_smoke_evidence",
-                    "extracted_smoke_log",
-                    "extracted_smoke_stdout",
-                    "extracted_smoke_stderr",
-                    "extracted_hang_trace",
-                    "extracted_launchservices_marker",
-                )
-            },
+        embedded["qualification/r-integration-kit-manifest.json"] = (
+            args.r_integration_kit_manifest
         )
+    return embedded
+
+
+def _dispatch_archive(args: argparse.Namespace) -> None:
+    result = inspect_archive(
+        args.archive,
+        archive_root_name=args.archive_root_name,
+        target=args.target,
+        embedded_files=_archive_embedded_files(args),
+    )
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _dispatch_evidence(args: argparse.Namespace) -> None:
+    names = (
+        "archive",
+        "deployment_manifest",
+        "runtime_probe",
+        "smoke_evidence",
+        "smoke_log",
+        "smoke_stdout",
+        "smoke_stderr",
+        "hang_trace",
+        "launchservices_marker",
+        "archive_inspection",
+        "signing_inventory",
+        "output",
+        "r_runtime_profile",
+        "direct_build_manifest",
+        "extracted_runtime_probe",
+        "extracted_deployment_manifest",
+        "extracted_smoke_evidence",
+        "extracted_smoke_log",
+        "extracted_smoke_stdout",
+        "extracted_smoke_stderr",
+        "extracted_hang_trace",
+        "extracted_launchservices_marker",
+    )
+    write_qualification_evidence(
+        target=args.target,
+        **{name: getattr(args, name) for name in names},
+    )
+
+
+def _dispatch_command(args: argparse.Namespace) -> None:
+    handlers = {
+        "validate-root": _dispatch_validate_root,
+        "inspect": _dispatch_inspect,
+        "finalize-smoke": _dispatch_finalize,
+        "native-graph": _dispatch_native_graph,
+        "archive": _dispatch_archive,
+        "evidence": _dispatch_evidence,
+    }
+    handlers[args.command](args)
 
 
 def main() -> int:
