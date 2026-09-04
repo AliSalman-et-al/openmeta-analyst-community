@@ -1270,6 +1270,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         assert covariates_model.setData(covariates_model.index(0, 0), "") is False
         assert errors == ["Covariate names cannot be empty."]
     finally:
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
