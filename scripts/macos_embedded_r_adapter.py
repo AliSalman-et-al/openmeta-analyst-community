@@ -10,7 +10,7 @@ import os
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
-from typing import Any
+from typing import TypedDict
 
 from scripts.qt6_macos_feasibility_impl import is_macho_candidate
 
@@ -286,8 +286,16 @@ def audit_symlinks(framework: Path) -> list[dict[str, str]]:
     return records
 
 
-def macho_inventory(framework: Path, architecture: str) -> list[dict[str, Any]]:
-    result = []
+class MachORecord(TypedDict):
+    path: str
+    sha256: str
+    architectures: list[str]
+    install_id: str | None
+    dependencies: list[str]
+
+
+def macho_inventory(framework: Path, architecture: str) -> list[MachORecord]:
+    result: list[MachORecord] = []
     for path in sorted(framework.rglob("*")):
         if path.is_symlink() or not path.is_file() or not is_macho_candidate(path):
             continue
@@ -296,15 +304,14 @@ def macho_inventory(framework: Path, architecture: str) -> list[dict[str, Any]]:
             raise AdapterError(
                 f"R Mach-O is not {architecture}-only: {path}: {observed}"
             )
-        result.append(
-            {
-                "path": path.relative_to(framework).as_posix(),
-                "sha256": sha256_file(path),
-                "architectures": observed,
-                "install_id": install_id(path),
-                "dependencies": dependencies(path),
-            }
-        )
+        record: MachORecord = {
+            "path": path.relative_to(framework).as_posix(),
+            "sha256": sha256_file(path),
+            "architectures": observed,
+            "install_id": install_id(path),
+            "dependencies": dependencies(path),
+        }
+        result.append(record)
     if not result:
         raise AdapterError("embedded R framework has no Mach-O inventory")
     return result
@@ -346,7 +353,7 @@ def _loader_replacement(binary: Path, target: Path) -> str:
 
 
 def validate_relocated_inventory(
-    framework: Path, inventory: list[dict[str, Any]]
+    framework: Path, inventory: list[MachORecord]
 ) -> None:
     for record in inventory:
         binary = framework / record["path"]
@@ -368,14 +375,14 @@ def validate_relocated_inventory(
                 )
 
 
-def pre_normalization_audit(framework: Path, architecture: str) -> dict[str, Any]:
+def pre_normalization_audit(framework: Path, architecture: str) -> dict[str, object]:
     framework = framework.resolve(strict=True)
     font_links = plan_fontconfig_links(framework)
     links = audit_pre_normalization_symlinks(framework, font_links)
     native = macho_inventory(framework, architecture)
     dependency_map = []
     queue = [(record, framework / record["path"]) for record in native]
-    planned_copies: dict[str, dict[str, Any]] = {}
+    planned_copies: dict[str, dict[str, object]] = {}
     while queue:
         record, inspected_binary = queue.pop(0)
         binary = framework / record["path"]
@@ -408,15 +415,14 @@ def pre_normalization_audit(framework: Path, architecture: str) -> dict[str, Any
                     "source": str(source),
                     "sha256": source_hash,
                 }
-                native.append(
-                    {
-                        "path": target_relative,
-                        "sha256": source_hash,
-                        "architectures": [architecture],
-                        "install_id": install_id(source),
-                        "dependencies": dependencies(source),
-                    }
+                record = MachORecord(
+                    path=target_relative,
+                    sha256=source_hash,
+                    architectures=[architecture],
+                    install_id=install_id(source),
+                    dependencies=dependencies(source),
                 )
+                native.append(record)
                 queue.append((native[-1], source))
             if source is None and (
                 not target.is_file() or not is_macho_candidate(target)

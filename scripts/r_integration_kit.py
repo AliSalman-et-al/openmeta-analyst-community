@@ -13,7 +13,6 @@ import platform
 import shutil
 import subprocess
 import sys
-from typing import Any, cast
 from urllib.parse import urlparse
 
 
@@ -96,6 +95,60 @@ class KitError(RuntimeError):
     """Raised when an integration kit violates its immutable contract."""
 
 
+def _record_string(record: dict[str, object], key: str, label: str) -> str:
+    value = record.get(key)
+    if not isinstance(value, str):
+        raise KitError(f"{label} is missing its {key} string")
+    return value
+
+
+def _record_strings(record: dict[str, object], key: str, label: str) -> list[str]:
+    value = record.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise KitError(f"{label} is missing its {key} string list")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise KitError(f"{label} is missing its {key} string list")
+        result.append(item)
+    return result
+
+
+def _record_list(record: dict[str, object], key: str, label: str) -> list[dict[str, object]]:
+    value = record.get(key)
+    if not isinstance(value, list):
+        raise KitError(f"{label} is missing its {key} record list")
+    result: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            raise KitError(f"{label} has a malformed {key} record")
+        result.append({str(name): field for name, field in item.items()})
+    return result
+
+
+def _record_mapping(record: dict[str, object], key: str, label: str) -> dict[str, object]:
+    value = record.get(key)
+    if not isinstance(value, dict):
+        raise KitError(f"{label} is missing its {key} object")
+    result: dict[str, object] = {}
+    for name, field in value.items():
+        if not isinstance(name, str):
+            raise KitError(f"{label} has a malformed {key} object")
+        result[name] = field
+    return result
+
+
+def _mapping(value: object, label: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise KitError(f"{label} must be an object")
+    result: dict[str, object] = {}
+    for name, field in value.items():
+        if not isinstance(name, str):
+            raise KitError(f"{label} has a non-string key")
+        result[name] = field
+    return result
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -104,8 +157,8 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def files(root: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
+def files(root: Path) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root).as_posix()
         if path.is_symlink():
@@ -124,7 +177,7 @@ def files(root: Path) -> list[dict[str, Any]]:
     return records
 
 
-def canonical_digest(manifest: dict[str, Any]) -> str:
+def canonical_digest(manifest: dict[str, object]) -> str:
     unsigned = {key: value for key, value in manifest.items() if key != "kit_sha256"}
     payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(payload).hexdigest()
@@ -164,11 +217,13 @@ def _declares_license_file(value: object) -> bool:
 def _valid_license_files(value: object, *, declared_license: object) -> bool:
     if not isinstance(value, list):
         return False
-    records: list[dict[str, Any]] = []
+    records: list[dict[str, object]] = []
     for item in value:
         if not isinstance(item, dict):
             return False
-        record = cast(dict[str, Any], item)
+        record = {key: field for key, field in item.items() if isinstance(key, str)}
+        if len(record) != len(item):
+            return False
         path = record.get("path")
         if not (
             isinstance(path, str)
@@ -180,12 +235,13 @@ def _valid_license_files(value: object, *, declared_license: object) -> bool:
             return False
         records.append(record)
     return not _declares_license_file(declared_license) or any(
-        Path(record["path"]).name.casefold() in {"license", "licence"}
+        Path(_record_string(record, "path", "license record")).name.casefold()
+        in {"license", "licence"}
         for record in records
     )
 
 
-def _valid_official_r(record: dict[str, Any], target: str) -> bool:
+def _valid_official_r(record: dict[str, object], target: str) -> bool:
     if record.get("url") != OFFICIAL_R_URLS[target]:
         return False
     if target == "windows-x64":
@@ -205,13 +261,15 @@ def _valid_official_r(record: dict[str, Any], target: str) -> bool:
     )
 
 
-def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, Any]:
-    provenance = json.loads(path.read_text(encoding="utf-8"))
-    official_r = provenance.get("official_r", {})
-    ppm = provenance.get("ppm_packages", [])
-    source_packages = provenance.get("source_packages", [])
-    rpy2 = provenance.get("rpy2", {})
-    rpy2_archives = rpy2.get("source_archives", [])
+def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, object]:
+    provenance = _mapping(
+        json.loads(path.read_text(encoding="utf-8")), "provenance manifest"
+    )
+    official_r = _record_mapping(provenance, "official_r", "provenance")
+    ppm = _record_list(provenance, "ppm_packages", "provenance")
+    source_packages = _record_list(provenance, "source_packages", "provenance")
+    rpy2 = _record_mapping(provenance, "rpy2", "provenance")
+    rpy2_archives = _record_list(rpy2, "source_archives", "rpy2 provenance")
     if not (
         provenance.get("schema_version") == 1
         and provenance.get("target") == target
@@ -331,10 +389,12 @@ def installed_package_inventory(library: Path) -> list[dict[str, str]]:
 
 
 def validate_installed_provenance(
-    installed: list[dict[str, str]], provenance: dict[str, Any]
+    installed: list[dict[str, str]], provenance: dict[str, object]
 ) -> None:
-    claims = provenance["ppm_packages"] + provenance["source_packages"]
-    by_name: dict[str, dict[str, Any]] = {}
+    claims = _record_list(provenance, "ppm_packages", "provenance") + _record_list(
+        provenance, "source_packages", "provenance"
+    )
+    by_name: dict[str, dict[str, object]] = {}
     for record in claims:
         name = str(record["name"])
         if name in by_name:
@@ -360,7 +420,7 @@ def validate_installed_provenance(
 
 
 def copy_source_payload(
-    source_root: Path, provenance: dict[str, Any], destination: Path
+    source_root: Path, provenance: dict[str, object], destination: Path
 ) -> list[dict[str, str]]:
     claims = [
         {
@@ -368,7 +428,7 @@ def copy_source_payload(
             "version": record["version"],
             "sha256": record["sha256"],
         }
-        for record in provenance["source_packages"]
+        for record in _record_list(provenance, "source_packages", "provenance")
         if record.get("name") == "RCMetaR"
     ]
     claims.extend(
@@ -377,7 +437,11 @@ def copy_source_payload(
             "version": record["version"],
             "sha256": record["sha256"],
         }
-        for record in provenance["rpy2"]["source_archives"]
+        for record in _record_list(
+            _record_mapping(provenance, "rpy2", "provenance"),
+            "source_archives",
+            "rpy2 provenance",
+        )
     )
     candidates = [path for path in source_root.iterdir() if path.is_file()]
     by_hash: dict[str, list[Path]] = {}
@@ -538,14 +602,16 @@ def _macos_metadata(path: Path) -> tuple[str | None, list[str], str | None, str]
     return install_id, sorted(set(rpaths)), minimum_os, identity
 
 
-def _resolve_windows_closure(records: list[dict[str, Any]]) -> None:
-    by_name: dict[str, list[dict[str, Any]]] = {}
+def _resolve_windows_closure(records: list[dict[str, object]]) -> None:
+    by_name: dict[str, list[dict[str, object]]] = {}
     for record in records:
-        by_name.setdefault(Path(record["path"]).name.casefold(), []).append(record)
+        by_name.setdefault(
+            Path(_record_string(record, "path", "native record")).name.casefold(), []
+        ).append(record)
     for record in records:
         resolutions = []
-        for import_record in record.pop("_imports"):
-            name = import_record["name"]
+        for import_record in _record_list(record, "_imports", "native record"):
+            name = _record_string(import_record, "name", "native import")
             if _windows_system_import(name):
                 resolutions.append({**import_record, "resolution": "system"})
                 continue
@@ -565,30 +631,35 @@ def _resolve_windows_closure(records: list[dict[str, Any]]) -> None:
         record["imports"] = resolutions
 
 
-def _resolve_macos_closure(records: list[dict[str, Any]], root: Path) -> None:
-    by_path = {(root / record["path"]).resolve(): record for record in records}
-    by_install_id: dict[str, list[dict[str, Any]]] = {}
+def _resolve_macos_closure(records: list[dict[str, object]], root: Path) -> None:
+    by_path = {
+        (root / _record_string(record, "path", "native record")).resolve(): record
+        for record in records
+    }
+    by_install_id: dict[str, list[dict[str, object]]] = {}
     for record in records:
         if record.get("install_id"):
             by_install_id.setdefault(str(record["install_id"]), []).append(record)
     for record in records:
-        loader = (root / record["path"]).resolve().parent
+        loader = (
+            root / _record_string(record, "path", "native record")
+        ).resolve().parent
         resolutions = []
-        for dependency in record.pop("_imports"):
+        for dependency in _record_strings(record, "_imports", "native record"):
             lowered = dependency.casefold()
             if lowered.startswith(FORBIDDEN_NATIVE_PREFIXES):
                 raise KitError(f"forbidden external Mach-O dependency: {dependency}")
             if dependency.startswith(("/usr/lib/", "/System/Library/")):
                 resolutions.append({"name": dependency, "resolution": "system"})
                 continue
-            candidates: list[dict[str, Any]] = []
+            candidates: list[dict[str, object]] = []
             if dependency.startswith("@loader_path/"):
                 resolved = (loader / dependency[len("@loader_path/") :]).resolve()
                 if resolved in by_path:
                     candidates.append(by_path[resolved])
             elif dependency.startswith("@rpath/"):
                 suffix = dependency[len("@rpath/") :]
-                for rpath in record.get("rpaths", []):
+                for rpath in _record_strings(record, "rpaths", "native record"):
                     if rpath.startswith("@loader_path/"):
                         resolved = (
                             loader / rpath[len("@loader_path/") :] / suffix
@@ -615,7 +686,7 @@ def _resolve_macos_closure(records: list[dict[str, Any]], root: Path) -> None:
         record["imports"] = resolutions
 
 
-def _windows_native_record(path: Path, relative: str) -> dict[str, Any]:
+def _windows_native_record(path: Path, relative: str) -> dict[str, object]:
     import pefile
 
     try:
@@ -652,7 +723,7 @@ def _windows_native_record(path: Path, relative: str) -> dict[str, Any]:
 
 def _macos_native_record(
     path: Path, relative: str, target: str, architecture: str
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     from scripts.qt6_macos_feasibility_impl import is_macho_candidate
 
     if not is_macho_candidate(path):
@@ -697,8 +768,8 @@ def _macos_native_record(
     }
 
 
-def _native_records(root: Path, target: str, architecture: str) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
+def _native_records(root: Path, target: str, architecture: str) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
     for path in _native_paths(root):
         relative = path.relative_to(root).as_posix()
         if relative.startswith("python/uv-cache/"):
@@ -718,7 +789,7 @@ def _native_paths(root: Path) -> list[Path]:
 
 def _native_record(
     path: Path, relative: str, target: str, architecture: str
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     if target.startswith("windows-"):
         if path.suffix.lower() not in {".exe", ".dll", ".pyd"}:
             return None
@@ -726,25 +797,28 @@ def _native_record(
     return _macos_native_record(path, relative, target, architecture)
 
 
-def _validate_windows_inventory(records: list[dict[str, Any]]) -> None:
+def _validate_windows_inventory(records: list[dict[str, object]]) -> None:
     _resolve_windows_closure(records)
     r_dlls = [
-        record for record in records if Path(record["path"]).name.casefold() == "r.dll"
+        record
+        for record in records
+        if Path(_record_string(record, "path", "native record")).name.casefold()
+        == "r.dll"
     ]
     if len(r_dlls) != 1:
         raise KitError("kit must contain exactly one canonical R.dll")
 
 
-def _validate_macos_inventory(root: Path, records: list[dict[str, Any]]) -> None:
+def _validate_macos_inventory(root: Path, records: list[dict[str, object]]) -> None:
     _resolve_macos_closure(records, root)
     shared_r = [
         record
         for record in records
-        if record["path"].endswith("/lib/libR.dylib")
+        if _record_string(record, "path", "native record").endswith("/lib/libR.dylib")
         or (
-            "/Versions/" in record["path"]
-            and "/Resources/" not in record["path"]
-            and record["path"].endswith("/R")
+            "/Versions/" in _record_string(record, "path", "native record")
+            and "/Resources/" not in _record_string(record, "path", "native record")
+            and _record_string(record, "path", "native record").endswith("/R")
         )
     ]
     if len({record["sha256"] for record in shared_r}) != 1:
@@ -753,7 +827,7 @@ def _validate_macos_inventory(root: Path, records: list[dict[str, Any]]) -> None
 
 def native_dependency_inventory(
     root: Path, target: str, architecture: str
-) -> list[dict[str, Any]]:
+) -> list[dict[str, object]]:
     records = _native_records(root, target, architecture)
     if target.startswith("windows-"):
         _validate_windows_inventory(records)
@@ -762,7 +836,7 @@ def native_dependency_inventory(
     return records
 
 
-def build(args: argparse.Namespace) -> dict[str, Any]:
+def build(args: argparse.Namespace) -> dict[str, object]:
     target = args.target
     if not _valid_sha256(args.package_lock_sha256):
         raise KitError("package lock SHA256 must be lowercase hexadecimal")
@@ -800,7 +874,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     provenance = load_provenance(args.provenance_manifest, target, bridge)
     rcmetar = next(
         record
-        for record in provenance["source_packages"]
+        for record in _record_list(provenance, "source_packages", "provenance")
         if record.get("name") == "RCMetaR"
     )
     expected_rcmetar_url = (
@@ -841,8 +915,9 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     shutil.copy2(bridge, output / "bridge" / bridge.name)
     if target.startswith("macos-"):
         relocate_macos_api_bridge(output, output / "bridge" / bridge.name)
-    provenance["rpy2"]["built_bridge_sha256"] = provenance["rpy2"]["bridge_sha256"]
-    provenance["rpy2"]["bridge_sha256"] = sha256_file(output / "bridge" / bridge.name)
+    rpy2 = _record_mapping(provenance, "rpy2", "provenance")
+    rpy2["built_bridge_sha256"] = rpy2["bridge_sha256"]
+    rpy2["bridge_sha256"] = sha256_file(output / "bridge" / bridge.name)
     source_payload = copy_source_payload(
         args.source_payload.resolve(strict=True), provenance, output / "source-archives"
     )
@@ -952,7 +1027,7 @@ def verify_content(
     target: str | None = None,
     uv_lock: Path | None = None,
     expected_kit_sha256: str | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     root = root.resolve(strict=True)
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -1002,7 +1077,7 @@ def verify_content(
     return manifest
 
 
-def verify(root: Path, *, target: str | None = None) -> dict[str, Any]:
+def verify(root: Path, *, target: str | None = None) -> dict[str, object]:
     root = root.resolve(strict=True)
     manifest = verify_content(root, target=target)
     manifest_target = manifest["target"]
@@ -1011,7 +1086,10 @@ def verify(root: Path, *, target: str | None = None) -> dict[str, Any]:
     }
     bridge = root / str(manifest["api_bridge_path"])
     require_api_bridge(bridge)
-    if any("_rinterface_cffi_abi" in path.lower() for path in observed):
+    observed_paths = {
+        _record_string(item, "path", "integration-kit record") for item in files(root)
+    }
+    if any("_rinterface_cffi_abi" in path.lower() for path in observed_paths):
         raise KitError("integration kit contains a forbidden ABI bridge")
     if (
         str(manifest_target).startswith("macos-")
@@ -1060,7 +1138,7 @@ def verify(root: Path, *, target: str | None = None) -> dict[str, Any]:
     return manifest
 
 
-def consume(args: argparse.Namespace) -> dict[str, Any]:
+def consume(args: argparse.Namespace) -> dict[str, object]:
     manifest = verify(args.kit, target=args.target)
     destination = args.destination.resolve()
     if destination.exists():

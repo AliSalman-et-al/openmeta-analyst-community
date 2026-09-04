@@ -13,7 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable, cast
+from typing import Callable
 
 from rc_metastudio.macos_macho import (
     is_macho_candidate as _is_macho_candidate,
@@ -113,9 +113,26 @@ def _dependency_versions() -> tuple[dict[str, str], float]:
     from PyQt6 import QtCore
     import rpy2.robjects as ro
 
-    result = float(cast(Any, ro.r("sum(c(1.25, 2.5, 3.75))"))[0])
+    def first_r_value(value: object, expression: str) -> object:
+        get_item = getattr(value, "__getitem__", None)
+        if not callable(get_item):
+            raise RuntimeError(f"rpy2 expression did not return a vector: {expression}")
+        try:
+            return get_item(0)
+        except (IndexError, KeyError, TypeError) as exc:
+            raise RuntimeError(
+                f"rpy2 expression returned no first value: {expression}"
+            ) from exc
+
+    raw_result = first_r_value(ro.r("sum(c(1.25, 2.5, 3.75))"), "sum")
+    if not isinstance(raw_result, (int, float)):
+        raise RuntimeError("rpy2 sum expression did not return a number")
+    result = float(raw_result)
     r_version = str(
-        cast(Any, ro.r("paste(R.version$major, R.version$minor, sep='.')"))[0]
+        first_r_value(
+            ro.r("paste(R.version$major, R.version$minor, sep='.')"),
+            "R.version",
+        )
     )
     versions = {
         "python": platform.python_version(),
@@ -395,7 +412,7 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
             raise RuntimeError(
                 "minimal PyInstaller deployment exceeded its inventory bound"
             )
-    files.sort(key=lambda record: cast(str, record["path"]))
+    files.sort(key=lambda record: record["path"])
     inventory = {
         "schema_version": 2,
         "file_count": len(files),
@@ -622,11 +639,15 @@ def _packaged_bridge(app_root: Path) -> Path:
 
 
 def _validate_packaged_smoke(
-    package: dict[str, Any], app_root: Path
+    package: dict[str, object], app_root: Path
 ) -> Path:
-    plugin = Path(package["cocoa_plugin"])
+    plugin_value = package.get("cocoa_plugin")
+    r_home_value = package.get("r_home")
+    if not isinstance(plugin_value, str) or not isinstance(r_home_value, str):
+        raise RuntimeError("packaged smoke omitted its path fields")
+    plugin = Path(plugin_value)
     private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
-    if Path(package.get("r_home", "")) != private_r_home:
+    if Path(r_home_value) != private_r_home:
         raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
     if package.get("rpy2_mode") != "API":
         raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
@@ -637,7 +658,7 @@ def _validate_packaged_smoke(
     return plugin
 
 
-def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
+def run_feasibility(target: str, evidence_dir: Path) -> dict[str, object]:
     expected_machine, machine = _native_target(target)
 
     build_root = _feasibility_build_root(target, evidence_dir)
@@ -782,7 +803,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         }
     )
 
-    evidence: dict[str, Any] = {
+    evidence: dict[str, object] = {
         "schema_version": 1,
         "target": target,
         "status": "passed",

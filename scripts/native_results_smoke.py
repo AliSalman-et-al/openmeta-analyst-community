@@ -11,9 +11,12 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import subprocess
 import sys
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
 
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
+
+if TYPE_CHECKING:
+    from PyQt6 import QtGui, QtWidgets
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -111,7 +114,7 @@ def _canonical_member(root: Path, value: object, suffix: str) -> Path:
 def _rect(value: object, name: str) -> dict[str, int]:
     if not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}:
         raise ValueError("native Results evidence has malformed %s" % name)
-    record = cast(dict[str, Any], value)
+    record = cast(dict[str, object], value)
     return {
         "x": _strict_int(record["x"], "%s x" % name),
         "y": _strict_int(record["y"], "%s y" % name),
@@ -129,7 +132,7 @@ def _pixel_size(value: object) -> list[int]:
     ]
 
 
-def _image_has_variation(image: Any) -> bool:
+def _image_has_variation(image: QtGui.QImage) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull() or converted.width() < 1 or converted.height() < 1:
         return False
@@ -148,7 +151,7 @@ def _validate_png_capture(
 
     if not isinstance(capture, dict):
         raise ValueError("native Results evidence capture is malformed")
-    capture = cast(dict[str, Any], capture)
+    capture = cast(dict[str, object], capture)
     path = _canonical_member(root, capture.get("path"), ".png")
     payload = path.read_bytes()
     if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -231,10 +234,13 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
     records = []
     for scale in SCALE_FACTORS:
         record_path = _record_path(root, scale)
-        record = json.loads(
+        record_value = json.loads(
             record_path.read_text(encoding="utf-8"),
             parse_constant=_reject_nonstandard_json_constant,
         )
+        if not isinstance(record_value, dict):
+            raise ValueError("native Results evidence record is malformed")
+        record = cast(dict[str, object], record_value)
         expected_dpr = scale
         scale_factor = _strict_number(
             record.get("scale_factor"), "scale factor", minimum=0.01
@@ -297,9 +303,12 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
 
 
 def _capture_window(
-    app: Any, window: Any, destination: Path, attempts: int = MAX_CAPTURE_ATTEMPTS
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempts: int = MAX_CAPTURE_ATTEMPTS,
 ) -> dict[str, object]:
-    from PyQt6 import QtCore, QtGui
+    from PyQt6 import QtCore, QtGui, sip
 
     last_problem = "window was not exposed"
     for attempt in range(1, attempts + 1):
@@ -325,7 +334,7 @@ def _capture_window(
                     last_problem = "window client was not painted"
                     desktop = QtGui.QPixmap()
                 else:
-                    desktop = screen.grabWindow(0)
+                    desktop = screen.grabWindow(sip.voidptr(0))
                 if desktop.isNull():
                     if attempt < attempts:
                         QtCore.QThread.msleep(50)

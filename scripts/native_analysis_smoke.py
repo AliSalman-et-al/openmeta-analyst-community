@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Callable
 
 from PyQt6 import QtCore, QtWidgets, sip
 
@@ -151,7 +151,7 @@ def main() -> int:
         )
         app.processEvents()
 
-    def make_configuration() -> Any:
+    def make_configuration() -> analysis_setup_dialog.AnalysisSetupDialog:
         dialog = analysis_setup_dialog.AnalysisSetupDialog(
             Model(), parent=owner, confidence_level=95.0
         )

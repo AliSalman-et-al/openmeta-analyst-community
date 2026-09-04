@@ -11,15 +11,19 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Any, cast
+from collections.abc import Callable
 
 
-_killpg = cast(Any, getattr(os, "killpg", None))
-_getpgid = cast(Any, getattr(os, "getpgid", None))
-_sigkill = cast(Any, getattr(signal, "SIGKILL", None))
+_killpg: Callable[[int, int | signal.Signals], None] | None = getattr(
+    os, "killpg", None
+)
+_getpgid: Callable[[int], int] | None = getattr(os, "getpgid", None)
+_sigkill: int = getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
 def _process_group_exists(process_group_id: int) -> bool:
+    if _killpg is None:
+        raise RuntimeError("process groups are unavailable on this platform")
     try:
         _killpg(process_group_id, 0)
         return True
@@ -41,6 +45,8 @@ def _wait_for_group_exit(process_group_id: int, timeout_seconds: float) -> bool:
 
 
 def _terminate_posix_group(process: subprocess.Popen[bytes]) -> None:
+    if _getpgid is None or _killpg is None:
+        raise RuntimeError("process groups are unavailable on this platform")
     process_group_id = _getpgid(process.pid)
     try:
         _killpg(process_group_id, signal.SIGTERM)

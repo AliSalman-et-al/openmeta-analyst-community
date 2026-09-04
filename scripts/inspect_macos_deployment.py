@@ -13,7 +13,7 @@ import plistlib
 import stat
 import subprocess
 import sys
-from typing import Any, TypeGuard, cast
+from typing import TypeGuard, cast
 import unicodedata
 import zipfile
 
@@ -131,23 +131,64 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _valid_r_kit_derivation(manifest: Any, derivation: Any, target: str) -> bool:
+def _mapping_or_empty(value: object) -> dict[str, object]:
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        return {}
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            return {}
+        result[key] = item
+    return result
+
+
+def _int_or_default(value: object, default: int) -> int:
+    return value if isinstance(value, int) else default
+
+
+def _float_or_default(value: object, default: float) -> float:
+    return float(value) if isinstance(value, (int, float)) else default
+
+
+def _strings_or_empty(value: object) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return []
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            return []
+        result.append(item)
+    return result
+
+
+def _valid_r_kit_derivation(
+    manifest: dict[str, object], derivation: dict[str, object], target: str
+) -> bool:
+    manifest_records = manifest.get("files")
+    if not isinstance(manifest_records, list):
+        return False
     manifest_files = {
         record.get("path"): record
-        for record in manifest.get("files", [])
+        for value in manifest_records
+        for record in [_mapping_or_empty(value)]
         if record.get("kind") == "file"
     }
+    source_group = _mapping_or_empty(derivation.get("source"))
+    pre_sign_group = _mapping_or_empty(derivation.get("pre_sign"))
+    final_group = _mapping_or_empty(derivation.get("final"))
+    transformations = _mapping_or_empty(derivation.get("transformations"))
     for name in ("api_bridge", "r_shared_library"):
-        source = derivation.get("source", {}).get(name, {})
-        pre_sign = derivation.get("pre_sign", {}).get(name, {})
-        final = derivation.get("final", {}).get(name, {})
-        transformation = derivation.get("transformations", {}).get(name)
+        source = _mapping_or_empty(source_group.get(name))
+        pre_sign = _mapping_or_empty(pre_sign_group.get(name))
+        final = _mapping_or_empty(final_group.get(name))
+        transformation = _mapping_or_empty(transformations.get(name))
         pre_sign_is_derived = pre_sign.get("sha256") == source.get("sha256") or (
             name == "api_bridge"
-            and isinstance(transformation, dict)
             and transformation.get("kind") == "mach-o-load-command-relocation"
-            and transformation.get("source", {}).get("sha256") == source.get("sha256")
-            and transformation.get("output", {}).get("sha256") == pre_sign.get("sha256")
+            and _mapping_or_empty(transformation.get("source")).get("sha256")
+            == source.get("sha256")
+            and _mapping_or_empty(transformation.get("output")).get("sha256")
+            == pre_sign.get("sha256")
             and bool(transformation.get("changes"))
         )
         if not (
@@ -164,16 +205,18 @@ def _valid_r_kit_derivation(manifest: Any, derivation: Any, target: str) -> bool
 
 def validate_r_delivery_identity(
     app_root: Path,
-    runtime_probe: dict[str, Any],
+    runtime_probe: dict[str, object],
     *,
     target: str,
     architecture: str,
     source_commit: str,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Validate one, and only one, packaged R delivery identity."""
     marker_path = app_root / DIRECT_R_MARKER_RELATIVE
     marker_present = marker_path.is_file()
-    probe_direct = runtime_probe.get("r", {}).get("direct_spike") is True
+    probe_r = _mapping_or_empty(runtime_probe.get("r"))
+    probe_rpy2 = _mapping_or_empty(runtime_probe.get("rpy2"))
+    probe_direct = probe_r.get("direct_spike") is True
     kit_root = app_root / "Contents" / "Resources" / "r-integration-kit"
     kit_manifest_path = kit_root / "manifest.json"
     derivation_path = kit_root / "derivation.json"
@@ -208,8 +251,12 @@ def validate_r_delivery_identity(
         }
 
     try:
-        kit_manifest = json.loads(kit_manifest_path.read_text(encoding="utf-8"))
-        derivation = json.loads(derivation_path.read_text(encoding="utf-8"))
+        kit_manifest = _mapping_or_empty(
+            json.loads(kit_manifest_path.read_text(encoding="utf-8"))
+        )
+        derivation = _mapping_or_empty(
+            json.loads(derivation_path.read_text(encoding="utf-8"))
+        )
     except (OSError, json.JSONDecodeError) as exc:
         raise MacOSDeploymentInspectionError(
             "macOS deployment lacks its R integration-kit manifest"
@@ -223,10 +270,10 @@ def validate_r_delivery_identity(
         and derivation.get("kit_sha256") == kit_manifest.get("kit_sha256")
         and derivation.get("target") == target
         and _valid_r_kit_derivation(kit_manifest, derivation, target)
-        and derivation.get("final", {}).get("api_bridge", {}).get("sha256")
-        == runtime_probe.get("rpy2", {}).get("api_bridge_sha256")
-        and derivation.get("final", {}).get("r_shared_library", {}).get("sha256")
-        == runtime_probe.get("r", {}).get("shared_library_sha256")
+        and _mapping_or_empty(_mapping_or_empty(derivation.get("final")).get("api_bridge")).get("sha256")
+        == probe_rpy2.get("api_bridge_sha256")
+        and _mapping_or_empty(_mapping_or_empty(derivation.get("final")).get("r_shared_library")).get("sha256")
+        == probe_r.get("shared_library_sha256")
     ):
         raise MacOSDeploymentInspectionError(
             "macOS R integration-kit identity is invalid"
@@ -870,7 +917,7 @@ def validate_signing_inventory(
 ) -> dict:
     if not isinstance(inventory, dict):
         raise MacOSDeploymentInspectionError("signing inventory must be an object")
-    typed_inventory = cast(dict[str, Any], inventory)
+    typed_inventory = cast(dict[str, object], inventory)
     expected_keys = {
         "schema_version",
         "app",
@@ -880,7 +927,7 @@ def validate_signing_inventory(
         "verification",
     }
     native_files = typed_inventory.get("native_files")
-    nested_bundles = typed_inventory.get("nested_bundles")
+    nested_bundles = _strings_or_empty(typed_inventory.get("nested_bundles"))
     verification = typed_inventory.get("verification")
     if (
         set(typed_inventory) != expected_keys
@@ -891,8 +938,6 @@ def validate_signing_inventory(
         or not all(isinstance(item, str) for item in native_files)
         or len(native_files) != len(set(native_files))
         or set(native_files) != native_paths
-        or not isinstance(nested_bundles, list)
-        or not all(isinstance(item, str) for item in nested_bundles)
         or len(nested_bundles) != len(set(nested_bundles))
         or verification != {"individual_strict": True, "outer_deep_strict": True}
     ):
@@ -924,7 +969,7 @@ def validate_r_framework_inventory(
         raise MacOSDeploymentInspectionError(
             "R framework inventory is not a record list"
         )
-    typed_records = cast(list[dict[str, Any]], records)
+    typed_records = cast(list[dict[str, object]], records)
     by_path = {record.get("path"): record for record in typed_records}
     framework = "Contents/Frameworks/R.framework"
     if delivery_kind == "direct-spike":
@@ -963,7 +1008,7 @@ def validate_r_framework_inventory(
         if (
             launcher.get("kind") != "file"
             or "architectures" in launcher
-            or not int(launcher.get("mode", 0)) & 0o111
+            or not _int_or_default(launcher.get("mode"), 0) & 0o111
             or launcher.get("shebang") != "#!/bin/sh"
         ):
             raise MacOSDeploymentInspectionError(
@@ -979,7 +1024,7 @@ def validate_r_framework_inventory(
         r_executable = by_path[native_path]
         if (
             r_executable.get("architectures") != [architecture]
-            or not int(r_executable.get("mode", 0)) & 0o111
+            or not _int_or_default(r_executable.get("mode"), 0) & 0o111
         ):
             raise MacOSDeploymentInspectionError(
                 "R framework native executable target is not in the Mach-O inventory"
@@ -1038,7 +1083,7 @@ def validate_rpy2_api_payload(records: object) -> None:
         isinstance(item, dict) for item in records
     ):
         raise MacOSDeploymentInspectionError("rpy2 inventory is not a record list")
-    typed_records = cast(list[dict[str, Any]], records)
+    typed_records = cast(list[dict[str, object]], records)
     if _has_abi_bridge(typed_records):
         raise MacOSDeploymentInspectionError(
             "deployment contains the forbidden rpy2 ABI-mode fallback bridge"
@@ -1057,7 +1102,7 @@ def validate_rpy2_api_payload(records: object) -> None:
         )
 
 
-def _has_abi_bridge(records: list[dict[str, Any]]) -> bool:
+def _has_abi_bridge(records: list[dict[str, object]]) -> bool:
     return any(
         "_rinterface_cffi_abi" in str(record.get("path", "")).lower()
         for record in records
@@ -1065,8 +1110,8 @@ def _has_abi_bridge(records: list[dict[str, Any]]) -> bool:
 
 
 def _matching_rpy2_records(
-    records: list[dict[str, Any]], marker: str
-) -> list[dict[str, Any]]:
+    records: list[dict[str, object]], marker: str
+) -> list[dict[str, object]]:
     return [
         record
         for record in records
@@ -2364,7 +2409,7 @@ def validate_macos_surface_records(scales: object) -> None:
         isinstance(item, dict) for item in scales
     ):
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
-    typed_scales = cast(list[dict[str, Any]], scales)
+    typed_scales = cast(list[dict[str, object]], scales)
     if [item.get("requested") for item in typed_scales] != ["1.25", "1.50", "1.75"]:
         raise MacOSDeploymentInspectionError("macOS surface scales are incomplete")
     for item in typed_scales:
@@ -2374,11 +2419,11 @@ def validate_macos_surface_records(scales: object) -> None:
             )
 
 
-def _surface_item_valid(item: dict[str, Any]) -> bool:
-    menu = item.get("native_menu", {})
-    file_dialog = item.get("native_file_dialog", {})
-    critical_dialog = item.get("critical_dialog", {})
-    accessibility = item.get("accessibility", {})
+def _surface_item_valid(item: dict[str, object]) -> bool:
+    menu = _mapping_or_empty(item.get("native_menu", {}))
+    file_dialog = _mapping_or_empty(item.get("native_file_dialog", {}))
+    critical_dialog = _mapping_or_empty(item.get("critical_dialog", {}))
+    accessibility = _mapping_or_empty(item.get("accessibility", {}))
     return (
         _surface_basic_controls(item, menu, file_dialog)
         and _surface_critical_dialog(critical_dialog)
@@ -2387,7 +2432,9 @@ def _surface_item_valid(item: dict[str, Any]) -> bool:
     )
 
 
-def _surface_basic_controls(item: dict, menu: dict, file_dialog: dict) -> bool:
+def _surface_basic_controls(
+    item: dict[str, object], menu: dict[str, object], file_dialog: dict[str, object]
+) -> bool:
     return (
         item.get("platform_plugin") == "cocoa"
         and item.get("locale") == "de_DE"
@@ -2397,15 +2444,15 @@ def _surface_basic_controls(item: dict, menu: dict, file_dialog: dict) -> bool:
     )
 
 
-def _surface_menu_valid(menu: dict) -> bool:
+def _surface_menu_valid(menu: dict[str, object]) -> bool:
     return (
         menu.get("is_native") is True
-        and int(menu.get("menu_count", 0)) >= 1
-        and int(menu.get("action_count", 0)) >= 1
+        and _int_or_default(menu.get("menu_count"), 0) >= 1
+        and _int_or_default(menu.get("action_count"), 0) >= 1
     )
 
 
-def _surface_file_dialog_valid(file_dialog: dict) -> bool:
+def _surface_file_dialog_valid(file_dialog: dict[str, object]) -> bool:
     return all(
         (
             file_dialog.get("dont_use_native_dialog") is False,
@@ -2421,7 +2468,7 @@ def _surface_file_dialog_valid(file_dialog: dict) -> bool:
     )
 
 
-def _surface_critical_dialog(critical: dict) -> bool:
+def _surface_critical_dialog(critical: dict[str, object]) -> bool:
     return all(
         (
             critical.get("dont_use_native_dialog") is False,
@@ -2440,8 +2487,8 @@ def _surface_critical_dialog(critical: dict) -> bool:
     )
 
 
-def _surface_accessibility(accessibility: dict) -> bool:
-    native = accessibility.get("native", {})
+def _surface_accessibility(accessibility: dict[str, object]) -> bool:
+    native = _mapping_or_empty(accessibility.get("native", {}))
     return all(
         (
             accessibility.get("focus_before") == "packagedAccessibilityControl",
@@ -2457,13 +2504,14 @@ def _surface_accessibility(accessibility: dict) -> bool:
             native.get("source") == "accessibility-tree",
             native.get("bridge") == "accessibilityAttributeValue:AXChildren",
             native.get("bridge_supported") is True,
-            int(native.get("root_count", 0)) >= 1,
+            _int_or_default(native.get("root_count"), 0) >= 1,
         )
     )
 
 
-def _surface_scale_values(item: dict) -> bool:
-    cleanup = item.get("cleanup", {})
+def _surface_scale_values(item: dict[str, object]) -> bool:
+    cleanup = _mapping_or_empty(item.get("cleanup", {}))
+    image_formats = _strings_or_empty(item.get("image_formats", []))
     return all(
         (
             cleanup.get("close_accepted") is True,
@@ -2471,21 +2519,21 @@ def _surface_scale_values(item: dict) -> bool:
             bool(item.get("available_styles")),
             bool(item.get("active_style")),
             bool(item.get("tls_backends")),
-            {"jpeg", "svg"} <= set(item.get("image_formats", [])),
-            abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1)))
+            {"jpeg", "svg"} <= set(image_formats),
+            abs(_float_or_default(item.get("qt_scale_factor"), 0) - _float_or_default(item.get("requested"), -1))
             < 1e-9,
-            float(item.get("baseline_device_pixel_ratio", 0)) > 0,
+            _float_or_default(item.get("baseline_device_pixel_ratio"), 0) > 0,
             abs(
-                float(item.get("expected_device_pixel_ratio", 0))
-                - float(item.get("baseline_device_pixel_ratio", 0))
-                * float(item.get("requested", -1))
+                _float_or_default(item.get("expected_device_pixel_ratio"), 0)
+                - _float_or_default(item.get("baseline_device_pixel_ratio"), 0)
+                * _float_or_default(item.get("requested"), -1)
             )
             < 1e-9,
             abs(
-                float(item.get("device_pixel_ratio", 0))
-                - float(item.get("expected_device_pixel_ratio", -1))
+                _float_or_default(item.get("device_pixel_ratio"), 0)
+                - _float_or_default(item.get("expected_device_pixel_ratio"), -1)
             )
-            <= float(item.get("dpr_tolerance", -1)),
+            <= _float_or_default(item.get("dpr_tolerance"), -1),
         )
     )
 

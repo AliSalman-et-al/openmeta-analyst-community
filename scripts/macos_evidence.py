@@ -14,7 +14,7 @@ import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import posixpath
 import re
-from typing import Any, Callable, NoReturn, cast
+from typing import Callable, NoReturn, cast
 
 from rc_metastudio.macos_macho import (
     MachOError,
@@ -85,13 +85,24 @@ def _fail(message: str) -> NoReturn:
     raise EvidenceError(message)
 
 
-def _mapping(value: object, label: str) -> dict[str, Any]:
+def _mapping(value: object, label: str) -> dict[str, object]:
     if not isinstance(value, dict):
         _fail(f"{label} must be an object")
-    return cast(dict[str, Any], value)
+    return cast(dict[str, object], value)
 
 
-def _retained_path(record: dict[str, Any], label: str, evidence_dir: Path) -> Path:
+def _string_list(value: object, label: str) -> list[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        _fail(f"{label} must be a list of strings")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            _fail(f"{label} must be a list of strings")
+        result.append(item)
+    return result
+
+
+def _retained_path(record: dict[str, object], label: str, evidence_dir: Path) -> Path:
     raw_path = record.get("retained_path")
     if not isinstance(raw_path, str) or not raw_path:
         _fail(f"{label} has no retained path")
@@ -102,7 +113,7 @@ def _retained_path(record: dict[str, Any], label: str, evidence_dir: Path) -> Pa
 
 
 def _validate_retained_file_record(
-    record: dict[str, Any],
+    record: dict[str, object],
     label: str,
     evidence_dir: Path | None,
     *,
@@ -170,7 +181,7 @@ def _validate_inventory_record_path(path: object, label: str) -> str:
 
 
 def _validate_inventory_symlinks(
-    records: dict[str, dict[str, Any]],
+    records: dict[str, dict[str, object]],
 ) -> dict[str, str]:
     virtual_nodes = set(records)
     for path in records:
@@ -323,18 +334,18 @@ QT_DIRECTORY_ALIASES = {
 }
 
 
-def _record_identity(record: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
+def _record_identity(record: dict[str, object]) -> tuple[str, tuple[str, ...]]:
     return (
         cast(str, record["sha256"]),
         tuple(cast(list[str], record["architectures"])),
     )
 
 
-def _is_authoritative_qt_file(path: str, record: dict[str, Any]) -> bool:
+def _is_authoritative_qt_file(path: str, record: dict[str, object]) -> bool:
     return path.startswith(AUTHORITATIVE_QT_ROOT) and record["kind"] == "file"
 
 
-def _is_qt_core_binding(path: str, record: dict[str, Any]) -> bool:
+def _is_qt_core_binding(path: str, record: dict[str, object]) -> bool:
     return (
         path.startswith(AUTHORITATIVE_BINDING_ROOT)
         and path.lower().endswith("/qtcore.abi3.so")
@@ -343,7 +354,7 @@ def _is_qt_core_binding(path: str, record: dict[str, Any]) -> bool:
 
 
 def _validate_qt_directory_aliases(
-    records: dict[str, dict[str, Any]], resolved_links: dict[str, str]
+    records: dict[str, dict[str, object]], resolved_links: dict[str, str]
 ) -> None:
     if set(records).intersection(QT_DIRECTORY_ALIASES) != set(QT_DIRECTORY_ALIASES):
         _fail("deployment inventory has an incomplete Qt directory alias set")
@@ -359,8 +370,8 @@ def _validate_qt_directory_aliases(
 
 
 def _authoritative_qt_files(
-    records: dict[str, dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
     authoritative_files = {
         path: record
         for path, record in records.items()
@@ -383,7 +394,7 @@ def _is_unrecognized_authoritative_path(path: str) -> bool:
 
 
 def _validate_required_r_payload(
-    records: dict[str, dict[str, Any]], lowered: list[str]
+    records: dict[str, dict[str, object]], lowered: list[str]
 ) -> None:
     if not _has_rinterface(lowered):
         _fail("deployment inventory is missing the packaged rpy2 native bridge")
@@ -405,11 +416,11 @@ def _has_rinterface(paths: list[str]) -> bool:
     return any("rinterface" in path for path in paths)
 
 
-def _lib_r_paths(records: dict[str, dict[str, Any]]) -> list[str]:
+def _lib_r_paths(records: dict[str, dict[str, object]]) -> list[str]:
     return [path for path, record in records.items() if _is_lib_r(path, record)]
 
 
-def _has_required_r_members(records: dict[str, dict[str, Any]]) -> bool:
+def _has_required_r_members(records: dict[str, dict[str, object]]) -> bool:
     required = {
         "Contents/Frameworks/R.framework/Resources/etc/Renviron",
         "Contents/Frameworks/R.framework/Resources/include/R.h",
@@ -418,16 +429,16 @@ def _has_required_r_members(records: dict[str, dict[str, Any]]) -> bool:
 
 
 def _has_flattened_compiler_runtime(
-    records: dict[str, dict[str, Any]], pattern: re.Pattern[str]
+    records: dict[str, dict[str, object]], pattern: re.Pattern[str]
 ) -> bool:
     return any(pattern.match(path) is not None for path in records)
 
 
-def _is_lib_r(path: str, record: dict[str, Any]) -> bool:
+def _is_lib_r(path: str, record: dict[str, object]) -> bool:
     return Path(path).name == "libR.dylib" and record["kind"] == "file"
 
 
-def _validate_cocoa_payload(records: dict[str, dict[str, Any]]) -> None:
+def _validate_cocoa_payload(records: dict[str, dict[str, object]]) -> None:
     cocoa_paths = [
         path for path, record in records.items() if _is_cocoa_plugin(path, record)
     ]
@@ -435,20 +446,20 @@ def _validate_cocoa_payload(records: dict[str, dict[str, Any]]) -> None:
         _fail("deployment inventory must contain exactly one Cocoa platform plugin")
 
 
-def _is_cocoa_plugin(path: str, record: dict[str, Any]) -> bool:
+def _is_cocoa_plugin(path: str, record: dict[str, object]) -> bool:
     return path.endswith("libqcocoa.dylib") and record["kind"] == "file"
 
 
 def _validate_required_deployment_payloads(
-    records: dict[str, dict[str, Any]], lowered: list[str]
-) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, object]], lowered: list[str]
+) -> dict[str, dict[str, object]]:
     authoritative_files = _authoritative_qt_files(records)
     _validate_required_r_payload(records, lowered)
     _validate_cocoa_payload(records)
     return authoritative_files
 
 
-def _validate_deployment_file_record(record: dict[str, Any], path: str) -> None:
+def _validate_deployment_file_record(record: dict[str, object], path: str) -> None:
     if set(record) != {"path", "kind", "size", "sha256", "architectures"}:
         _fail("deployment inventory file contains missing or unknown fields")
     digest = record.get("sha256")
@@ -471,7 +482,7 @@ def _only_arm64(value: object) -> bool:
     return isinstance(value, list) and all(item == "arm64" for item in value)
 
 
-def _validate_deployment_symlink_record(record: dict[str, Any], path: str) -> None:
+def _validate_deployment_symlink_record(record: dict[str, object], path: str) -> None:
     if set(record) != {"path", "kind", "size", "link_target", "resolved_path"}:
         _fail("deployment inventory symlink contains missing or unknown fields")
     link_target = record.get("link_target")
@@ -489,8 +500,8 @@ def _validate_deployment_symlink_record(record: dict[str, Any], path: str) -> No
 
 def _deployment_records(
     files: list[object],
-) -> tuple[dict[str, dict[str, Any]], int]:
-    records: dict[str, dict[str, Any]] = {}
+) -> tuple[dict[str, dict[str, object]], int]:
+    records: dict[str, dict[str, object]] = {}
     total = 0
     for raw_record in files:
         record = _mapping(raw_record, "deployment inventory file")
@@ -513,7 +524,7 @@ def _deployment_records(
     return records, total
 
 
-def _deployment_inventory(value: object) -> tuple[dict[str, dict[str, Any]], int]:
+def _deployment_inventory(value: object) -> tuple[dict[str, dict[str, object]], int]:
     inventory = _mapping(value, "deployment inventory")
     if set(inventory) != {"schema_version", "file_count", "total_bytes", "files"}:
         _fail("deployment inventory contains missing or unknown fields")
@@ -534,12 +545,12 @@ def _deployment_inventory(value: object) -> tuple[dict[str, dict[str, Any]], int
     return records, total
 
 
-def _valid_deployment_file_list(inventory: dict[str, Any], files: object) -> bool:
+def _valid_deployment_file_list(inventory: dict[str, object], files: object) -> bool:
     return inventory.get("schema_version") == 2 and isinstance(files, list)
 
 
 def _canonical_qt_frameworks(
-    authoritative_files: dict[str, dict[str, Any]],
+    authoritative_files: dict[str, dict[str, object]],
 ) -> tuple[dict[str, tuple[str, tuple[str, ...]]], dict[str, str]]:
     framework_pattern = re.compile(
         r"^Contents/Frameworks/PyQt6/Qt6/lib/(Qt[A-Za-z0-9]+)\.framework/"
@@ -573,7 +584,7 @@ def _is_canonical_framework_path(
     return name not in identities or pattern.fullmatch(path) is not None
 
 
-def _is_binding_extension(path: str, record: dict[str, Any]) -> bool:
+def _is_binding_extension(path: str, record: dict[str, object]) -> bool:
     return (
         path.startswith(AUTHORITATIVE_BINDING_ROOT)
         and not path.startswith(AUTHORITATIVE_QT_ROOT)
@@ -584,7 +595,7 @@ def _is_binding_extension(path: str, record: dict[str, Any]) -> bool:
 
 
 def _binding_extensions(
-    records: dict[str, dict[str, Any]],
+    records: dict[str, dict[str, object]],
 ) -> tuple[dict[str, tuple[str, tuple[str, ...]]], dict[str, str]]:
     identities = {
         Path(path).name: _record_identity(record)
@@ -691,7 +702,7 @@ def _validate_binding_file_alias(
 
 def _validate_qt_file_alias(
     path: str,
-    record: dict[str, Any],
+    record: dict[str, object],
     canonical_frameworks: dict[str, tuple[str, tuple[str, ...]]],
     binding_extensions: dict[str, tuple[str, tuple[str, ...]]],
     binding_extension_paths: dict[str, str],
@@ -731,10 +742,10 @@ def _is_second_qt_payload(path: str, name: str) -> bool:
 
 
 def _validate_inventory_artifacts(
-    records: dict[str, dict[str, Any]],
+    records: dict[str, dict[str, object]],
     expected_machine: str,
-    executable: dict[str, Any],
-    cocoa_plugin: dict[str, Any],
+    executable: dict[str, object],
+    cocoa_plugin: dict[str, object],
 ) -> None:
     for label, artifact in (("executable", executable), ("Cocoa plugin", cocoa_plugin)):
         deployment_path = artifact.get("deployment_path")
@@ -753,8 +764,8 @@ def _validate_inventory_artifacts(
 def _validate_deployment_inventory(
     value: object,
     expected_machine: str,
-    executable: dict[str, Any],
-    cocoa_plugin: dict[str, Any],
+    executable: dict[str, object],
+    cocoa_plugin: dict[str, object],
 ) -> None:
     records, _total = _deployment_inventory(value)
     resolved_links = _validate_inventory_symlinks(records)
@@ -792,15 +803,16 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
     plan = _mapping(value, "PyInstaller build plan")
     if set(plan) != {"schema_version", "builder", "arguments", "manual_qt_inputs"}:
         _fail("PyInstaller build plan contains missing or unknown fields")
-    arguments = plan.get("arguments")
+    arguments_value = plan.get("arguments")
     if (
         plan.get("schema_version") != 1
         or plan.get("builder") != "PyInstaller"
         or plan.get("manual_qt_inputs") != []
-        or not isinstance(arguments, list)
-        or not all(isinstance(argument, str) for argument in arguments)
+        or not isinstance(arguments_value, list)
+        or not all(isinstance(argument, str) for argument in arguments_value)
     ):
         _fail("PyInstaller build plan is malformed")
+    arguments = _string_list(arguments_value, "PyInstaller arguments")
     collection_options = {
         "--add-binary",
         "--collect-all",
@@ -841,7 +853,7 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
 
 def _validate_evidence_root(
     evidence: object, target: str
-) -> tuple[dict[str, Any], str]:
+) -> tuple[dict[str, object], str]:
     if target not in TARGET_MACHINES:
         _fail(f"unsupported target {target!r}")
     root = _mapping(evidence, "evidence")
@@ -875,7 +887,7 @@ def _validate_runner(value: object, expected_machine: str) -> None:
     _validate_runner_environment(runner)
 
 
-def _validate_runner_platform_identity(runner: dict[str, Any]) -> None:
+def _validate_runner_platform_identity(runner: dict[str, object]) -> None:
     if runner.get("system") != "Darwin":
         _fail("runner system must be Darwin")
     release = runner.get("release")
@@ -887,7 +899,7 @@ def _validate_runner_platform_identity(runner: dict[str, Any]) -> None:
 
 
 def _validate_runner_architecture(
-    runner: dict[str, Any], expected_machine: str
+    runner: dict[str, object], expected_machine: str
 ) -> None:
     if runner.get("machine") != expected_machine:
         _fail(f"runner architecture must be {expected_machine}")
@@ -897,7 +909,7 @@ def _validate_runner_architecture(
         _fail("Rosetta translation is forbidden")
 
 
-def _validate_runner_environment(runner: dict[str, Any]) -> None:
+def _validate_runner_environment(runner: dict[str, object]) -> None:
     if not _valid_github_runner(runner):
         _fail("GitHub runner OS or architecture identity is inconsistent")
     runner_image = runner.get("runner_image")
@@ -916,7 +928,7 @@ def _valid_runner_platform(value: object) -> bool:
     return isinstance(value, str) and value.startswith("macOS-")
 
 
-def _valid_github_runner(runner: dict[str, Any]) -> bool:
+def _valid_github_runner(runner: dict[str, object]) -> bool:
     return (
         runner.get("github_runner_os") == "macOS"
         and runner.get("github_runner_arch") == "ARM64"
@@ -963,7 +975,7 @@ def _validate_r_call(value: object) -> None:
 
 def _validate_package_smoke(
     value: object, expected_machine: str
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     package = _mapping(value, "package")
     _validate_package_identity(package, expected_machine)
     _validate_package_runtime(package)
@@ -976,7 +988,7 @@ def _validate_package_smoke(
 
 
 def _validate_package_identity(
-    package: dict[str, Any], expected_machine: str
+    package: dict[str, object], expected_machine: str
 ) -> None:
     if package.get("target_arch") != expected_machine:
         _fail(f"packaged target architecture must be {expected_machine}")
@@ -991,7 +1003,7 @@ def _validate_package_identity(
         _fail("packaged dependency identities do not match the locked stack")
 
 
-def _validate_package_runtime(package: dict[str, Any]) -> None:
+def _validate_package_runtime(package: dict[str, object]) -> None:
     if package.get("r_home") != "Contents/Frameworks/R.framework/Resources":
         _fail("packaged smoke did not report its private framework-owned R_HOME")
     if package.get("rpy2_mode") != "API":
@@ -1002,32 +1014,35 @@ def _validate_package_runtime(package: dict[str, Any]) -> None:
 
 
 def _validate_package_architectures(
-    executable: dict[str, Any],
-    cocoa_plugin: dict[str, Any],
+    executable: dict[str, object],
+    cocoa_plugin: dict[str, object],
     expected_machine: str,
 ) -> None:
     if executable.get("architectures") != [expected_machine]:
         _fail("packaged executable must be a thin native binary")
-    if expected_machine not in cocoa_plugin.get("architectures", []):
+    architectures = _string_list(
+        cocoa_plugin.get("architectures", []), "packaged Cocoa architectures"
+    )
+    if expected_machine not in architectures:
         _fail("packaged Cocoa plugin has no native architecture slice")
 
 
-def _valid_packaged_cocoa(package: dict[str, Any]) -> bool:
+def _valid_packaged_cocoa(package: dict[str, object]) -> bool:
     return package.get("qpa") == "cocoa" and str(
         package.get("cocoa_plugin", "")
     ).endswith("libqcocoa.dylib")
 
 
-def _validate_smoke_flags(record: dict[str, Any], label: str) -> None:
+def _validate_smoke_flags(record: dict[str, object], label: str) -> None:
     for key in ("visible", "resource_registered", "svg_rendered", "clean_exit"):
         if record.get(key) is not True:
             _fail(f"{label} smoke did not prove {key}")
 
 
 def _validate_package_artifacts(
-    package: dict[str, Any],
-    executable: dict[str, Any],
-    cocoa_plugin: dict[str, Any],
+    package: dict[str, object],
+    executable: dict[str, object],
+    cocoa_plugin: dict[str, object],
     expected_machine: str,
     evidence_dir: Path | None,
     architecture_reader: Callable[[Path], list[str]],
@@ -1077,7 +1092,7 @@ def _validate_diagnostic(name: str, value: object, evidence_dir: Path | None) ->
         _validate_retained_diagnostic(name, path, digest, evidence_dir)
 
 
-def _diagnostic_identity(name: str, record: dict[str, Any]) -> tuple[str, str]:
+def _diagnostic_identity(name: str, record: dict[str, object]) -> tuple[str, str]:
     path = record.get("path")
     digest = record.get("sha256")
     if not isinstance(path, str) or not isinstance(digest, str):
@@ -1132,7 +1147,11 @@ def _validate_native_component(
         _fail(f"native component {name} has an incomplete retained inventory")
     for item in retained:
         item_record = _mapping(item, f"native_components.{name}.retained")
-        if expected_machine not in item_record.get("architectures", []):
+        architectures = _string_list(
+            item_record.get("architectures", []),
+            f"native_components.{name}.architectures",
+        )
+        if expected_machine not in architectures:
             _fail(f"native component {name} has no {expected_machine} slice")
         _validate_retained_file_record(
             item_record,

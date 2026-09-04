@@ -8,7 +8,8 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, NoReturn
+from collections.abc import Sequence
+from typing import NoReturn
 
 from PyQt6 import QtGui
 
@@ -45,12 +46,43 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _mapping(value: object, label: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        _fail(f"{label} must be an object")
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            _fail(f"{label} has a non-string key")
+        result[key] = item
+    return result
+
+
+def _list(value: object, label: str) -> list[object]:
+    if not isinstance(value, list):
+        _fail(f"{label} must be a list")
+    return [item for item in value]
+
+
+def _number(value: object, label: str) -> float:
+    if not isinstance(value, (int, float)):
+        _fail(f"{label} must be a number")
+    return float(value)
+
+
+def _integer(value: object, label: str) -> int:
+    if type(value) is not int:
+        _fail(f"{label} must be an integer")
+    return value
+
+
 def _physical_pixel_extent(logical_extent: float, device_pixel_ratio: float) -> int:
     """Match Qt's half-up conversion from positive logical to physical pixels."""
     return int((logical_extent * device_pixel_ratio) + 0.5)
 
 
-def _read_nonblank_png(path: Path, expected_size: Any = None) -> list[int]:
+def _read_nonblank_png(
+    path: Path, expected_size: Sequence[object] | None = None
+) -> list[int]:
     image = QtGui.QImage(str(path))
     if image.isNull():
         _fail("%s is not a readable PNG" % path.name)
@@ -72,12 +104,16 @@ def _read_nonblank_png(path: Path, expected_size: Any = None) -> list[int]:
     return actual
 
 
-def _rect(record: dict[str, Any], field: str) -> tuple[int, int, int, int]:
+def _rect(record: dict[str, object], field: str) -> tuple[int, int, int, int]:
     value = record.get(field)
     if not isinstance(value, dict):
         _fail("%s has no %s record" % (record.get("name"), field))
+    rect_value = _mapping(value, field)
     try:
-        rect = tuple(int(value[key]) for key in ("x", "y", "width", "height"))
+        rect = tuple(
+            _integer(rect_value[key], f"{field} {key}")
+            for key in ("x", "y", "width", "height")
+        )
     except (KeyError, TypeError, ValueError):
         _fail("%s has malformed %s" % (record.get("name"), field))
     if rect[2] < 1 or rect[3] < 1:
@@ -96,8 +132,10 @@ def _contains(
     )
 
 
-def _validate_scenario_semantics(record: dict[str, Any]) -> tuple[int, int, int, int]:
-    name = record["name"]
+def _validate_scenario_semantics(record: dict[str, object]) -> tuple[int, int, int, int]:
+    name = record.get("name")
+    if not isinstance(name, str) or name not in EXPECTED_SCENARIO_CONTRACTS:
+        _fail("scenario has an unknown name")
     archetype, exact_client_size, owner_size = EXPECTED_SCENARIO_CONTRACTS[name]
     if record.get("archetype") != archetype:
         _fail("%s has wrong archetype" % name)
@@ -125,16 +163,25 @@ def _validate_scenario_semantics(record: dict[str, Any]) -> tuple[int, int, int,
     ):
         _fail("%s has an unexpected capture method" % name)
     probe = record.get("client_paint_probe_pixel_size")
-    if not isinstance(probe, list) or len(probe) != 2 or min(probe) < 1:
+    if (
+        not isinstance(probe, list)
+        or len(probe) != 2
+        or any(not isinstance(value, int) or value < 1 for value in probe)
+    ):
         _fail("%s has no valid client paint probe" % name)
-    probe_dpr = float(record.get("client_paint_probe_device_pixel_ratio", 0))
+    probe_dpr = _number(
+        record.get("client_paint_probe_device_pixel_ratio", 0),
+        "client paint probe device pixel ratio",
+    )
     expected_probe = [round(client[2] * probe_dpr), round(client[3] * probe_dpr)]
     if probe_dpr <= 0 or probe != expected_probe:
         _fail("%s client paint probe geometry/DPR is inconsistent" % name)
     return frame
 
 
-def _validate_unavailable_scenario(record: dict[str, Any], expected_scale: str) -> None:
+def _validate_unavailable_scenario(
+    record: dict[str, object], expected_scale: str
+) -> None:
     name = record.get("name")
     if name not in CAPABILITY_QUALIFIED_SCENARIOS:
         _fail("%s cannot be capability-unavailable" % name)
@@ -155,9 +202,11 @@ def _validate_unavailable_scenario(record: dict[str, Any], expected_scale: str) 
     margins = record.get("frame_margins")
     if not isinstance(margins, dict):
         _fail("%s has no native frame margins" % name)
+    margin_values_record = _mapping(margins, "native frame margins")
     try:
         margin_values = [
-            int(margins[key]) for key in ("left", "top", "right", "bottom")
+            _integer(margin_values_record[key], f"margin {key}")
+            for key in ("left", "top", "right", "bottom")
         ]
     except (KeyError, TypeError, ValueError):
         _fail("%s has malformed native frame margins" % name)
@@ -176,11 +225,13 @@ def _validate_unavailable_scenario(record: dict[str, Any], expected_scale: str) 
 
 def validate_evidence(
     root: Path, expected_platform: str, expected_scale: str
-) -> dict[str, Any]:
+) -> dict[str, object]:
     root = Path(root).resolve()
     manifest_path = root / "manifest.json"
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = _mapping(
+            json.loads(manifest_path.read_text(encoding="utf-8")), "manifest"
+        )
     except (OSError, json.JSONDecodeError) as exc:
         _fail("manifest.json is missing or unreadable: %s" % exc)
 
@@ -195,12 +246,16 @@ def validate_evidence(
     if str(manifest.get("machine", "")).lower() not in {"amd64", "x86_64"}:
         _fail("evidence was not generated on x64")
 
-    surfaces = manifest.get("surfaces")
-    if not isinstance(surfaces, list):
-        _fail("surfaces must be a list")
-    unavailable = manifest.get("unavailable_scenarios")
-    if not isinstance(unavailable, list):
-        _fail("unavailable_scenarios must be a list")
+    surfaces = [
+        _mapping(record, "surface record")
+        for record in _list(manifest.get("surfaces"), "surfaces")
+    ]
+    unavailable = [
+        _mapping(record, "unavailable scenario record")
+        for record in _list(
+            manifest.get("unavailable_scenarios"), "unavailable_scenarios"
+        )
+    ]
     surface_names = tuple(record.get("name") for record in surfaces)
     unavailable_names = tuple(record.get("name") for record in unavailable)
     observed_names = surface_names + unavailable_names
@@ -230,7 +285,12 @@ def validate_evidence(
     for record in surfaces:
         frame = _validate_scenario_semantics(record)
         relative = record.get("screenshot")
-        expected_relative = "screenshots/%s.png" % record["name"]
+        name = record.get("name")
+        if not isinstance(name, str):
+            _fail("surface record has no name")
+        if not isinstance(relative, str):
+            _fail("surface record has no screenshot path")
+        expected_relative = "screenshots/%s.png" % name
         if relative != expected_relative:
             _fail("scenario %s has unexpected screenshot path" % record["name"])
         expected_files.add(relative)
@@ -239,7 +299,7 @@ def validate_evidence(
             _fail("missing screenshot %s" % relative)
         if _sha256(path) != record.get("sha256"):
             _fail("SHA-256 mismatch for %s" % relative)
-        dpr = float(record.get("device_pixel_ratio", 0))
+        dpr = _number(record.get("device_pixel_ratio", 0), "device pixel ratio")
         if dpr <= 0:
             _fail("invalid device pixel ratio for %s" % relative)
         expected_pixels = [
@@ -250,14 +310,19 @@ def validate_evidence(
             _fail("capture geometry/DPR metadata is inconsistent for %s" % relative)
         _read_nonblank_png(path, expected_pixels)
 
-    artifact = manifest.get("intrinsic_artifact", {})
+    artifact = _mapping(manifest.get("intrinsic_artifact", {}), "intrinsic artifact")
     artifact_relative = artifact.get("path")
+    if not isinstance(artifact_relative, str):
+        _fail("intrinsic artifact path is missing")
     if artifact_relative != "intrinsic-ratio-evidence.png":
         _fail("unexpected intrinsic artifact path")
     artifact_path = root / artifact_relative
     if _sha256(artifact_path) != artifact.get("sha256"):
         _fail("SHA-256 mismatch for intrinsic artifact")
-    _read_nonblank_png(artifact_path, artifact.get("pixel_size"))
+    artifact_size = artifact.get("pixel_size")
+    if not isinstance(artifact_size, list):
+        _fail("intrinsic artifact pixel size is missing")
+    _read_nonblank_png(artifact_path, artifact_size)
 
     actual_files = {
         path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
@@ -276,7 +341,7 @@ def validate_evidence(
     return manifest
 
 
-def main(argv: Any = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
     parser.add_argument(

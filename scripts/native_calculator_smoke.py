@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 from pathlib import PurePosixPath
 import sys
-from typing import Any, Callable, Protocol, TextIO
+from types import SimpleNamespace
+from typing import Callable, Protocol, TextIO
 
 from rc_metastudio import automation
 
@@ -110,7 +111,7 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
     encoded.save(path, format="PNG")
 
 
-def install_native_test_backend() -> Any:
+def install_native_test_backend() -> SimpleNamespace:
     """Create the calculator smoke's explicit local test backend."""
     from scripts.local_r_test_backend import create
 
