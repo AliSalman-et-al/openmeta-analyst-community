@@ -4,20 +4,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 import copy
 import hashlib
 import json
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
+from rc_metastudio import project_format
 from rc_metastudio.project_domain import JsonObject, JsonValue
 from rc_metastudio.project_format import (
     ProjectDocument,
-    load_project,
+    ProjectDurabilityError,
     reconstruct_analysis_dataset,
-    save_project,
 )
+
+InstallDocument = Callable[[ProjectDocument], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +47,12 @@ def _document_digest(document: ProjectDocument) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _validated_document(document: ProjectDocument) -> ProjectDocument:
+    candidate = _copy_document(document)
+    reconstruct_analysis_dataset(candidate)
+    return candidate
 
 
 class WorkspaceSession:
@@ -102,8 +110,7 @@ class WorkspaceSession:
         record_history: bool = True,
     ) -> None:
         """Validate all replacement data before changing the live workspace."""
-        candidate = _copy_document(document)
-        reconstruct_analysis_dataset(candidate)
+        candidate = _validated_document(document)
         previous = self._document
         if previous is not None and record_history:
             self._history.append(WorkspaceChange(_copy_document(previous), candidate))
@@ -120,11 +127,37 @@ class WorkspaceSession:
         """Publish one validated project/state pair as one undoable change."""
         self.replace(ProjectDocument(1, dict(project), dict(state)))
 
-    def open(self, path: str | Path) -> ProjectDocument:
-        """Decode and validate before replacing the current project."""
-        candidate = load_project(path)
-        reconstruct_analysis_dataset(candidate)
-        self.replace(candidate, path=path, record_history=False)
+    def open(
+        self, path: str | Path, *, install: InstallDocument | None = None
+    ) -> ProjectDocument:
+        """Decode and validate before replacing the current project.
+
+        ``install`` is a narrow adapter seam: callers may install the validated
+        candidate in another representation before this session commits it.
+        If installation fails, this session remains untouched.
+        """
+        candidate = _validated_document(project_format.load_project(path))
+        if install is not None:
+            previous_document = (
+                _copy_document(self._document) if self._document is not None else None
+            )
+            previous_path = self._path
+            previous_history = copy.deepcopy(self._history)
+            previous_redo = copy.deepcopy(self._redo)
+            previous_saved_digest = self._saved_digest
+            previous_forced_dirty = self._forced_dirty
+            try:
+                install(_copy_document(candidate))
+            except Exception:
+                self._document = previous_document
+                self._path = previous_path
+                self._history = previous_history
+                self._redo = previous_redo
+                self._saved_digest = previous_saved_digest
+                self._forced_dirty = previous_forced_dirty
+                raise
+        self._document = candidate
+        self._path = Path(path)
         self._history.clear()
         self._redo.clear()
         self._saved_digest = _document_digest(candidate)
@@ -137,22 +170,49 @@ class WorkspaceSession:
     def new(
         self, document: ProjectDocument, path: str | Path | None = None
     ) -> None:
-        self.replace(document, path=path, record_history=False)
+        candidate = _validated_document(document)
+        self._document = candidate
         self._path = Path(path) if path is not None else None
         self._history.clear()
         self._redo.clear()
-        self._saved_digest = _document_digest(document)
+        self._saved_digest = _document_digest(candidate)
         self._forced_dirty = False
 
-    def save(self, path: str | Path | None = None) -> Path:
-        if self._document is None:
+    def save(
+        self,
+        path: str | Path | None = None,
+        *,
+        document: ProjectDocument | None = None,
+    ) -> Path:
+        """Persist one validated document and publish it only after replacement.
+
+        A document supplied by an adapter is validated and written as one
+        transaction.  ``ProjectDurabilityError`` means the replacement already
+        happened, so the in-memory save metadata is committed before the error
+        is re-raised for the UI to report.
+        """
+        current = self._document
+        if current is None and document is None:
             raise ValueError("cannot save an empty workspace")
         destination = Path(path) if path is not None else self._path
         if destination is None:
             raise ValueError("save path is required for an unnamed workspace")
-        save_project(destination, self._document.project, self._document.state)
+        if document is not None:
+            candidate = _validated_document(document)
+        else:
+            assert current is not None
+            candidate = _copy_document(current)
+        try:
+            project_format.save_project(destination, candidate.project, candidate.state)
+        except ProjectDurabilityError:
+            self._document = candidate
+            self._path = destination
+            self._saved_digest = _document_digest(candidate)
+            self._forced_dirty = False
+            raise
+        self._document = candidate
         self._path = destination
-        self._saved_digest = _document_digest(self._document)
+        self._saved_digest = _document_digest(candidate)
         self._forced_dirty = False
         return destination
 

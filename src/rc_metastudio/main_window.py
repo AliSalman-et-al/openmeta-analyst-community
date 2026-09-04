@@ -106,33 +106,10 @@ def _resolve_open_file_path(file_path):
     return file_path
 
 
-def _load_structured_project(file_path):
-    document = project_format.load_project(file_path)
-    runtime_project = project_adapter.document_to_runtime_project(document)
-    return (
-        runtime_project.dataset,
-        runtime_project.model_state,
-        runtime_project.restored_selection,
-    )
-
-
-class InvalidProjectFileError(ValueError):
-    pass
-
-
-def _validate_open_project_dataset(dataset):
-    if isinstance(dataset, analysis_dataset.Dataset):
-        return dataset
-    raise InvalidProjectFileError(
-        "This file is not a valid RC MetaStudio project file."
-    )
-
-
 def _format_open_project_error(file_path, exception):
     if isinstance(
         exception,
         (
-            InvalidProjectFileError,
             project_adapter.ProjectAdapterError,
             project_format.ProjectFormatError,
         ),
@@ -1503,12 +1480,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         file_path = _resolve_open_file_path(file_path)
 
-        data_model = None
         try:
-            data_model, state_dict, restored_selection = _load_structured_project(
-                file_path
-            )
-            data_model = _validate_open_project_dataset(data_model)
+            self.workspace.open(file_path, install=self._install_open_document)
         except Exception as e:
             msg = _format_open_project_error(file_path, e)
             if raise_on_error:
@@ -1516,6 +1489,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
+        self.out_path = file_path
+        self.model.analysis_source_path = file_path
+        self.dataset_file_lbl.setText("Open Project: %s" % file_path)
+        self.workspace_is_dirty = self.workspace.is_dirty
+        self._update_recent_project_nonfatal(file_path, "opened")
+        return True
+
+    def _install_open_document(self, document):
+        """Adapt a validated session document into the live Qt model."""
+        runtime = project_adapter.document_to_runtime_project(document)
         previous_model = self.model
         previous_current = self.tableView.currentIndex()
         current_cell = (
@@ -1530,32 +1513,20 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             (index.row(), index.column()) for index in selection_model.selectedIndexes()
         ]
         try:
-            self.set_model(
-                data_model,
-                state_dict,
-                check_for_appropriate_metric=not restored_selection,
-                preserve_state_selection=restored_selection,
+            self._set_model_adapter(
+                runtime.dataset,
+                runtime.model_state,
+                check_for_appropriate_metric=not runtime.restored_selection,
+                preserve_state_selection=runtime.restored_selection,
                 recalculate_outcomes=False,
             )
-            self.model.analysis_source_path = file_path
-            self.dataset_file_lbl.setText("Open Project: %s" % file_path)
-        except Exception as e:
+            # Keep the adapter/session boundary exercised while the session
+            # still owns the open transaction. A successful open below resets
+            # this provisional snapshot as a document boundary.
+            self.data_dirtied()
+        except Exception:
             self._restore_failed_open(previous_model, current_cell, selected_cells)
-            msg = _format_open_project_error(file_path, e)
-            try:
-                app_error_handler.log_exception(type(e), e, e.__traceback__)
-            except Exception:
-                pass
-            if raise_on_error:
-                raise RuntimeError(msg) from e
-            QMessageBox.critical(self, "Could Not Open Project", msg)
-            return None
-        self.out_path = file_path
-        self.workspace.new(_document_from_model(self.model), path=file_path)
-        self.workspace_is_dirty = self.workspace.is_dirty
-        self._update_recent_project_nonfatal(file_path, "opened")
-
-        return True
+            raise
 
     def _restore_failed_open(self, model, current_cell, selected_cells):
         """Restore the live Qt adapter after a candidate model fails to install."""
@@ -1852,14 +1823,22 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if not destination.lower().endswith(".rcms"):
             destination += ".rcms"
 
+        try:
+            document = _document_from_model(self.model)
+        except Exception as e:
+            app_error_handler.log_exception(type(e), e, e.__traceback__)
+            QMessageBox.critical(
+                self,
+                "Could Not Save Project",
+                "RC MetaStudio could not save %s.\n\nDetails: %s: %s"
+                % (destination, e.__class__.__name__, e),
+            )
+            return False
+
         durability_error = None
         try:
-            project = project_adapter.dataset_to_project(self.model.dataset)
-            state = project_adapter.model_to_state(self.model)
-            project_format.save_project(destination, project, state)
+            self.workspace.save(destination, document=document)
         except project_format.ProjectDurabilityError as e:
-            # Atomic replacement already happened. Treat the installed document
-            # as the current saved project while reporting durability uncertainty.
             durability_error = e
         except Exception as e:
             app_error_handler.log_exception(type(e), e, e.__traceback__)
@@ -1876,10 +1855,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
-        self.workspace.replace(
-            _document_from_model(self.model), path=destination, record_history=False
-        )
-        self.workspace.mark_saved()
         self.workspace_is_dirty = self.workspace.is_dirty
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
