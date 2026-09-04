@@ -738,7 +738,7 @@ test_that("continuous RevMan Forest Style builds mean SD total columns", {
   expect_gt(file.info(png_path)$size, 5000)
 })
 
-test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric axis", {
+test_that("diagnostic RevMan Forest Style uses DTA columns and a probability-scale metric axis", {
   fixture <- metafor_diagnostic_fixture(measure = "Sens")
   fixture$params$fp_style <- "revman"
   res <- rma.uni(
@@ -758,7 +758,7 @@ test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric ax
   expect_equal(bundle$style_blocks$favours_left, "")
   expect_equal(bundle$style_blocks$favours_right, "")
   expect_equal(bundle$style_blocks$axis_label, "Sensitivity")
-  expect_equal(rcmetar.metafor.xlab(bundle), "Sensitivity")
+  expect_equal(rcmetar.metafor.xlab(bundle), "Sensitivity (probability scale)")
   expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
 
   png_path <- tempfile(fileext = ".png")

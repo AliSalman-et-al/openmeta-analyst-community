@@ -364,7 +364,7 @@ test_that("core diagnostic multi-analysis facade preserves multi-metric results"
   expect_true(any(grepl("Sens|Spec", names(result))))
   expect_named(
     result$display_images,
-    c("Sensitivity Forest Plot", "Specificity Forest Plot"),
+    c("diagnostic.Sens.forest", "diagnostic.Spec.forest"),
     ignore.order = TRUE
   )
   expect_false("SROC" %in% names(result$display_images))
