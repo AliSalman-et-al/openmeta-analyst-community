@@ -1337,7 +1337,7 @@ def parse_out_results(result):
                 text_d.update(
                     _format_table_summary(display_text_n, text, study_names=study_names)
                 )
-            elif _is_named_result_summary(text):
+            elif _has_r_names(text):
                 text_d.update(
                     _format_named_result_summary(
                         display_text_n, text, study_names=study_names
@@ -1352,6 +1352,27 @@ def parse_out_results(result):
                     text, field_name=text_n
                 )
 
+    sections = [
+        {
+            "id": _result_section_id("text", key),
+            "kind": "text",
+            "order": index,
+            "title": key,
+            "source_key": key,
+        }
+        for index, key in enumerate(text_d)
+    ]
+    image_offset = len(sections)
+    sections.extend(
+        {
+            "id": _result_section_id("image", key),
+            "kind": "image",
+            "order": image_offset + index,
+            "title": key,
+            "source_key": key,
+        }
+        for index, key in enumerate(image_path_d)
+    )
     to_return = {
         "images": image_path_d,
         "display_images": display_image_path_d,
@@ -1360,6 +1381,7 @@ def parse_out_results(result):
         "image_params_paths": image_params_paths_d,
         "image_order": image_order,
         "plot_capabilities": plot_capability_d,
+        "sections": sections,
     }
     return parse_analysis_result(to_return)
 
@@ -1484,15 +1506,10 @@ def _is_named_table_summary(r_object):
     return False
 
 
-def _is_named_result_summary(r_object):
-    """Return whether an R value can be safely rendered as named output."""
-    if not _has_r_names(r_object):
-        return False
-    if isinstance(r_object, rpy2.robjects.vectors.ListVector):
-        return True
-    if isinstance(r_object, rpy2.robjects.vectors.Vector):
-        return True
-    return False
+def _result_section_id(kind, source_key):
+    """Return a stable semantic ID supplied by the result producer's key."""
+    normalized = re.sub(r"[^a-z0-9]+", "-", str(source_key).lower()).strip("-")
+    return f"{kind}:{normalized or 'unnamed'}"
 
 
 def _format_named_result_summary(parent_name, r_object, study_names=None):

@@ -52,7 +52,6 @@ from rc_metastudio import (
     app_error_handler,
     plot_capabilities,
     r_bridge,
-    result_sections,
 )
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
@@ -316,8 +315,9 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.items_to_coords = {}
         self._wrapped_text_items = []
         self.texts = results["texts"]
-        self.texts, self.references_text = result_sections.pop_references_section(
-            self.texts
+        self.references_text = next(
+            (section.value for section in results.sections if section.semantic_id == "text:references"),
+            None,
         )
 
         self.add_result_sections()
@@ -336,16 +336,13 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         # Ordering and plot capabilities come from the immutable result
         # contract.  The title is used only when painting display text.
         for section in sorted(self.results["sections"], key=lambda item: item.order):
-            if section.title == result_sections.REFERENCE_SECTION_TITLE:
+            if section.semantic_id == "text:references":
                 continue
-            display_title = result_sections.section_display_title(
-                section.title, {"text_titles": list(self.texts), "image_titles": list(self.images)}, section.kind
-            )
             if section.kind == "text":
-                self.add_text_section(section.title, display_title, section.value)
+                self.add_text_section(section.source_key, section.title, section.value)
             elif section.kind == "image":
                 self.add_image_section(
-                    section.title, display_title, section.value
+                    section.source_key, section.title, section.value
                 )
 
     def add_image_section(self, title, display_title, image):
@@ -454,7 +451,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         if self.references_text is None:
             return
 
-        qt_item = self.add_title(result_sections.REFERENCE_SECTION_TITLE)
+        qt_item = self.add_title("References")
         text_item_rect, pos = self.create_text_item(
             str(self.references_text), self.position(), wrap=True
         )

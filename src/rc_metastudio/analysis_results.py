@@ -4,11 +4,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-import hashlib
 from types import MappingProxyType
-from typing import Generic, Literal, Self, SupportsIndex, TypedDict, TypeVar, overload
+from typing import Literal, TypedDict, overload
 
 
 PlotKind = Literal[
@@ -27,28 +26,6 @@ PlotKind = Literal[
 ]
 PlotComposition = Literal["single"]
 PlotRegenerator = Literal["forest", "regression", "funnel", "sroc", "none"]
-_T = TypeVar("_T")
-
-
-class FrozenMapping(Mapping[str, _T], Generic[_T]):
-    """Read-only mapping with a typed mutation trap for legacy callers."""
-
-    def __init__(self, values: Mapping[str, _T]) -> None:
-        self._values = MappingProxyType(dict(values))
-
-    def __getitem__(self, key: str) -> _T:
-        return self._values[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._values)
-
-    def __len__(self) -> int:
-        return len(self._values)
-
-    def __setitem__(self, _key: str, _value: _T) -> None:
-        raise TypeError("analysis result values are immutable")
-
-
 @dataclass(frozen=True, slots=True)
 class PlotCapability(Mapping[str, object]):
     """Immutable capability data attached to one semantic plot artifact."""
@@ -94,6 +71,7 @@ class RawAnalysisResult(TypedDict, total=False):
     image_params_paths: dict[str, str]
     image_order: list[str] | None
     plot_capabilities: dict[str, dict[str, object]]
+    sections: list[dict[str, object]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,65 +83,36 @@ class ResultSection:
     order: int
     title: str
     value: str
+    source_key: str
     plot_kind: PlotKind | None = None
     plot_data: str | None = None
     capability: PlotCapability | None = None
-
-
-class FrozenStrings(Sequence[str]):
-    """Tuple-backed sequence that keeps the old list equality contract."""
-
-    def __init__(self, values: Iterable[str]) -> None:
-        self._values = tuple(values)
-
-    @overload
-    def __getitem__(self, index: int) -> str: ...
-
-    @overload
-    def __getitem__(self, index: slice) -> tuple[str, ...]: ...
-
-    def __getitem__(self, index: int | slice) -> str | tuple[str, ...]:
-        return self._values[index]
-
-    def __len__(self) -> int:
-        return len(self._values)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._values)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, (list, tuple, FrozenStrings)):
-            return tuple(self) == tuple(other)
-        return False
-
-    def __repr__(self) -> str:
-        return repr(list(self._values))
 
 
 @dataclass(frozen=True, slots=True)
 class AnalysisResult:
     """Validated immutable result contract consumed by application adapters."""
 
-    texts: FrozenMapping[str]
-    images: FrozenMapping[str]
-    display_images: FrozenMapping[str]
-    image_var_names: FrozenMapping[str]
-    image_params_paths: FrozenMapping[str]
-    image_order: FrozenStrings | None
-    plot_capabilities: FrozenMapping[PlotCapability]
+    texts: Mapping[str, str]
+    images: Mapping[str, str]
+    display_images: Mapping[str, str]
+    image_var_names: Mapping[str, str]
+    image_params_paths: Mapping[str, str]
+    image_order: tuple[str, ...] | None
+    plot_capabilities: Mapping[str, PlotCapability]
     sections: tuple[ResultSection, ...]
 
     @overload
-    def __getitem__(self, key: Literal["texts"]) -> FrozenMapping[str]: ...
+    def __getitem__(self, key: Literal["texts"]) -> Mapping[str, str]: ...
 
     @overload
-    def __getitem__(self, key: Literal["images", "display_images", "image_var_names", "image_params_paths"]) -> FrozenMapping[str]: ...
+    def __getitem__(self, key: Literal["images", "display_images", "image_var_names", "image_params_paths"]) -> Mapping[str, str]: ...
 
     @overload
-    def __getitem__(self, key: Literal["image_order"]) -> FrozenStrings | None: ...
+    def __getitem__(self, key: Literal["image_order"]) -> tuple[str, ...] | None: ...
 
     @overload
-    def __getitem__(self, key: Literal["plot_capabilities"]) -> FrozenMapping[PlotCapability]: ...
+    def __getitem__(self, key: Literal["plot_capabilities"]) -> Mapping[str, PlotCapability]: ...
 
     @overload
     def __getitem__(self, key: Literal["sections"]) -> tuple[ResultSection, ...]: ...
@@ -197,70 +146,54 @@ class AnalysisResult:
             return default
 
 
-def _section_id(kind: str, key: str) -> str:
-    return hashlib.sha256(f"{kind}\0{key}".encode("utf-8")).hexdigest()[:24]
-
-
 def _sections(
     texts: Mapping[str, str],
     images: Mapping[str, str],
     image_params_paths: Mapping[str, str],
     capabilities: Mapping[str, PlotCapability],
+    metadata: Iterable[Mapping[str, object]] | None,
 ) -> tuple[ResultSection, ...]:
     result: list[ResultSection] = []
-    ordered_items = _ordered_section_items(texts, images)
-    for order, (kind, (title, value)) in enumerate(ordered_items):
+    if metadata is None:
+        entries: list[tuple[str, str, str, str, int]] = []
+        entries.extend((f"text:{index}", "text", title, value, index) for index, (title, value) in enumerate(texts.items()))
+        image_offset = len(entries)
+        entries.extend((f"image:{index}", "image", title, value, image_offset + index) for index, (title, value) in enumerate(images.items()))
+    else:
+        entries = []
+        for item in metadata:
+            semantic_id = item.get("id")
+            kind = item.get("kind")
+            source_key = item.get("source_key")
+            title = item.get("title")
+            order = item.get("order")
+            if (
+                not isinstance(semantic_id, str)
+                or kind not in ("text", "image")
+                or not isinstance(source_key, str)
+                or not isinstance(title, str)
+                or type(order) is not int
+            ):
+                raise ValueError("analysis result section metadata is invalid")
+            values = texts if kind == "text" else images
+            value = values.get(source_key)
+            if value is None:
+                raise ValueError("analysis result section references missing value")
+            entries.append((semantic_id, kind, title, value, order, source_key))
+    for entry in entries:
+        if len(entry) == 5:
+            semantic_id, kind, title, value, order = entry
+            source_key = title
+        else:
+            semantic_id, kind, title, value, order, source_key = entry
         if kind == "text":
-            result.append(ResultSection(_section_id("text", title), "text", order, title, value))
+            result.append(ResultSection(semantic_id, "text", order, title, value, source_key))
             continue
-        capability = capabilities[title]
-        result.append(ResultSection(_section_id("image", title), "image", order, title, value, capability.plot_kind, image_params_paths.get(title), capability))
+        capability = capabilities.get(source_key)
+        if capability is None:
+            raise ValueError("analysis result image has no plot capability")
+        result.append(ResultSection(semantic_id, "image", order, title, value, source_key, capability.plot_kind, image_params_paths.get(source_key), capability))
     return tuple(result)
-
-
-def _ordered_section_items(
-    texts: Mapping[str, str], images: Mapping[str, str]
-) -> list[tuple[str, tuple[str, str]]]:
-    text_items = list(texts.items())
-    image_items = list(images.items())
-    summary = next((item for item in text_items if item[0] == "Summary"), None)
-    if summary is None or "Weights" not in texts:
-        return _text_sections(text_items) + _image_sections(image_items)
-    text_items.remove(summary)
-    text_items.insert(0, summary)
-    return _standard_sections(text_items, image_items)
-
-
-def _text_sections(items: list[tuple[str, str]]) -> list[tuple[str, tuple[str, str]]]:
-    return [("text", item) for item in items]
-
-
-def _image_sections(items: list[tuple[str, str]]) -> list[tuple[str, tuple[str, str]]]:
-    return [("image", item) for item in items]
-
-
-def _standard_sections(
-    texts: list[tuple[str, str]], images: list[tuple[str, str]]
-) -> list[tuple[str, tuple[str, str]]]:
-    return _text_sections(texts[:1]) + _image_sections(images) + _text_sections(texts[1:])
-
-
-class _FrozenList(list[str]):
-    """Deprecated private helper retained only for old callers during parsing."""
-
-    def _immutable(self, *_args: object, **_kwargs: object) -> None:
-        raise TypeError("analysis result values are immutable")
-
-    __setitem__ = __delitem__ = append = clear = extend = insert = remove = reverse = sort = _immutable
-
-    def pop(self, index: SupportsIndex = -1, /) -> str:
-        raise TypeError("analysis result values are immutable")
-
-    def __iadd__(self, value: Iterable[str], /) -> Self:
-        raise TypeError("analysis result values are immutable")
-
-    def __imul__(self, value: SupportsIndex, /) -> Self:
-        raise TypeError("analysis result values are immutable")
 
 
 def _freeze_result(
@@ -271,16 +204,17 @@ def _freeze_result(
     image_params_paths: Mapping[str, str],
     image_order: Iterable[str] | None,
     plot_capabilities: Mapping[str, PlotCapability],
+    metadata: Iterable[Mapping[str, object]] | None = None,
 ) -> AnalysisResult:
     return AnalysisResult(
-        texts=FrozenMapping(texts),
-        images=FrozenMapping(images),
-        display_images=FrozenMapping(display_images),
-        image_var_names=FrozenMapping(image_var_names),
-        image_params_paths=FrozenMapping(image_params_paths),
-        image_order=None if image_order is None else FrozenStrings(image_order),
-        plot_capabilities=FrozenMapping(plot_capabilities),
-        sections=_sections(texts, images, image_params_paths, plot_capabilities),
+        texts=MappingProxyType(dict(texts)),
+        images=MappingProxyType(dict(images)),
+        display_images=MappingProxyType(dict(display_images)),
+        image_var_names=MappingProxyType(dict(image_var_names)),
+        image_params_paths=MappingProxyType(dict(image_params_paths)),
+        image_order=None if image_order is None else tuple(image_order),
+        plot_capabilities=MappingProxyType(dict(plot_capabilities)),
+        sections=_sections(texts, images, image_params_paths, plot_capabilities, metadata),
     )
 
 
@@ -313,6 +247,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
         "plot_capabilities": _object_mapping(
             source.get("plot_capabilities"), "plot_capabilities"
         ),
+        "sections": _section_metadata(source.get("sections")),
     }
 
     # Local import avoids a module cycle: plot_capabilities owns descriptor
@@ -334,6 +269,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
         raw["image_params_paths"],
         raw["image_order"],
         capabilities,
+        raw.get("sections"),
     )
 
 
@@ -379,3 +315,16 @@ def _optional_string_list(value: object, label: str) -> list[str] | None:
             raise ValueError(f"{label} must be a list of text values or null")
         result.append(item)
     return result
+
+
+def _section_metadata(value: object) -> list[dict[str, object]] | None:
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("sections must be a list")
+    metadata: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError("sections entries must be mappings")
+        metadata.append({str(key): field for key, field in item.items()})
+    return metadata
