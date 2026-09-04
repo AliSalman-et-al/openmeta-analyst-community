@@ -86,6 +86,19 @@ def _plot_capability(
     }
 
 
+def _plot_capability_model(**overrides):
+    from rc_metastudio.analysis_results import PlotCapability
+
+    values = _plot_capability(**overrides)
+    return PlotCapability(
+        plot_kind=values["plot_kind"],
+        editable=values["editable"],
+        styleable=values["styleable"],
+        composition=values["composition"],
+        regenerator=values["regenerator"],
+    )
+
+
 def _analysis_result(payload):
     """Build the complete result contract used by ResultsWindow fixtures."""
     payload = dict(payload)
@@ -3198,7 +3211,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             artifact = results_window.PlotArtifact(
                 title,
                 "missing.png",
-                _plot_capability(
+                _plot_capability_model(
                     plot_kind=plot_kind,
                     editable=editable,
                     styleable=plot_kind not in ("other", "roc", "sroc"),
@@ -3370,7 +3383,7 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
     artifact = results_window.PlotArtifact(
         "Cumulative Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(plot_kind="cumulative_forest", editable=False),
+        _plot_capability_model(plot_kind="cumulative_forest", editable=False),
         params_path=str(tmp_path / "forest_params"),
     )
 
@@ -3426,7 +3439,7 @@ def test_results_window_save_handler_accepts_backend_export_formats(
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest_params"),
     )
 
@@ -3481,7 +3494,7 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest_params"),
     )
 

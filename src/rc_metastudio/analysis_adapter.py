@@ -618,7 +618,19 @@ def _merge_diagnostic_artifacts(
         ("display_images", metric_result.display_images),
         ("image_var_names", metric_result.image_var_names),
         ("image_params_paths", metric_result.image_params_paths),
-        ("plot_capabilities", metric_result.plot_capabilities),
+        (
+            "plot_capabilities",
+            {
+                key: {
+                    "plot_kind": capability.plot_kind,
+                    "editable": capability.editable,
+                    "styleable": capability.styleable,
+                    "composition": capability.composition,
+                    "regenerator": capability.regenerator,
+                }
+                for key, capability in metric_result.plot_capabilities.items()
+            },
+        ),
     ):
         cast(dict[str, object], merged_result[key]).update(values)
 

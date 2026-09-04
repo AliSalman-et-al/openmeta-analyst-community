@@ -9,6 +9,7 @@ from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 prepare_generated_ui_imports()
 
 from rc_metastudio import funnel_plot_editor_dialog, results_window
+from rc_metastudio.analysis_results import PlotCapability
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 
 
@@ -22,6 +23,10 @@ def _params(kind):
         "funnel.point.size": 1.0,
         "funnel.label.policy": "none",
     }
+
+
+def _funnel_capability():
+    return PlotCapability("funnel", True, True, "single", "funnel")
 
 
 def test_funnel_editor_preserves_statistical_params_and_updates_presentation(qapp):
@@ -232,7 +237,7 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     artifact = results_window.PlotArtifact(
         "Ordinary Funnel Plot",
         str(image_path),
-        {"plot_kind": "funnel", "regenerator": "funnel"},
+        _funnel_capability(),
         params_path=str(base),
     )
     window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
@@ -286,7 +291,7 @@ def test_funnel_editor_rejects_svgz_output_path(qapp):
     artifact = results_window.PlotArtifact(
         "Ordinary Funnel Plot",
         "funnel.png",
-        {"plot_kind": "funnel", "regenerator": "funnel"},
+        _funnel_capability(),
         params_path="funnel",
     )
     window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
