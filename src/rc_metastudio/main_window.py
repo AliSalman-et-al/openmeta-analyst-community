@@ -1108,6 +1108,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self.workspace.mark_dirty()
             self.workspace_is_dirty = self.workspace.is_dirty
 
+    def reset_workspace_after_failed_paste(self, dataset, state_dict):
+        """Install the pre-paste snapshot as a clean atomic workspace state."""
+        self.set_model(dataset, state_dict=state_dict)
+        self.workspace.new(_document_from_model(self.model))
+        self.current_data_unsaved = False
+
     def edit_dataset(self):
         current_dataset = copy.deepcopy(self.model.dataset)
         edit_window = edit_dialog.EditDialog(current_dataset, parent=self)

@@ -62,7 +62,8 @@
       "__post_init__": "validates the immutable small-study request's cross-field contract"
     },
     "src/rc_metastudio/automation.py": {
-      "start_automation_smoke": "hidden packaged qualification hook coordinates startup and teardown at one boundary"
+      "start_automation_smoke": "hidden packaged qualification hook coordinates startup and teardown at one boundary",
+      "dispatch": "the hidden packaged hook has one explicit command boundary for shell and project smoke modes"
     },
     "src/rc_metastudio/continuous_data_dialog.py": {
       "val_changed": "Qt table validation dispatches family-specific fields and feedback",
@@ -79,6 +80,7 @@
     },
     "src/rc_metastudio/dataset_table_view.py": {
       "paste_contents": "Qt clipboard parsing coordinates a rectangular edit across visible adapter cells",
+      "_preflight_paste": "clipboard validation checks rectangular shape, bounds, and every candidate cell before mutation",
       "row_header_clicked": "the Qt adapter selects one isolated family editor and publishes its accepted snapshot",
       "keyPressEvent": "Qt keyboard dispatch preserves the table's standard navigation and clipboard commands"
     },
@@ -93,7 +95,14 @@
     "src/rc_metastudio/main_window.py": {
       "add_new": "the three dimension-specific editors have intentionally distinct validation and selection transitions",
       "open": "interface boundary coordinates prompt, decode, replacement, and recent-project updates",
-      "save": "interface boundary coordinates save-as prompts, serialization, and recent-project updates"
+      "save": "interface boundary coordinates save-as prompts, serialization, and recent-project updates",
+      "__setattr__": "the legacy dirty-state property is a narrow UI compatibility boundary that synchronizes validated workspace state"
+    },
+    "src/rc_metastudio/adaptive_window.py": {
+      "eventFilter": "Qt event filtering preserves the adaptive window lifecycle across native resize and teardown events"
+    },
+    "src/rc_metastudio/r_bridge.py": {
+      "_r_param_value": "the R boundary preserves nested vectors and recursively validates foreign parameter values"
     },
     "r/RCMetaR/R/meta_methods.R": {
       "bootstrap": "statistical resampling has independent method, seed, and result-shape branches"

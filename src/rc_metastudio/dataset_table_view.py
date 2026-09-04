@@ -32,7 +32,7 @@ from rc_metastudio import diagnostic_data_dialog
 from rc_metastudio import app_error_handler
 from rc_metastudio import qt_layout
 from rc_metastudio import meta_globals
-from rc_metastudio import project_adapter, project_format
+from rc_metastudio import project_adapter
 from rc_metastudio import analysis_dataset
 from rc_metastudio import qt_text
 from rc_metastudio import tabular_data
@@ -53,6 +53,7 @@ if TYPE_CHECKING:
 class MainWindowProtocol(Protocol):
     model: "DatasetTableModel"
     workspace_is_dirty: bool | None
+    current_data_unsaved: bool
     oneArmMetricMenu: QMenu
     twoArmMetricMenu: QMenu
 
@@ -60,6 +61,7 @@ class MainWindowProtocol(Protocol):
     def data_error(self, message: str) -> None: ...
     def record_workspace_change(self, before, after) -> None: ...
     def restore_workspace_after_failed_edit(self, was_dirty: bool) -> None: ...
+    def reset_workspace_after_failed_paste(self, dataset, state_dict) -> None: ...
     def delete_study(self, study, *, study_index: int) -> None: ...
     def edit_group_name(self, group: str) -> None: ...
     def rename_covariate(self, covariate) -> None: ...
@@ -732,16 +734,9 @@ class DatasetTableView(QtWidgets.QTableView):
         self._add_studies_if_necessary(upper_left_index, new_content)
         if not self.paste_contents(upper_left_index, new_content):
             if self.main_gui is not None:
-                self._main_gui().set_model(
-                    original_dataset, state_dict=original_state_dict
+                self._main_gui().reset_workspace_after_failed_paste(
+                    original_dataset, original_state_dict
                 )
-                self._main_gui().workspace.new(
-                    project_format.ProjectDocument(
-                        1,
-                        *(_workspace_snapshot(self.model()) or ({}, {})),
-                    )
-                )
-                self._main_gui().current_data_unsaved = False
                 self.setCurrentIndex(self.model().index(upper_left_index.row(), upper_left_index.column()))
             return False
         self._last_paste_committed = True
