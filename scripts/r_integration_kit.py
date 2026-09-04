@@ -615,7 +615,90 @@ def _resolve_macos_closure(records: list[dict[str, Any]], root: Path) -> None:
         record["imports"] = resolutions
 
 
-def native_dependency_inventory(
+def _windows_native_record(path: Path, relative: str) -> dict[str, Any]:
+    import pefile
+
+    try:
+        pe = pefile.PE(str(path), fast_load=True)
+        pe.parse_data_directories(
+            directories=[
+                pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"],
+                pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT"],
+            ]
+        )
+    except pefile.PEFormatError as exc:
+        raise KitError(f"native Windows payload is not valid PE: {relative}") from exc
+    machine = pe.FILE_HEADER.Machine
+    if machine != 0x8664:
+        raise KitError(
+            f"native Windows payload is not x86_64: {relative}=0x{machine:04x}"
+        )
+    imports = [
+        {"name": entry.dll.decode("ascii", errors="strict"), "kind": "normal"}
+        for entry in getattr(pe, "DIRECTORY_ENTRY_IMPORT", [])
+    ]
+    imports.extend(
+        {"name": entry.dll.decode("ascii", errors="strict"), "kind": "delay"}
+        for entry in getattr(pe, "DIRECTORY_ENTRY_DELAY_IMPORT", [])
+    )
+    return {
+        "path": relative,
+        "owner": _owner(relative),
+        "sha256": sha256_file(path),
+        "architecture": "x86_64",
+        "_imports": sorted(imports, key=lambda item: (item["name"], item["kind"])),
+    }
+
+
+def _macos_native_record(
+    path: Path, relative: str, target: str, architecture: str
+) -> dict[str, Any] | None:
+    from scripts.qt6_macos_feasibility_impl import is_macho_candidate
+
+    if not is_macho_candidate(path):
+        return None
+    completed = subprocess.run(
+        ["otool", "-L", str(path)], capture_output=True, text=True, check=False
+    )
+    if completed.returncode:
+        raise KitError(f"otool could not inspect Mach-O candidate: {relative}")
+    archs = subprocess.run(
+        ["lipo", "-archs", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    if archs != [architecture]:
+        raise KitError(
+            f"native macOS payload is not thin {architecture}: {relative}={archs}"
+        )
+    install_id, rpaths, minimum_os, signing_identity = _macos_metadata(path)
+    target_minimum = TARGETS[target][2]
+    if (
+        minimum_os is None
+        or target_minimum is None
+        or _macos_version(minimum_os) > _macos_version(target_minimum)
+    ):
+        raise KitError(
+            f"Mach-O deployment target exceeds {target_minimum}: {relative}={minimum_os}"
+        )
+    return {
+        "path": relative,
+        "owner": _owner(relative),
+        "sha256": sha256_file(path),
+        "architecture": architecture,
+        "install_id": install_id,
+        "rpaths": rpaths,
+        "minimum_macos": minimum_os,
+        "signing_identity": signing_identity,
+        "_imports": [
+            line.strip().split(" (", 1)[0]
+            for line in completed.stdout.splitlines()[1:]
+        ],
+    }
+
+
+def _native_records(
     root: Path, target: str, architecture: str
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
@@ -625,96 +708,20 @@ def native_dependency_inventory(
         relative = path.relative_to(root).as_posix()
         if relative.startswith("python/uv-cache/"):
             continue
-        if target.startswith("windows-") and path.suffix.lower() in {
-            ".exe",
-            ".dll",
-            ".pyd",
-        }:
-            import pefile
+        if target.startswith("windows-"):
+            if path.suffix.lower() in {".exe", ".dll", ".pyd"}:
+                records.append(_windows_native_record(path, relative))
+            continue
+        record = _macos_native_record(path, relative, target, architecture)
+        if record is not None:
+            records.append(record)
+    return records
 
-            try:
-                pe = pefile.PE(str(path), fast_load=True)
-                pe.parse_data_directories(
-                    directories=[
-                        pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"],
-                        pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT"],
-                    ]
-                )
-            except pefile.PEFormatError as exc:
-                raise KitError(
-                    f"native Windows payload is not valid PE: {relative}"
-                ) from exc
-            machine = pe.FILE_HEADER.Machine
-            if machine != 0x8664:
-                raise KitError(
-                    f"native Windows payload is not x86_64: {relative}=0x{machine:04x}"
-                )
-            imports = [
-                {"name": entry.dll.decode("ascii", errors="strict"), "kind": "normal"}
-                for entry in getattr(pe, "DIRECTORY_ENTRY_IMPORT", [])
-            ]
-            imports.extend(
-                {"name": entry.dll.decode("ascii", errors="strict"), "kind": "delay"}
-                for entry in getattr(pe, "DIRECTORY_ENTRY_DELAY_IMPORT", [])
-            )
-            records.append(
-                {
-                    "path": relative,
-                    "owner": _owner(relative),
-                    "sha256": sha256_file(path),
-                    "architecture": "x86_64",
-                    "_imports": sorted(
-                        imports, key=lambda item: (item["name"], item["kind"])
-                    ),
-                }
-            )
-        elif target.startswith("macos-"):
-            from scripts.qt6_macos_feasibility_impl import is_macho_candidate
 
-            if not is_macho_candidate(path):
-                continue
-            completed = subprocess.run(
-                ["otool", "-L", str(path)], capture_output=True, text=True, check=False
-            )
-            if completed.returncode:
-                raise KitError(f"otool could not inspect Mach-O candidate: {relative}")
-            archs = subprocess.run(
-                ["lipo", "-archs", str(path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.split()
-            if archs != [architecture]:
-                raise KitError(
-                    f"native macOS payload is not thin {architecture}: {relative}={archs}"
-                )
-            imports = [
-                line.strip().split(" (", 1)[0]
-                for line in completed.stdout.splitlines()[1:]
-            ]
-            install_id, rpaths, minimum_os, signing_identity = _macos_metadata(path)
-            target_minimum = TARGETS[target][2]
-            if (
-                minimum_os is None
-                or target_minimum is None
-                or _macos_version(minimum_os) > _macos_version(target_minimum)
-            ):
-                raise KitError(
-                    f"Mach-O deployment target exceeds {TARGETS[target][2]}: {relative}={minimum_os}"
-                )
-            records.append(
-                {
-                    "path": relative,
-                    "owner": _owner(relative),
-                    "sha256": sha256_file(path),
-                    "architecture": architecture,
-                    "install_id": install_id,
-                    "rpaths": rpaths,
-                    "minimum_macos": minimum_os,
-                    "signing_identity": signing_identity,
-                    "_imports": imports,
-                }
-            )
+def native_dependency_inventory(
+    root: Path, target: str, architecture: str
+) -> list[dict[str, Any]]:
+    records = _native_records(root, target, architecture)
     if target.startswith("windows-"):
         _resolve_windows_closure(records)
         r_dlls = [
@@ -1104,4 +1111,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
