@@ -130,6 +130,25 @@ def test_adapter_persists_internal_identities_across_reopen() -> None:
     )
 
 
+def test_adapter_derives_repeatable_identities_for_legacy_projects() -> None:
+    project = _multi_arm_project("binary")
+
+    first = project_adapter.project_to_dataset(copy.deepcopy(project))
+    second = project_adapter.project_to_dataset(copy.deepcopy(project))
+
+    def identities(dataset):
+        unit = dataset.studies[0].analysis_units_by_outcome["Outcome"]["first"]
+        return (
+            dataset.studies[0].stable_id,
+            dataset.get_outcome_obj("Outcome").stable_id,
+            dataset.get_follow_up_stable_id("Outcome", "first"),
+            unit.stable_id,
+            tuple(group.stable_id for group in unit.groups.values()),
+        )
+
+    assert identities(first) == identities(second)
+
+
 def test_document_to_runtime_project_reconstructs_state_and_selection() -> None:
     project = _multi_arm_project("binary")
     state: JsonObject = {

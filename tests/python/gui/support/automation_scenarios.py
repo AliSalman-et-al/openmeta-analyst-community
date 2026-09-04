@@ -321,7 +321,12 @@ def _exercise_all_packaged_samples(meta, representative_sample):
             dict[str, Any],
             project_adapter.dataset_to_project(meta.model.dataset)["dataset"],
         )
-        expected = cast(dict[str, Any], document.project["dataset"])
+        expected = cast(
+            dict[str, Any],
+            project_adapter.dataset_to_project(
+                project_adapter.project_to_dataset(document.project)
+            )["dataset"],
+        )
         for field in ("title", "analysis_family", "outcomes", "studies"):
             if observed[field] != expected[field]:
                 raise RuntimeError(
