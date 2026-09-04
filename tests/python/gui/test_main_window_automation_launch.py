@@ -4156,18 +4156,19 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
         show_legend: QtWidgets.QCheckBox
         plot_tab: QtWidgets.QWidget
         selected: list[object]
+        analysis_service: analysis_setup_dialog.analysis_adapter.AnalysisService
 
         def _selected_covariates(self):
             return [covariate]
 
         def _meta_regression_metric(self):
             return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_metric(
-                self
+                cast(analysis_setup_dialog.AnalysisSetupDialog, self)
             )
 
         def _meta_regression_request(self):
             return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_request(
-                self
+                cast(analysis_setup_dialog.AnalysisSetupDialog, self)
             )
 
         def parent(self):

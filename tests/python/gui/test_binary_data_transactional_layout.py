@@ -7,8 +7,7 @@ import pytest
 from rc_metastudio import automation
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from rc_metastudio import adaptive_window
-
+from rc_metastudio import adaptive_window, calculator_service
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -33,27 +32,27 @@ def _open_binary_dialog(monkeypatch):
         lambda _window: QtCore.QRect(AVAILABLE),
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _level: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda _data: {"FAIL": True},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda *_args, **_kwargs: (None, None, None),
     )
@@ -292,7 +291,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
         }
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", back_calculate
+        calculator_service.r_bridge, "impute_binary_data", back_calculate
     )
     try:
         dialog.clear_form()
@@ -362,7 +361,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
+        calculator_service.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def cancel_choice(chooser):
@@ -415,7 +414,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
+        calculator_service.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def accept_second_choice(chooser):

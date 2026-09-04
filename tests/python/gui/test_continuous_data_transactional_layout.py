@@ -5,8 +5,7 @@ from typing import cast
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from rc_metastudio import adaptive_window
-
+from rc_metastudio import adaptive_window, calculator_service
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -114,12 +113,12 @@ def _open_continuous_dialog(
             reject_metric_choice,
         )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _conf: 1.96,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "continuous_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
@@ -136,22 +135,22 @@ def _open_continuous_dialog(
         return {"succeeded": False, "comment": "stub"}
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_continuous_data",
         impute,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_pre_post_continuous_data",
         impute_pre_post,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (2.5, 1.5, 3.5)},
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda effect, _scale, metric=None: effect["calc_scale"],
     )
@@ -161,7 +160,7 @@ def _open_continuous_dialog(
         return back_calc_result or {"FAIL": True}
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge, "back_calculate_continuous_data", back_calc
+        calculator_service.r_bridge, "back_calculate_continuous_data", back_calc
     )
     dialog = continuous_data_dialog.ContinuousDataDialog(
         analysis_unit or FakeContinuousAnalysisUnit(),
@@ -237,7 +236,7 @@ def test_continuous_back_calculation_enablement_probes_metric_assumptions(
         }
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "back_calculate_continuous_data",
         assumption_dependent_solver,
     )
@@ -689,7 +688,9 @@ def test_successful_continuous_back_calculation_updates_data_without_root_growth
     "fault_boundary",
     ["setter", "impute_data", "copy", "snapshot", "undo_push"],
 )
-@pytest.mark.skip(reason="Qt history publication contract replaced by dialog-local transient history")
+@pytest.mark.skip(
+    reason="Qt history publication contract replaced by dialog-local transient history"
+)
 def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
     monkeypatch, fault_boundary
 ):
@@ -818,7 +819,9 @@ def test_continuous_back_calculation_apply_failures_restore_exact_transaction(
         _close(app, dialog)
 
 
-@pytest.mark.skip(reason="Qt history publication contract replaced by dialog-local transient history")
+@pytest.mark.skip(
+    reason="Qt history publication contract replaced by dialog-local transient history"
+)
 @pytest.mark.parametrize(
     "failure_timing",
     [

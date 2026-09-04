@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
 
 import pytest
-from rc_metastudio import automation
+from rc_metastudio import automation, calculator_service
 from PyQt6.QtWidgets import QDialog
 from test_types import key_click, required
 
@@ -202,12 +202,12 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda *args: warnings.append(args),
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda confidence: 1.96,
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
@@ -217,7 +217,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -227,12 +227,12 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "impute_binary_data",
             lambda data: {"FAIL": True},
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -340,12 +340,12 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda _level: 1.96,
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "continuous_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -360,10 +360,10 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             return {"succeeded": False, "comment": "complete input"}
 
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge, "impute_continuous_data", impute
+            calculator_service.r_bridge, "impute_continuous_data", impute
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "continuous_effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
@@ -373,7 +373,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -383,7 +383,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "back_calculate_continuous_data",
             lambda *args, **kwargs: {"FAIL": True},
         )
@@ -441,9 +441,17 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         before_invalid = copy.deepcopy(model.get_current_analysis_unit_for_study(0))
 
         def reject_invalid_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                continuous_data_dialog.ContinuousDataDialog,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(),
+                    "continuous edit dialog",
+                ),
+            )
             dialog.simple_table.setCurrentCell(0, 0)
-            dialog.simple_table.item(0, 0).setText("10,5")
+            required(dialog.simple_table.item(0, 0), "continuous data cell").setText(
+                "10,5"
+            )
             dialog.reject()
 
         QtCore.QTimer.singleShot(0, reject_invalid_edit)
@@ -494,12 +502,12 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda _level: 1.96,
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -514,10 +522,10 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             return {"TP": None, "FP": None, "FN": None, "TN": None}
 
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge, "impute_diagnostic_data", impute
+            calculator_service.r_bridge, "impute_diagnostic_data", impute
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "diagnostic_effects_for_study",
             lambda *args, metrics, **kwargs: {
                 metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
@@ -531,7 +539,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             },
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -584,9 +592,17 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         undo_count = window.workspace.can_undo
 
         def reject_invalid_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                diagnostic_data_dialog.DiagnosticDataDialog,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(),
+                    "diagnostic edit dialog",
+                ),
+            )
             dialog.two_by_two_table.setCurrentCell(0, 0)
-            dialog.two_by_two_table.item(0, 0).setText("13,5")
+            required(
+                dialog.two_by_two_table.item(0, 0), "diagnostic data cell"
+            ).setText("13,5")
             dialog.reject()
 
         QtCore.QTimer.singleShot(0, reject_invalid_edit)

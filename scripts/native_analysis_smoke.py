@@ -65,8 +65,10 @@ def main() -> int:
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
     from scripts.local_r_test_backend import create
+
     backend_fake = create()
     from rc_metastudio import r_bridge
+
     for name, implementation in vars(backend_fake).items():
         setattr(r_bridge, name, implementation)
     _phase("backend-installed")
@@ -86,7 +88,7 @@ def main() -> int:
         create_progress_dialog,
     )
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
 
     _install_backend_test_double(
         backend,
@@ -220,9 +222,9 @@ def main() -> int:
     failing = make_configuration()
     _phase("failure-configuration-created")
     progress_count = len(created_progress_dialogs)
-    backend.run_versioned_analysis_request = lambda *_args, **_kwargs: (_ for _ in ()).throw(
-        RuntimeError("native backend failure")
-    )
+    backend.run_versioned_analysis_request = lambda *_args, **_kwargs: (
+        _ for _ in ()
+    ).throw(RuntimeError("native backend failure"))
     original_critical = analysis_setup_dialog.QMessageBox.critical
     setattr(
         analysis_setup_dialog.QMessageBox, "critical", lambda *_args, **_kwargs: None

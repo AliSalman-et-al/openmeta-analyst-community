@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from pathlib import PurePosixPath
 import sys
-from typing import Any, Callable, TextIO
+from typing import Any, Callable, Protocol, TextIO
 
 from rc_metastudio import automation
 
@@ -20,6 +20,14 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from rc_metastudio.qt6_resources import ensure_application_resources
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from rc_metastudio.runtime_types import required
+from rc_metastudio.workspace_session import WorkspaceSession
+
+
+class AutomationWindow(Protocol):
+    workspace: WorkspaceSession
+    workspace_is_dirty: bool
+
+    def close(self) -> bool: ...
 
 
 def _phase(name: str) -> None:
@@ -116,7 +124,7 @@ def install_native_test_backend() -> Any:
 
 
 def close_automation_window(
-    app: QtWidgets.QApplication, window: QtWidgets.QWidget
+    app: QtWidgets.QApplication, window: AutomationWindow
 ) -> None:
     """Close without triggering last-window quit or pumping teardown events."""
     previous_auto_quit = app.quitOnLastWindowClosed()
@@ -206,6 +214,7 @@ def _run_main() -> int:
         dataset_table_model,
         r_bridge,
     )
+
     for name, implementation in vars(backend).items():
         setattr(r_bridge, name, implementation)
     _install_backend_test_double(

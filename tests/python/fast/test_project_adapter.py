@@ -95,7 +95,7 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
         | {
             "groups": [
                 {key: value for key, value in group.items() if key != "stable_id"}
-                for group in unit["groups"]
+                for group in _objects(unit["groups"])
             ]
         }
         for unit in rebuilt_units

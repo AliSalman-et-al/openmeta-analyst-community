@@ -51,10 +51,17 @@ class _TestObjects:
 
 
 class _TestLoader:
-    def load_meta(self) -> None: pass
-    def load_metafor(self) -> None: pass
-    def load_rcmetar(self) -> None: pass
-    def load_grid(self) -> None: pass
+    def load_meta(self) -> None:
+        pass
+
+    def load_metafor(self) -> None:
+        pass
+
+    def load_rcmetar(self) -> None:
+        pass
+
+    def load_grid(self) -> None:
+        pass
 
 
 @pytest.fixture
@@ -80,9 +87,16 @@ def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         "normalize_diagnostic_effects": normalize_diagnostic_effects,
         "impute_binary_data": lambda _data: {"FAIL": True},
         "impute_continuous_data": lambda _data, _alpha: {"succeeded": False},
-        "impute_pre_post_continuous_data": lambda _data, _corr, _alpha: {"succeeded": False},
+        "impute_pre_post_continuous_data": lambda _data, _corr, _alpha: {
+            "succeeded": False
+        },
         "back_calculate_continuous_data": lambda *_args, **_kwargs: {"FAIL": True},
-        "impute_diagnostic_data": lambda _data: {"TP": None, "TN": None, "FP": None, "FN": None},
+        "impute_diagnostic_data": lambda _data: {
+            "TP": None,
+            "TN": None,
+            "FP": None,
+            "FN": None,
+        },
         "get_analysis_plot_capabilities": lambda *_args, **_kwargs: [],
         "dataset_to_simple_binary_r_object": _unavailable,
         "dataset_to_simple_continuous_r_object": _unavailable,
@@ -118,19 +132,13 @@ def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
 def inject_calculator_boundary(
     inject_python_boundary: None,
 ) -> None:
-    """Expose the canonical boundary to legacy calculator UI test seams."""
+    """Expose the canonical boundary to direct R-dependent test seams."""
     from rc_metastudio import (
-        binary_data_dialog,
-        continuous_data_dialog,
-        diagnostic_data_dialog,
-        dataset_table_model,
         calculator_routines,
+        dataset_table_model,
     )
 
     for module in (
-        binary_data_dialog,
-        continuous_data_dialog,
-        diagnostic_data_dialog,
         dataset_table_model,
         calculator_routines,
     ):

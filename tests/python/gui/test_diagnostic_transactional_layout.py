@@ -5,8 +5,7 @@ from typing import cast
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from rc_metastudio import adaptive_window
-
+from rc_metastudio import adaptive_window, calculator_service
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -88,29 +87,29 @@ def _open_data_dialog(
         lambda _window: QtCore.QRect(available),
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_diagnostic_data",
         lambda _data: imputed or {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         },
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda effect, scale, metric=None: effect[scale],
     )

@@ -45,7 +45,7 @@ def _json_list(value: object) -> list[object]:
     return cast(list[object], value)
 
 
-def _close_shell(app: QtWidgets.QApplication, window: QtWidgets.QMainWindow) -> None:
+def _close_shell(app: QtWidgets.QApplication, window) -> None:
     if window.workspace.document is None and window.workspace.is_dirty:
         from rc_metastudio.main_window import _document_from_model
 

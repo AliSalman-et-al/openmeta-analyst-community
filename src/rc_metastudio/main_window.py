@@ -1523,9 +1523,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             if previous_current.isValid()
             else None
         )
+        selection_model = required(
+            self.tableView.selectionModel(), "workspace selection model"
+        )
         selected_cells = [
-            (index.row(), index.column())
-            for index in self.tableView.selectionModel().selectedIndexes()
+            (index.row(), index.column()) for index in selection_model.selectedIndexes()
         ]
         try:
             self.set_model(
@@ -1569,7 +1571,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.populate_metrics_menu(metric_to_check=model.current_effect)
         self.update_outcome_lbl()
         self.update_follow_up_label()
-        selection_model = self.tableView.selectionModel()
+        selection_model = required(
+            self.tableView.selectionModel(), "workspace selection model"
+        )
         selection_model.clearSelection()
         select = QtCore.QItemSelectionModel.SelectionFlag.Select
         for row, column in selected_cells:
