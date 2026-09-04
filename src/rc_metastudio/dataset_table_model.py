@@ -383,10 +383,6 @@ class DatasetTableModel(QAbstractTableModel):
         return f"{float_var:.{precision}f}"
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        """Implements the required QTTableModel data method. There is a lot of switching on
-        role/index/datatype here, but this seems consistent with the QT paradigm (see
-        Summerfield's book)
-        """
         if (
             not index.isValid()
             or index.model() is not self
@@ -394,171 +390,120 @@ class DatasetTableModel(QAbstractTableModel):
             or not 0 <= index.column() < self.columnCount()
         ):
             return None
-
-        precise_digits = 12
-        num_digits = None
-
         if not index.isValid() or not (0 <= index.row() < len(self.dataset)):
             return _item_data()
         study = self.dataset.studies[index.row()]
-        current_data_type = self.dataset.get_outcome_type(self.current_outcome_name)
-        outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome_name)
-        column = index.column()
-
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
-            if column == self.NAME:
-                return _item_data(_editable_data(study.name))
-            elif column == self.YEAR:
-                if study.year in (None, "", 0):
-                    return _item_data("")
-                else:
-                    return _item_data(study.year)
-            elif self.current_outcome_name is not None and column in self.RAW_DATA:
-                adjusted_index = column - 3
-                if self.current_outcome_name in study.analysis_units_by_outcome:
-                    analysis_unit = self.get_current_analysis_unit_for_study(
-                        index.row()
-                    )
-                    current_raw_data = analysis_unit.get_raw_data_for_groups(
-                        self.current_groups
-                    )
-                    if len(current_raw_data) > adjusted_index:
-                        val = current_raw_data[adjusted_index]
-                        if val == "" or val is None:
-                            return _item_data("")
-                        try:
-                            sample_size_columns = (
-                                self.RAW_DATA[0],
-                                self.RAW_DATA[3],
-                            )
+            return self._display_data(index, role, study)
+        return self._role_data(index, role, study)
 
-                            if (
-                                current_data_type == CONTINUOUS
-                                and column not in sample_size_columns
-                            ):
-                                if role == Qt.ItemDataRole.EditRole:
-                                    num_digits = precise_digits
-                                return _item_data(
-                                    str(self.format_float(val, num_digits=num_digits))
-                                )
-                            else:
-                                return _item_data(round(val, self.NUM_DIGITS))
-                        except (TypeError, ValueError):
-                            return _item_data(_to_native_text(val))
-                    else:
-                        return _item_data("")
-                else:
-                    return _item_data("")
-            elif (
-                self.current_outcome_name is not None
-                and self.get_current_follow_up_name() is not None
-                and column in self.OUTCOMES
-            ):
-                if role == Qt.ItemDataRole.EditRole:
-                    num_digits = precise_digits
+    def _display_data(self, index, role, study):
+        column = index.column()
+        if column == self.NAME:
+            return _item_data(_editable_data(study.name))
+        if column == self.YEAR:
+            return _item_data("" if study.year in (None, "", 0) else study.year)
+        if self.current_outcome_name is not None and column in self.RAW_DATA:
+            return self._raw_cell_data(index, role, study)
+        if (
+            self.current_outcome_name is not None
+            and self.get_current_follow_up_name() is not None
+            and column in self.OUTCOMES
+        ):
+            return self._outcome_cell_data(index, role)
+        if self.OUTCOMES and column != self.INCLUDE_STUDY and column > max(self.OUTCOMES):
+            return self._covariate_cell_data(column, role, study)
+        return _item_data()
 
-                group_comparison = self.get_current_group_comparison()
-                outcome_index = column - self.OUTCOMES[0]
-                outcome_val = None
-                analysis_unit = self.get_current_analysis_unit_for_study(index.row())
+    def _raw_cell_data(self, index, role, study):
+        if self.current_outcome_name not in study.analysis_units_by_outcome:
+            return _item_data("")
+        raw_data = self.get_current_analysis_unit_for_study(
+            index.row()
+        ).get_raw_data_for_groups(self.current_groups)
+        adjusted_index = index.column() - 3
+        if len(raw_data) <= adjusted_index:
+            return _item_data("")
+        value = raw_data[adjusted_index]
+        if value in ("", None):
+            return _item_data("")
+        try:
+            sample_size_columns = (self.RAW_DATA[0], self.RAW_DATA[3])
+            precise = role == Qt.ItemDataRole.EditRole
+            if self.get_current_outcome_type(get_str=False) == CONTINUOUS and index.column() not in sample_size_columns:
+                digits = 12 if precise else None
+                return _item_data(str(self.format_float(value, num_digits=digits)))
+            return _item_data(round(value, self.NUM_DIGITS))
+        except (TypeError, ValueError):
+            return _item_data(_to_native_text(value))
 
-                if not self.is_diagnostic():
-                    effect = self.current_effect
+    def _outcome_cell_data(self, index, role):
+        unit = self.get_current_analysis_unit_for_study(index.row())
+        source = self._display_effect_source(unit)
+        comparison = self.get_current_group_comparison()
+        outcome_index = index.column() - self.OUTCOMES[0]
+        data_type = self.get_current_outcome_type(get_str=False)
+        subtype = self.get_current_outcome_subtype()
+        effect = self.current_effect
+        if self.is_diagnostic():
+            effect = "Spec" if outcome_index >= 3 else "Sens"
+            outcome_index %= 3
+        if data_type == CONTINUOUS and subtype == "generic_effect":
+            values = unit.get_display_effect_and_se_for_source(source, effect, comparison)
+        else:
+            values = unit.get_display_effect_and_ci_for_source(source, effect, comparison)
+        value = values[outcome_index]
+        if value is None:
+            return _item_data("")
+        digits = 12 if role == Qt.ItemDataRole.EditRole else None
+        if self.is_diagnostic() and digits is None:
+            digits = 3
+        return _item_data(self.format_float(value, num_digits=digits))
 
-                    if (
-                        current_data_type == CONTINUOUS
-                        and outcome_subtype == "generic_effect"
-                    ):
-                        display_effect_and_error = analysis_unit.get_display_effect_and_se_for_source(
-                            self._display_effect_source(analysis_unit), effect, group_comparison
-                        )
-                        outcome_val = display_effect_and_error[outcome_index]
-                    else:
-                        display_effect_and_interval = analysis_unit.get_display_effect_and_ci_for_source(
-                            self._display_effect_source(analysis_unit), effect, group_comparison
-                        )
-                        outcome_val = display_effect_and_interval[outcome_index]
+    def _covariate_cell_data(self, column, role, study):
+        covariate = self.get_covariate_for_column(column)
+        if covariate is None:
+            return _item_data("")
+        value = study.covariate_values.get(covariate.name, "")
+        if value is None:
+            value = ""
+        if value != "" and covariate.data_type == CONTINUOUS:
+            digits = 12 if role == Qt.ItemDataRole.EditRole else None
+            return _item_data(self.format_float(value, num_digits=digits))
+        return _item_data(_to_native_text(value))
 
-                    if outcome_val is None:
-                        return _item_data("")
-                    return _item_data(
-                        self.format_float(outcome_val, num_digits=num_digits)
-                    )
-                else:
-                    # Diagnostic tables always show sensitivity and specificity
-                    # rather than one current effect, so parse
-                    # out the estimates and CIs for these manually here.
-                    m_str = "Sens"
-                    if column in self.OUTCOMES[3:]:
-                        m_str = "Spec"
+    def _role_data(self, index, role, study):
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+        if role == Qt.ItemDataRole.CheckStateRole:
+            return self._check_state_data(index, study)
+        if role == Qt.ItemDataRole.BackgroundRole:
+            return self._background_data(index)
+        if role == Qt.ItemDataRole.ForegroundRole:
+            return self._foreground_data(index)
+        return _item_data()
 
-                    display_effect_and_interval = analysis_unit.get_display_effect_and_ci_for_source(
-                        self._display_effect_source(analysis_unit), m_str, group_comparison
-                    )
-                    outcome_val = display_effect_and_interval[outcome_index % 3]
+    def _check_state_data(self, index, study):
+        if index.column() != self.INCLUDE_STUDY or not self._study_has_entered_data(index.row()):
+            return _item_data()
+        checked = index.row() < self.rowCount() - 1 and study.include
+        return _item_data(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
 
-                    if outcome_val is None:
-                        return _item_data("")
+    def _background_data(self, index):
+        if not self._study_has_entered_data(index.row()):
+            return _item_data()
+        if index.column() in self.OUTCOMES:
+            return _item_data(QColor("#D6A93A"))
+        if (
+            index.column() in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
+            and self.current_effect in ONE_ARM_METRICS
+        ):
+            return _item_data(QColor(Qt.GlobalColor.gray))
+        return _item_data()
 
-                    # Sensitivity and specificity have historically been
-                    # displayed to three decimals. Preserve that presentation
-                    # contract without rounding the stored calculation values.
-                    diagnostic_digits = num_digits if num_digits is not None else 3
-                    return _item_data(
-                        self.format_float(outcome_val, num_digits=diagnostic_digits)
-                    )
-
-            elif column != self.INCLUDE_STUDY and column > max(self.OUTCOMES):
-                # here the column is to the right of the outcomes (and not the 0th, or
-                # 'include study' column), and thus must correspond to a covariate.
-                covariate = self.get_covariate_for_column(column)
-                if covariate is None:
-                    return _item_data("")
-
-                covariate_name = covariate.name
-                cov_value = (
-                    study.covariate_values[covariate_name]
-                    if covariate_name in study.covariate_values
-                    else None
-                )
-                if cov_value is None:
-                    cov_value = ""
-
-                if cov_value != "" and covariate.data_type == CONTINUOUS:
-                    return _item_data(
-                        self.format_float(cov_value, num_digits=num_digits)
-                    )
-                else:
-                    # factor
-                    return _item_data(_to_native_text(cov_value))
-        elif role == Qt.ItemDataRole.TextAlignmentRole:
-            return _item_data(
-                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            )
-        elif role == Qt.ItemDataRole.CheckStateRole:
-            # this is where we deal with the inclusion/exclusion of studies
-            if column == self.INCLUDE_STUDY and self._study_has_entered_data(
-                index.row()
-            ):
-                checked_state = Qt.CheckState.Unchecked
-                if index.row() < self.rowCount() - 1 and study.include:
-                    checked_state = Qt.CheckState.Checked
-                return _item_data(checked_state)
-        elif role == Qt.ItemDataRole.BackgroundRole:
-            row_has_entered_data = self._study_has_entered_data(index.row())
-            if row_has_entered_data and column in self.OUTCOMES:
-                return _item_data(QColor("#D6A93A"))
-            elif (
-                row_has_entered_data
-                and column in self.RAW_DATA[len(self.RAW_DATA) // 2 :]
-                and self.current_effect in ONE_ARM_METRICS
-            ):
-                return _item_data(QColor(Qt.GlobalColor.gray))
-        elif role == Qt.ItemDataRole.ForegroundRole:
-            row_has_entered_data = self._study_has_entered_data(index.row())
-            if row_has_entered_data and column in self.OUTCOMES:
-                return _item_data(QColor(Qt.GlobalColor.black))
-
+    def _foreground_data(self, index):
+        if self._study_has_entered_data(index.row()) and index.column() in self.OUTCOMES:
+            return _item_data(QColor(Qt.GlobalColor.black))
         return _item_data()
 
     def get_current_group_comparison(self):

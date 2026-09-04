@@ -143,17 +143,27 @@ class WorkspaceEditingService:
         outcome_subtype: str | None,
     ) -> None:
         """Apply the durable inclusion rule after a successful cell edit."""
-        if diagnostic or inclusion_column or not outcome_selected:
+        if diagnostic:
+            return
+        if inclusion_column:
+            return
+        if not outcome_selected:
             return
         if not study.manually_excluded:
             study.include = True
-        required = (
-            ("est", "SE")
-            if data_type == "continuous" and outcome_subtype == "generic_effect"
-            else ("upper", "lower", "est")
-        )
-        if any(_effect_value(effect, key) is None for key in required):
+        if not WorkspaceEditingService._effect_is_complete(
+            effect, data_type, outcome_subtype
+        ):
             study.include = False
+
+    @staticmethod
+    def _effect_is_complete(effect, data_type, outcome_subtype) -> bool:
+        if data_type == "continuous" and outcome_subtype == "generic_effect":
+            return all(_effect_value(effect, key) is not None for key in ("est", "SE"))
+        return all(
+            _effect_value(effect, key) is not None
+            for key in ("upper", "lower", "est")
+        )
 
     def confidence_settings(self, level: object) -> ConfidenceSettings:
         validated = validate_confidence_level(level)
@@ -223,26 +233,33 @@ class WorkspaceEditingService:
             )
         if target.column == context.year_column:
             return self._edit_year(study, value)
-        if context.outcome_name is not None and target.column in context.raw_columns:
-            result = self._edit_raw_data(dataset, study, target, context, value, recalculate)
-            self._update_inclusion(dataset, study, target, context, result)
-            return result
-        if target.column in context.outcome_columns:
-            result = self._edit_outcome(dataset, study, target, context, value, import_csv)
-            self._update_inclusion(dataset, study, target, context, result)
-            return result
-        if target.column == context.include_column:
-            included, valid = self._parse_inclusion(value)
-            if not valid:
-                return AppliedWorkspaceEdit(
-                    error="Study inclusion must be checked or unchecked."
-                )
-            study.include = included
-            study.manually_excluded = not included
-            return AppliedWorkspaceEdit()
-        result = self._edit_covariate(study, context, value)
+        result = self._apply_analysis_edit(
+            dataset, study, target, context, value, import_csv, recalculate
+        )
         self._update_inclusion(dataset, study, target, context, result)
         return result
+
+    def _apply_analysis_edit(
+        self, dataset, study, target, context, value, import_csv, recalculate
+    ) -> AppliedWorkspaceEdit:
+        if context.outcome_name is not None and target.column in context.raw_columns:
+            return self._edit_raw_data(dataset, study, target, context, value, recalculate)
+        if target.column in context.outcome_columns:
+            return self._edit_outcome(dataset, study, target, context, value, import_csv)
+        if target.column == context.include_column:
+            return self._edit_inclusion(study, value)
+        return self._edit_covariate(study, context, value)
+
+    @staticmethod
+    def _edit_inclusion(study: Study, value: object) -> AppliedWorkspaceEdit:
+        included, valid = WorkspaceEditingService._parse_inclusion(value)
+        if not valid:
+            return AppliedWorkspaceEdit(
+                error="Study inclusion must be checked or unchecked."
+            )
+        study.include = included
+        study.manually_excluded = not included
+        return AppliedWorkspaceEdit()
 
     def _update_inclusion(
         self, dataset, study, target, context, result: AppliedWorkspaceEdit
@@ -288,24 +305,35 @@ class WorkspaceEditingService:
     ) -> Study | None:
         self._last_error = None
         if target.row >= len(dataset):
-            if target.column != context.name_column:
-                self._last_error = "Please enter a study name before entering study data."
-                return None
-            name = qt_text.to_native_text(value)
-            if name == "" and not allow_empty_names:
-                self._last_error = "Please enter a study name before entering study data."
-                return None
-            while len(dataset) <= target.row:
-                dataset.add_study(Study(dataset.max_study_id() + 1))
+            return self._new_study_for_edit(
+                dataset, target, context, value, allow_empty_names
+            )
         study = dataset.studies[target.row]
-        if (
-            not allow_empty_names
-            and not study.name.strip()
-            and self._requires_named_study(target, context, value)
-        ):
+        if self._edit_requires_name(study, target, context, value, allow_empty_names):
             self._last_error = "Please enter a study name before entering study data."
             return None
         return study
+
+    def _new_study_for_edit(
+        self, dataset, target, context, value, allow_empty_names
+    ) -> Study | None:
+        if target.column != context.name_column:
+            self._last_error = "Please enter a study name before entering study data."
+            return None
+        if qt_text.to_native_text(value) == "" and not allow_empty_names:
+            self._last_error = "Please enter a study name before entering study data."
+            return None
+        while len(dataset) <= target.row:
+            dataset.add_study(Study(dataset.max_study_id() + 1))
+        return dataset.studies[target.row]
+
+    @staticmethod
+    def _edit_requires_name(study, target, context, value, allow_empty_names):
+        return (
+            not allow_empty_names
+            and not study.name.strip()
+            and WorkspaceEditingService._requires_named_study(target, context, value)
+        )
 
     @staticmethod
     def _requires_named_study(
