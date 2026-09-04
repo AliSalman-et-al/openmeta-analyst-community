@@ -49,7 +49,9 @@ def ensure_analysis_unit(
         analysis_unit = study.get_analysis_unit(outcome, follow_up)
     except KeyError:
         study.add_outcome(
-            dataset.get_outcome_obj(outcome), group_names=dataset.get_group_names()
+            dataset.get_outcome_obj(outcome),
+            group_names=dataset.get_group_names(),
+            follow_up_id=dataset.get_follow_up_stable_id(outcome, follow_up),
         )
         try:
             analysis_unit = study.get_analysis_unit(outcome, follow_up)
