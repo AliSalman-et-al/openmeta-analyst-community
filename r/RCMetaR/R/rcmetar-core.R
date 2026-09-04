@@ -702,6 +702,13 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         stop("Analysis request must be a named list.", call.=FALSE)
     } else {
         request$version <- request$version %||% 1L
+        request$data_type <- request$data_type %||% .rcmetar.data.type(om.data)
+        request$method <- request$method %||% method
+        request$params <- request$params %||% params
+        request$workflow <- request$workflow %||% workflow
+        request$selected.cov <- request$selected.cov %||% selected.cov
+        request$cond.means.data <- request$cond.means.data %||% cond.means.data
+        request$stop.at.rma <- request$stop.at.rma %||% stop.at.rma
     }
     if (length(request$version) != 1 || !identical(as.integer(request$version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
@@ -720,6 +727,10 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     params <- .rcmetar.as.params.list(request$params)
     method <- as.character(request$method)
     metric <- as.character(request$metric %||% params$measure %||% "")
+    if (length(metric) == 1L &&
+            identical(gsub("[[:space:].]+", "", trimws(metric)), "TXMean")) {
+        metric <- "TXMean"
+    }
     if (length(metric) != 1L || !nzchar(metric)) {
         stop("Analysis request must include one metric.", call.=FALSE)
     }
@@ -1085,16 +1096,12 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     workflow <- as.character(request$workflow[[1L]])
     kind <- if (length(result$plot_names)) as.character(result$plot_names[[1L]]) else "plot"
     keys <- paste0("analysis.", workflow, ".", kind, ".", seq_along(titles))
-    names(result$images) <- keys
-    if (!is.null(result$display_images)) names(result$display_images) <- keys
-    if (!is.null(result$plot_names)) names(result$plot_names) <- keys
-    if (!is.null(result$plot_params_paths)) names(result$plot_params_paths) <- keys
-    if (!is.null(result$plot_capabilities)) names(result$plot_capabilities) <- keys
-    result$image_order <- keys
-    result$plot_titles <- stats::setNames(titles, keys)
+    result$image_order <- titles
+    result$plot_titles <- stats::setNames(titles, titles)
+    result$plot_source_keys <- stats::setNames(keys, titles)
     result$sections <- lapply(seq_along(keys), function(index) list(
         id=keys[[index]], kind="image", order=as.integer(index - 1L),
-        title=titles[[index]], source_key=keys[[index]]
+        title=titles[[index]], source_key=keys[[index]], value_key=titles[[index]]
     ))
     result
 }
