@@ -3,7 +3,6 @@
 """Qt table model for dataset, outcome, follow-up, and treatment views."""
 
 import copy
-from statistics import NormalDist
 from dataclasses import dataclass
 from functools import cmp_to_key
 
@@ -11,12 +10,10 @@ from PyQt6 import QtCore
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
-from rc_metastudio import calculator_routines as calc_fncs
 from rc_metastudio import name_validation, project_adapter, qt_text, workspace_editing
 from rc_metastudio.analysis_dataset import Covariate, Dataset, Outcome, Study
 from rc_metastudio.dataset_analysis_domain import (
     ensure_analysis_unit,
-    has_entered_data,
     has_study_entered_data,
     included_studies_have_effects,
     included_studies_have_raw_data,
@@ -27,24 +24,17 @@ from rc_metastudio.meta_globals import (
     ALL_METRIC_NAMES,
     BINARY,
     BINARY_METRIC_NAMES,
-    BINARY_ONE_ARM_METRICS,
     CONTINUOUS,
     CONTINUOUS_METRIC_NAMES,
-    CONTINUOUS_ONE_ARM_METRICS,
     DEFAULT_CONFIDENCE_LEVEL,
     DEFAULT_GROUP_NAMES,
     DIAGNOSTIC,
     DIAGNOSTIC_METRIC_LABELS,
-    DIAGNOSTIC_METRICS,
-    EMPTY_VALS,
     FACTOR,
     NUM_DIGITS,
     ONE_ARM_METRICS,
     OTHER,
     STR_TO_TYPE_DICT,
-    is_a_float,
-    is_an_int,
-    is_empty,
     validate_confidence_level,
 )
 from rc_metastudio.workspace_column_identity import (
@@ -157,21 +147,6 @@ def validate_new_study_name(name):
     return name_validation.validate_required_name("study", name)
 
 
-def _to_int(value):
-    if hasattr(value, "toInt"):
-        return value.toInt()
-    try:
-        return int(value), True
-    except (TypeError, ValueError):
-        return 0, False
-
-
-def _to_double(value):
-    if hasattr(value, "toDouble"):
-        return value.toDouble()
-    return qt_text.parse_decimal(value)
-
-
 def _parse_inclusion(value):
     if isinstance(value, Qt.CheckState):
         return value is Qt.CheckState.Checked, value in (
@@ -228,10 +203,68 @@ class DatasetTableModel(QAbstractTableModel):
 
     dataset: Dataset
 
+    @property
+    def current_outcome_name(self):
+        return self.view_state.current_outcome_name
+
+    @current_outcome_name.setter
+    def current_outcome_name(self, value):
+        self.view_state.current_outcome_name = value
+
+    @property
+    def current_follow_up_index(self):
+        return self.view_state.current_follow_up_index
+
+    @current_follow_up_index.setter
+    def current_follow_up_index(self, value):
+        self.view_state.current_follow_up_index = value
+
+    @property
+    def current_groups(self):
+        return self.view_state.current_groups
+
+    @current_groups.setter
+    def current_groups(self, value):
+        self.view_state.current_groups = value
+
+    @property
+    def previous_groups(self):
+        return self.view_state.previous_groups
+
+    @previous_groups.setter
+    def previous_groups(self, value):
+        self.view_state.previous_groups = value
+
+    @property
+    def current_effect(self):
+        return self.view_state.current_effect
+
+    @current_effect.setter
+    def current_effect(self, value):
+        self.view_state.current_effect = value
+
+    @property
+    def confidence_level(self):
+        return self.view_state.confidence_level
+
+    @confidence_level.setter
+    def confidence_level(self, value):
+        self.view_state.confidence_level = value
+
+    @property
+    def confidence_multiplier(self):
+        return self.view_state.confidence_multiplier
+
+    @confidence_multiplier.setter
+    def confidence_multiplier(self, value):
+        self.view_state.confidence_multiplier = value
+
     def __init__(
         self, filename="", dataset: Dataset | None = None, add_blank_study=True
     ):
         super().__init__()
+
+        self.view_state = workspace_editing.WorkspaceViewState()
 
         self.editing_service = workspace_editing.WorkspaceEditingService()
         # Kept as a module-level compatibility seam for existing test and
@@ -275,37 +308,10 @@ class DatasetTableModel(QAbstractTableModel):
         self.dataError.emit(msg)
         return False
 
-    def _study_name_is_blank(self, study):
-        return qt_text.is_blank(study.name)
-
-    def _value_is_empty(self, value):
-        return value in EMPTY_VALS
-
-    def _analysis_unit_has_entered_data(self, analysis_unit):
-        return has_entered_data(analysis_unit)
-
     def _study_has_entered_data(self, row):
         if row < 0 or row >= len(self.dataset):
             return False
         return has_study_entered_data(self.dataset.studies[row])
-
-    def _edit_requires_named_study(self, column, value):
-        if column == self.NAME:
-            return False
-        if column == self.INCLUDE_STUDY:
-            included, valid = _parse_inclusion(value)
-            return valid and included
-        if column == self.YEAR:
-            return False
-
-        value_is_blank = qt_text.is_blank(value)
-        if self.current_outcome_name is not None and column in self.RAW_DATA:
-            return not value_is_blank
-        if column in self.OUTCOMES:
-            return not value_is_blank
-        if self.OUTCOMES and column > max(self.OUTCOMES):
-            return not value_is_blank
-        return False
 
     def set_current_metric(self, metric):
         self.current_effect = metric
@@ -467,17 +473,13 @@ class DatasetTableModel(QAbstractTableModel):
                         current_data_type == CONTINUOUS
                         and outcome_subtype == "generic_effect"
                     ):
-                        display_effect_and_error = (
-                            analysis_unit.get_display_effect_and_se(
-                                effect, group_comparison
-                            )
+                        display_effect_and_error = analysis_unit.get_display_effect_and_se_for_source(
+                            self._display_effect_source(analysis_unit), effect, group_comparison
                         )
                         outcome_val = display_effect_and_error[outcome_index]
                     else:
-                        display_effect_and_interval = (
-                            analysis_unit.get_display_effect_and_ci(
-                                effect, group_comparison
-                            )
+                        display_effect_and_interval = analysis_unit.get_display_effect_and_ci_for_source(
+                            self._display_effect_source(analysis_unit), effect, group_comparison
                         )
                         outcome_val = display_effect_and_interval[outcome_index]
 
@@ -494,8 +496,8 @@ class DatasetTableModel(QAbstractTableModel):
                     if column in self.OUTCOMES[3:]:
                         m_str = "Spec"
 
-                    display_effect_and_interval = (
-                        analysis_unit.get_display_effect_and_ci(m_str, group_comparison)
+                    display_effect_and_interval = analysis_unit.get_display_effect_and_ci_for_source(
+                        self._display_effect_source(analysis_unit), m_str, group_comparison
                     )
                     outcome_val = display_effect_and_interval[outcome_index % 3]
 
@@ -577,369 +579,35 @@ class DatasetTableModel(QAbstractTableModel):
             group_comparison = "-".join(self.current_groups)
         return group_comparison
 
-    def _verify_raw_data(self, s, col, data_type, index_of_s=None):
-        def as_int(value):
-            return int(float(value))
-
-        # ignore blank entries
-        if qt_text.is_blank(s):
-            return True, None
-
-        if not is_a_float(s):
-            return False, "Raw data needs to be numeric."
-
-        if data_type in (BINARY, DIAGNOSTIC):
-            if not is_an_int(s):
-                return (
-                    False,
-                    "Expected a whole number (count), but a decimal value was entered.",
-                )
-            if as_int(s) < 0:
-                return False, "Counts cannot be negative."
-
-        # Event counts cannot exceed the matching group sample sizes.
-        msg = "Number of events cannot be greater than number of samples."
-        if index_of_s is None:
-            raise ValueError("Raw-data validation requires a model index")
-        (row, col) = (index_of_s.row(), index_of_s.column())
-        if data_type == BINARY:
-            if col in [3, 5]:  # col is TxA or TxB
-                sample_count = _to_text_value(self.data(self.index(row, col + 1)))
-                if is_an_int(sample_count):
-                    if as_int(s) > as_int(sample_count):
-                        return False, msg
-            elif col in [4, 6]:  # col is N_A or N_B
-                event_count = _to_text_value(self.data(self.index(row, col - 1)))
-                if is_an_int(event_count):
-                    if as_int(s) < as_int(event_count):
-                        return False, msg
-
-        if data_type == CONTINUOUS:
-            if float(s) <= 0:
-                if col in [3, 6]:
-                    return False, "Count cannot be zero or negative"
-                if col in [5, 8]:
-                    return False, "Standard Deviation cannot be zero or negative"
-
-        return True, None
-
-    def _verify_outcome_data(self, s, col, row, data_type):
-        outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome_name)
-
-        if not is_a_float(s):
-            return False, "Outcomes must be numeric."
-
-        analysis_unit = self.get_current_analysis_unit_for_study(row)
-        group_comparison = self.get_current_group_comparison()
-
-        n1 = None
-        if self.current_effect == "PFT":
-            _e1, n1, _e2, _n2 = self.get_current_raw_data_for_study(study_index=row)
-
-        binary_display_scale = self._get_conv_to_display_scale(
-            data_type=BINARY, effect=self.current_effect, n1=n1
+    def _editing_context(self, column=None):
+        covariate = (
+            self.get_covariate_for_column(column)
+            if column is not None and self.OUTCOMES and column > max(self.OUTCOMES)
+            else None
         )
-        continuous_display_scale = self._get_conv_to_display_scale(
-            data_type=CONTINUOUS, effect=self.current_effect
+        return workspace_editing.WorkspaceEditingContext(
+            outcome_name=self.current_outcome_name,
+            follow_up_name=self.get_current_follow_up_name(),
+            current_groups=tuple(self.current_groups),
+            current_effect=self.current_effect,
+            data_type=self.get_current_outcome_type(get_str=False),
+            outcome_subtype=self.get_current_outcome_subtype(),
+            group_comparison=self.get_current_group_comparison(),
+            raw_columns=tuple(self.RAW_DATA),
+            outcome_columns=tuple(self.OUTCOMES),
+            include_column=self.INCLUDE_STUDY,
+            name_column=self.NAME,
+            year_column=self.YEAR,
+            confidence_level=self.get_confidence_level(),
+            confidence_multiplier=self.get_confidence_multiplier(),
+            covariate_name=covariate.name if covariate is not None else None,
+            covariate_type=covariate.data_type if covariate is not None else None,
+            covariate=covariate,
         )
 
-        previous_estimate, previous_lower, previous_upper = None, None, None
-        if data_type in [BINARY, CONTINUOUS]:
-            previous_estimate, previous_lower, previous_upper = (
-                analysis_unit.get_effect_and_ci(
-                    self.current_effect,
-                    group_comparison,
-                    self.get_confidence_multiplier(),
-                )
-            )
-        if data_type == BINARY:
-            previous_estimate, previous_lower, previous_upper = [
-                binary_display_scale(x)
-                for x in [previous_estimate, previous_lower, previous_upper]
-            ]
-        elif data_type == CONTINUOUS:
-            previous_estimate, previous_lower, previous_upper = [
-                continuous_display_scale(x)
-                for x in [previous_estimate, previous_lower, previous_upper]
-            ]
-        elif data_type == DIAGNOSTIC:
-            m_str = "Sens" if col in self.OUTCOMES[:3] else "Spec"
-            previous_estimate, previous_lower, previous_upper = (
-                analysis_unit.get_effect_and_ci(
-                    m_str, group_comparison, self.get_confidence_multiplier()
-                )
-            )
-            diagnostic_display_scale = self._get_conv_to_display_scale(
-                data_type=DIAGNOSTIC, effect=m_str
-            )
-            previous_estimate, previous_lower, previous_upper = [
-                diagnostic_display_scale(x)
-                for x in [previous_estimate, previous_lower, previous_upper]
-            ]
-
-        # here we check if there is raw data for this study;
-        # if there is, we don't allow entry of outcomes
-        raw_data = self.get_current_raw_data_for_study(row)
-
-        if not all([is_empty(s_i) for s_i in raw_data]):
-            # Treat tiny floating-point differences as unchanged so tabbing
-            # through calculated cells does not trigger unnecessary warnings.
-            # for the last 'raw data' column.
-            d = dict(
-                list(
-                    zip(
-                        self.OUTCOMES,
-                        [previous_estimate, previous_lower, previous_upper],
-                    )
-                )
-            )
-            new_val = float(s)
-            previously_was_none = d[col] is None
-            delta = None
-            if previously_was_none:
-                # then it was previously not set;
-                # go ahead and let the user override.
-                delta = float("-inf")
-            else:
-                delta = abs(new_val - d[col])
-            epsilon = 10e-6
-            if delta > epsilon:
-                return (
-                    False,
-                    """You have already entered raw data for this study. If you want to enter the outcome directly, delete the raw data first.""",
-                )
-
-        if qt_text.is_blank(s):
-            # in this case, they've deleted a value
-            # (i.e., left it blank) -- this is OK.
-            return True, None
-        if self.current_effect in ("OR", "RR"):
-            if float(s) < 0:
-                return False, "Ratios cannot be negative."
-
-        # figure out why type of column we are in
-        fields = ["est", "lower", "upper"]
-        if data_type == DIAGNOSTIC:
-            fields.extend(fields[:])
-        col_to_type = dict(list(zip(self.OUTCOMES, fields)))
-        val_str = col_to_type[col]
-
-        if outcome_subtype == "generic_effect":
-            if col == self.OUTCOMES[1]:  # se column
-                if float(s) < 0:
-                    return False, "Standard Error cannot be negative"
-        else:
-
-            def is_between_bounds(
-                est=previous_estimate, low=previous_lower, high=previous_upper
-            ):
-                return calc_fncs.between_bounds(est=est, low=low, high=high)
-
-            good_result = None
-            msg = ""
-            if val_str == "est":
-                (good_result, msg) = is_between_bounds(est=float(s))
-            elif val_str == "lower":
-                (good_result, msg) = is_between_bounds(low=float(s))
-            elif val_str == "upper":
-                (good_result, msg) = is_between_bounds(high=float(s))
-            assert good_result is not None, (
-                "Why don't we have a result for what outcome we're in?"
-            )
-            if not good_result:
-                return False, msg
-
-        return True, None
-
-    def _verify_year(self, s):
-        if qt_text.is_blank(s):
-            return True, None
-
-        if not is_an_int(s):
-            return False, "Years need to be integers."
-
-        return True, None
-
-    def _edit_year(self, study, value):
-        year_ok, msg = self._verify_year(_to_text_value(value))
-        if not year_ok:
-            self._reject_edit(msg)
-            return False
-        study.year = _to_int(value)[0]
-        return True
-
-    def _edit_raw_data(self, index, value, study, data_type):
-        normalized_value, numeric_valid = qt_text.normalize_decimal_text(value)
-        if not numeric_valid:
-            self._reject_edit("Raw data needs to be numeric.")
-            return False
-        data_ok, msg = self._verify_raw_data(
-            normalized_value, index.column(), data_type, index
-        )
-        if not data_ok:
-            self._reject_edit(msg)
-            return False
-
-        column = index.column()
-        adjust_by = 3
-        group_name = self.current_groups[0]
-        if data_type == BINARY and column in self.RAW_DATA[2:]:
-            adjust_by += 2
-            group_name = self.current_groups[1]
-        elif data_type == CONTINUOUS and column in self.RAW_DATA[3:]:
-            adjust_by += 3
-            group_name = self.current_groups[1]
-
-        live_analysis_unit = self.get_current_analysis_unit_for_study(index.row())
-        analysis_unit = copy.deepcopy(live_analysis_unit)
-        old_include = study.include
-        old_manually_excluded = study.manually_excluded
-        double_value, converted_ok = _to_double(normalized_value)
-        analysis_unit.groups[group_name].raw_data[column - adjust_by] = (
-            double_value if converted_ok else ""
-        )
-        follow_up = self.get_current_follow_up_name()
-        study.replace_analysis_unit(self.current_outcome_name, follow_up, analysis_unit)
-        try:
-            self.update_outcome_if_possible(index.row())
-        except Exception as exc:
-            study.replace_analysis_unit(
-                self.current_outcome_name, follow_up, live_analysis_unit
-            )
-            study.include = old_include
-            study.manually_excluded = old_manually_excluded
-            self._reject_edit(
-                "Could not compute study effects from the edited raw data: %s" % exc
-            )
-            return False
-        live_analysis_unit.adopt_calculated_state(analysis_unit)
-        study.replace_analysis_unit(
-            self.current_outcome_name, follow_up, live_analysis_unit
-        )
-        return True
-
-    def _edit_covariate(self, study, column, value):
-        cov = self.get_covariate_for_column(column)
-        if cov.data_type == FACTOR:
-            new_value = _to_native_text(value)
-        elif qt_text.is_blank(value):
-            new_value = None
-        else:
-            new_value, converted_ok = _to_double(value)
-            if not converted_ok:
-                self._reject_edit(
-                    "Covariate values for continuous covariates need to be numeric."
-                )
-                return False
-        study.set_covariate_value(cov, new_value)
-        return True
-
-    def _edit_outcome(
-        self, index, value, data_type, subtype, group_comparison, import_csv
-    ):
-        column = index.column()
-        row = index.row()
-        if qt_text.is_blank(value):
-            display_scale_val = None
-            converted_ok = False
-        else:
-            normalized_value, numeric_valid = qt_text.normalize_decimal_text(value)
-            if not numeric_valid:
-                self._reject_edit("Outcomes must be numeric.")
-                return False
-            data_ok, msg = self._verify_outcome_data(
-                normalized_value, column, row, data_type
-            )
-            if not data_ok and not import_csv:
-                self._reject_edit(msg)
-                return False
-            display_scale_val, converted_ok = _to_double(normalized_value)
-
-        if display_scale_val is not None and not converted_ok:
-            return True
-        if not self.is_diagnostic():
-            n1 = None
-            if self.current_effect == "PFT":
-                _e1, n1, _e2, _n2 = self.get_current_raw_data_for_study(study_index=row)
-            calculation_scale_value = self._get_calc_scale_value(
-                display_scale_val,
-                data_type=data_type,
-                effect=self.current_effect,
-                n1=n1,
-            )
-            analysis_unit = self.get_current_analysis_unit_for_study(row)
-            if subtype == "generic_effect":
-                if column == self.OUTCOMES[0]:
-                    analysis_unit.set_effect(
-                        self.current_effect, group_comparison, calculation_scale_value
-                    )
-                elif column == self.OUTCOMES[1]:
-                    analysis_unit.set_standard_error(
-                        self.current_effect, group_comparison, calculation_scale_value
-                    )
-            else:
-                if column == self.OUTCOMES[0]:
-                    analysis_unit.set_effect(
-                        self.current_effect, group_comparison, calculation_scale_value
-                    )
-                elif column == self.OUTCOMES[1]:
-                    analysis_unit.set_lower(
-                        self.current_effect, group_comparison, calculation_scale_value
-                    )
-                else:
-                    analysis_unit.set_upper(
-                        self.current_effect, group_comparison, calculation_scale_value
-                    )
-                se = (
-                    analysis_unit.calculate_se_if_possible(
-                        self.current_effect,
-                        group_comparison,
-                        confidence_multiplier=self.confidence_multiplier,
-                    )
-                    if None
-                    not in analysis_unit.get_entered_effect_and_ci(
-                        self.current_effect, group_comparison
-                    )
-                    else None
-                )
-                analysis_unit.set_standard_error(
-                    self.current_effect, group_comparison, se
-                )
-            analysis_unit.calculate_display_effect_and_ci(
-                self.current_effect,
-                group_comparison,
-                self._get_conv_to_display_scale(
-                    data_type=data_type, effect=self.current_effect, n1=n1
-                ),
-                confidence_level=self.get_confidence_level(),
-                confidence_multiplier=self.confidence_multiplier,
-            )
-        else:
-            analysis_unit = self.get_current_analysis_unit_for_study(row)
-            metric = "Spec" if column in self.OUTCOMES[3:] else "Sens"
-            calculation_scale_value = self._get_calc_scale_value(
-                display_scale_val, data_type=data_type, effect=metric
-            )
-            if column in (self.OUTCOMES[0], self.OUTCOMES[3]):
-                analysis_unit.set_effect(
-                    metric, group_comparison, calculation_scale_value
-                )
-            elif column in (self.OUTCOMES[1], self.OUTCOMES[4]):
-                analysis_unit.set_lower(
-                    metric, group_comparison, calculation_scale_value
-                )
-            else:
-                analysis_unit.set_upper(
-                    metric, group_comparison, calculation_scale_value
-                )
-            analysis_unit.calculate_display_effect_and_ci(
-                metric,
-                group_comparison,
-                self._get_conv_to_display_scale(data_type=data_type, effect=metric),
-                confidence_level=self.get_confidence_level(),
-                confidence_multiplier=self.confidence_multiplier,
-            )
-        return True
+    def _display_effect_source(self, analysis_unit):
+        raw_data = analysis_unit.get_raw_data_for_groups(self.current_groups)
+        return "derived_preview" if any(value not in (None, "") for value in raw_data) else "entered"
 
     def _inclusion_value_for_edit(self, index, value, role):
         if role not in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.CheckStateRole):
@@ -964,135 +632,6 @@ class DatasetTableModel(QAbstractTableModel):
                 self._reject_edit("Study inclusion must be checked or unchecked.")
                 return None, False
         return inclusion_value, True
-
-    def _prepare_edit_target(self, index, value, allow_empty_names):
-        if not (
-            index.isValid()
-            and index.model() is self
-            and 0 <= index.row() < self.rowCount()
-            and 0 <= index.column() < self.columnCount()
-        ):
-            self._reject_edit("Cannot edit that cell.")
-            return None
-
-        column = index.column()
-        old_value = (
-            StudyInclusionState(
-                include=bool(self.dataset.studies[index.row()].include),
-                manually_excluded=bool(
-                    self.dataset.studies[index.row()].manually_excluded
-                ),
-            )
-            if index.row() < len(self.dataset) and column == self.INCLUDE_STUDY
-            else self.data(index, Qt.ItemDataRole.EditRole)
-        )
-
-        if index.row() >= len(self.dataset):
-            if column != self.NAME:
-                self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
-                return None
-
-            name = _to_text_value(value)
-            if name == "" and not allow_empty_names:
-                self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
-                return None
-
-            while len(self.dataset) <= index.row():
-                self.dataset.add_study(Study(self.max_study_id() + 1))
-
-        study = self.dataset.studies[index.row()]
-        if (
-            not allow_empty_names
-            and self._study_name_is_blank(study)
-            and self._edit_requires_named_study(column, value)
-        ):
-            self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
-            return None
-        return _EditTarget(
-            study=study,
-            column=column,
-            old_value=old_value,
-            data_type=self.dataset.get_outcome_type(self.current_outcome_name),
-            outcome_subtype=self.dataset.get_outcome_subtype(self.current_outcome_name),
-        )
-
-    def _edit_study_name(self, index, study, value, allow_empty_names):
-        name = _to_text_value(value)
-        if name == "" and not allow_empty_names:
-            self._reject_edit(STUDY_NAME_REQUIRED_MESSAGE)
-            return False, None
-        if name in self.dataset.get_study_names() and name != study.name:
-            self._reject_edit("Duplicate study names not allowed")
-            return False, None
-
-        added_study_id = None
-        if index.row() == self.rowCount() - DUMMY_ROWS - 1 and name != "":
-            new_study = Study(self.max_study_id() + 1)
-            new_study.include = False
-            self.dataset.add_study(new_study)
-            added_study_id = int(new_study.id)
-            self.study_auto_added = added_study_id
-            self.reset_model()
-            self.editFocusRequested.emit(self.index(index.row(), index.column() + 1))
-        study.name = name
-        return True, added_study_id
-
-    def _apply_edit(
-        self,
-        index,
-        value,
-        target,
-        inclusion_value,
-        import_csv,
-        allow_empty_names,
-    ):
-        column = target.column
-        study = target.study
-        if column == self.NAME:
-            return self._edit_study_name(index, study, value, allow_empty_names)
-        if column == self.YEAR:
-            if not self._edit_year(study, value):
-                return False, None
-        elif self.current_outcome_name is not None and column in self.RAW_DATA:
-            if not self._edit_raw_data(index, value, study, target.data_type):
-                return False, None
-        elif column in self.OUTCOMES:
-            if not self._edit_outcome(
-                index,
-                value,
-                target.data_type,
-                target.outcome_subtype,
-                self.get_current_group_comparison(),
-                import_csv,
-            ):
-                return False, None
-        elif column == self.INCLUDE_STUDY:
-            study.include = inclusion_value
-            study.manually_excluded = not inclusion_value
-        else:
-            if not self._edit_covariate(study, column, value):
-                return False, None
-        return True, None
-
-    def _update_inclusion_after_edit(self, index, target):
-        if (
-            self.is_diagnostic()
-            or target.column == self.INCLUDE_STUDY
-            or self.current_outcome_name is None
-        ):
-            return
-        effect = self.get_current_analysis_unit_for_study(index.row()).entered_effects[
-            self.current_effect
-        ][self.get_current_group_comparison()]
-        self.editing_service.update_inclusion_after_edit(
-            target.study,
-            diagnostic=self.is_diagnostic(),
-            inclusion_column=target.column == self.INCLUDE_STUDY,
-            outcome_selected=self.current_outcome_name is not None,
-            effect=effect,
-            data_type=target.data_type,
-            outcome_subtype=target.outcome_subtype,
-        )
 
     def _publish_workspace_edit(
         self, index, target, added_study_id, before_workspace_snapshot
@@ -1150,26 +689,52 @@ class DatasetTableModel(QAbstractTableModel):
         inclusion_value, valid = self._inclusion_value_for_edit(index, value, role)
         if not valid:
             return False
-        target = self._prepare_edit_target(index, value, allow_empty_names)
-        if target is None:
-            return False
+        if (
+            not index.isValid()
+            or index.model() is not self
+            or not 0 <= index.row() < self.rowCount()
+            or not 0 <= index.column() < self.columnCount()
+        ):
+            return self._reject_edit("Cannot edit that cell.")
         before_workspace_snapshot = (
             project_adapter.dataset_to_project(copy.deepcopy(self.dataset)),
             project_adapter.model_to_state(self),
         )
-        applied, added_study_id = self._apply_edit(
-            index,
-            value,
-            target,
-            inclusion_value,
-            import_csv,
-            allow_empty_names,
+        context = self._editing_context(index.column())
+        old_value = (
+            StudyInclusionState(
+                include=bool(self.dataset.studies[index.row()].include),
+                manually_excluded=bool(self.dataset.studies[index.row()].manually_excluded),
+            )
+            if index.column() == self.INCLUDE_STUDY and index.row() < len(self.dataset)
+            else self.data(index, Qt.ItemDataRole.EditRole)
         )
-        if not applied:
+        edit_target = workspace_editing.WorkspaceEditTarget(
+            row=index.row(), column=index.column(), old_value=old_value
+        )
+        append_blank_study = index.row() >= len(self.dataset)
+        result = self.editing_service.apply_edit(
+            self.dataset,
+            edit_target,
+            context,
+            inclusion_value if index.column() == self.INCLUDE_STUDY else value,
+            allow_empty_names=allow_empty_names,
+            import_csv=import_csv,
+            append_blank_study=append_blank_study,
+            recalculate=getattr(self, "update_outcome_if_possible", None),
+        )
+        if not result.applied:
+            self._reject_edit(result.error or "The entered value could not be used.")
             return False
-        self._update_inclusion_after_edit(index, target)
+        target = _EditTarget(
+            study=self.dataset.studies[index.row()],
+            column=index.column(),
+            old_value=old_value,
+            data_type=context.data_type,
+            outcome_subtype=context.outcome_subtype,
+        )
         self._publish_workspace_edit(
-            index, target, added_study_id, before_workspace_snapshot
+            index, target, result.added_study_id, before_workspace_snapshot
         )
         return True
 
@@ -2021,126 +1586,9 @@ class DatasetTableModel(QAbstractTableModel):
         return all([not study.include for study in self.dataset.studies])
 
     def update_outcome_if_possible(self, study_index):
-        """Rules:
-        Checks the parametric study to ascertain if enough raw data has been
-        entered to compute the outcome. If so, the outcome is computed and
-        displayed.
-
-        If the raw data is not empty, the outcome should be blanked out.
-        If the raw data is empty, the outcome should not be effected
-        """
-        group_comparison = self.get_current_group_comparison()
-        data_type = self.get_current_outcome_type(get_str=False)
-        one_arm_effect = (
-            self.current_effect in BINARY_ONE_ARM_METRICS + CONTINUOUS_ONE_ARM_METRICS
+        self.editing_service.update_outcome_if_possible(
+            self.dataset, study_index, self._editing_context()
         )
-        analysis_unit = self.get_current_analysis_unit_for_study(study_index)
-
-        if data_type == DIAGNOSTIC or not self.study_has_point_est(study_index):
-            self.dataset.studies[study_index].include = False
-
-        complete = self.raw_data_is_complete_for_study(study_index) or (
-            one_arm_effect
-            and self.raw_data_is_complete_for_study(study_index, first_arm_only=True)
-        )
-        if complete:
-            if not self.dataset.studies[study_index].manually_excluded:
-                self.dataset.studies[study_index].include = True
-
-            calculated = self.editing_service.preview_raw_effects(
-                data_type,
-                self.current_effect,
-                self.get_current_raw_data_for_study(study_index),
-                self.confidence_level,
-            )
-            if data_type == DIAGNOSTIC:
-                if not isinstance(calculated, dict):
-                    raise TypeError("diagnostic effects must be a metric mapping")
-                for metric, (est, lower, upper) in calculated.items():
-                    analysis_unit.set_effect_and_ci(
-                        metric,
-                        group_comparison,
-                        est,
-                        lower,
-                        upper,
-                        confidence_multiplier=self.confidence_multiplier,
-                    )
-                    analysis_unit.calculate_display_effect_and_ci(
-                        metric,
-                        group_comparison,
-                        self.editing_service.display_scale_converter(data_type, metric),
-                        confidence_level=self.get_confidence_level(),
-                        confidence_multiplier=self.confidence_multiplier,
-                    )
-            else:
-                if not isinstance(calculated, tuple):
-                    raise TypeError("non-diagnostic effects must be a result tuple")
-                (est, lower, upper), n1 = calculated
-                analysis_unit.set_effect_and_ci(
-                    self.current_effect,
-                    group_comparison,
-                    est,
-                    lower,
-                    upper,
-                    confidence_multiplier=self.confidence_multiplier,
-                )
-                analysis_unit.calculate_display_effect_and_ci(
-                    self.current_effect,
-                    group_comparison,
-                    self.editing_service.display_scale_converter(
-                        data_type, self.current_effect, n1
-                    ),
-                    confidence_level=self.get_confidence_level(),
-                    confidence_multiplier=self.confidence_multiplier,
-                )
-        elif self._raw_data_is_not_empty_for_study(study_index) or (
-            one_arm_effect
-            and self._raw_data_is_not_empty_for_study(study_index, first_arm_only=True)
-        ):
-            if data_type == DIAGNOSTIC:
-                self._clear_diagnostic_effects_for_study(
-                    analysis_unit, group_comparison
-                )
-            else:
-                analysis_unit.set_effect_and_ci(
-                    self.current_effect,
-                    group_comparison,
-                    None,
-                    None,
-                    None,
-                    confidence_multiplier=self.confidence_multiplier,
-                )
-                analysis_unit.set_standard_error(
-                    self.current_effect, group_comparison, None
-                )
-                analysis_unit.calculate_display_effect_and_ci(
-                    self.current_effect,
-                    group_comparison,
-                    self.editing_service.display_scale_converter(
-                        data_type, self.current_effect
-                    ),
-                    confidence_level=self.get_confidence_level(),
-                    confidence_multiplier=self.confidence_multiplier,
-                )
-
-    def _clear_effect_and_display_ci(self, analysis_unit, effect, group_comparison):
-        analysis_unit.set_effect_and_ci(
-            effect,
-            group_comparison,
-            None,
-            None,
-            None,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-        analysis_unit.set_standard_error(effect, group_comparison, None)
-        analysis_unit.set_display_effect(effect, group_comparison, None)
-        analysis_unit.set_display_lower(effect, group_comparison, None)
-        analysis_unit.set_display_upper(effect, group_comparison, None)
-        analysis_unit.set_display_se(effect, group_comparison, None)
-
-    def _clear_diagnostic_effects_for_study(self, analysis_unit, group_comparison):
-        for metric in DIAGNOSTIC_METRICS:
-            self._clear_effect_and_display_ci(analysis_unit, metric, group_comparison)
 
     def get_current_raw_data(self, only_if_included=True, only_these_studies=None):
         raw_data = []
@@ -2171,8 +1619,11 @@ class DatasetTableModel(QAbstractTableModel):
         effect = effect or self.current_effect
         analysis_unit = self.get_current_analysis_unit_for_study(study_index)
 
-        if None in analysis_unit.get_effect_and_se(
-            effect, group_comparison, self.confidence_multiplier
+        if None in analysis_unit.get_effect_and_se_for_source(
+            self._display_effect_source(analysis_unit),
+            effect,
+            group_comparison,
+            self.confidence_multiplier,
         ):
             return False
 
@@ -2183,9 +1634,10 @@ class DatasetTableModel(QAbstractTableModel):
         analysis_unit = self.get_current_analysis_unit_for_study(study_index)
         effect = effect or self.current_effect
 
-        estimate = analysis_unit.get_estimate(effect, group_comparison)
+        source = self._display_effect_source(analysis_unit)
+        estimate = analysis_unit.get_estimate_for_source(source, effect, group_comparison)
         standard_error = analysis_unit.get_se(
-            effect, group_comparison, self.confidence_multiplier
+            source, effect, group_comparison, self.confidence_multiplier
         )
         return estimate, standard_error
 
@@ -2218,7 +1670,10 @@ class DatasetTableModel(QAbstractTableModel):
             self.dataset.studies,
             lambda index: self.get_current_analysis_unit_for_study(
                 index
-            ).get_effect_and_se(
+            ).get_effect_and_se_for_source(
+                self._display_effect_source(
+                    self.get_current_analysis_unit_for_study(index)
+                ),
                 effect or self.current_effect,
                 self.get_current_group_comparison(),
                 self.confidence_multiplier,
@@ -2298,6 +1753,7 @@ class DatasetTableModel(QAbstractTableModel):
                     confidence_level=self.get_confidence_level(),
                     confidence_multiplier=self.confidence_multiplier,
                     check_if_necessary=True,
+                    source=self._display_effect_source(x),
                 )
             elif current_data_type == DIAGNOSTIC:
                 for m_str in ["Sens", "Spec"]:
@@ -2310,17 +1766,11 @@ class DatasetTableModel(QAbstractTableModel):
                         confidence_level=self.get_confidence_level(),
                         confidence_multiplier=self.confidence_multiplier,
                         check_if_necessary=True,
+                        source=self._display_effect_source(x),
                     )
 
     def _get_conv_to_display_scale(self, data_type, effect, n1=None):
         return self.editing_service.display_scale_converter(data_type, effect, n1)
-
-    def _get_calc_scale_value(
-        self, display_scale_val=None, data_type=None, effect=None, n1=None
-    ):
-        return self.editing_service.to_calculation_scale(
-            display_scale_val, data_type, effect, n1
-        )
 
     def set_confidence_level(self, confidence_level):
         """Sets multiplier as well (~1.96 for 95% conf level)"""

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
 from rc_metastudio.workspace_editing import WorkspaceEditingService
+from rc_metastudio.workspace_editing import WorkspaceEditingContext, WorkspaceEditTarget
+from rc_metastudio.analysis_dataset import Dataset, Study as DomainStudy
 from rc_metastudio.meta_globals import BINARY
 
 
@@ -57,3 +59,36 @@ def test_inclusion_policy_is_owned_by_the_qt_free_service():
     )
 
     assert study.include is True
+
+
+def test_edit_service_validates_and_mutates_year_without_qt():
+    dataset = Dataset()
+    dataset.add_study(DomainStudy(1, name="Alpha"))
+    context = WorkspaceEditingContext(
+        outcome_name=None,
+        follow_up_name=None,
+        current_groups=(),
+        current_effect=None,
+        data_type=None,
+        outcome_subtype=None,
+        group_comparison="",
+        raw_columns=(),
+        outcome_columns=(),
+        include_column=0,
+        name_column=1,
+        year_column=2,
+        confidence_level=95.0,
+        confidence_multiplier=1.96,
+    )
+    service = WorkspaceEditingService(FakeBridge())
+
+    applied = service.apply_edit(
+        dataset, WorkspaceEditTarget(0, 2, None), context, "2026"
+    )
+    rejected = service.apply_edit(
+        dataset, WorkspaceEditTarget(0, 2, 2026), context, "not-a-year"
+    )
+
+    assert applied.applied is True
+    assert dataset.studies[0].year == 2026
+    assert rejected.error == "Years need to be integers."
