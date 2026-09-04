@@ -25,13 +25,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11.9
-      - run: uv venv --python 3.11.9
-      - name: Install code-health analyzers
-        run: >-
-          uv pip install
-          complexipy==7.0.1
-          grimp==3.16
-          radon==6.0.1
+      - run: uv sync --frozen --only-group dev --no-install-project
       - name: Resolve comparison base
         id: base
         shell: bash
