@@ -902,6 +902,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     opened = []
     started = []
     closed = []
+    startup_events = []
 
     class Window:
         def __init__(self):
@@ -956,13 +957,18 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     monkeypatch.setattr(
         launch,
         "_import_main_window",
-        lambda: type("MainWindowModule", (), {"MainWindow": Window}),
+        lambda: startup_events.append("main-window-import")
+        or type("MainWindowModule", (), {"MainWindow": Window}),
     )
     monkeypatch.setattr(launch.QtWidgets, "QApplication", lambda argv: app)
     monkeypatch.setattr(launch, "QPixmap", lambda path: object())
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
     monkeypatch.setattr(launch, "create_startup_splash", lambda: Splash(object()))
-    monkeypatch.setattr(launch, "load_R_libraries", lambda app, splash: None)
+    monkeypatch.setattr(
+        launch,
+        "load_R_libraries",
+        lambda app, splash: startup_events.append("r-backend-ready"),
+    )
     monkeypatch.setattr(
         automation,
         "dispatch",
@@ -974,6 +980,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert opened == [sample_project]
     assert started == []
     assert closed == [True]
+    assert startup_events == ["r-backend-ready", "main-window-import"]
     marker = json.loads(completion_marker.read_text(encoding="utf-8"))
     assert marker["project"] == "amino.rcms"
     os.chdir(REPO_ROOT)

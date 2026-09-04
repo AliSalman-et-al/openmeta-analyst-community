@@ -207,13 +207,12 @@ def start():
 
         return automation.dispatch(startup_argv)
     startup_project_path = _startup_project_path(startup_argv)
-    main_window = _import_main_window()
     app = app_error_handler.get_or_create_application(list(sys.argv))
     _configure_application(app)
     baseline_ids = _top_level_ids(app)
     try:
         settings.setup_directories()
-        meta = _create_interactive_shell(app, main_window.MainWindow, load_R_libraries)
+        meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
         if startup_project_path:
             opened = meta.open(startup_project_path)
             if (
@@ -244,8 +243,8 @@ def start():
         _dispose_new_top_levels(app, baseline_ids)
 
 
-def _create_interactive_shell(app, meta_factory, r_loader):
-    """Create splash and shell with fail-closed ownership transfer."""
+def _create_interactive_shell(app, main_window_loader, r_loader):
+    """Load the R backend before importing and constructing the main window."""
     baseline_ids = _top_level_ids(app)
     splash = None
     try:
@@ -258,7 +257,7 @@ def _create_interactive_shell(app, meta_factory, r_loader):
         if time_elapsed < SPLASH_DISPLAY_TIME:
             QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
 
-        meta = meta_factory()
+        meta = main_window_loader().MainWindow()
         splash.finish(meta)
         _show_main_window(meta)
         _dispose_qobjects(app, (splash,))

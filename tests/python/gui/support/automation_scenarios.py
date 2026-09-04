@@ -1476,8 +1476,11 @@ def start_shell_failure_smoke(stage):
             raise _InjectedStartupFailure(stage)
         return QtWidgets.QMainWindow()
 
+    def main_window_loader():
+        return type("MainWindowModule", (), {"MainWindow": meta_factory})
+
     try:
-        _create_interactive_shell(app, meta_factory, r_loader)
+        _create_interactive_shell(app, main_window_loader, r_loader)
     except _InjectedStartupFailure:
         pass
     else:
@@ -1696,13 +1699,12 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
     app_error_handler.install_global_exception_handler()
     app = app_error_handler.get_or_create_application(list(sys.argv))
     _configure_application(app)
-    main_window = _import_main_window()
     baseline_ids = _top_level_ids(app)
     result = {"completed": False}
 
     try:
         settings.setup_directories()
-        meta = _create_interactive_shell(app, main_window.MainWindow, load_R_libraries)
+        meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
 
         def complete_wizard():
             wizard = getattr(meta, "_startup_wizard", None)
