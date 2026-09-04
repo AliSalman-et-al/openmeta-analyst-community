@@ -5022,8 +5022,10 @@ def test_data_type_page_reflows_buttons_without_horizontal_overflow():
 def test_data_type_page_buttons_center_icons_inside_declared_slots():
     from PyQt6 import QtWidgets
     from rc_metastudio import main_wizard
+    from rc_metastudio.qt6_resources import ensure_application_resources
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    ensure_application_resources()
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
