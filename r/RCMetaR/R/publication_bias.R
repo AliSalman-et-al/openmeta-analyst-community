@@ -635,8 +635,7 @@
         `Methods not applicable`="small-study.methods-not-applicable",
         Extrapolation="small-study.extrapolation"
     )
-    id <- fixed[[name]]
-    if (!is.null(id)) return(id)
+    if (name %in% names(fixed)) return(unname(fixed[[name]]))
     if (startsWith(name, "Trim-and-fill "))
         return(paste0("small-study.trim-and-fill.",
                       gsub("[^a-z0-9]+", "-", tolower(sub("^Trim-and-fill ", "", name)))))
