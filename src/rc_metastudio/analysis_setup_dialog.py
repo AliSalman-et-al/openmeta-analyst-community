@@ -114,6 +114,37 @@ def _normalize_parameter_definition(
     return _ParameterDefinition(name, kind, default, metadata)
 
 
+def _shared_diagnostic_specs(confidence_level):
+    return {
+        "conf.level": _normalize_parameter_definition(
+            "conf.level", "float", confidence_level, None
+        ),
+        "digits": _normalize_parameter_definition("digits", "int", 2, None),
+        "adjust": _normalize_parameter_definition("adjust", "float", 0.5, None),
+        "correction.policy": _normalize_parameter_definition(
+            "correction.policy",
+            ["Studies with any zero cell", "All studies if any zero exists", "None"],
+            "All studies if any zero exists",
+            None,
+        ),
+        "estimator": _normalize_parameter_definition(
+            "estimator", ["REML", "ML"], "REML", None
+        ),
+    }
+
+
+def _present_values(names, source):
+    return {name: source[name] for name in names if name in source}
+
+
+def _plot_parameter_values(values):
+    return {
+        name: value
+        for name, value in values.items()
+        if name.startswith(("fp_", "bp_"))
+    }
+
+
 class _DiagnosticMethodPanel(object):
     """A group-specific method editor used by the unified diagnostic dialog."""
 
@@ -218,6 +249,23 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         super(AnalysisSetupDialog, self).__init__(parent)
         self.analysis_service = analysis_service or analysis_adapter.AnalysisService()
         self.setupUi(self)
+        self._initialize_controls(external_params, analysis_type)
+        self._initialize_analysis_state(
+            model,
+            confidence_level,
+            diagnostic_metrics,
+            diagnostic_analysis_details,
+        )
+        self._connect_dialog_actions()
+        self._configure_data_family()
+        self.populate_parameter_controls()
+        if self._combined_diagnostic:
+            self._finish_combined_diagnostic_ui()
+        adaptive_window.register_adaptive_window(
+            self, adaptive_window.WindowRole.TRANSACTIONAL
+        )
+
+    def _initialize_controls(self, external_params, analysis_type):
         self._hide_internal_plot_path_controls()
         self._layout_reflow_pending = False
         self._layout_reflow_timer = QtCore.QTimer(self)
@@ -233,15 +281,33 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self.current_param_vals: dict[str, object] = dict(external_params or {})
         self.analysis_type = analysis_type
         self.is_meta_regression = analysis_type == "meta-regression"
-        self.model = model
         self._loading_plot_style = False
         self._setup_plot_controls()
         self._load_plot_params()
 
+    def _initialize_analysis_state(
+        self, model, confidence_level, diagnostic_metrics, diagnostic_analysis_details
+    ):
+        self.model = model
         if confidence_level is None:
             raise ValueError("CONFIDENCE LEVEL MUST BE SPECIFIED")
         self.confidence_level = validate_confidence_level(confidence_level)
+        self.data_type = self.model.get_current_outcome_type()
+        self.current_widgets = []
+        self.current_method = ""
+        self.current_params: dict[str, object] = {}
+        self.current_defaults: dict[str, object] = {}
+        self.param_d: dict[str, object] = {}
+        self.var_order: list[str] | None = None
+        self.diagnostic_analysis_details = diagnostic_analysis_details or {}
+        self.diagnostic_metrics = tuple(diagnostic_metrics or ())
+        self._combined_diagnostic = False
+        self._shared_diagnostic_param_specs = _shared_diagnostic_specs(
+            self.confidence_level
+        )
+        self._shared_diagnostic_widgets = []
 
+    def _connect_dialog_actions(self):
         self._accepted_connection = None
         self._set_accepted_handler(
             self.run_meta_regression if self.is_meta_regression else self.run_ma
@@ -259,7 +325,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             )
         )
 
-        self.data_type = self.model.get_current_outcome_type()
+    def _configure_data_family(self):
         self._setup_covariates_tab()
         if self.data_type != "binary":
             self.disable_bin_only_fields()
@@ -270,52 +336,15 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         if self.model.current_effect in ONE_ARM_METRICS:
             self.setup_fields_for_one_arm()
 
-        self.current_widgets = []
-        self.current_method = ""
-        self.current_params: dict[str, object] = {}
-        self.current_defaults: dict[str, object] = {}
-        self.param_d: dict[str, object] = {}
-        self.var_order: list[str] | None = None
-
-        # Diagnostic analyses can run several metrics at once. Map each
-        # selected metric to its method and parameters, for example:
-        #   diagnostic_analysis_details["Sens"] -> (method, parameters)
-        # Paired metrics currently share configuration but retain separate
-        # entries because downstream analysis dispatches by metric.
-        self.diagnostic_analysis_details = diagnostic_analysis_details or {}
-
-        # Callers exclude metrics already present in the details mapping.
-        self.diagnostic_metrics: tuple[str, ...] = tuple(diagnostic_metrics or ())
-        self._combined_diagnostic = False
-        self._shared_diagnostic_param_specs = {
-            "conf.level": _normalize_parameter_definition(
-                "conf.level", "float", self.confidence_level, None
-            ),
-            "digits": _normalize_parameter_definition("digits", "int", 2, None),
-            "adjust": _normalize_parameter_definition("adjust", "float", 0.5, None),
-            "correction.policy": _normalize_parameter_definition(
-                "correction.policy", ["Studies with any zero cell", "All studies if any zero exists", "None"], "All studies if any zero exists", None
-            ),
-            "estimator": _normalize_parameter_definition(
-                "estimator", ["REML", "ML"], "REML", None
-            ),
-        }
-        self._shared_diagnostic_widgets = []
-
         if self.data_type == "diagnostic":
             self.sens_spec = any(
-                [m in ("sens", "spec") for m in self.diagnostic_metrics]
+                metric in ("sens", "spec") for metric in self.diagnostic_metrics
             )
-            self.lr_dor = any([m in ("lr", "dor") for m in self.diagnostic_metrics])
+            self.lr_dor = any(
+                metric in ("lr", "dor") for metric in self.diagnostic_metrics
+            )
             self._combined_diagnostic = self.sens_spec and self.lr_dor
             self.setup_diagnostic_ui()
-
-        self.populate_parameter_controls()
-        if self._combined_diagnostic:
-            self._finish_combined_diagnostic_ui()
-        adaptive_window.register_adaptive_window(
-            self, adaptive_window.WindowRole.TRANSACTIONAL
-        )
 
     def _hide_internal_plot_path_controls(self):
         """Keep generated output paths out of the researcher-facing form."""
@@ -497,51 +526,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         selection = self.analysis_service.select_studies_for_covariates(
             self.model, selected_covariates
         )
-
-        if selection.has_missing_values:
-            excluded = ", ".join(selection.excluded_study_names)
-            excluded_text = (
-                "\nThe following studies will be excluded: %s" % excluded
-                if excluded
-                else ""
-            )
-            choice = QMessageBox.warning(
-                self,
-                "Missing Covariate Values",
-                "Some studies do not have values for the selected covariates. "
-                "%s\nRun the regression without those studies?" % excluded_text,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if choice == QMessageBox.StandardButton.No:
-                return
-
-        metric = self.model.current_effect
-        if self.data_type == "diagnostic":
-            if self.is_meta_regression:
-                # Reitsma is a joint raw-count model. Sensitivity is only the
-                # representative metric required by the typed request; both
-                # modeled sides are always returned.
-                metric = "Sens"
-            else:
-                metric = (
-                    "Sens"
-                    if self.sensitivity_radio.isChecked()
-                    else "Spec"
-                    if self.specificity_radio.isChecked()
-                    else "DOR"
-                )
-        add_plot_params(self)
-        parameters = copy.deepcopy(self.current_param_vals)
-        parameters["measure"] = metric
-        if self.data_type == "diagnostic" and self.is_meta_regression:
-            parameters["joint.metrics"] = "Sens,Spec"
-        request = self.analysis_service.make_request(
-            data_type=self.data_type,
-            workflow="meta-regression",
-            method="diagnostic.reitsma" if self.data_type == "diagnostic" else "meta_regression",
-            metric=metric,
-            parameters=parameters,
-        )
+        if selection.has_missing_values and not self._confirm_excluded_studies(
+            selection.excluded_study_names
+        ):
+            return
+        request = self._meta_regression_request()
         fixed_effects = self.fixed_effects_radio.isChecked()
         self._run_analysis(
             lambda: self.analysis_service.execute_meta_regression(
@@ -554,6 +543,47 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             ),
             "Sorry, there was an error performing the regression.\n%s",
             string_result_is_failure=True,
+        )
+
+    def _confirm_excluded_studies(self, names):
+        excluded = ", ".join(names)
+        excluded_text = ""
+        if excluded:
+            excluded_text = f"\nThe following studies will be excluded: {excluded}"
+        choice = QMessageBox.warning(
+            self,
+            "Missing Covariate Values",
+            "Some studies do not have values for the selected covariates. "
+            f"{excluded_text}\nRun the regression without those studies?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return choice != QMessageBox.StandardButton.No
+
+    def _meta_regression_metric(self):
+        if self.data_type != "diagnostic":
+            return self.model.current_effect
+        if self.is_meta_regression or self.sensitivity_radio.isChecked():
+            return "Sens"
+        return "Spec" if self.specificity_radio.isChecked() else "DOR"
+
+    def _meta_regression_request(self):
+        metric = self._meta_regression_metric()
+        add_plot_params(self)
+        parameters = copy.deepcopy(self.current_param_vals)
+        parameters["measure"] = metric
+        if self.data_type == "diagnostic" and self.is_meta_regression:
+            parameters["joint.metrics"] = "Sens,Spec"
+        method = (
+            "diagnostic.reitsma"
+            if self.data_type == "diagnostic"
+            else "meta_regression"
+        )
+        return self.analysis_service.make_request(
+            data_type=self.data_type,
+            workflow="meta-regression",
+            method=method,
+            metric=metric,
+            parameters=parameters,
         )
 
     def _load_plot_params(self):
@@ -758,32 +788,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             cbo_box = self.method_cbo_box
             param_box = self.parameter_grp_box
 
-        # The backend filters methods against the selected dataset and metric.
         tmp_obj_name = "tmp_obj"
-        if self.data_type == "binary":
-            self.analysis_service.prepare_method_dataset(
-                self.model, "binary", var_name=tmp_obj_name
-            )
-        elif self.data_type == "continuous":
-            self.analysis_service.prepare_method_dataset(
-                self.model, "continuous", var_name=tmp_obj_name
-            )
-        elif self.data_type == "diagnostic":
-            self.analysis_service.prepare_method_dataset(
-                self.model, "diagnostic", var_name=tmp_obj_name
-            )
-
-        self.available_method_d = None
-        # The feasibility API accepts one diagnostic metric even when the analysis
-        # configures a pair. Each supported pair has the same feasible methods, so
-        # use its representative metric.
-        metric = self.model.current_effect
-        if self.data_type == "diagnostic":
-            if self.analysis_type is None:
-                metric = "Sens" if self.sens_spec else "DOR"
-            else:
-                metric = "Sens"
-
+        self.analysis_service.prepare_method_dataset(
+            self.model, self.data_type, var_name=tmp_obj_name
+        )
+        metric = self._method_query_metric()
         method_query = {
             "for_data_type": self.data_type,
             "data_obj_name": tmp_obj_name,
@@ -795,39 +804,33 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         self.available_method_d = normalize_available_method_labels(
             self.available_method_d
         )
+        method_names = self._available_method_names(metric)
+        self._populate_method_combo(cbo_box, method_names)
+        self.current_method = self.available_method_d[str(cbo_box.currentText())]
+        self.setup_params()
+        self._set_parameter_box_title(cbo_box, param_box)
+        if cbo_box is self.method_cbo_box:
+            excluded = SHARED_DIAGNOSTIC_PARAMS if self._combined_diagnostic else ()
+            self.ui_for_params(excluded_names=excluded)
 
-        # Preserve the method order returned by the backend.
+    def _method_query_metric(self):
+        if self.data_type != "diagnostic":
+            return self.model.current_effect
+        if self.analysis_type is not None or self.sens_spec:
+            return "Sens"
+        return "DOR"
+
+    def _available_method_names(self, metric):
         method_names = list(self.available_method_d.keys())
-
-        # Hide the joint Reitsma method when sensitivity and specificity
-        # cannot both be estimated from the selected effects.
         reitsma_name = "Reitsma bivariate model"
         if self.data_type == "diagnostic" and not self.is_meta_regression:
-            for reitsma_method in (reitsma_name,):
-                method_function = self.available_method_d.get(reitsma_method)
-                should_remove_reitsma_method = (
-                    metric != "Sens"
-                    or self.analysis_type is not None
-                    or not (
-                        "sens" in self.diagnostic_metrics
-                        and "spec" in self.diagnostic_metrics
-                    )
-                    or (
-                        method_function in COUNT_BASED_DIAGNOSTIC_METHODS
-                        and not self.model.included_studies_have_raw_data()
-                    )
-                )
-                if reitsma_method in method_names and should_remove_reitsma_method:
-                    method_names.remove(reitsma_method)
-            # Fix for issue # 175
+            if self._hide_reitsma(metric) and reitsma_name in method_names:
+                method_names.remove(reitsma_name)
             if all(metric in self.diagnostic_metrics for metric in ("lr", "dor")):
                 peto_method = "Diagnostic Fixed-Effect Peto"
                 if peto_method in method_names:
                     method_names.remove(peto_method)
-
         method_names.sort(reverse=True)
-
-        # default to Reitsma for joint diagnostic analysis
         if (
             self.data_type == "diagnostic"
             and not self.is_meta_regression
@@ -835,22 +838,26 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         ):
             method_names.remove(reitsma_name)
             method_names.insert(0, reitsma_name)
+        return method_names
 
+    def _hide_reitsma(self, metric):
+        if metric != "Sens" or self.analysis_type is not None:
+            return True
+        if not {"sens", "spec"}.issubset(self.diagnostic_metrics):
+            return True
+        method = self.available_method_d.get("Reitsma bivariate model")
+        return method in COUNT_BASED_DIAGNOSTIC_METHODS and not (
+            self.model.included_studies_have_raw_data()
+        )
+
+    @staticmethod
+    def _populate_method_combo(cbo_box, method_names):
         signals_were_blocked = cbo_box.blockSignals(True)
         try:
             for method in method_names:
                 cbo_box.addItem(method)
         finally:
             cbo_box.blockSignals(signals_were_blocked)
-        self.current_method = self.available_method_d[str(cbo_box.currentText())]
-        self.setup_params()
-        self._set_parameter_box_title(cbo_box, param_box)
-        if cbo_box is self.method_cbo_box:
-            self.ui_for_params(
-                excluded_names=SHARED_DIAGNOSTIC_PARAMS
-                if self._combined_diagnostic
-                else ()
-            )
 
     def clear_param_ui(self):
         parameter_layout = self.parameter_grp_box.layout()
@@ -863,6 +870,19 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
     def ui_for_params(self, adjust_root=True, excluded_names=()):
         self._configure_plot_option_groups()
+        parameter_layout = self._parameter_layout()
+        method_description = self.analysis_service.method_description(
+            self.current_method
+        )
+        self.add_method_description(
+            parameter_layout, 0, "Description: %s" % method_description
+        )
+        self._add_parameter_controls(
+            parameter_layout, self._ordered_parameter_definitions(), excluded_names
+        )
+        self._schedule_local_reflow()
+
+    def _parameter_layout(self):
         parameter_layout = self.parameter_grp_box.layout()
         if parameter_layout is None:
             parameter_layout = QGridLayout()
@@ -870,19 +890,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             self.parameter_grp_box.setLayout(parameter_layout)
         if not isinstance(parameter_layout, QGridLayout):
             raise TypeError("Analysis parameters require a grid layout")
+        return parameter_layout
 
-        current_grid_row = 0
-
-        # add the method description
-        method_description = self.analysis_service.method_description(self.current_method)
-
-        self.add_method_description(
-            parameter_layout,
-            current_grid_row,
-            "Description: %s" % method_description,
-        )
-        current_grid_row += 1
-
+    def _ordered_parameter_definitions(self):
         definitions = [
             _normalize_parameter_definition(
                 name,
@@ -894,16 +904,16 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         ]
         if self.var_order is not None:
             by_name = {spec.name: spec for spec in definitions}
-            definitions = [by_name[name] for name in self.var_order]
-        else:
-            # Keep the legacy display order when the backend omits var_order.
-            definitions = [
-                spec
-                for kind in ("enum", "float", "int", "string")
-                for spec in definitions
-                if spec.kind == kind
-            ]
+            return [by_name[name] for name in self.var_order]
+        return [
+            spec
+            for kind in ("enum", "float", "int", "string")
+            for spec in definitions
+            if spec.kind == kind
+        ]
 
+    def _add_parameter_controls(self, layout, definitions, excluded_names):
+        row = 1
         for spec in definitions:
             if spec.name in excluded_names:
                 self._register_shared_diagnostic_param(spec)
@@ -911,11 +921,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
             label = self._parameter_label(spec)
             control = self._create_parameter_control(spec, self.current_param_vals)
             self.current_widgets.extend((label, control))
-            parameter_layout.addWidget(label, current_grid_row, 0)
-            parameter_layout.addWidget(control, current_grid_row, 1)
-            current_grid_row += 1
-
-        self._schedule_local_reflow()
+            layout.addWidget(label, row, 0)
+            layout.addWidget(control, row, 1)
+            row += 1
 
     def _parameter_label(self, spec):
         label = QLabel(parameter_display_label(spec.name, spec.metadata))
@@ -1196,17 +1204,11 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         definitions, _defaults, _order, _metadata = self.analysis_service.parameters(
             method
         )
-        params = {
-            name: value
-            for name, value in self.current_param_vals.items()
-            if name.startswith("fp_") or name.startswith("bp_")
-        }
-        for name in SHARED_DIAGNOSTIC_PARAMS:
-            if name in definitions and name in self.current_param_vals:
-                params[name] = self.current_param_vals[name]
-        for name in definitions:
-            if name not in SHARED_DIAGNOSTIC_PARAMS and name in local_params:
-                params[name] = local_params[name]
+        params = _plot_parameter_values(self.current_param_vals)
+        shared = set(definitions).intersection(SHARED_DIAGNOSTIC_PARAMS)
+        params.update(_present_values(shared, self.current_param_vals))
+        local_names = set(definitions).difference(SHARED_DIAGNOSTIC_PARAMS)
+        params.update(_present_values(local_names, local_params))
         return params
 
     def setup_diagnostic_ui(self):

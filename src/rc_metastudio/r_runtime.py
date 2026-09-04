@@ -68,26 +68,46 @@ def _validate_frozen_derivation_record(
     record = final.get(name, {})
     manifest_record = manifest_files.get(source_record.get("path"), {})
     transformation = transformations.get(name)
-    pre_sign_is_derived = pre_sign_record.get("sha256") == source_record.get("sha256")
-    if name == "api_bridge" and isinstance(transformation, dict):
-        pre_sign_is_derived = pre_sign_is_derived or (
-            transformation.get("kind") == "mach-o-load-command-relocation"
-            and transformation.get("source", {}).get("sha256")
-            == source_record.get("sha256")
-            and transformation.get("output", {}).get("sha256")
-            == pre_sign_record.get("sha256")
-            and bool(transformation.get("changes"))
-        )
-    valid_chain = (
-        source_record.get("sha256") == manifest_record.get("sha256")
-        and pre_sign_is_derived
-        and record.get("path") == pre_sign_record.get("path")
-        and pre_sign_record.get("signing_identity")
-        and record.get("signing_identity")
-    )
-    if not valid_chain:
+    if not _valid_derivation_chain(
+        name,
+        source_record,
+        pre_sign_record,
+        record,
+        manifest_record,
+        transformation,
+    ):
         raise RuntimeError(f"Frozen R derivation chain is invalid for {name}.")
     _validate_frozen_path(record, app_root, name)
+
+
+def _valid_derivation_chain(
+    name, source, pre_sign, final, manifest_record, transformation
+):
+    if source.get("sha256") != manifest_record.get("sha256"):
+        return False
+    derived = pre_sign.get("sha256") == source.get("sha256")
+    if name == "api_bridge":
+        derived = derived or _valid_bridge_relocation(
+            transformation, source, pre_sign
+        )
+    return bool(
+        derived
+        and final.get("path") == pre_sign.get("path")
+        and pre_sign.get("signing_identity")
+        and final.get("signing_identity")
+    )
+
+
+def _valid_bridge_relocation(transformation, source, pre_sign):
+    if not isinstance(transformation, dict):
+        return False
+    return bool(
+        transformation.get("kind") == "mach-o-load-command-relocation"
+        and transformation.get("source", {}).get("sha256") == source.get("sha256")
+        and transformation.get("output", {}).get("sha256")
+        == pre_sign.get("sha256")
+        and transformation.get("changes")
+    )
 
 
 def _frozen_kit_identity(root):
@@ -248,7 +268,13 @@ def configure_bundled_r_environment(app_root=None):
     r_home = _configure_r_home(root, frozen)
     r_libs = _configure_r_libraries(root, r_home, frozen)
     _set_r_environment()
-    identity = {
+    identity = _runtime_identity(manifest, derivation, direct_spike)
+    _install_runtime_identity(identity, frozen)
+    return dict(identity)
+
+
+def _runtime_identity(manifest, derivation, direct_spike):
+    return {
         "R_HOME": os.environ.get("R_HOME"),
         "R_LIBS": os.environ.get("R_LIBS"),
         "cffi_mode": "API",
@@ -256,6 +282,10 @@ def configure_bundled_r_environment(app_root=None):
         "derivation": derivation,
         "direct_spike": direct_spike,
     }
+
+
+def _install_runtime_identity(identity, frozen):
+    global _BOOTSTRAP_THREAD_ID, _RUNTIME_IDENTITY
     if _RUNTIME_IDENTITY is not None and _RUNTIME_IDENTITY != identity:
         raise RuntimeError(
             "Embedded R was already configured with a different runtime identity."
@@ -263,7 +293,6 @@ def configure_bundled_r_environment(app_root=None):
     _RUNTIME_IDENTITY = identity
     if frozen:
         _BOOTSTRAP_THREAD_ID = threading.get_ident()
-    return dict(identity)
 
 
 def _app_root():

@@ -49,6 +49,25 @@ PUBLICATION_BIAS_MIN_WIDTH = 560
 PUBLICATION_BIAS_PREFERRED_WIDTH = 700
 
 
+def _available_method_text(methods) -> str:
+    primary = [
+        _TEST_LABELS.get(item.method, item.method)
+        for item in methods
+        if item.role == "primary"
+    ]
+    additional = [
+        _TEST_LABELS.get(item.method, item.method)
+        for item in methods
+        if item.role != "primary"
+    ]
+    lines = []
+    if primary:
+        lines.append("Primary: " + ", ".join(primary))
+    if additional:
+        lines.append("Additional: " + ", ".join(additional))
+    return "\n".join(lines)
+
+
 class PublicationBiasDialog(
     QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog
 ):
@@ -60,6 +79,14 @@ class PublicationBiasDialog(
         self.analysis_service = analysis_service or SmallStudyEffectsService()
         self.setupUi(self)
         self._configure_scroll_surfaces()
+        self._configure_initial_values()
+        self._populate_context()
+        self._update_controls()
+        self.failure_label.clear()
+        self._connect_controls()
+        self._configure_window()
+
+    def _configure_initial_values(self):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setModal(True)
         self.correction_policy_combo.addItems(
@@ -82,9 +109,8 @@ class PublicationBiasDialog(
             self.correction_policy_combo.setCurrentText(
                 CorrectionPolicy.ALL_STUDIES_IF_ANY_ZERO_EXISTS.value
             )
-        self._populate_context()
-        self._update_controls()
-        self.failure_label.clear()
+
+    def _connect_controls(self):
         for control in (
             self.ordinary_funnel_check,
             self.contour_funnel_check,
@@ -99,6 +125,8 @@ class PublicationBiasDialog(
         self.button_box.accepted.connect(
             app_error_handler.safe_slot(self.run, parent=self)
         )
+
+    def _configure_window(self):
         self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
@@ -160,27 +188,12 @@ class PublicationBiasDialog(
         self._eligibility_report = report
         self.context_label.setText(self._context_summary(report))
         available = [item for item in report.methods if item.available]
-        if available:
-            primary = [
-                _TEST_LABELS.get(item.method, item.method)
-                for item in available
-                if item.role == "primary"
-            ]
-            additional = [
-                _TEST_LABELS.get(item.method, item.method)
-                for item in available
-                if item.role != "primary"
-            ]
-            lines = []
-            if primary:
-                lines.append("Primary: " + ", ".join(primary))
-            if additional:
-                lines.append("Additional: " + ", ".join(additional))
-            self.automatic_test_label.setText("\n".join(lines))
-        else:
+        if not available:
             self.automatic_test_label.setText(
                 "No formal asymmetry test is available for this effect measure."
             )
+            return
+        self.automatic_test_label.setText(_available_method_text(available))
 
     def _context_summary(self, report=None) -> str:
         data_type = str(self.model.get_current_outcome_type())

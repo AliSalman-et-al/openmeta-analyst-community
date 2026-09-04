@@ -1229,18 +1229,7 @@ def parse_out_results(result):
 
     result = dict(_result_items_for_display(result))
     study_names = _study_names_from_result(result)
-    image_path_d = _r_mapping_or_empty(result.get("images"))
-    display_image_path_d = _r_mapping_or_empty(result.get("display_images"))
-    image_var_name_d = _r_mapping_or_empty(result.get("plot_names"))
-    image_params_paths_d = _r_mapping_or_empty(result.get("plot_params_paths"))
-    plot_capability_d = _r_mapping_or_empty(result.get("plot_capabilities"))
-    producer_sections = _r_section_metadata(result.get("sections"))
-    raw_image_order = result.get("image_order")
-    image_order = (
-        None
-        if raw_image_order is None or _r_is_null(raw_image_order)
-        else list(raw_image_order)
-    )
+    metadata = _result_metadata(result)
     text_d = {}
     text_sources = {}
 
@@ -1251,29 +1240,46 @@ def parse_out_results(result):
         for index, key in enumerate(key for key in text_d if key not in text_sources):
             text_sources[key] = (text_n, index)
 
-    sections = _text_section_metadata(text_sources, producer_sections)
+    sections = _text_section_metadata(text_sources, metadata["sections"])
     image_offset = len(sections)
     sections.extend(
         _image_section_metadata(
-            image_path_d,
-            image_var_name_d,
-            plot_capability_d,
-            producer_sections,
+            metadata["images"],
+            metadata["image_var_names"],
+            metadata["plot_capabilities"],
+            metadata["sections"],
             image_offset,
         )
     )
     to_return = {
         "version": 1,
-        "images": image_path_d,
-        "display_images": display_image_path_d,
-        "image_var_names": image_var_name_d,
+        "images": metadata["images"],
+        "display_images": metadata["display_images"],
+        "image_var_names": metadata["image_var_names"],
         "texts": text_d,
-        "image_params_paths": image_params_paths_d,
-        "image_order": image_order,
-        "plot_capabilities": plot_capability_d,
+        "image_params_paths": metadata["image_params_paths"],
+        "image_order": metadata["image_order"],
+        "plot_capabilities": metadata["plot_capabilities"],
         "sections": sections,
     }
     return parse_analysis_result(to_return)
+
+
+def _result_metadata(result):
+    image_order = result.get("image_order")
+    if image_order is None or _r_is_null(image_order):
+        image_order = None
+    else:
+        image_order = list(image_order)
+    return {
+        "images": _r_mapping_or_empty(result.get("images")),
+        "display_images": _r_mapping_or_empty(result.get("display_images")),
+        "image_var_names": _r_mapping_or_empty(result.get("plot_names")),
+        "image_params_paths": _r_mapping_or_empty(result.get("plot_params_paths")),
+        "plot_capabilities": _r_mapping_or_empty(result.get("plot_capabilities")),
+        "sections": _r_section_metadata(result.get("sections")),
+        "image_order": image_order,
+    }
 
 
 _RESULT_METADATA_KEYS = frozenset(
@@ -1546,14 +1552,9 @@ def _format_named_result_summary(parent_name, r_object, study_names=None):
     # ``MAResults`` list for compatibility with the multi-study model.  It is
     # not a meaningful heading in the Results window, so unwrap that single
     # transport layer before rendering the fields.
-    if _has_r_names(r_object):
-        names = [str(name) for name in list(r_object.names)]
-        if len(names) == 1 and names[0].replace(" ", "") == "MAResults":
-            wrapped = list(r_object)[0]
-            if _has_r_names(wrapped):
-                return {
-                    parent_name: _format_named_value(wrapped, study_names=study_names)
-                }
+    wrapped = _unwrapped_ma_results(r_object)
+    if wrapped is not None:
+        return {parent_name: _format_named_value(wrapped, study_names=study_names)}
     if _is_named_table_summary(r_object):
         return _format_named_table_summary(
             parent_name, r_object, study_names=study_names
@@ -1562,6 +1563,16 @@ def _format_named_result_summary(parent_name, r_object, study_names=None):
         return _format_named_text_summary(parent_name, r_object)
     rendered = _format_named_value(r_object, study_names=study_names)
     return {parent_name: rendered} if rendered else {}
+
+
+def _unwrapped_ma_results(r_object):
+    if not _has_r_names(r_object):
+        return None
+    names = [str(name) for name in list(r_object.names)]
+    if len(names) != 1 or names[0].replace(" ", "") != "MAResults":
+        return None
+    wrapped = list(r_object)[0]
+    return wrapped if _has_r_names(wrapped) else None
 
 
 def _is_named_text_summary(r_object):
@@ -1598,43 +1609,37 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "":
             continue
-
-        display_name = _display_section_name(name)
-        section_name = _summary_section_name(parent_name, display_name)
-        dims = _r_dims(item)
-        if len(dims) == 2:
-            sections.update(
-                _format_table_summary(
-                    section_name,
-                    item,
-                    display_name,
-                    study_names=study_names,
-                )
-            )
-        elif len(dims) == 3:
-            sections.update(
-                _format_r_array_sections(
-                    parent_name, display_name, item, study_names=study_names
-                )
-            )
-        elif _is_r_string_vector(item):
-            sections[section_name] = _format_result_text(
-                ", ".join(str(value) for value in item)
-            )
-        elif _has_r_names(item):
-            rendered = _format_named_value(item, study_names=study_names)
-            if rendered:
-                sections[section_name] = rendered
-        elif _is_r_iterable(item):
-            rendered = _format_r_vector(item)
-            if rendered:
-                sections[section_name] = rendered
-        else:
-            sections[section_name] = _format_r_table_cell(item, field_name=name)
+        sections.update(
+            _format_named_table_item(parent_name, str(name), item, study_names)
+        )
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
     return sections
+
+
+def _format_named_table_item(parent_name, name, item, study_names):
+    display_name = _display_section_name(name)
+    section_name = _summary_section_name(parent_name, display_name)
+    dims = _r_dims(item)
+    if len(dims) == 2:
+        return _format_table_summary(
+            section_name, item, display_name, study_names=study_names
+        )
+    if len(dims) == 3:
+        return _format_r_array_sections(
+            parent_name, display_name, item, study_names=study_names
+        )
+    if _is_r_string_vector(item):
+        text = ", ".join(str(value) for value in item)
+        return {section_name: _format_result_text(text)}
+    if _has_r_names(item):
+        rendered = _format_named_value(item, study_names=study_names)
+    elif _is_r_iterable(item):
+        rendered = _format_r_vector(item)
+    else:
+        rendered = _format_r_table_cell(item, field_name=name)
+    return {section_name: rendered} if rendered else {}
 
 
 def _format_named_value(r_object, study_names=None):
@@ -2030,6 +2035,12 @@ def _format_result_text(text):
         lambda match: chr(int(match.group(1), 16)),
         text,
     )
+    text = _clean_console_text(text)
+    text = _replace_result_labels(text)
+    return text
+
+
+def _clean_console_text(text):
     # ``capture.output(print(...))`` is occasionally the only representation
     # available for a legacy R object.  Remove console framing while retaining
     # the actual text.  Structured values are rendered by the helpers above,
@@ -2054,7 +2065,10 @@ def _format_result_text(text):
         if stripped.startswith("$"):
             continue
         cleaned_lines.append(line)
-    text = "\n".join(cleaned_lines).strip()
+    return "\n".join(cleaned_lines).strip()
+
+
+def _replace_result_labels(text):
     for raw_label, display_label in (
         ("Zhou.Dendukuri", "Zhou-Dendukuri"),
         ("Holling.Unadjusted", "Holling (unadjusted)"),
@@ -2088,46 +2102,56 @@ def make_weights_str(results):
     if weights_object is None:
         raise Exception("make_weights_str() requires 'weights' in the results")
 
-    digits = PERCENTAGE_DISPLAY_DIGITS
-    if _is_r_iterable(weights_object):
-        raw_weights = list(weights_object)
-    else:
-        raw_weights = [weights_object]
+    raw_weights = _weight_values(weights_object)
     if not raw_weights:
         return "No study weights available.\n"
-    weights = []
-    for value in raw_weights:
-        scalar = (
-            _r_singleton_to_scalar(value)
-            if _is_r_iterable(value) and len(value) == 1
-            else value
+    weights = [_format_weight(value) for value in raw_weights]
+    study_names = _weight_study_names(results, weights_object, len(weights))
+    return _weight_table(study_names, weights)
+
+
+def _weight_values(weights_object):
+    return list(weights_object) if _is_r_iterable(weights_object) else [weights_object]
+
+
+def _format_weight(value):
+    scalar = value
+    if _is_r_iterable(value) and len(value) == 1:
+        scalar = _r_singleton_to_scalar(value)
+    if scalar is None or str(scalar) == "NA":
+        return "NA"
+    try:
+        return "{0:.{digits}f}%".format(
+            float(scalar), digits=PERCENTAGE_DISPLAY_DIGITS
         )
-        if scalar is None or str(scalar) == "NA":
-            weights.append("NA")
-        else:
-            try:
-                weights.append("{0:.{digits}f}%".format(float(scalar), digits=digits))
-            except (TypeError, ValueError):
-                weights.append(_format_r_table_cell(scalar))
+    except (TypeError, ValueError):
+        return _format_r_table_cell(scalar)
+
+
+def _weight_study_names(results, weights_object, count):
     if "input_data" in results:
         study_names = list(results["input_data"].do_slot("study.names"))
     else:
         weight_names = _r_names_or_none(weights_object)
-        if weight_names is not None and len(weight_names) == len(weights):
+        if weight_names is not None and len(weight_names) == count:
             study_names = weight_names
         else:
-            study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
-    if len(study_names) != len(weights):
-        study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
+            study_names = _default_study_names(count)
+    return study_names if len(study_names) == count else _default_study_names(count)
 
+
+def _default_study_names(count):
+    return ["Study %d" % (index + 1) for index in range(count)]
+
+
+def _weight_table(study_names, weights):
     table, widths = tabulate(
         [study_names, weights], sep=": ", return_col_widths=True, align=["L", "R"]
     )
     header = "{0:<{widths[0]}}  {1:<{widths[1]}}".format(
         "Study names", "Weights", widths=widths
     )
-    table = "\n".join([header, table]) + "\n"
-    return table
+    return "\n".join([header, table]) + "\n"
 
 
 @serialized_r_call

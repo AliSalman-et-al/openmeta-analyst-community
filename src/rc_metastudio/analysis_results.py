@@ -242,22 +242,30 @@ def _result_section(
 def _section_fields(
     item: Mapping[str, object],
 ) -> tuple[str, Literal["text", "image"], int, str, str]:
-    semantic_id = item.get("id")
+    semantic_id = _required_section_text(item, "id")
+    source_key = _required_section_text(item, "source_key")
+    title = _required_section_text(item, "title")
     kind = item.get("kind")
-    source_key = item.get("source_key")
-    title = item.get("title")
-    order = item.get("order")
-    if not isinstance(semantic_id, str) or not semantic_id:
-        raise ValueError("analysis result section id must be non-empty text")
-    if kind not in ("text", "image"):
+    if kind == "text":
+        typed_kind: Literal["text", "image"] = "text"
+    elif kind == "image":
+        typed_kind = "image"
+    else:
         raise ValueError("analysis result section kind is invalid")
-    if not isinstance(source_key, str) or not source_key:
-        raise ValueError("analysis result section source key must be non-empty text")
-    if not isinstance(title, str) or not title:
-        raise ValueError("analysis result section title must be non-empty text")
-    if type(order) is not int or order < 0:
+    order = item.get("order")
+    if type(order) is not int:
         raise ValueError("analysis result section order must be a non-negative integer")
-    return semantic_id, cast(Literal["text", "image"], kind), order, title, source_key
+    if order < 0:
+        raise ValueError("analysis result section order must be a non-negative integer")
+    return semantic_id, typed_kind, order, title, source_key
+
+
+def _required_section_text(item: Mapping[str, object], field: str) -> str:
+    value = item.get(field)
+    if isinstance(value, str) and value:
+        return value
+    label = field.replace("_", " ")
+    raise ValueError(f"analysis result section {label} must be non-empty text")
 
 
 def _freeze_result(

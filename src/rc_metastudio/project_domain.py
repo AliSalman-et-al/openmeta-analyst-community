@@ -470,25 +470,43 @@ def _typed_covariate(value: Mapping[str, object], index: int) -> CovariateSnapsh
     )
 
 
-def _typed_unit(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]) -> UnitSnapshot:
+def _follow_up_snapshot(
+    outcome: OutcomeSnapshot, label: str | None
+) -> FollowUpSnapshot | None:
+    return next((item for item in outcome.follow_ups if item.label == label), None)
+
+
+def _typed_group(value: Mapping[str, object], unit_identity: str, index: int):
+    identity = cast(str, value.get("stable_id") or f"{unit_identity}:group:{index}")
+    raw_data = tuple(
+        cast(JsonValue, copy.deepcopy(item))
+        for item in cast(list[object], value["raw_data"])
+    )
+    return GroupSnapshot(
+        GroupId(identity),
+        cast(str, value["name"]),
+        raw_data,
+        _wire_pairs(value),
+    )
+
+
+def _typed_unit(
+    value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]
+) -> UnitSnapshot:
     outcome = cast(str, value["outcome"])
     follow_up = cast(str | None, value["follow_up"])
     outcome_snapshot = outcomes[outcome]
-    follow_up_snapshot = next(
-        (item for item in outcome_snapshot.follow_ups if item.label == follow_up), None
+    follow_up_snapshot = _follow_up_snapshot(outcome_snapshot, follow_up)
+    fallback_identity = (
+        follow_up_snapshot.identity if follow_up_snapshot is not None else "default"
     )
     unit_identity = cast(
         str,
         value.get("stable_id")
-        or f"{outcome_snapshot.identity}:{follow_up_snapshot.identity if follow_up_snapshot else 'default'}",
+        or f"{outcome_snapshot.identity}:{fallback_identity}",
     )
     groups = tuple(
-        GroupSnapshot(
-            GroupId(cast(str, group.get("stable_id") or f"{unit_identity}:group:{index}")),
-            cast(str, group["name"]),
-            tuple(cast(JsonValue, copy.deepcopy(item)) for item in cast(list[object], group["raw_data"])),
-            _wire_pairs(group),
-        )
+        _typed_group(group, unit_identity, index)
         for index, group in enumerate(
             _object(item, "group") for item in _array(value["groups"], "groups")
         )
@@ -497,7 +515,10 @@ def _typed_unit(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnaps
         outcome_snapshot.identity,
         None if follow_up_snapshot is None else follow_up_snapshot.identity,
         groups,
-        cast(Mapping[str, JsonValue], copy.deepcopy(_object(value["entered_effects"], "entered_effects"))),
+        cast(
+            Mapping[str, JsonValue],
+            copy.deepcopy(_object(value["entered_effects"], "entered_effects")),
+        ),
         _wire_pairs(value),
     )
 
@@ -520,7 +541,10 @@ def _typed_study(
         year,
         cast(bool, value["include"]),
         sample_size,
-        cast(Mapping[str, JsonValue], copy.deepcopy(_object(value["covariates"], "covariates"))),
+        cast(
+            Mapping[str, JsonValue],
+            copy.deepcopy(_object(value["covariates"], "covariates")),
+        ),
         units,
         _wire_pairs(value),
     )
