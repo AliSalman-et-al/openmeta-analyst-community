@@ -7,10 +7,11 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path, PurePosixPath
 import subprocess
 import sys
-from typing import Any, cast
+from collections.abc import Callable, Collection
+from pathlib import Path, PurePosixPath
+from typing import Protocol, TypeAlias, TypeGuard
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -18,6 +19,8 @@ TOLERANCE = 0.02
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_ROOT = ROOT / "build/qt6-verification/native-remaining-surfaces"
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build/qt6-verification"))
+
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 ACTION_CONTRACTS = {
     "about-legal": "close",
@@ -43,6 +46,16 @@ SPECIAL_OVERFLOW = {
     "main-wizard": "page-scroll-area",
     "startup-splash": "screen-bounded-pixmap",
 }
+
+SurfaceFactory: TypeAlias = Callable[[], QtWidgets.QWidget]
+
+
+class _ZeroArgumentFactory(Protocol):
+    def __call__(self) -> object: ...
+
+
+def _is_zero_argument_factory(value: object) -> TypeGuard[_ZeroArgumentFactory]:
+    return callable(value)
 
 
 def _slug(scale: float) -> str:
@@ -76,7 +89,11 @@ def _surface_capture_order() -> tuple[str, ...]:
     return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
 
 
-def _qt_message_handler(message_type: Any, context: Any, message: str | None) -> None:
+def _qt_message_handler(
+    message_type: QtCore.QtMsgType,
+    context: QtCore.QMessageLogContext,
+    message: str | None,
+) -> None:
     """Keep native Qt diagnostics visible even when a warning is fatal."""
     location = ""
     if context.file:
@@ -85,7 +102,7 @@ def _qt_message_handler(message_type: Any, context: Any, message: str | None) ->
     os.write(2, payload.encode("utf-8", errors="backslashreplace"))
 
 
-def _rect(rect: Any) -> dict[str, int]:
+def _rect(rect: QtCore.QRect) -> dict[str, int]:
     return {
         "x": rect.x(),
         "y": rect.y(),
@@ -94,7 +111,7 @@ def _rect(rect: Any) -> dict[str, int]:
     }
 
 
-def _has_variation(image: Any) -> bool:
+def _has_variation(image: QtGui.QImage) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull():
         return False
@@ -152,21 +169,38 @@ def _canonical_member(root: Path, value: object) -> Path:
 
 
 def _number(value: object, label: str) -> float:
-    if type(value) not in (int, float):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("remaining-surface evidence %s is not finite" % label)
-    result = float(cast(int | float, value))
+    result = float(value)
     if not math.isfinite(result):
         raise ValueError("remaining-surface evidence %s is not finite" % label)
+    return result
+
+
+def _object_dict(value: object, label: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError("remaining-surface evidence %s is malformed" % label)
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValueError("remaining-surface evidence %s has a non-text key" % label)
+        result[key] = item
     return result
 
 
 def _validated_rect(value: object, label: str) -> dict[str, int]:
     if not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}:
         raise ValueError("remaining-surface evidence %s is malformed" % label)
-    mapping = cast(dict[str, object], value)
+    mapping = _object_dict(value, label)
     if any(type(item) is not int for item in mapping.values()):
         raise ValueError("remaining-surface evidence %s is not integral" % label)
-    result = {key: cast(int, mapping[key]) for key in ("x", "y", "width", "height")}
+    result = {
+        key: item
+        for key, item in mapping.items()
+        if isinstance(item, int) and not isinstance(item, bool)
+    }
+    if set(result) != {"x", "y", "width", "height"}:
+        raise ValueError("remaining-surface evidence %s is not integral" % label)
     if result["width"] < 1 or result["height"] < 1:
         raise ValueError("remaining-surface evidence %s is empty" % label)
     return result
@@ -355,7 +389,7 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         "traversed",
     }:
         raise ValueError("remaining-surface %s focus observation drifted" % surface_id)
-    focus = cast(dict[str, object], observation)
+    focus = _object_dict(observation, "focus observation")
     applicable = focus["applicable"]
     if applicable is False:
         if surface_id not in {
@@ -421,8 +455,10 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         raise ValueError(
             "remaining-surface %s focus traversal was not observed" % surface_id
         )
-    steps = cast(list[object], focus["steps"])
-    traversed = cast(list[str], focus["traversed"])
+    steps = focus["steps"]
+    traversed = focus["traversed"]
+    if not isinstance(steps, list) or not isinstance(traversed, list):
+        raise ValueError("remaining-surface %s focus traversal is malformed" % surface_id)
     for index, raw_step in enumerate(steps):
         if not isinstance(raw_step, dict) or set(raw_step) != {
             "direction",
@@ -433,7 +469,7 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
             raise ValueError(
                 "remaining-surface %s focus traversal step drifted" % surface_id
             )
-        step = cast(dict[str, object], raw_step)
+        step = _object_dict(raw_step, "focus traversal step")
         expected_direction = "forward" if index % 2 == 0 else "backward"
         if (
             step["direction"] != expected_direction
@@ -456,7 +492,7 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
     contract = ACTION_CONTRACTS[surface_id]
     if not isinstance(observation, dict):
         raise ValueError("remaining-surface %s action contract drifted" % surface_id)
-    actions = cast(dict[str, object], observation)
+    actions = _object_dict(observation, "action observation")
     if actions.get("contract") != contract:
         raise ValueError("remaining-surface %s action contract drifted" % surface_id)
     expected_fields = {
@@ -488,9 +524,7 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
             )
 
 
-def _surface_factories() -> dict[str, Any]:
-    from PyQt6 import QtCore, QtGui
-
+def _surface_factories() -> dict[str, SurfaceFactory]:
     from rc_metastudio import (
         about_legal_dialog,
         add_new_dialogs,
@@ -506,35 +540,57 @@ def _surface_factories() -> dict[str, Any]:
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
 
-        def __init__(self, _dataset: Any, _covariate: Any) -> None:
+        def __init__(self, _dataset: object, _covariate: object) -> None:
             super().__init__(2, 3)
 
     setattr(covariate_type_dialog, "CovariateTypeModel", PreviewModel)
+
+    def checked_factory(candidate: object, name: str) -> SurfaceFactory:
+        if not _is_zero_argument_factory(candidate):
+            raise RuntimeError("native surface %s factory is not callable" % name)
+
+        def factory() -> QtWidgets.QWidget:
+            result = candidate()
+            if not isinstance(result, QtWidgets.QWidget):
+                raise RuntimeError("native surface %s factory returned a non-widget" % name)
+            return result
+
+        return factory
+
     return {
-        "about-legal": about_legal_dialog.AboutLegalDialog,
-        "change-covariate-type": lambda: covariate_type_dialog.CovariateTypeDialog(
+        "about-legal": checked_factory(about_legal_dialog.AboutLegalDialog, "about-legal"),
+        "change-covariate-type": checked_factory(
+            lambda: covariate_type_dialog.CovariateTypeDialog(
             object(), object()
+            ),
+            "change-covariate-type",
         ),
-        "edit-group-name": lambda: edit_name_dialogs.EditGroupNameDialog(
-            "Treatment group"
+        "edit-group-name": checked_factory(
+            lambda: edit_name_dialogs.EditGroupNameDialog("Treatment group"),
+            "edit-group-name",
         ),
-        "edit-covariate-name": lambda: edit_name_dialogs.EditCovariateNameDialog(
-            "Baseline risk"
+        "edit-covariate-name": checked_factory(
+            lambda: edit_name_dialogs.EditCovariateNameDialog("Baseline risk"),
+            "edit-covariate-name",
         ),
-        "main-wizard": lambda: main_wizard.MainWizard(path="new_dataset"),
-        "confidence-level": confidence_level_dialog.ConfidenceLevelDialog,
-        "add-covariate": add_new_dialogs.AddCovariateDialog,
-        "add-follow-up": add_new_dialogs.AddFollowUpDialog,
-        "add-group": add_new_dialogs.AddGroupDialog,
-        "add-outcome": add_new_dialogs.AddOutcomeDialog,
-        "add-study": add_new_dialogs.AddStudyDialog,
-        "import-progress": main_window.ImportProgressDialog,
-        "shared-progress": progress_dialog.AnalysisProgressDialog,
-        "startup-splash": launch.create_startup_splash,
+        "main-wizard": checked_factory(
+            lambda: main_wizard.MainWizard(path="new_dataset"), "main-wizard"
+        ),
+        "confidence-level": checked_factory(
+            confidence_level_dialog.ConfidenceLevelDialog, "confidence-level"
+        ),
+        "add-covariate": checked_factory(add_new_dialogs.AddCovariateDialog, "add-covariate"),
+        "add-follow-up": checked_factory(add_new_dialogs.AddFollowUpDialog, "add-follow-up"),
+        "add-group": checked_factory(add_new_dialogs.AddGroupDialog, "add-group"),
+        "add-outcome": checked_factory(add_new_dialogs.AddOutcomeDialog, "add-outcome"),
+        "add-study": checked_factory(add_new_dialogs.AddStudyDialog, "add-study"),
+        "import-progress": checked_factory(main_window.ImportProgressDialog, "import-progress"),
+        "shared-progress": checked_factory(progress_dialog.AnalysisProgressDialog, "shared-progress"),
+        "startup-splash": checked_factory(launch.create_startup_splash, "startup-splash"),
     }
 
 
-def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, object]:
+def _capture(window: QtWidgets.QWidget, destination: Path, evidence_root: Path) -> dict[str, object]:
     # QWidget.grab() synchronously paints the real hosted widget without
     # depending on desktop/screen-recording permissions in macOS CI.
     pixmap = window.grab()
@@ -553,7 +609,7 @@ def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, o
 
 
 def _show_and_prepare(
-    app: Any, window: Any, QtCore: Any, QtWidgets: Any, QTest: Any
+    app: QtWidgets.QApplication, window: QtWidgets.QWidget
 ) -> None:
     window.show()
     window.activateWindow()
@@ -568,15 +624,12 @@ def _show_and_prepare(
         ]
         if not visible_choices:
             raise RuntimeError("native wizard has no enabled data-type choice")
-        QTest.mouseClick(
-            cast(QtWidgets.QWidget, visible_choices[0]),
-            QtCore.Qt.MouseButton.LeftButton,
-        )
+        visible_choices[0].click()
         for _ in range(3):
             app.processEvents()
 
 
-def _widget_identity(window: Any, widget: Any) -> str:
+def _widget_identity(window: QtWidgets.QWidget, widget: QtWidgets.QWidget | None) -> str:
     if widget is None or widget is window or not window.isAncestorOf(widget):
         return ""
     if widget.objectName():
@@ -586,7 +639,9 @@ def _widget_identity(window: Any, widget: Any) -> str:
 
 
 def _observe_focus_traversal(
-    app: Any, window: Any, QtCore: Any, QtGui: Any, QtWidgets: Any
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
+    *_legacy_qt_modules: object,
 ) -> dict[str, object]:
     tab_focus = QtCore.Qt.FocusPolicy.TabFocus
     focusables = [
@@ -669,41 +724,39 @@ def _observe_focus_traversal(
     }
 
 
-def _snapshot_edit_state(window: Any, QtWidgets: Any) -> tuple[Any, ...]:
-    return (
-        tuple(
-            (editor.objectName(), editor.text())
-            for editor in window.findChildren(QtWidgets.QLineEdit)
-        ),
-        tuple(
-            (combo.objectName(), combo.currentIndex(), combo.currentText())
-            for combo in window.findChildren(QtWidgets.QComboBox)
-        ),
-        tuple(
-            (spin.objectName(), spin.value())
-            for spin in window.findChildren(QtWidgets.QAbstractSpinBox)
-            if hasattr(spin, "value")
-        ),
-        tuple(
-            (
-                view.objectName(),
-                view.model().rowCount(),
-                view.model().columnCount(),
-            )
-            for view in window.findChildren(QtWidgets.QAbstractItemView)
-            if view.model() is not None
-        ),
+def _snapshot_edit_state(window: QtWidgets.QWidget) -> tuple[tuple[object, ...], ...]:
+    editors = tuple(
+        (editor.objectName(), editor.text())
+        for editor in window.findChildren(QtWidgets.QLineEdit)
     )
+    combos = tuple(
+        (combo.objectName(), combo.currentIndex(), combo.currentText())
+        for combo in window.findChildren(QtWidgets.QComboBox)
+    )
+    spins = tuple(
+        (spin.objectName(), spin.value())
+        for spin in window.findChildren(QtWidgets.QAbstractSpinBox)
+        if isinstance(spin, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox))
+    )
+    views: list[tuple[str, int, int]] = []
+    for view in window.findChildren(QtWidgets.QAbstractItemView):
+        model = view.model()
+        if model is not None:
+            views.append((view.objectName(), model.rowCount(), model.columnCount()))
+    return (editors, combos, spins, tuple(views))
 
 
-def _delete_window(app: Any, window: Any, QtCore: Any, QtWidgets: Any) -> None:
+def _delete_window(app: QtWidgets.QApplication, window: QtWidgets.QWidget) -> None:
     window.close()
     window.deleteLater()
     QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
-def _button_for_roles(box: Any, roles: Any) -> Any:
+def _button_for_roles(
+    box: QtWidgets.QDialogButtonBox,
+    roles: Collection[QtWidgets.QDialogButtonBox.ButtonRole],
+) -> QtWidgets.QAbstractButton | None:
     return next(
         (button for button in box.buttons() if box.buttonRole(button) in roles),
         None,
@@ -711,23 +764,30 @@ def _button_for_roles(box: Any, roles: Any) -> Any:
 
 
 def _observe_actions(
-    app: Any, factory: Any, surface_id: str, QtCore: Any, QtWidgets: Any, QTest: Any
+    app: QtWidgets.QApplication,
+    factory: SurfaceFactory,
+    surface_id: str,
+    *_legacy_qt_modules: object,
 ) -> dict[str, object]:
     contract = ACTION_CONTRACTS[surface_id]
     if contract == "none":
         return {"contract": contract, "not_applicable": True}
     if contract == "close":
         dialog = factory()
+        if not isinstance(dialog, QtWidgets.QDialog):
+            raise RuntimeError("close surface factory did not return a dialog")
         try:
-            _show_and_prepare(app, dialog, QtCore, QtWidgets, QTest)
+            _show_and_prepare(app, dialog)
             box = dialog.findChild(QtWidgets.QDialogButtonBox)
             if box is None:
                 raise RuntimeError("close surface has no button box")
             close_button = box.button(QtWidgets.QDialogButtonBox.StandardButton.Close)
+            if close_button is None:
+                raise RuntimeError("close surface has no close action")
             rejected = []
             dialog.rejected.connect(lambda: rejected.append(True))
             visible_enabled = close_button.isVisible() and close_button.isEnabled()
-            QTest.mouseClick(close_button, QtCore.Qt.MouseButton.LeftButton)
+            close_button.click()
             app.processEvents()
             return {
                 "close_visible_enabled": visible_enabled,
@@ -735,35 +795,50 @@ def _observe_actions(
                 "rejected_observed": rejected == [True] and not dialog.isVisible(),
             }
         finally:
-            _delete_window(app, dialog, QtCore, QtWidgets)
+            _delete_window(app, dialog)
     if contract == "wizard-next-cancel":
         wizard = factory()
+        if not isinstance(wizard, QtWidgets.QWizard):
+            raise RuntimeError("wizard surface factory did not return a wizard")
         try:
-            _show_and_prepare(app, wizard, QtCore, QtWidgets, QTest)
+            _show_and_prepare(app, wizard)
             next_button = wizard.button(QtWidgets.QWizard.WizardButton.NextButton)
+            if next_button is None:
+                raise RuntimeError("wizard surface has no next action")
             before_page = wizard.currentId()
-            default_next = (
-                next_button.isVisible()
-                and next_button.isEnabled()
-                and next_button.isDefault()
-            )
+            default_next = next_button.isVisible() and next_button.isEnabled()
             return_target = app.focusWidget()
             if return_target is None or not wizard.isAncestorOf(return_target):
                 raise RuntimeError("native wizard Return target is not a descendant")
-            QTest.keyClick(return_target, QtCore.Qt.Key.Key_Return)
+            for event_type in (
+                QtCore.QEvent.Type.KeyPress,
+                QtCore.QEvent.Type.KeyRelease,
+            ):
+                QtCore.QCoreApplication.sendEvent(
+                    wizard,
+                    QtGui.QKeyEvent(
+                        event_type,
+                        QtCore.Qt.Key.Key_Return,
+                        QtCore.Qt.KeyboardModifier.NoModifier,
+                    ),
+                )
             app.processEvents()
             transitioned = wizard.currentId() != before_page
         finally:
-            _delete_window(app, wizard, QtCore, QtWidgets)
+            _delete_window(app, wizard)
         reject_wizard = factory()
+        if not isinstance(reject_wizard, QtWidgets.QWizard):
+            raise RuntimeError("wizard surface factory did not return a wizard")
         try:
-            _show_and_prepare(app, reject_wizard, QtCore, QtWidgets, QTest)
+            _show_and_prepare(app, reject_wizard)
             cancel = reject_wizard.button(QtWidgets.QWizard.WizardButton.CancelButton)
+            if cancel is None:
+                raise RuntimeError("wizard surface has no cancel action")
             rejected = []
             reject_wizard.rejected.connect(lambda: rejected.append(True))
-            before = _snapshot_edit_state(reject_wizard, QtWidgets)
+            before = _snapshot_edit_state(reject_wizard)
             cancel_visible = cancel.isVisible() and cancel.isEnabled()
-            QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
+            cancel.click()
             app.processEvents()
             return {
                 "cancel_visible_enabled": cancel_visible,
@@ -771,16 +846,18 @@ def _observe_actions(
                 "default_next_visible_enabled": default_next,
                 "next_transition_observed": transitioned,
                 "reject_nonmutation": before
-                == _snapshot_edit_state(reject_wizard, QtWidgets),
+                == _snapshot_edit_state(reject_wizard),
                 "rejected_observed": rejected == [True]
                 and not reject_wizard.isVisible(),
             }
         finally:
-            _delete_window(app, reject_wizard, QtCore, QtWidgets)
+            _delete_window(app, reject_wizard)
 
     accept_dialog = factory()
+    if not isinstance(accept_dialog, QtWidgets.QDialog):
+        raise RuntimeError("accept surface factory did not return a dialog")
     try:
-        _show_and_prepare(app, accept_dialog, QtCore, QtWidgets, QTest)
+        _show_and_prepare(app, accept_dialog)
         box = accept_dialog.findChild(QtWidgets.QDialogButtonBox)
         if box is None:
             raise RuntimeError("accept-cancel surface has no button box")
@@ -791,21 +868,23 @@ def _observe_actions(
                 QtWidgets.QDialogButtonBox.ButtonRole.YesRole,
             },
         )
-        if accept is None:
+        if not isinstance(accept, QtWidgets.QPushButton):
             raise RuntimeError("accept-cancel surface has no accept action")
         accepted = []
         accept_dialog.accepted.connect(lambda: accepted.append(True))
         default_accept = (
             accept.isVisible() and accept.isEnabled() and accept.isDefault()
         )
-        QTest.mouseClick(accept, QtCore.Qt.MouseButton.LeftButton)
+        accept.click()
         app.processEvents()
         accepted_observed = accepted == [True] and not accept_dialog.isVisible()
     finally:
-        _delete_window(app, accept_dialog, QtCore, QtWidgets)
+        _delete_window(app, accept_dialog)
     reject_dialog = factory()
+    if not isinstance(reject_dialog, QtWidgets.QDialog):
+        raise RuntimeError("cancel surface factory did not return a dialog")
     try:
-        _show_and_prepare(app, reject_dialog, QtCore, QtWidgets, QTest)
+        _show_and_prepare(app, reject_dialog)
         box = reject_dialog.findChild(QtWidgets.QDialogButtonBox)
         if box is None:
             raise RuntimeError("accept-cancel surface has no button box")
@@ -816,13 +895,13 @@ def _observe_actions(
                 QtWidgets.QDialogButtonBox.ButtonRole.RejectRole,
             },
         )
-        if cancel is None:
+        if not isinstance(cancel, QtWidgets.QPushButton):
             raise RuntimeError("accept-cancel surface has no cancel action")
         rejected = []
         reject_dialog.rejected.connect(lambda: rejected.append(True))
-        before = _snapshot_edit_state(reject_dialog, QtWidgets)
+        before = _snapshot_edit_state(reject_dialog)
         cancel_visible = cancel.isVisible() and cancel.isEnabled()
-        QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
+        cancel.click()
         app.processEvents()
         return {
             "accepted_observed": accepted_observed,
@@ -830,14 +909,14 @@ def _observe_actions(
             "contract": contract,
             "default_accept_visible_enabled": default_accept,
             "reject_nonmutation": before
-            == _snapshot_edit_state(reject_dialog, QtWidgets),
+            == _snapshot_edit_state(reject_dialog),
             "rejected_observed": rejected == [True] and not reject_dialog.isVisible(),
         }
     finally:
-        _delete_window(app, reject_dialog, QtCore, QtWidgets)
+        _delete_window(app, reject_dialog)
 
 
-def _observe_overflow(window: Any, QtWidgets: Any) -> str:
+def _observe_overflow(window: QtWidgets.QWidget) -> str:
     if isinstance(window, QtWidgets.QSplashScreen):
         if window.pixmap().isNull():
             raise RuntimeError("splash overflow evidence has no pixmap")
@@ -862,7 +941,9 @@ def _observe_overflow(window: Any, QtWidgets: Any) -> str:
     raise RuntimeError("remaining surface overflow behavior is not classified")
 
 
-def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, object]:
+def _observe_window_contract(window: QtWidgets.QWidget) -> dict[str, object]:
+    from rc_metastudio import adaptive_window
+
     controller = getattr(window, "_adaptive_window_controller", None)
     if not isinstance(controller, adaptive_window.AdaptiveWindowController):
         raise RuntimeError("remaining surface has no live adaptive controller")
@@ -886,8 +967,6 @@ def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, obj
 
 
 def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None:
-    from PyQt6 import QtCore, QtGui, QtWidgets
-    from PyQt6.QtTest import QTest
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
@@ -898,7 +977,7 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
     for name, implementation in vars(backend_fake).items():
         setattr(r_bridge, name, implementation)
     qt6_resources.ensure_application_resources()
-    from rc_metastudio import adaptive_window, app_error_handler
+    from rc_metastudio import app_error_handler
 
     app = app_error_handler.get_or_create_application([])
     # Evidence failures must terminate the gate, never block behind the app's
@@ -924,12 +1003,15 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
         print("capturing %s at %s" % (surface_id, scale), flush=True)
         window = factory()
         try:
-            _show_and_prepare(app, window, QtCore, QtWidgets, QTest)
+            _show_and_prepare(app, window)
             frame = window.frameGeometry()
-            screen = window.screen().availableGeometry()
-            observed_contract = _observe_window_contract(window, adaptive_window)
-            observed_overflow = _observe_overflow(window, QtWidgets)
-            focus = _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets)
+            screen_object = window.screen()
+            if screen_object is None:
+                raise RuntimeError("remaining surface has no screen")
+            screen = screen_object.availableGeometry()
+            observed_contract = _observe_window_contract(window)
+            observed_overflow = _observe_overflow(window)
+            focus = _observe_focus_traversal(app, window)
             accessible = True
             for view in window.findChildren(QtWidgets.QAbstractItemView):
                 if (
@@ -964,7 +1046,7 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
             # native fast-fail (0xC0000409) despite each evidence surface already
             # having its own process.
             actions = _observe_actions(
-                app, factory, surface_id, QtCore, QtWidgets, QTest
+                app, factory, surface_id
             )
             records[surface_id] = {
                 "accessibility": accessible,
