@@ -630,6 +630,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 self._viewport_width_override = self._layout_viewport_width()
             try:
                 self._refit_viewport_items()
+                self._relayout_sections()
             finally:
                 self._viewport_width_override = None
 

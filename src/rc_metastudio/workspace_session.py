@@ -132,9 +132,11 @@ class WorkspaceSession:
             raise RuntimeError("workspace replacement unexpectedly produced no document")
         return loaded
 
-    def new(self, document: ProjectDocument) -> None:
-        self.replace(document, path=None, record_history=False)
-        self._path = None
+    def new(
+        self, document: ProjectDocument, path: str | Path | None = None
+    ) -> None:
+        self.replace(document, path=path, record_history=False)
+        self._path = Path(path) if path is not None else None
         self._history.clear()
         self._redo.clear()
         self._saved_digest = _document_digest(document)

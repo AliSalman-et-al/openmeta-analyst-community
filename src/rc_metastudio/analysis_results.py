@@ -208,14 +208,27 @@ def _sections(
     capabilities: Mapping[str, PlotCapability],
 ) -> tuple[ResultSection, ...]:
     result: list[ResultSection] = []
-    order = 0
-    for title, value in texts.items():
-        result.append(ResultSection(_section_id("text", title), "text", order, title, value))
-        order += 1
-    for title, value in images.items():
+    text_items = list(texts.items())
+    image_items = list(images.items())
+    summary = next((item for item in text_items if item[0] == "Summary"), None)
+    standard_layout = summary is not None and "Weights" in texts
+    if standard_layout and summary is not None:
+        text_items.remove(summary)
+        text_items.insert(0, summary)
+    ordered_items = (
+        [("text", item) for item in text_items[:1]]
+        + [("image", item) for item in image_items]
+        + [("text", item) for item in text_items[1:]]
+        if standard_layout
+        else [("text", item) for item in text_items]
+        + [("image", item) for item in image_items]
+    )
+    for order, (kind, (title, value)) in enumerate(ordered_items):
+        if kind == "text":
+            result.append(ResultSection(_section_id("text", title), "text", order, title, value))
+            continue
         capability = capabilities[title]
         result.append(ResultSection(_section_id("image", title), "image", order, title, value, capability.plot_kind, image_params_paths.get(title), capability))
-        order += 1
     return tuple(result)
 
 

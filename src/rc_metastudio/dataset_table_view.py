@@ -35,6 +35,7 @@ from rc_metastudio import diagnostic_data_dialog
 from rc_metastudio import app_error_handler
 from rc_metastudio import qt_layout
 from rc_metastudio import meta_globals
+from rc_metastudio import project_adapter
 from rc_metastudio import qt_text
 from rc_metastudio import tabular_data
 from rc_metastudio.analysis_dataset import Study
@@ -58,6 +59,7 @@ class MainWindowProtocol(Protocol):
     twoArmMetricMenu: QMenu
 
     def data_dirtied(self) -> None: ...
+    def record_workspace_change(self, before, after) -> None: ...
     def delete_study(self, study, *, study_index: int) -> None: ...
     def edit_group_name(self, group: str) -> None: ...
     def rename_covariate(self, covariate) -> None: ...
@@ -507,6 +509,8 @@ class DatasetTableView(QtWidgets.QTableView):
 
             # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
+                before_project = project_adapter.dataset_to_project(self.model().dataset)
+                before_state = project_adapter.model_to_state(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -522,11 +526,18 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    # push the edit even
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
+                    after_project = project_adapter.dataset_to_project(self.model().dataset)
+                    after_state = project_adapter.model_to_state(self.model())
+                    self._main_gui().record_workspace_change(
+                        (before_project, before_state), (after_project, after_state)
+                    )
             elif data_type == "continuous":
                 cur_raw_data_dict = {}
                 for group_name in current_groups:

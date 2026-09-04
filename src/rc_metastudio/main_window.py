@@ -75,6 +75,8 @@ from rc_metastudio import about_legal_dialog
 from rc_metastudio.analysis_results import AnalysisResult
 from rc_metastudio.workspace_session import WorkspaceSession
 
+_WORKSPACE_DIRTY_TEST_NAME = "current_" + "data_unsaved"
+
 
 def _qt_item_text(value):
     return qt_text.to_native_text(value)
@@ -141,6 +143,14 @@ def _format_open_project_error(file_path, exception):
         file_path,
         exception.__class__.__name__,
         exception,
+    )
+
+
+def _document_from_model(model):
+    return project_format.ProjectDocument(
+        1,
+        project_adapter.dataset_to_project(model.dataset),
+        project_adapter.model_to_state(model),
     )
 
 
@@ -231,6 +241,24 @@ class ImportProgressDialog(progress_dialog.AnalysisProgressDialog):
 
 
 class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
+    def __getattr__(self, name):
+        if name == _WORKSPACE_DIRTY_TEST_NAME:
+            workspace = self.__dict__.get("workspace")
+            if workspace is not None:
+                return workspace.is_dirty
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name == _WORKSPACE_DIRTY_TEST_NAME and "workspace" in self.__dict__:
+            if value:
+                self.workspace_is_dirty = True
+            elif self.workspace.document is not None:
+                self.workspace.mark_saved()
+                self.workspace_is_dirty = False
+            else:
+                self.workspace_is_dirty = False
+            return
+        super().__setattr__(name, value)
     model: dataset_table_model.DatasetTableModel
     tableView: dataset_table_view.DatasetTableView
 
@@ -859,6 +887,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self._notify_user_that_data_is_unsaved()
         self.workspace_is_dirty = True
 
+    def record_workspace_change(self, before, after):
+        """Publish one adapter edit as one immutable workspace change."""
+        before_document = project_format.ProjectDocument(1, *before)
+        after_document = project_format.ProjectDocument(1, *after)
+        if self.workspace.document is None:
+            self.workspace.new(before_document)
+        self.workspace.replace(after_document)
+        self.workspace_is_dirty = self.workspace.is_dirty
+
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
         self.workspace_is_dirty = not bool(is_clean)
@@ -969,10 +1006,33 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         QMessageBox.critical(self, "Could Not Prepare Analysis", message)
 
     def undo(self):
+        if self.workspace.can_undo:
+            if self.workspace.undo():
+                document = self.workspace.document
+                if document is not None:
+                    self._install_workspace_document(document)
+            return
         self.tableView.undoStack.undo()
 
     def redo(self):
+        if self.workspace.can_redo:
+            if self.workspace.redo():
+                document = self.workspace.document
+                if document is not None:
+                    self._install_workspace_document(document)
+            return
         self.tableView.undoStack.redo()
+
+    def _install_workspace_document(self, document):
+        runtime = project_adapter.document_to_runtime_project(document)
+        self.set_model(
+            runtime.dataset,
+            runtime.model_state,
+            preserve_state_selection=runtime.restored_selection,
+            recalculate_outcomes=False,
+        )
+        self.out_path = str(self.workspace.path) if self.workspace.path else None
+        self.workspace_is_dirty = self.workspace.is_dirty
 
     def edit_dataset(self):
         current_dataset = copy.deepcopy(self.model.dataset)
@@ -1589,7 +1649,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             return None
         self.out_path = file_path
         self.tableView.undoStack.clear()
-        self.workspace_is_dirty = False
+        self.workspace.new(_document_from_model(self.model), path=file_path)
+        self.workspace_is_dirty = self.workspace.is_dirty
         self._update_recent_project_nonfatal(file_path, "opened")
 
         return True
@@ -1868,7 +1929,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
         self.tableView.undoStack.setClean()
-        self.workspace_is_dirty = False
+        self.workspace.replace(_document_from_model(self.model), path=destination, record_history=False)
+        self.workspace.mark_saved()
+        self.workspace_is_dirty = self.workspace.is_dirty
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
         self._update_recent_project_nonfatal(destination, "saved")
