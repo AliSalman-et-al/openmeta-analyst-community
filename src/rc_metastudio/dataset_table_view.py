@@ -183,15 +183,26 @@ class DatasetTableView(QtWidgets.QTableView):
         finally:
             self._column_widths.end_schema_change()
         self._column_model = model
-        if model is not None:
-            model.modelAboutToBeReset.connect(self._begin_column_schema_change)
-            model.modelReset.connect(self._end_column_schema_change)
-            model.columnsAboutToBeInserted.connect(self._begin_column_schema_change)
-            model.columnsInserted.connect(self._end_column_schema_change)
-            model.columnsAboutToBeRemoved.connect(self._begin_column_schema_change)
-            model.columnsRemoved.connect(self._end_column_schema_change)
-            model.headerDataChanged.connect(self.synchronize_column_widths)
+        self._connect_column_model(model)
         self.synchronize_column_widths()
+
+    def restore_model(self, model):
+        """Restore a previously bound model without repeating failed layout work."""
+        self._disconnect_column_model()
+        QTableView.setModel(self, model)
+        self._column_model = model
+        self._connect_column_model(model)
+
+    def _connect_column_model(self, model):
+        if model is None:
+            return
+        model.modelAboutToBeReset.connect(self._begin_column_schema_change)
+        model.modelReset.connect(self._end_column_schema_change)
+        model.columnsAboutToBeInserted.connect(self._begin_column_schema_change)
+        model.columnsInserted.connect(self._end_column_schema_change)
+        model.columnsAboutToBeRemoved.connect(self._begin_column_schema_change)
+        model.columnsRemoved.connect(self._end_column_schema_change)
+        model.headerDataChanged.connect(self.synchronize_column_widths)
 
     def _disconnect_column_model(self):
         if self._column_model is None:

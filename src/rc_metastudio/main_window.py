@@ -1525,6 +1525,17 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
+        previous_model = self.model
+        previous_current = self.tableView.currentIndex()
+        current_cell = (
+            (previous_current.row(), previous_current.column())
+            if previous_current.isValid()
+            else None
+        )
+        selected_cells = [
+            (index.row(), index.column())
+            for index in self.tableView.selectionModel().selectedIndexes()
+        ]
         try:
             self.set_model(
                 data_model,
@@ -1536,6 +1547,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.model.analysis_source_path = file_path
             self.dataset_file_lbl.setText("Open Project: %s" % file_path)
         except Exception as e:
+            self._restore_failed_open(previous_model, current_cell, selected_cells)
             msg = _format_open_project_error(file_path, e)
             try:
                 app_error_handler.log_exception(type(e), e, e.__traceback__)
@@ -1551,6 +1563,31 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self._update_recent_project_nonfatal(file_path, "opened")
 
         return True
+
+    def _restore_failed_open(self, model, current_cell, selected_cells):
+        """Restore the live Qt adapter after a candidate model fails to install."""
+        self._disconnect_model_signals()
+        self.model = model
+        self.tableView.restore_model(model)
+        self._setup_connections(menu_actions=False)
+        if len(model.dataset) >= 2:
+            self.enable_menu_options_that_require_dataset()
+        else:
+            self.disable_menu_options_that_require_dataset()
+        self._refresh_advanced_analysis_actions()
+        self.populate_metrics_menu(metric_to_check=model.current_effect)
+        self.update_outcome_lbl()
+        self.update_follow_up_label()
+        selection_model = self.tableView.selectionModel()
+        selection_model.clearSelection()
+        select = QtCore.QItemSelectionModel.SelectionFlag.Select
+        for row, column in selected_cells:
+            selection_model.select(model.index(row, column), select)
+        if current_cell is not None:
+            selection_model.setCurrentIndex(
+                model.index(*current_cell),
+                QtCore.QItemSelectionModel.SelectionFlag.NoUpdate,
+            )
 
     def delete_study(self, study, study_index=None):
         def undo_f():
