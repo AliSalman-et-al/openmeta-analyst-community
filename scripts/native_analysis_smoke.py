@@ -167,7 +167,10 @@ def main() -> int:
     if confidence_input is None:
         raise RuntimeError("confidence-level input is missing")
     confidence_input.setLocale(QtCore.QLocale(QtCore.QLocale.Language.German))
-    confidence_input.lineEdit().setText("90,5")
+    line_edit = confidence_input.lineEdit()
+    if line_edit is None:
+        raise RuntimeError("confidence-level line edit is missing")
+    line_edit.setText("90,5")
     confidence_input.interpretText()
     request = configuration.analysis_requests()[0]
 
