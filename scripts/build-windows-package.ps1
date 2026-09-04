@@ -305,7 +305,7 @@ function Invoke-PackagedAppSmokeTest {
         if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
         $env:QT_SCALE_FACTOR = "1.25"
         $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
-            -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
+            -ArgumentList @("--automation-package-workflow-observation", ('"{0}"' -f $workflowObservationPath), $quotedSamplePath) `
             -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath
         if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
 

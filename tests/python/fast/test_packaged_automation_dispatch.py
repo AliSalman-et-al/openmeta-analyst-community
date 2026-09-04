@@ -24,6 +24,11 @@ import pytest
             "start_startup_wizard_smoke",
             ("wizard.json", "sample.rcms"),
         ),
+        (
+            ["RCMetaStudio", "--automation-package-workflow-observation", "workflow.json", "sample.rcms"],
+            "start_package_workflow_observation",
+            ("workflow.json", "sample.rcms"),
+        ),
     ],
 )
 def test_packaged_qualification_commands_reach_shipped_hooks(
@@ -51,6 +56,8 @@ def test_packaged_qualification_commands_validate_their_arguments():
         automation.dispatch(["RCMetaStudio", "--automation-package-surface-smoke"])
     with pytest.raises(SystemExit, match="startup-wizard-smoke requires"):
         automation.dispatch(["RCMetaStudio", "--automation-startup-wizard-smoke"])
+    with pytest.raises(SystemExit, match="workflow-observation requires"):
+        automation.dispatch(["RCMetaStudio", "--automation-package-workflow-observation"])
 
 
 def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
@@ -64,14 +71,13 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
     workflow_path.write_text(json.dumps({
         "summary": "Binary Random-Effects Model\nEstimate 1",
         "svg_paths": {"forest": str(tmp_path / "forest.svg")},
-        "locale_variants": [
+        "locale_inputs": [
             {"locale": "en_US", "input": "1.2", "canonical_value": 1.2},
             {"locale": "de_DE", "input": "1,2", "canonical_value": 1.2},
         ],
-        "representative_edit": True,
-        "real_r_analysis": True,
-        "save_reopen": True,
-        "analysis_after_reopen": True,
+        "edit_observed": True,
+        "analysis_observed": True,
+        "reopen_observed": True,
     }), encoding="utf-8")
     (tmp_path / "forest.svg").write_text("<svg />", encoding="utf-8")
     surfaces_path = tmp_path / "surfaces.json"

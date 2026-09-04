@@ -885,7 +885,7 @@ PY
       "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
       --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
       --completion-log "$smoke_log_path" -- \
-      "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
+      "$app_root/RCMetaStudio" --automation-package-workflow-observation "$workflow_observation_path" "$sample_path"
 
   for scale in "1.25" "1.50" "1.75"; do
     step "Running packaged Cocoa surface smoke at scale $scale"
@@ -1123,7 +1123,10 @@ PY
       "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
       --stdout "$extracted_stdout" --stderr "$extracted_stderr" \
       --completion-log "$extracted_smoke_log" -- \
-      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
+      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-workflow-observation "$extracted_workflow" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
+  # The normal native gate remains part of this extracted-package qualification:
+  # --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
+  run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   for scale in "1.25" "1.50" "1.75"; do
     QT_SCALE_FACTOR="$scale" RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
       RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \

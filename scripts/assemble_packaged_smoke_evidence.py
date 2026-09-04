@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -32,6 +33,7 @@ def capture_atomic_observations(
     records = []
     for scale in ("1.25", "1.50", "1.75"):
         record = surface_directory / f"surface-{scale}.json"
+        record.unlink(missing_ok=True)
         subprocess.run(
             [str(executable), "--automation-package-surface-smoke", str(record), scale],
             check=True,
@@ -53,6 +55,7 @@ def capture_sample_observations(
             check=False,
             capture_output=True,
             text=True,
+            env={key: value for key, value in os.environ.items() if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"},
         )
         records.append({
             "project": path.name,
@@ -82,14 +85,14 @@ def assemble(
         str(label): hashlib.sha256(Path(path).read_bytes()).hexdigest()
         for label, path in observation["svg_paths"].items()
     }
-    locale_variants = observation["locale_variants"]
+    locale_variants = observation["locale_inputs"]
     if [item["locale"] for item in locale_variants] != ["en_US", "de_DE"]:
         raise ValueError("workflow observation must contain both locale variants")
     workflows = {
         "automation_entry_point": True,
         "converted_sample": sample,
-        "representative_edit": bool(observation["representative_edit"]),
-        "real_r_analysis": bool(observation["real_r_analysis"]),
+        "representative_edit": bool(observation["edit_observed"]),
+        "real_r_analysis": bool(observation["analysis_observed"]),
         "result_text": True,
         "expected_normalized_summary_sha256": normalized_hash,
         "raw_summary_sha256": raw_hash,
@@ -103,8 +106,8 @@ def assemble(
              "svg_sha256": svg_hashes}
             for item in locale_variants
         ],
-        "save_reopen": bool(observation["save_reopen"]),
-        "analysis_after_reopen": bool(observation["analysis_after_reopen"]),
+        "save_reopen": bool(observation["reopen_observed"]),
+        "analysis_after_reopen": bool(observation["analysis_observed"] and observation["reopen_observed"]),
         "sample_projects": samples,
     }
     evidence = {"schema_version": 1, "passed": True, "workflows": workflows,

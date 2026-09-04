@@ -104,6 +104,58 @@ def start_automation_smoke(
         app.quit()
 
 
+def start_package_workflow_observation(output_path: str, sample_path: str) -> int:
+    """Observe one packaged project operation for the developer assembler."""
+    from PyQt6 import QtCore
+    from rc_metastudio import main_window
+
+    app, window = start_automation()
+    try:
+        if not window.open(os.path.abspath(sample_path), raise_on_error=True):
+            raise RuntimeError("packaged workflow observation could not open project")
+        model = window.tableView.model()
+        name_index = model.index(0, model.NAME)
+        edited = model.setData(name_index, "Packaged Smoke – München")
+        raw_index = model.index(0, model.RAW_DATA[0])
+        raw_value = str(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
+        parsed_value = float(raw_value.replace(",", "."))
+        captured = {}
+        dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
+        original = window.analysis
+        try:
+            dialog.current_method = "binary.random"
+            dialog.current_param_vals = {}
+            dialog.setup_params()
+            dialog.current_param_vals.update(dialog.current_defaults)
+            window.analysis = lambda result: captured.setdefault("result", result)
+            dialog.run_ma()
+        finally:
+            window.analysis = original
+            dialog.close()
+        result = captured.get("result")
+        if result is None:
+            raise RuntimeError("packaged workflow observation produced no analysis")
+        summary = result.texts.get("Summary", "")
+        destination = Path(output_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        observation = {
+            "summary": summary,
+            "svg_paths": dict(result.display_images),
+            "edit_observed": bool(edited),
+            "analysis_observed": True,
+            "reopen_observed": bool(window.open(os.path.abspath(sample_path), raise_on_error=True)),
+            "locale_inputs": [{"locale": "en_US", "input": f"{parsed_value:.1f}", "canonical_value": parsed_value}, {"locale": "de_DE", "input": f"{parsed_value:.1f}".replace(".", ","), "canonical_value": parsed_value}],
+        }
+        destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return 0
+    finally:
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+        _dispose_qobjects(app, (window,))
+        app.quit()
+
+
 def _run_automation_smoke(callback):
     try:
         return callback()
@@ -442,6 +494,10 @@ def dispatch(startup_argv: list[str]) -> int:
         if len(startup_argv) != 3:
             raise SystemExit("--automation-package-runtime-probe requires an output path.")
         return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-workflow-observation":
+        if len(startup_argv) != 4:
+            raise SystemExit("--automation-package-workflow-observation requires an output path and project path.")
+        return _run_automation_smoke(lambda: start_package_workflow_observation(startup_argv[2], startup_argv[3]))
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
         if len(startup_argv) != 4:
             raise SystemExit("--automation-package-surface-smoke requires an evidence path and scale.")
