@@ -14,7 +14,7 @@
     "source_fallback": false,
     "required_normal_packages": [
       "mada", "metafor", "rsvg", "svglite", "tiff", "xml2", "roxygen2", "testthat",
-      "igraph", "quantreg", "ape", "Hmisc", "mice", "ggplot2", "RColorBrewer",
+      "quantreg", "ape", "Hmisc", "mice", "ggplot2", "RColorBrewer",
       "Rcpp", "magrittr", "irlba", "minqa", "nloptr", "RcppEigen", "SparseM", "MatrixModels", "Formula",
       "latticeExtra", "acepack", "gridExtra", "data.table", "htmlTable", "viridis", "htmltools", "viridisLite",
       "htmlwidgets", "rmarkdown", "knitr", "stringr", "stringi", "colorspace", "gtable", "scales", "vctrs",
@@ -316,12 +316,6 @@
       "source": "cran",
       "reason": "Bundled as part of the app-level CRAN dependency closure.",
       "evidence": ["scripts/install-r-deps.R"]
-    },
-    {
-      "name": "igraph",
-      "source": "cran",
-      "reason": "Bundled as an app-level dependency retained outside direct RCMetaR metadata; no direct RCMetaR call site has been identified in this slice.",
-      "evidence": ["r/RCMetaR/DESCRIPTION", "scripts/install-r-deps.R"]
     },
     {
       "name": "quantreg",

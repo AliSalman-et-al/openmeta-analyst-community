@@ -312,7 +312,7 @@ def test_RCMetaR_r_manifests_validate():
     assert policy["repository"] == "https://packagemanager.posit.co/cran/2026-07-16"
     assert policy["normal_install_type"] == "binary"
     assert policy["source_fallback"] is False
-    assert len(policy["required_normal_packages"]) == 57
+    assert len(policy["required_normal_packages"]) == 56
     assert policy["source_exceptions"] == []
 
 
@@ -332,6 +332,24 @@ def test_meta_is_pinned_directly_and_transitive_statistics_packages_stay_in_clos
     for package in ("metabook", "CompQuadForm"):
         assert package not in direct
         assert app[package]["source"] == "cran"
+
+
+def test_removed_igraph_is_not_an_explicit_manifest_or_packaging_dependency():
+    manifest = json.loads((REPO_ROOT / DEPENDENCY_MANIFEST).read_text(encoding="utf-8"))
+    policy = manifest["binary_package_policy"]
+    manifest_names = {
+        item["name"]
+        for section in ("direct_RCMetaR_dependencies", "app_r_bundle_dependencies")
+        for item in manifest[section]
+    }
+
+    assert "igraph" not in manifest_names
+    assert "igraph" not in policy["required_normal_packages"]
+    for package_script in (
+        REPO_ROOT / "scripts" / "build-macos-package.sh",
+        REPO_ROOT / "scripts" / "build-windows-package.ps1",
+    ):
+        assert "igraph" not in package_script.read_text(encoding="utf-8")
 
 
 def test_manifest_rejects_wrong_meta_pin(tmp_path):
