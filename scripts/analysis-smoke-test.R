@@ -168,7 +168,7 @@ record(
   rcmetar.run.diagnostic.analyses(
     multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
-    list(multi_sens_params, multi_spec_params), version=1
+    list(multi_sens_params, multi_spec_params), request.version=1
   )
 )
 record(
@@ -176,7 +176,7 @@ record(
   rcmetar.run.diagnostic.analyses(
     multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
-    list(multi_sens_params, multi_spec_params), version=1,
+    list(multi_sens_params, multi_spec_params), request.version=1,
     workflow = "cumulative"
   )
 )
@@ -185,7 +185,7 @@ record(
   rcmetar.run.diagnostic.analyses(
     multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
-    list(multi_sens_params, multi_spec_params), version=1,
+    list(multi_sens_params, multi_spec_params), request.version=1,
     workflow = "leave-one-out"
   )
 )
@@ -194,7 +194,7 @@ record(
   rcmetar.run.diagnostic.analyses(
     multi_fixture$data,
     c("diagnostic.random", "diagnostic.random"),
-    list(multi_sens_params, multi_spec_params), version=1,
+    list(multi_sens_params, multi_spec_params), request.version=1,
     workflow = "subgroup"
   )
 )
