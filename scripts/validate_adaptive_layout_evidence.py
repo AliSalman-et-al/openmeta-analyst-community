@@ -132,25 +132,36 @@ def _contains(
     )
 
 
-def _validate_scenario_semantics(record: dict[str, object]) -> tuple[int, int, int, int]:
+def _scenario_contract(
+    record: dict[str, object],
+) -> tuple[str, str, list[int] | None, list[int] | None]:
     name = record.get("name")
     if not isinstance(name, str) or name not in EXPECTED_SCENARIO_CONTRACTS:
         _fail("scenario has an unknown name")
     archetype, exact_client_size, owner_size = EXPECTED_SCENARIO_CONTRACTS[name]
-    if record.get("archetype") != archetype:
-        _fail("%s has wrong archetype" % name)
-    if record.get("owning_workspace_client_size") != owner_size:
-        _fail("%s has wrong owning Workspace contract" % name)
+    return name, archetype, exact_client_size, owner_size
+
+
+def _validate_requested_client(
+    record: dict[str, object],
+    name: str,
+    exact_client_size: list[int] | None,
+    client: tuple[int, int, int, int],
+) -> None:
     requested = record.get("requested_client_size")
-    client = _rect(record, "actual_client_geometry")
-    frame = _rect(record, "actual_frame_geometry")
-    available = _rect(record, "available_screen_geometry")
     actual_client_size = [client[2], client[3]]
     if exact_client_size is not None:
         if requested != exact_client_size or actual_client_size != exact_client_size:
             _fail("%s did not request and reach its exact client viewport" % name)
     elif requested != actual_client_size:
         _fail("%s content-driven requested and actual client sizes differ" % name)
+
+
+def _validate_scenario_geometry(
+    record: dict[str, object], name: str, client: tuple[int, int, int, int]
+) -> tuple[int, int, int, int]:
+    frame = _rect(record, "actual_frame_geometry")
+    available = _rect(record, "available_screen_geometry")
     if not _contains(frame, client):
         _fail("%s frame does not contain its client geometry" % name)
     if not _contains(available, frame):
@@ -162,6 +173,12 @@ def _validate_scenario_semantics(record: dict[str, object]) -> tuple[int, int, i
         != "QScreen.grabWindow(window); native frame capture"
     ):
         _fail("%s has an unexpected capture method" % name)
+    return frame
+
+
+def _validate_client_paint_probe(
+    record: dict[str, object], name: str, client: tuple[int, int, int, int]
+) -> None:
     probe = record.get("client_paint_probe_pixel_size")
     if (
         not isinstance(probe, list)
@@ -176,6 +193,20 @@ def _validate_scenario_semantics(record: dict[str, object]) -> tuple[int, int, i
     expected_probe = [round(client[2] * probe_dpr), round(client[3] * probe_dpr)]
     if probe_dpr <= 0 or probe != expected_probe:
         _fail("%s client paint probe geometry/DPR is inconsistent" % name)
+
+
+def _validate_scenario_semantics(
+    record: dict[str, object],
+) -> tuple[int, int, int, int]:
+    name, archetype, exact_client_size, owner_size = _scenario_contract(record)
+    if record.get("archetype") != archetype:
+        _fail("%s has wrong archetype" % name)
+    if record.get("owning_workspace_client_size") != owner_size:
+        _fail("%s has wrong owning Workspace contract" % name)
+    client = _rect(record, "actual_client_geometry")
+    _validate_requested_client(record, name, exact_client_size, client)
+    frame = _validate_scenario_geometry(record, name, client)
+    _validate_client_paint_probe(record, name, client)
     return frame
 
 
@@ -183,6 +214,16 @@ def _validate_unavailable_scenario(
     record: dict[str, object], expected_scale: str
 ) -> None:
     name = record.get("name")
+    _validate_unavailable_identity(record, name, expected_scale)
+    expected_client = EXPECTED_SCENARIO_CONTRACTS[name][1]
+    _validate_unavailable_request(record, name, expected_client)
+    margins = _margin_values(record.get("frame_margins"), name)
+    _validate_unavailable_geometry(record, name, expected_client, margins)
+
+
+def _validate_unavailable_identity(
+    record: dict[str, object], name: object, expected_scale: str
+) -> None:
     if name not in CAPABILITY_QUALIFIED_SCENARIOS:
         _fail("%s cannot be capability-unavailable" % name)
     if str(expected_scale) != "1.5":
@@ -194,28 +235,28 @@ def _validate_unavailable_scenario(
         != "required native frame exceeds available screen geometry"
     ):
         _fail("%s has an invalid unavailable reason" % name)
-    expected_client = EXPECTED_SCENARIO_CONTRACTS[name][1]
+
+
+def _validate_unavailable_request(
+    record: dict[str, object], name: object, expected_client: list[int] | None
+) -> None:
     if expected_client is None:
         _fail("%s has no exact client contract" % name)
     if record.get("requested_client_size") != expected_client:
         _fail("%s has the wrong unavailable client request" % name)
-    margins = record.get("frame_margins")
-    if not isinstance(margins, dict):
-        _fail("%s has no native frame margins" % name)
-    margin_values_record = _mapping(margins, "native frame margins")
-    try:
-        margin_values = [
-            _integer(margin_values_record[key], f"margin {key}")
-            for key in ("left", "top", "right", "bottom")
-        ]
-    except (KeyError, TypeError, ValueError):
-        _fail("%s has malformed native frame margins" % name)
-    if min(margin_values) < 0:
+
+
+def _validate_unavailable_geometry(
+    record: dict[str, object],
+    name: object,
+    expected_client: list[int] | None,
+    margins: list[int],
+) -> None:
+    if expected_client is None:
+        _fail("%s has no exact client contract" % name)
+    if min(margins) < 0:
         _fail("%s has negative native frame margins" % name)
-    required = [
-        expected_client[0] + margin_values[0] + margin_values[2],
-        expected_client[1] + margin_values[1] + margin_values[3],
-    ]
+    required = _required_frame_size(expected_client, margins)
     if record.get("required_frame_size") != required:
         _fail("%s has inconsistent required frame geometry" % name)
     available = _rect(record, "available_screen_geometry")
@@ -223,18 +264,36 @@ def _validate_unavailable_scenario(
         _fail("%s was marked unavailable even though its native frame fits" % name)
 
 
-def validate_evidence(
-    root: Path, expected_platform: str, expected_scale: str
-) -> dict[str, object]:
-    root = Path(root).resolve()
+def _margin_values(margins: object, name: object) -> list[int]:
+    margin_values_record = _mapping(margins, "native frame margins")
+    try:
+        return [
+            _integer(margin_values_record[key], f"margin {key}")
+            for key in ("left", "top", "right", "bottom")
+        ]
+    except (KeyError, TypeError, ValueError):
+        _fail("%s has malformed native frame margins" % name)
+
+
+def _required_frame_size(client_size: list[int], margins: list[int]) -> list[int]:
+    return [
+        client_size[0] + margins[0] + margins[2],
+        client_size[1] + margins[1] + margins[3],
+    ]
+
+
+def _read_manifest(root: Path) -> dict[str, object]:
     manifest_path = root / "manifest.json"
     try:
-        manifest = _mapping(
-            json.loads(manifest_path.read_text(encoding="utf-8")), "manifest"
-        )
+        value = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         _fail("manifest.json is missing or unreadable: %s" % exc)
+    return _mapping(value, "manifest")
 
+
+def _validate_manifest_metadata(
+    manifest: dict[str, object], expected_platform: str, expected_scale: str
+) -> None:
     if manifest.get("schema_version") != 2:
         _fail("unexpected manifest schema version")
     if manifest.get("platform_plugin") != expected_platform:
@@ -246,6 +305,10 @@ def validate_evidence(
     if str(manifest.get("machine", "")).lower() not in {"amd64", "x86_64"}:
         _fail("evidence was not generated on x64")
 
+
+def _scenario_records(
+    manifest: dict[str, object],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     surfaces = [
         _mapping(record, "surface record")
         for record in _list(manifest.get("surfaces"), "surfaces")
@@ -256,6 +319,12 @@ def validate_evidence(
             manifest.get("unavailable_scenarios"), "unavailable_scenarios"
         )
     ]
+    return surfaces, unavailable
+
+
+def _validate_scenario_membership(
+    surfaces: list[dict[str, object]], unavailable: list[dict[str, object]]
+) -> None:
     surface_names = tuple(record.get("name") for record in surfaces)
     unavailable_names = tuple(record.get("name") for record in unavailable)
     observed_names = surface_names + unavailable_names
@@ -266,64 +335,65 @@ def validate_evidence(
             "scenario membership is %r plus unavailable %r, expected %r"
             % (surface_names, unavailable_names, EXPECTED_SCENARIOS)
         )
-    expected_surface_order = tuple(
-        name for name in EXPECTED_SCENARIOS if name in surface_names
-    )
-    if surface_names != expected_surface_order:
+    expected_order = tuple(name for name in EXPECTED_SCENARIOS if name in surface_names)
+    if surface_names != expected_order:
         _fail(
             "available scenario order is %r, expected %r"
-            % (surface_names, expected_surface_order)
+            % (surface_names, expected_order)
         )
-    for record in unavailable:
-        _validate_unavailable_scenario(record, expected_scale)
 
-    expected_files = {
-        "manifest.json",
-        "HUMAN_REVIEW.md",
-        "intrinsic-ratio-evidence.png",
-    }
-    for record in surfaces:
-        frame = _validate_scenario_semantics(record)
-        relative = record.get("screenshot")
-        name = record.get("name")
-        if not isinstance(name, str):
-            _fail("surface record has no name")
-        if not isinstance(relative, str):
-            _fail("surface record has no screenshot path")
-        expected_relative = "screenshots/%s.png" % name
-        if relative != expected_relative:
-            _fail("scenario %s has unexpected screenshot path" % record["name"])
-        expected_files.add(relative)
-        path = root / relative
-        if not path.is_file():
-            _fail("missing screenshot %s" % relative)
-        if _sha256(path) != record.get("sha256"):
-            _fail("SHA-256 mismatch for %s" % relative)
-        dpr = _number(record.get("device_pixel_ratio", 0), "device pixel ratio")
-        if dpr <= 0:
-            _fail("invalid device pixel ratio for %s" % relative)
-        expected_pixels = [
-            _physical_pixel_extent(frame[2], dpr),
-            _physical_pixel_extent(frame[3], dpr),
-        ]
-        if expected_pixels != record.get("capture_pixel_size"):
-            _fail("capture geometry/DPR metadata is inconsistent for %s" % relative)
-        _read_nonblank_png(path, expected_pixels)
 
+def _validate_surface_record(
+    root: Path, record: dict[str, object], expected_files: set[str]
+) -> None:
+    frame = _validate_scenario_semantics(record)
+    relative = record.get("screenshot")
+    name = record.get("name")
+    if not isinstance(name, str):
+        _fail("surface record has no name")
+    if not isinstance(relative, str):
+        _fail("surface record has no screenshot path")
+    expected_relative = "screenshots/%s.png" % name
+    if relative != expected_relative:
+        _fail("scenario %s has unexpected screenshot path" % record["name"])
+    expected_files.add(relative)
+    path = root / relative
+    if not path.is_file():
+        _fail("missing screenshot %s" % relative)
+    if _sha256(path) != record.get("sha256"):
+        _fail("SHA-256 mismatch for %s" % relative)
+    dpr = _number(record.get("device_pixel_ratio", 0), "device pixel ratio")
+    if dpr <= 0:
+        _fail("invalid device pixel ratio for %s" % relative)
+    expected_pixels = [
+        _physical_pixel_extent(frame[2], dpr),
+        _physical_pixel_extent(frame[3], dpr),
+    ]
+    if expected_pixels != record.get("capture_pixel_size"):
+        _fail("capture geometry/DPR metadata is inconsistent for %s" % relative)
+    _read_nonblank_png(path, expected_pixels)
+
+
+def _validate_intrinsic_artifact(
+    root: Path, manifest: dict[str, object], expected_files: set[str]
+) -> None:
     artifact = _mapping(manifest.get("intrinsic_artifact", {}), "intrinsic artifact")
-    artifact_relative = artifact.get("path")
-    if not isinstance(artifact_relative, str):
+    relative = artifact.get("path")
+    if not isinstance(relative, str):
         _fail("intrinsic artifact path is missing")
-    if artifact_relative != "intrinsic-ratio-evidence.png":
+    if relative != "intrinsic-ratio-evidence.png":
         _fail("unexpected intrinsic artifact path")
-    artifact_path = root / artifact_relative
-    if _sha256(artifact_path) != artifact.get("sha256"):
+    path = root / relative
+    if _sha256(path) != artifact.get("sha256"):
         _fail("SHA-256 mismatch for intrinsic artifact")
-    artifact_size = artifact.get("pixel_size")
-    if not isinstance(artifact_size, list):
+    size = artifact.get("pixel_size")
+    if not isinstance(size, list):
         _fail("intrinsic artifact pixel size is missing")
-    _read_nonblank_png(artifact_path, artifact_size)
+    expected_files.add(relative)
+    _read_nonblank_png(path, size)
 
+
+def _validate_artifact_membership(root: Path, expected_files: set[str]) -> None:
     actual_files = {
         path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
     }
@@ -335,9 +405,30 @@ def validate_evidence(
                 sorted(actual_files - expected_files),
             )
         )
-    checklist = root / "HUMAN_REVIEW.md"
-    if not checklist.read_text(encoding="utf-8").strip():
+    if not (root / "HUMAN_REVIEW.md").read_text(encoding="utf-8").strip():
         _fail("HUMAN_REVIEW.md is empty")
+
+
+def validate_evidence(
+    root: Path, expected_platform: str, expected_scale: str
+) -> dict[str, object]:
+    root = Path(root).resolve()
+    manifest = _read_manifest(root)
+    _validate_manifest_metadata(manifest, expected_platform, expected_scale)
+    surfaces, unavailable = _scenario_records(manifest)
+    _validate_scenario_membership(surfaces, unavailable)
+    for record in unavailable:
+        _validate_unavailable_scenario(record, expected_scale)
+
+    expected_files: set[str] = {
+        "manifest.json",
+        "HUMAN_REVIEW.md",
+        "intrinsic-ratio-evidence.png",
+    }
+    for record in surfaces:
+        _validate_surface_record(root, record, expected_files)
+    _validate_intrinsic_artifact(root, manifest, expected_files)
+    _validate_artifact_membership(root, expected_files)
     return manifest
 
 

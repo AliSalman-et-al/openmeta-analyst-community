@@ -13,6 +13,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from typing import cast
 from urllib.parse import urlparse
 
 
@@ -114,7 +115,9 @@ def _record_strings(record: dict[str, object], key: str, label: str) -> list[str
     return result
 
 
-def _record_list(record: dict[str, object], key: str, label: str) -> list[dict[str, object]]:
+def _record_list(
+    record: dict[str, object], key: str, label: str
+) -> list[dict[str, object]]:
     value = record.get(key)
     if not isinstance(value, list):
         raise KitError(f"{label} is missing its {key} record list")
@@ -126,7 +129,9 @@ def _record_list(record: dict[str, object], key: str, label: str) -> list[dict[s
     return result
 
 
-def _record_mapping(record: dict[str, object], key: str, label: str) -> dict[str, object]:
+def _record_mapping(
+    record: dict[str, object], key: str, label: str
+) -> dict[str, object]:
     value = record.get(key)
     if not isinstance(value, dict):
         raise KitError(f"{label} is missing its {key} object")
@@ -214,27 +219,46 @@ def _declares_license_file(value: object) -> bool:
     return "file license" in normalized or "file licence" in normalized
 
 
-def _valid_license_files(value: object, *, declared_license: object) -> bool:
-    if not isinstance(value, list):
+def _license_record(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    record = {key: field for key, field in value.items() if isinstance(key, str)}
+    if len(record) != len(value):
+        return None
+    if not _license_path_valid(record):
+        return None
+    return record
+
+
+def _license_path_valid(record: dict[str, object]) -> bool:
+    path = record.get("path")
+    if not isinstance(path, str) or not path:
         return False
+    relative = Path(path)
+    if relative.is_absolute() or ".." in relative.parts:
+        return False
+    return _valid_sha256(record.get("sha256"))
+
+
+def _license_records(value: object) -> list[dict[str, object]] | None:
+    if not isinstance(value, list):
+        return None
     records: list[dict[str, object]] = []
     for item in value:
-        if not isinstance(item, dict):
-            return False
-        record = {key: field for key, field in item.items() if isinstance(key, str)}
-        if len(record) != len(item):
-            return False
-        path = record.get("path")
-        if not (
-            isinstance(path, str)
-            and path
-            and not Path(path).is_absolute()
-            and ".." not in Path(path).parts
-            and _valid_sha256(record.get("sha256"))
-        ):
-            return False
+        record = _license_record(item)
+        if record is None:
+            return None
         records.append(record)
-    return not _declares_license_file(declared_license) or any(
+    return records
+
+
+def _valid_license_files(value: object, *, declared_license: object) -> bool:
+    records = _license_records(value)
+    if records is None:
+        return False
+    if not _declares_license_file(declared_license):
+        return True
+    return any(
         Path(_record_string(record, "path", "license record")).name.casefold()
         in {"license", "licence"}
         for record in records
@@ -261,97 +285,178 @@ def _valid_official_r(record: dict[str, object], target: str) -> bool:
     )
 
 
-def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, object]:
-    provenance = _mapping(
-        json.loads(path.read_text(encoding="utf-8")), "provenance manifest"
-    )
+def _read_provenance(path: Path) -> dict[str, object]:
+    return _mapping(json.loads(path.read_text(encoding="utf-8")), "provenance manifest")
+
+
+def _provenance_sections(
+    provenance: dict[str, object],
+) -> tuple[
+    dict[str, object],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    dict[str, object],
+    list[dict[str, object]],
+]:
     official_r = _record_mapping(provenance, "official_r", "provenance")
     ppm = _record_list(provenance, "ppm_packages", "provenance")
     source_packages = _record_list(provenance, "source_packages", "provenance")
     rpy2 = _record_mapping(provenance, "rpy2", "provenance")
     rpy2_archives = _record_list(rpy2, "source_archives", "rpy2 provenance")
-    if not (
-        provenance.get("schema_version") == 1
-        and provenance.get("target") == target
-        and _valid_official_r(official_r, target)
-        and isinstance(ppm, list)
-        and ppm
-        and isinstance(source_packages, list)
-        and source_packages
-        and rpy2.get("version") == RPY2_VERSION
-        and rpy2.get("sdist_distribution") == "rpy2-rinterface"
-        and rpy2.get("sdist_version") == RPY2_RINTERFACE_VERSION
-        and rpy2.get("robjects_version") == RPY2_ROBJECTS_VERSION
-        and _verified_https(rpy2.get("sdist_url"))
-        and urlparse(str(rpy2.get("sdist_url"))).hostname == "files.pythonhosted.org"
-        and _valid_sha256(rpy2.get("sdist_sha256"))
-        and _valid_sha256(rpy2.get("build_log_sha256"))
-        and rpy2.get("toolchain")
-        and rpy2.get("license")
-        and isinstance(rpy2_archives, list)
-        and rpy2.get("bridge_sha256") == sha256_file(bridge)
-    ):
+    return official_r, ppm, source_packages, rpy2, rpy2_archives
+
+
+def _validate_provenance_identity(
+    provenance: dict[str, object],
+    target: str,
+    bridge: Path,
+    official_r: dict[str, object],
+    ppm: list[dict[str, object]],
+    source_packages: list[dict[str, object]],
+    rpy2: dict[str, object],
+    rpy2_archives: list[dict[str, object]],
+) -> None:
+    valid_rpy2 = _valid_rpy2_identity(rpy2, bridge)
+    valid_manifest = all(
+        (
+            provenance.get("schema_version") == 1,
+            provenance.get("target") == target,
+            _valid_official_r(official_r, target),
+            bool(ppm),
+            bool(source_packages),
+            valid_rpy2,
+            bool(rpy2_archives),
+        )
+    )
+    if not valid_manifest:
         raise KitError("integration-kit provenance manifest is incomplete or invalid")
+
+
+def _valid_rpy2_identity(rpy2: dict[str, object], bridge: Path) -> bool:
+    return all(
+        (
+            rpy2.get("version") == RPY2_VERSION,
+            rpy2.get("sdist_distribution") == "rpy2-rinterface",
+            rpy2.get("sdist_version") == RPY2_RINTERFACE_VERSION,
+            rpy2.get("robjects_version") == RPY2_ROBJECTS_VERSION,
+            _verified_https(rpy2.get("sdist_url")),
+            urlparse(str(rpy2.get("sdist_url"))).hostname == "files.pythonhosted.org",
+            _valid_sha256(rpy2.get("sdist_sha256")),
+            _valid_sha256(rpy2.get("build_log_sha256")),
+            bool(rpy2.get("toolchain")),
+            bool(rpy2.get("license")),
+            rpy2.get("bridge_sha256") == sha256_file(bridge),
+        )
+    )
+
+
+def _validate_rpy2_archives(
+    rpy2: dict[str, object], archives: list[dict[str, object]]
+) -> None:
     expected_rpy2_archives = {
         "rpy2": "3.6.7",
         "rpy2-rinterface": RPY2_RINTERFACE_VERSION,
         "rpy2-robjects": RPY2_ROBJECTS_VERSION,
     }
-    if {
+    observed_archives = {
         str(record.get("distribution")): str(record.get("version"))
-        for record in rpy2_archives
-        if isinstance(record, dict)
-    } != expected_rpy2_archives:
+        for record in archives
+    }
+    if observed_archives != expected_rpy2_archives:
         raise KitError("rpy2 split source archive provenance is incomplete")
-    for record in rpy2_archives:
-        if not (
-            _verified_https(record.get("url"))
-            and urlparse(str(record.get("url"))).hostname == "files.pythonhosted.org"
-            and _valid_sha256(record.get("sha256"))
-            and _valid_license_files(
-                record.get("license_files"), declared_license="file LICENSE"
-            )
-        ):
+    for record in archives:
+        if not _valid_rpy2_archive(record):
             raise KitError("rpy2 split source archive license provenance is invalid")
-    rinterface_archive = next(
-        record
-        for record in rpy2_archives
-        if record.get("distribution") == "rpy2-rinterface"
-    )
-    if rpy2.get("sdist_url") != rinterface_archive.get("url") or rpy2.get(
-        "sdist_sha256"
-    ) != rinterface_archive.get("sha256"):
+    rinterface_archive = _rinterface_archive(archives)
+    if not _rinterface_matches(rpy2, rinterface_archive):
         raise KitError("rpy2 API bridge source differs from retained rinterface sdist")
+
+
+def _rinterface_archive(archives: list[dict[str, object]]) -> dict[str, object]:
+    return next(
+        record for record in archives if record.get("distribution") == "rpy2-rinterface"
+    )
+
+
+def _rinterface_matches(rpy2: dict[str, object], archive: dict[str, object]) -> bool:
+    return all(
+        (
+            rpy2.get("sdist_url") == archive.get("url"),
+            rpy2.get("sdist_sha256") == archive.get("sha256"),
+        )
+    )
+
+
+def _valid_rpy2_archive(record: dict[str, object]) -> bool:
+    return all(
+        (
+            _verified_https(record.get("url")),
+            urlparse(str(record.get("url"))).hostname == "files.pythonhosted.org",
+            _valid_sha256(record.get("sha256")),
+            _valid_license_files(
+                record.get("license_files"), declared_license="file LICENSE"
+            ),
+        )
+    )
+
+
+def _validate_ppm_packages(ppm: list[dict[str, object]], target: str) -> None:
     for record in ppm:
-        if not (
-            record.get("name")
-            and record.get("version")
-            and record.get("package_type") in {"win.binary", "mac.binary"}
-            and str(record.get("url", "")).startswith(
-                f"{PPM_REPOSITORY}/{PPM_CONTRIB_PATHS[target]}/"
-            )
-            and _valid_sha256(record.get("sha256"))
-            and _valid_license_files(
-                record.get("license_files"), declared_license=record.get("license")
-            )
-            and record.get("license")
-            and record.get("license") != "unknown"
-        ):
+        if not _valid_ppm_package(record, target):
             raise KitError("PPM archive provenance is incomplete or invalid")
+
+
+def _valid_ppm_package(record: dict[str, object], target: str) -> bool:
+    return all(
+        (
+            bool(record.get("name")),
+            bool(record.get("version")),
+            record.get("package_type") in {"win.binary", "mac.binary"},
+            str(record.get("url", "")).startswith(
+                f"{PPM_REPOSITORY}/{PPM_CONTRIB_PATHS[target]}/"
+            ),
+            _valid_sha256(record.get("sha256")),
+            _valid_license_files(
+                record.get("license_files"), declared_license=record.get("license")
+            ),
+            bool(record.get("license")),
+            record.get("license") != "unknown",
+        )
+    )
+
+
+def _validate_source_packages(source_packages: list[dict[str, object]]) -> None:
     source_names = {record.get("name") for record in source_packages}
     if "RCMetaR" not in source_names:
         raise KitError("RCMetaR source provenance is required")
     for record in source_packages:
-        if not (
-            _verified_https(record.get("url"))
-            and _valid_sha256(record.get("sha256"))
-            and _valid_sha256(record.get("build_log_sha256"))
-            and record.get("toolchain")
-            and record.get("package_type") == "source"
-            and record.get("version")
-            and record.get("license")
-        ):
+        if not _valid_source_package(record):
             raise KitError("source-package provenance is incomplete or invalid")
+
+
+def _valid_source_package(record: dict[str, object]) -> bool:
+    return all(
+        (
+            _verified_https(record.get("url")),
+            _valid_sha256(record.get("sha256")),
+            _valid_sha256(record.get("build_log_sha256")),
+            bool(record.get("toolchain")),
+            record.get("package_type") == "source",
+            bool(record.get("version")),
+            bool(record.get("license")),
+        )
+    )
+
+
+def load_provenance(path: Path, target: str, bridge: Path) -> dict[str, object]:
+    provenance = _read_provenance(path)
+    official_r, ppm, source_packages, rpy2, archives = _provenance_sections(provenance)
+    _validate_provenance_identity(
+        provenance, target, bridge, official_r, ppm, source_packages, rpy2, archives
+    )
+    _validate_rpy2_archives(rpy2, archives)
+    _validate_ppm_packages(ppm, target)
+    _validate_source_packages(source_packages)
     return provenance
 
 
@@ -388,9 +493,9 @@ def installed_package_inventory(library: Path) -> list[dict[str, str]]:
     return packages
 
 
-def validate_installed_provenance(
-    installed: list[dict[str, str]], provenance: dict[str, object]
-) -> None:
+def _provenance_claims_by_name(
+    provenance: dict[str, object],
+) -> dict[str, dict[str, object]]:
     claims = _record_list(provenance, "ppm_packages", "provenance") + _record_list(
         provenance, "source_packages", "provenance"
     )
@@ -400,28 +505,46 @@ def validate_installed_provenance(
         if name in by_name:
             raise KitError(f"package provenance contains duplicate identity: {name}")
         by_name[name] = record
+    return by_name
+
+
+def _validate_claimed_packages(
+    installed: list[dict[str, str]], claims: dict[str, dict[str, object]]
+) -> None:
     installed_by_name = {record["name"]: record for record in installed}
-    for name, claim in by_name.items():
+    for name, claim in claims.items():
         observed = installed_by_name.get(name)
         if observed is None or observed["version"] != claim["version"]:
             raise KitError(
                 f"installed package differs from provenance: {name}={observed and observed['version']}"
             )
+
+
+def _unclaimed_installed_packages(
+    installed: list[dict[str, str]], claims: dict[str, dict[str, object]]
+) -> list[str]:
     unclaimed = sorted(
         record["name"]
         for record in installed
         if record.get("priority") not in {"base", "recommended"}
-        and record["name"] not in by_name
+        and record["name"] not in claims
     )
+    return unclaimed
+
+
+def validate_installed_provenance(
+    installed: list[dict[str, str]], provenance: dict[str, object]
+) -> None:
+    claims = _provenance_claims_by_name(provenance)
+    _validate_claimed_packages(installed, claims)
+    unclaimed = _unclaimed_installed_packages(installed, claims)
     if unclaimed:
         raise KitError(
             "installed package lacks exact provenance: " + ", ".join(unclaimed)
         )
 
 
-def copy_source_payload(
-    source_root: Path, provenance: dict[str, object], destination: Path
-) -> list[dict[str, str]]:
+def _source_payload_claims(provenance: dict[str, object]) -> list[dict[str, object]]:
     claims = [
         {
             "name": record["name"],
@@ -443,30 +566,53 @@ def copy_source_payload(
             "rpy2 provenance",
         )
     )
+    return claims
+
+
+def _source_payload_by_hash(
+    source_root: Path,
+) -> tuple[list[Path], dict[str, list[Path]]]:
     candidates = [path for path in source_root.iterdir() if path.is_file()]
     by_hash: dict[str, list[Path]] = {}
     for path in candidates:
         by_hash.setdefault(sha256_file(path), []).append(path)
+
+    return candidates, by_hash
+
+
+def _copy_source_claim(
+    claim: dict[str, object], matches: list[Path], destination: Path
+) -> dict[str, str]:
+    name = str(claim["name"])
+    if len(matches) != 1:
+        raise KitError(f"source payload is missing or ambiguous: {name}")
+    source = matches[0]
+    target = destination / source.name
+    if target.exists():
+        raise KitError(f"source payload filename collision: {source.name}")
+    shutil.copy2(source, target)
+    return {
+        "name": name,
+        "version": str(claim["version"]),
+        "path": f"source-archives/{target.name}",
+        "sha256": str(claim["sha256"]),
+    }
+
+
+def copy_source_payload(
+    source_root: Path, provenance: dict[str, object], destination: Path
+) -> list[dict[str, str]]:
+    claims = _source_payload_claims(provenance)
+    candidates, by_hash = _source_payload_by_hash(source_root)
     if len(candidates) != len(claims):
         raise KitError("source payload must contain exactly the retained archives")
     destination.mkdir()
     records = []
     for claim in claims:
-        matches = by_hash.get(str(claim["sha256"]), [])
-        if len(matches) != 1:
-            raise KitError(f"source payload is missing or ambiguous: {claim['name']}")
-        source = matches[0]
-        target = destination / source.name
-        if target.exists():
-            raise KitError(f"source payload filename collision: {source.name}")
-        shutil.copy2(source, target)
         records.append(
-            {
-                "name": str(claim["name"]),
-                "version": str(claim["version"]),
-                "path": f"source-archives/{target.name}",
-                "sha256": str(claim["sha256"]),
-            }
+            _copy_source_claim(
+                claim, by_hash.get(str(claim["sha256"]), []), destination
+            )
         )
     return sorted(records, key=lambda record: record["name"])
 
@@ -641,49 +787,76 @@ def _resolve_macos_closure(records: list[dict[str, object]], root: Path) -> None
         if record.get("install_id"):
             by_install_id.setdefault(str(record["install_id"]), []).append(record)
     for record in records:
-        loader = (
-            root / _record_string(record, "path", "native record")
-        ).resolve().parent
-        resolutions = []
-        for dependency in _record_strings(record, "_imports", "native record"):
-            lowered = dependency.casefold()
-            if lowered.startswith(FORBIDDEN_NATIVE_PREFIXES):
-                raise KitError(f"forbidden external Mach-O dependency: {dependency}")
-            if dependency.startswith(("/usr/lib/", "/System/Library/")):
-                resolutions.append({"name": dependency, "resolution": "system"})
-                continue
-            candidates: list[dict[str, object]] = []
-            if dependency.startswith("@loader_path/"):
-                resolved = (loader / dependency[len("@loader_path/") :]).resolve()
-                if resolved in by_path:
-                    candidates.append(by_path[resolved])
-            elif dependency.startswith("@rpath/"):
-                suffix = dependency[len("@rpath/") :]
-                for rpath in _record_strings(record, "rpaths", "native record"):
-                    if rpath.startswith("@loader_path/"):
-                        resolved = (
-                            loader / rpath[len("@loader_path/") :] / suffix
-                        ).resolve()
-                        if resolved in by_path:
-                            candidates.append(by_path[resolved])
-                candidates.extend(by_install_id.get(dependency, []))
-            else:
-                candidates.extend(by_install_id.get(dependency, []))
-            unique = {item["path"]: item for item in candidates}
-            if len(unique) != 1:
-                raise KitError(
-                    f"Mach-O dependency is unresolved or ambiguous: {record['path']} -> {dependency}"
-                )
-            resolved_record = next(iter(unique.values()))
-            resolutions.append(
-                {
-                    "name": dependency,
-                    "resolution": "kit",
-                    "resolved_path": resolved_record["path"],
-                    "resolved_sha256": resolved_record["sha256"],
-                }
-            )
-        record["imports"] = resolutions
+        record["imports"] = _macos_record_resolutions(
+            record, root, by_path, by_install_id
+        )
+
+
+def _macos_record_resolutions(
+    record: dict[str, object],
+    root: Path,
+    by_path: dict[Path, dict[str, object]],
+    by_install_id: dict[str, list[dict[str, object]]],
+) -> list[dict[str, object]]:
+    loader = (root / _record_string(record, "path", "native record")).resolve().parent
+    return [
+        _macos_dependency_resolution(record, dependency, loader, by_path, by_install_id)
+        for dependency in _record_strings(record, "_imports", "native record")
+    ]
+
+
+def _macos_dependency_resolution(
+    record: dict[str, object],
+    dependency: str,
+    loader: Path,
+    by_path: dict[Path, dict[str, object]],
+    by_install_id: dict[str, list[dict[str, object]]],
+) -> dict[str, object]:
+    if dependency.casefold().startswith(FORBIDDEN_NATIVE_PREFIXES):
+        raise KitError(f"forbidden external Mach-O dependency: {dependency}")
+    if dependency.startswith(("/usr/lib/", "/System/Library/")):
+        return {"name": dependency, "resolution": "system"}
+    candidates = _macos_dependency_candidates(
+        record, dependency, loader, by_path, by_install_id
+    )
+    unique = {item["path"]: item for item in candidates}
+    if len(unique) != 1:
+        raise KitError(
+            f"Mach-O dependency is unresolved or ambiguous: {record['path']} -> {dependency}"
+        )
+    resolved = next(iter(unique.values()))
+    return {
+        "name": dependency,
+        "resolution": "kit",
+        "resolved_path": resolved["path"],
+        "resolved_sha256": resolved["sha256"],
+    }
+
+
+def _macos_dependency_candidates(
+    record: dict[str, object],
+    dependency: str,
+    loader: Path,
+    by_path: dict[Path, dict[str, object]],
+    by_install_id: dict[str, list[dict[str, object]]],
+) -> list[dict[str, object]]:
+    if dependency.startswith("@loader_path/"):
+        resolved = (loader / dependency[len("@loader_path/") :]).resolve()
+        return [by_path[resolved]] if resolved in by_path else []
+    if dependency.startswith("@rpath/"):
+        suffix = dependency[len("@rpath/") :]
+        candidates = [
+            by_path[resolved]
+            for rpath in _record_strings(record, "rpaths", "native record")
+            if rpath.startswith("@loader_path/")
+            for resolved in [
+                (loader / rpath[len("@loader_path/") :] / suffix).resolve()
+            ]
+            if resolved in by_path
+        ]
+        candidates.extend(by_install_id.get(dependency, []))
+        return candidates
+    return list(by_install_id.get(dependency, []))
 
 
 def _windows_native_record(path: Path, relative: str) -> dict[str, object]:
@@ -768,7 +941,9 @@ def _macos_native_record(
     }
 
 
-def _native_records(root: Path, target: str, architecture: str) -> list[dict[str, object]]:
+def _native_records(
+    root: Path, target: str, architecture: str
+) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for path in _native_paths(root):
         relative = path.relative_to(root).as_posix()
@@ -836,37 +1011,46 @@ def native_dependency_inventory(
     return records
 
 
-def build(args: argparse.Namespace) -> dict[str, object]:
-    target = args.target
-    if not _valid_sha256(args.package_lock_sha256):
+def _validate_build_target(
+    target: str, source_commit: str, package_lock_sha256: str
+) -> tuple[str, str, str | None]:
+    if not _valid_sha256(package_lock_sha256):
         raise KitError("package lock SHA256 must be lowercase hexadecimal")
-    if not (
-        len(args.source_commit) == 40
-        and all(character in "0123456789abcdef" for character in args.source_commit)
+    if len(source_commit) != 40 or any(
+        character not in "0123456789abcdef" for character in source_commit
     ):
         raise KitError("source commit must be a full lowercase Git SHA")
     expected_system, architecture, minimum_os = TARGETS[target]
     if platform.system() != expected_system:
         raise KitError(f"{target} kit must be built natively on {expected_system}")
-    observed_machine = platform.machine().lower()
     accepted = {"x86_64": {"x86_64", "amd64"}, "arm64": {"arm64", "aarch64"}}
-    if observed_machine not in accepted[architecture]:
+    if platform.machine().lower() not in accepted[architecture]:
         raise KitError(
-            f"{target} kit requires {architecture}, found {observed_machine}"
+            f"{target} kit requires {architecture}, found {platform.machine().lower()}"
         )
     if platform.python_version() != PYTHON_VERSION:
         raise KitError(
             f"integration kit requires Python {PYTHON_VERSION}, found {platform.python_version()}"
         )
+    return expected_system, architecture, minimum_os
+
+
+def _validate_rpy2_installation() -> None:
     if importlib.metadata.version("rpy2") != RPY2_VERSION:
         raise KitError(
             "installed rpy2 distribution differs from the integration-kit lock"
         )
-    if (
-        importlib.metadata.version("rpy2-rinterface") != RPY2_RINTERFACE_VERSION
-        or importlib.metadata.version("rpy2-robjects") != RPY2_ROBJECTS_VERSION
-    ):
+    components = (
+        ("rpy2-rinterface", RPY2_RINTERFACE_VERSION),
+        ("rpy2-robjects", RPY2_ROBJECTS_VERSION),
+    )
+    if any(importlib.metadata.version(name) != version for name, version in components):
         raise KitError("installed rpy2 components differ from the integration-kit lock")
+
+
+def _build_inputs(
+    args: argparse.Namespace, target: str
+) -> tuple[Path, Path, Path, dict[str, object], str]:
     runtime = args.runtime.resolve(strict=True)
     library = args.library.resolve(strict=True)
     bridge = args.api_bridge.resolve(strict=True)
@@ -877,15 +1061,15 @@ def build(args: argparse.Namespace) -> dict[str, object]:
         for record in _record_list(provenance, "source_packages", "provenance")
         if record.get("name") == "RCMetaR"
     )
-    expected_rcmetar_url = (
-        "https://github.com/AliSalman-et-al/rc-metastudio/archive/"
-        f"{args.source_commit}.tar.gz"
-    )
-    if rcmetar.get("url") != expected_rcmetar_url:
+    expected_url = f"https://github.com/AliSalman-et-al/rc-metastudio/archive/{args.source_commit}.tar.gz"
+    if rcmetar.get("url") != expected_url:
         raise KitError("RCMetaR source provenance does not match the builder commit")
     if not library.is_relative_to(runtime):
         raise KitError("private R library must be inside the staged runtime")
-    library_relative = library.relative_to(runtime).as_posix()
+    return runtime, library, bridge, provenance, library.relative_to(runtime).as_posix()
+
+
+def _validate_staged_r_version(runtime: Path, library: Path, target: str) -> None:
     r_home = library.parent
     rscript = (
         r_home / "bin" / ("Rscript.exe" if target.startswith("windows-") else "Rscript")
@@ -906,91 +1090,99 @@ def build(args: argparse.Namespace) -> dict[str, object]:
         raise KitError(
             f"staged R runtime differs from {R_VERSION}: {completed.stderr.strip()}"
         )
-    output = args.output.resolve()
-    if output.exists():
-        raise KitError(f"integration-kit output already exists: {output}")
-    (output / "runtime").parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(runtime, output / "runtime", symlinks=True)
-    (output / "bridge").mkdir()
-    shutil.copy2(bridge, output / "bridge" / bridge.name)
-    if target.startswith("macos-"):
-        relocate_macos_api_bridge(output, output / "bridge" / bridge.name)
-    rpy2 = _record_mapping(provenance, "rpy2", "provenance")
-    rpy2["built_bridge_sha256"] = rpy2["bridge_sha256"]
-    rpy2["bridge_sha256"] = sha256_file(output / "bridge" / bridge.name)
-    source_payload = copy_source_payload(
-        args.source_payload.resolve(strict=True), provenance, output / "source-archives"
-    )
+
+
+def _copy_windows_python_runtime(output: Path) -> None:
+    python_dll = Path(sys.base_prefix) / "python311.dll"
+    if not python_dll.is_file():
+        raise KitError("Windows kit producer cannot locate python311.dll")
+    native = output / "native"
+    native.mkdir()
+    shutil.copy2(python_dll, native / python_dll.name)
+    for runtime_name in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"):
+        shutil.copy2(_windows_runtime_source(runtime_name), native / runtime_name)
+
+
+def _windows_runtime_source(runtime_name: str) -> Path:
+    roots = (Path(sys.base_prefix), Path(sys.prefix))
+    direct = _direct_runtime_candidates(roots, runtime_name)
+    candidates = direct or _all_runtime_candidates(roots, runtime_name)
+    by_hash = {sha256_file(path): path for path in candidates}
+    if len(by_hash) != 1:
+        raise KitError(
+            f"Windows kit producer needs one unambiguous app-local {runtime_name}"
+        )
+    return next(iter(by_hash.values()))
+
+
+def _direct_runtime_candidates(
+    roots: tuple[Path, ...], runtime_name: str
+) -> list[Path]:
+    return [root / runtime_name for root in roots if (root / runtime_name).is_file()]
+
+
+def _all_runtime_candidates(roots: tuple[Path, ...], runtime_name: str) -> list[Path]:
+    return [
+        path
+        for root in set(roots)
+        for path in root.rglob(runtime_name)
+        if path.is_file()
+    ]
+
+
+def _copy_python_cache(args: argparse.Namespace, output: Path) -> None:
     uv_cache = args.uv_cache.resolve(strict=True)
     if not uv_cache.is_dir() or not any(path.is_file() for path in uv_cache.rglob("*")):
         raise KitError("integration kit requires a populated producer uv cache")
     if sha256_file(args.uv_lock.resolve(strict=True)) != args.uv_lock_sha256:
         raise KitError("producer uv.lock differs from its declared SHA256")
-    (output / "python").mkdir()
-    shutil.copytree(uv_cache, output / "python" / "uv-cache", symlinks=True)
-    if target.startswith("windows-"):
-        python_dll = Path(sys.base_prefix) / "python311.dll"
-        if not python_dll.is_file():
-            raise KitError("Windows kit producer cannot locate python311.dll")
-        (output / "native").mkdir()
-        shutil.copy2(python_dll, output / "native" / python_dll.name)
-        for runtime_name in (
-            "vcruntime140.dll",
-            "vcruntime140_1.dll",
-            "msvcp140.dll",
-        ):
-            direct = [
-                root / runtime_name
-                for root in (Path(sys.base_prefix), Path(sys.prefix))
-                if (root / runtime_name).is_file()
-            ]
-            candidates = direct or [
-                path
-                for root in {Path(sys.base_prefix), Path(sys.prefix)}
-                for path in root.rglob(runtime_name)
-                if path.is_file()
-            ]
-            by_hash = {sha256_file(path): path for path in candidates}
-            if len(by_hash) != 1:
-                raise KitError(
-                    f"Windows kit producer needs one unambiguous app-local {runtime_name}"
-                )
-            source = next(iter(by_hash.values()))
-            shutil.copy2(source, output / "native" / runtime_name)
-    copied_library = output / "runtime" / library_relative
-    copy_license_inventory(output / "runtime", copied_library, output / "licenses")
-    (output / "licenses" / "README.txt").write_text(
-        "Copied license texts are retained here; package metadata is in sources.json.\n",
-        encoding="utf-8",
-    )
-    installed_packages = installed_package_inventory(library)
-    validate_installed_provenance(installed_packages, provenance)
+    python_root = output / "python"
+    python_root.mkdir()
+    shutil.copytree(uv_cache, python_root / "uv-cache", symlinks=True)
+
+
+def _write_sources(
+    output: Path,
+    args: argparse.Namespace,
+    provenance: dict[str, object],
+    payload: list[dict[str, str]],
+    installed: list[dict[str, str]],
+) -> None:
     sources = {
         "provenance": provenance,
         "package_lock_sha256": args.package_lock_sha256,
-        "installed_packages": installed_packages,
-        "source_payload": source_payload,
+        "installed_packages": installed,
+        "source_payload": payload,
         "builder": {"source_commit": args.source_commit, "runner": platform.platform()},
     }
     (output / "sources.json").write_text(
         json.dumps(sources, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    if target.startswith("macos-"):
-        if args.runtime_profile is None or not args.runtime_profile.is_file():
-            raise KitError("macOS integration kit requires runtime-profile evidence")
-        (output / "evidence").mkdir()
-        shutil.copy2(args.runtime_profile, output / "evidence" / "runtime-profile.json")
-    native_dependencies = native_dependency_inventory(output, target, architecture)
+
+
+def _write_native_inventory(output: Path, target: str, architecture: str) -> None:
+    records = native_dependency_inventory(output, target, architecture)
     (output / "native-dependencies.json").write_text(
         json.dumps(
-            {"schema_version": 1, "target": target, "records": native_dependencies},
+            {"schema_version": 1, "target": target, "records": records},
             indent=2,
             sort_keys=True,
         )
         + "\n",
         encoding="utf-8",
     )
-    manifest = {
+
+
+def _build_manifest(
+    output: Path,
+    target: str,
+    architecture: str,
+    minimum_os: str | None,
+    library_relative: str,
+    bridge: Path,
+    args: argparse.Namespace,
+) -> dict[str, object]:
+    manifest: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "kind": "rc-metastudio-r-integration-kit",
         "target": target,
@@ -1011,14 +1203,130 @@ def build(args: argparse.Namespace) -> dict[str, object]:
             "uv_cache_path": "python/uv-cache",
             "uv_lock_sha256": args.uv_lock_sha256,
         },
-        "files": [],
+        "files": files(output),
     }
-    manifest["files"] = files(output)
     manifest["kit_sha256"] = canonical_digest(manifest)
     (output / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return manifest
+
+
+def build(args: argparse.Namespace) -> dict[str, object]:
+    target = args.target
+    _, architecture, minimum_os = _validate_build_target(
+        target, args.source_commit, args.package_lock_sha256
+    )
+    _validate_rpy2_installation()
+    runtime, library, bridge, provenance, library_relative = _build_inputs(args, target)
+    _validate_staged_r_version(runtime, library, target)
+    output = args.output.resolve()
+    if output.exists():
+        raise KitError(f"integration-kit output already exists: {output}")
+    (output / "runtime").parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(runtime, output / "runtime", symlinks=True)
+    (output / "bridge").mkdir()
+    shutil.copy2(bridge, output / "bridge" / bridge.name)
+    if target.startswith("macos-"):
+        relocate_macos_api_bridge(output, output / "bridge" / bridge.name)
+    rpy2 = _record_mapping(provenance, "rpy2", "provenance")
+    rpy2["built_bridge_sha256"] = rpy2["bridge_sha256"]
+    rpy2["bridge_sha256"] = sha256_file(output / "bridge" / bridge.name)
+    source_payload = copy_source_payload(
+        args.source_payload.resolve(strict=True), provenance, output / "source-archives"
+    )
+    _copy_python_cache(args, output)
+    if target.startswith("windows-"):
+        _copy_windows_python_runtime(output)
+    copied_library = output / "runtime" / library_relative
+    copy_license_inventory(output / "runtime", copied_library, output / "licenses")
+    (output / "licenses" / "README.txt").write_text(
+        "Copied license texts are retained here; package metadata is in sources.json.\n",
+        encoding="utf-8",
+    )
+    installed_packages = installed_package_inventory(library)
+    validate_installed_provenance(installed_packages, provenance)
+    _write_sources(output, args, provenance, source_payload, installed_packages)
+    if target.startswith("macos-"):
+        if args.runtime_profile is None or not args.runtime_profile.is_file():
+            raise KitError("macOS integration kit requires runtime-profile evidence")
+        (output / "evidence").mkdir()
+        shutil.copy2(args.runtime_profile, output / "evidence" / "runtime-profile.json")
+    _write_native_inventory(output, target, architecture)
+    return _build_manifest(
+        output, target, architecture, minimum_os, library_relative, bridge, args
+    )
+
+
+def _manifest_versions_valid(manifest: dict[str, object]) -> bool:
+    return manifest.get("versions") == {
+        "r": R_VERSION,
+        "python": PYTHON_VERSION,
+        "rpy2": RPY2_VERSION,
+        "rpy2_rinterface": RPY2_RINTERFACE_VERSION,
+        "rpy2_robjects": RPY2_ROBJECTS_VERSION,
+    }
+
+
+def _manifest_environment_valid(manifest: dict[str, object]) -> bool:
+    environment = manifest.get("python_environment")
+    if not isinstance(environment, dict):
+        return False
+    environment = {str(key): value for key, value in environment.items()}
+    return (
+        _valid_sha256(environment.get("uv_lock_sha256"))
+        and environment.get("uv_cache_path") == "python/uv-cache"
+    )
+
+
+def _manifest_identity_valid(
+    manifest: dict[str, object], target: str | None, expected_kit_sha256: str | None
+) -> bool:
+    manifest_target = manifest.get("target")
+    target_contract = TARGETS.get(str(manifest_target))
+    return all(
+        (
+            manifest.get("schema_version") == SCHEMA_VERSION,
+            manifest.get("kind") == "rc-metastudio-r-integration-kit",
+            manifest.get("target") in TARGETS,
+            manifest.get("cffi_mode") == "API",
+            _manifest_versions_valid(manifest),
+            manifest.get("kit_sha256") == canonical_digest(manifest),
+            expected_kit_sha256 is None
+            or manifest.get("kit_sha256") == expected_kit_sha256,
+            target is None or manifest.get("target") == target,
+            target_contract is not None,
+            target_contract is not None
+            and manifest.get("architecture") == target_contract[1],
+            target_contract is not None
+            and manifest.get("minimum_os") == target_contract[2],
+            _manifest_environment_valid(manifest),
+        )
+    )
+
+
+def _verify_manifest_files(root: Path, manifest: dict[str, object]) -> None:
+    expected = {
+        item["path"]: item for item in _record_list(manifest, "files", "manifest")
+    }
+    observed = {
+        item["path"]: item for item in files(root) if item["path"] != "manifest.json"
+    }
+    if expected != observed:
+        raise KitError("integration-kit content differs from its manifest")
+
+
+def _verify_uv_cache(
+    root: Path, uv_lock: Path | None, manifest: dict[str, object]
+) -> None:
+    if not any(path.is_file() for path in (root / "python" / "uv-cache").rglob("*")):
+        raise KitError("integration-kit authenticated uv cache is empty")
+    if uv_lock is not None:
+        environment = _record_mapping(manifest, "python_environment", "manifest")
+        if sha256_file(uv_lock.resolve(strict=True)) != environment["uv_lock_sha256"]:
+            raise KitError(
+                "consumer uv.lock differs from the authenticated producer lock"
+            )
 
 
 def verify_content(
@@ -1031,59 +1339,16 @@ def verify_content(
     root = root.resolve(strict=True)
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest_target = manifest.get("target")
-    target_contract = TARGETS.get(str(manifest_target))
-    if not (
-        manifest.get("schema_version") == SCHEMA_VERSION
-        and manifest.get("kind") == "rc-metastudio-r-integration-kit"
-        and manifest.get("target") in TARGETS
-        and manifest.get("cffi_mode") == "API"
-        and manifest.get("versions")
-        == {
-            "r": R_VERSION,
-            "python": PYTHON_VERSION,
-            "rpy2": RPY2_VERSION,
-            "rpy2_rinterface": RPY2_RINTERFACE_VERSION,
-            "rpy2_robjects": RPY2_ROBJECTS_VERSION,
-        }
-        and manifest.get("kit_sha256") == canonical_digest(manifest)
-        and (
-            expected_kit_sha256 is None
-            or manifest.get("kit_sha256") == expected_kit_sha256
-        )
-        and (target is None or manifest.get("target") == target)
-        and target_contract is not None
-        and manifest.get("architecture") == target_contract[1]
-        and manifest.get("minimum_os") == target_contract[2]
-        and _valid_sha256(manifest.get("python_environment", {}).get("uv_lock_sha256"))
-        and manifest.get("python_environment", {}).get("uv_cache_path")
-        == "python/uv-cache"
+    if not isinstance(manifest, dict) or not _manifest_identity_valid(
+        manifest, target, expected_kit_sha256
     ):
         raise KitError("integration-kit manifest identity is invalid")
-    expected = {item["path"]: item for item in manifest.get("files", [])}
-    observed = {
-        item["path"]: item for item in files(root) if item["path"] != "manifest.json"
-    }
-    if expected != observed:
-        raise KitError("integration-kit content differs from its manifest")
-    if not any(path.is_file() for path in (root / "python" / "uv-cache").rglob("*")):
-        raise KitError("integration-kit authenticated uv cache is empty")
-    if (
-        uv_lock is not None
-        and sha256_file(uv_lock.resolve(strict=True))
-        != manifest["python_environment"]["uv_lock_sha256"]
-    ):
-        raise KitError("consumer uv.lock differs from the authenticated producer lock")
+    _verify_manifest_files(root, manifest)
+    _verify_uv_cache(root, uv_lock, manifest)
     return manifest
 
 
-def verify(root: Path, *, target: str | None = None) -> dict[str, object]:
-    root = root.resolve(strict=True)
-    manifest = verify_content(root, target=target)
-    manifest_target = manifest["target"]
-    observed = {
-        item["path"]: item for item in files(root) if item["path"] != "manifest.json"
-    }
+def _verify_bridge_and_profile(root: Path, manifest: dict[str, object]) -> Path:
     bridge = root / str(manifest["api_bridge_path"])
     require_api_bridge(bridge)
     observed_paths = {
@@ -1092,49 +1357,80 @@ def verify(root: Path, *, target: str | None = None) -> dict[str, object]:
     if any("_rinterface_cffi_abi" in path.lower() for path in observed_paths):
         raise KitError("integration kit contains a forbidden ABI bridge")
     if (
-        str(manifest_target).startswith("macos-")
+        str(manifest["target"]).startswith("macos-")
         and not (root / "evidence" / "runtime-profile.json").is_file()
     ):
         raise KitError("macOS integration-kit runtime profile is missing")
-    sources = json.loads((root / "sources.json").read_text(encoding="utf-8"))
-    if not (
-        len(str(sources.get("package_lock_sha256", ""))) == 64
-        and sources.get("provenance", {}).get("rpy2", {}).get("version") == RPY2_VERSION
-        and sources.get("provenance", {}).get("rpy2", {}).get("bridge_sha256")
-        == sha256_file(bridge)
-        and isinstance(sources.get("installed_packages"), list)
-        and isinstance(sources.get("source_payload"), list)
-        and len(sources.get("source_payload", [])) == 4
+    return bridge
+
+
+def _verify_source_provenance(root: Path, bridge: Path) -> dict[str, object]:
+    sources = _mapping(
+        json.loads((root / "sources.json").read_text(encoding="utf-8")), "sources"
+    )
+    provenance = _mapping(sources.get("provenance"), "source provenance")
+    rpy2 = _mapping(provenance.get("rpy2"), "rpy2 provenance")
+    payload = sources.get("source_payload")
+    if not all(
+        (
+            len(str(sources.get("package_lock_sha256", ""))) == 64,
+            isinstance(rpy2, dict),
+            isinstance(rpy2, dict) and rpy2.get("version") == RPY2_VERSION,
+            isinstance(rpy2, dict) and rpy2.get("bridge_sha256") == sha256_file(bridge),
+            isinstance(sources.get("installed_packages"), list),
+            isinstance(payload, list),
+            isinstance(payload, list) and len(payload) == 4,
+        )
     ):
         raise KitError("integration-kit source provenance is incomplete")
-    validate_installed_provenance(sources["installed_packages"], sources["provenance"])
-    required_source_hashes = {
+    installed = cast(
+        list[dict[str, str]], _record_list(sources, "installed_packages", "sources")
+    )
+    validate_installed_provenance(installed, provenance)
+    return sources
+
+
+def _verify_source_payload(root: Path, sources: dict[str, object]) -> None:
+    provenance = _mapping(sources.get("provenance"), "source provenance")
+    source_packages = _record_list(provenance, "source_packages", "source provenance")
+    rpy2 = _record_mapping(provenance, "rpy2", "source provenance")
+    archives = _record_list(rpy2, "source_archives", "rpy2 provenance")
+    required = {
         record["sha256"]
-        for record in sources["provenance"]["source_packages"]
+        for record in source_packages
         if record.get("name") == "RCMetaR"
-    } | {
-        record["sha256"] for record in sources["provenance"]["rpy2"]["source_archives"]
-    }
-    observed_source_hashes = set()
-    for record in sources["source_payload"]:
+    } | {record["sha256"] for record in archives}
+    observed: set[object] = set()
+    for record in _record_list(sources, "source_payload", "sources"):
         source = root / str(record.get("path", ""))
         if not source.is_file() or sha256_file(source) != record.get("sha256"):
             raise KitError("retained source archive payload is missing or changed")
-        observed_source_hashes.add(record["sha256"])
-    if observed_source_hashes != required_source_hashes:
+        observed.add(record["sha256"])
+    if observed != required:
         raise KitError("retained source archives differ from provenance")
+
+
+def _verify_native_inventory(root: Path, manifest: dict[str, object]) -> None:
     expected_native = json.loads(
         (root / "native-dependencies.json").read_text(encoding="utf-8")
     )
+    target = str(manifest["target"])
     if not (
         expected_native.get("schema_version") == 1
-        and expected_native.get("target") == manifest_target
+        and expected_native.get("target") == target
         and expected_native.get("records")
-        == native_dependency_inventory(
-            root, str(manifest_target), str(manifest["architecture"])
-        )
+        == native_dependency_inventory(root, target, str(manifest["architecture"]))
     ):
         raise KitError("integration-kit native dependency inventory is invalid")
+
+
+def verify(root: Path, *, target: str | None = None) -> dict[str, object]:
+    root = root.resolve(strict=True)
+    manifest = verify_content(root, target=target)
+    bridge = _verify_bridge_and_profile(root, manifest)
+    sources = _verify_source_provenance(root, bridge)
+    _verify_source_payload(root, sources)
+    _verify_native_inventory(root, manifest)
     return manifest
 
 
