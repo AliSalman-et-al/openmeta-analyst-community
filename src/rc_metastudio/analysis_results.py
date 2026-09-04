@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, TypedDict
@@ -29,7 +29,7 @@ PlotRegenerator = Literal["forest", "regression", "funnel", "sroc", "none"]
 
 
 @dataclass(frozen=True, slots=True)
-class PlotCapability(Mapping[str, object]):
+class PlotCapability:
     """Immutable capability data attached to one semantic plot artifact."""
 
     plot_kind: PlotKind
@@ -37,33 +37,6 @@ class PlotCapability(Mapping[str, object]):
     styleable: bool
     composition: PlotComposition
     regenerator: PlotRegenerator
-
-    def __getitem__(self, key: str) -> object:
-        if key == "plot_kind":
-            return self.plot_kind
-        if key == "editable":
-            return self.editable
-        if key == "styleable":
-            return self.styleable
-        if key == "composition":
-            return self.composition
-        if key == "regenerator":
-            return self.regenerator
-        raise KeyError(key)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(
-            ("plot_kind", "editable", "styleable", "composition", "regenerator")
-        )
-
-    def __len__(self) -> int:
-        return 5
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Mapping):
-            return dict(self.items()) == dict(other.items())
-        return super().__eq__(other)
-
 
 class RawAnalysisResult(TypedDict, total=False):
     """Untrusted result shape accepted at the application boundary."""

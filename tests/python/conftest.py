@@ -107,8 +107,6 @@ def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         "run_small_study_effects": _unavailable,
         "regenerate_small_study_effects_funnel": _unavailable,
         "generate_small_study_effects_funnel": _unavailable,
-        "run_diagnostic_multi": _unavailable,
-        "run_diagnostic_workflow": _unavailable,
         "run_versioned_analysis_request": lambda _request: {
             "version": 1,
             "texts": {},

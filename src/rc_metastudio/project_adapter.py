@@ -12,7 +12,7 @@ from typing import Protocol
 from rc_metastudio import analysis_dataset
 from rc_metastudio import analysis_unit
 from rc_metastudio import two_way_dict
-from rc_metastudio.project_domain import AnalysisDataset, reconstruct_analysis_dataset
+from rc_metastudio.project_domain import validate_project_semantics
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
@@ -30,7 +30,6 @@ class RuntimeProject:
     dataset: analysis_dataset.Dataset
     model_state: JsonObject
     restored_selection: bool
-    semantic_dataset: AnalysisDataset
 
 
 class ProjectStateModel(Protocol):
@@ -442,12 +441,11 @@ def state_to_model_state(
 
 def document_to_runtime_project(document: ProjectDocument) -> RuntimeProject:
     """Reconstruct the application dataset and durable state from a document."""
-    semantic_dataset = reconstruct_analysis_dataset(document.project, document.state)
+    validate_project_semantics(document.project, document.state)
     dataset = project_to_dataset(document.project)
     model_state = state_to_model_state(dataset, document.state)
     return RuntimeProject(
         dataset=dataset,
         model_state=model_state,
         restored_selection=document.state["active_outcome"] is not None,
-        semantic_dataset=semantic_dataset,
     )

@@ -1,7 +1,7 @@
 import pytest
 
 from rc_metastudio import plot_capabilities
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import PlotCapability, parse_analysis_result
 
 
 def descriptor(**overrides):
@@ -71,8 +71,12 @@ def test_validate_result_returns_normalized_descriptors():
         }
     )
 
-    assert capabilities["Regression Plot"] == descriptor(
-        plot_kind="regression", regenerator="regression"
+    assert capabilities["Regression Plot"] == PlotCapability(
+        plot_kind="regression",
+        editable=True,
+        styleable=True,
+        composition="single",
+        regenerator="regression",
     )
 
 
@@ -185,4 +189,4 @@ def test_trimfill_funnel_has_an_explicit_editable_capability():
             },
         }
     )
-    assert capabilities["Trim-and-fill left"]["plot_kind"] == "trimfill_funnel"
+    assert capabilities["Trim-and-fill left"].plot_kind == "trimfill_funnel"

@@ -115,7 +115,7 @@ def validate_result(result: Mapping[str, object]) -> dict[str, PlotCapability]:
     missing_params = sorted(
         title
         for title, descriptor in normalized.items()
-        if descriptor["editable"] and title not in params_paths
+        if descriptor.editable and title not in params_paths
     )
     if missing_params:
         raise ValueError(

@@ -53,7 +53,11 @@ from rc_metastudio import (
     plot_capabilities,
     r_bridge,
 )
-from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
+from rc_metastudio.analysis_results import (
+    AnalysisResult,
+    PlotCapability,
+    parse_analysis_result,
+)
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 from rc_metastudio.plot_editor_dialog import EditPlotDialog
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
@@ -142,13 +146,18 @@ def _path_with_export_extension(file_path, export_format, *, allow_svgz=True):
 
 class PlotArtifact(object):
     def __init__(
-        self, title, image_path, capability, params_path=None, display_path=None
+        self,
+        title,
+        image_path,
+        capability: PlotCapability,
+        params_path=None,
+        display_path=None,
     ):
         self.title = title
         self.image_path = str(image_path)
         self.params_path = params_path
-        self.capability = dict(capability)
-        self.plot_kind = self.capability["plot_kind"]
+        self.capability = capability
+        self.plot_kind = capability.plot_kind
         self.display_image_path = str(display_path or self.image_path)
 
     def display_path(self):
@@ -845,7 +854,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 menu.addAction(action)
 
             context_menu = QMenu(self)
-            if artifact.capability["editable"]:
+            if artifact.capability.editable:
                 if plot_capabilities.option_groups(artifact.plot_kind):
                     action = QAction("Edit Plot", self)
                     action.triggered.connect(
@@ -865,7 +874,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         return _graphics_item_context_menu
 
     def edit_plot(self, artifact, plot_item):
-        regenerator = artifact.capability["regenerator"]
+        regenerator = artifact.capability.regenerator
         if regenerator == "forest":
             self._edit_forest_plot(artifact, plot_item)
         elif regenerator == "regression":
@@ -1073,10 +1082,10 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             raise Exception("Invalid format, needs to be one of: %s!" % valid_formats)
 
         export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
-        allow_svgz = artifact.capability.get("regenerator") != "funnel"
+        allow_svgz = artifact.capability.regenerator != "funnel"
 
         if not unscaled_image:
-            regenerator = artifact.capability["regenerator"]
+            regenerator = artifact.capability.regenerator
             default_path = {
                 "forest": "forest_plot",
                 "regression": "regression",
@@ -1130,6 +1139,8 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
 
 def _normalize_results(results: AnalysisResult) -> AnalysisResult:
+    if results.texts or results.images:
+        return results
     normalized: dict[str, object] = {
         "version": results.version,
         "texts": dict(results.texts),
@@ -1140,7 +1151,7 @@ def _normalize_results(results: AnalysisResult) -> AnalysisResult:
         "image_order": None
         if results.image_order is None
         else list(results.image_order),
-        "plot_capabilities": dict(results.plot_capabilities),
+        "plot_capabilities": {},
         "sections": [
             {
                 "id": section.semantic_id,

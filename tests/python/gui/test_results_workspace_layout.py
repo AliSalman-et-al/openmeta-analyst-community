@@ -4,7 +4,7 @@ from test_types import key_click, key_clicks, required
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import PlotCapability, parse_analysis_result
 from rc_metastudio.plot_text import normalize_plot_text_value
 
 pytestmark = pytest.mark.qsettings
@@ -65,6 +65,18 @@ def _plot_capability(
         "regenerator": regenerator,
         "composition": "single",
     }
+
+
+def _plot_capability_model(
+    plot_kind="forest", editable=True, styleable=True, regenerator="forest"
+):
+    return PlotCapability(
+        plot_kind=plot_kind,
+        editable=editable,
+        styleable=styleable,
+        regenerator=regenerator,
+        composition="single",
+    )
 
 
 def _use_isolated_settings(tmp_path):
@@ -690,7 +702,7 @@ def test_regenerable_plot_families_expose_native_edit_and_export_actions(
     artifact = results_window.PlotArtifact(
         title,
         str(tmp_path / "plot.svg"),
-        _plot_capability(plot_kind=plot_kind, regenerator=regenerator),
+        _plot_capability_model(plot_kind=plot_kind, regenerator=regenerator),
         params_path=str(tmp_path / "plot-params"),
     )
     try:
@@ -720,7 +732,7 @@ def test_results_window_regenerates_each_supported_export_format(
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.svg"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest-params"),
     )
     monkeypatch.setattr(
@@ -761,7 +773,7 @@ def test_results_window_exports_sroc_with_format_specific_default_name(
     artifact = results_window.PlotArtifact(
         "SROC",
         str(tmp_path / "sroc.svg"),
-        _plot_capability(plot_kind="sroc", regenerator="sroc"),
+        _plot_capability_model(plot_kind="sroc", regenerator="sroc"),
         params_path=str(tmp_path / "sroc-params"),
     )
     monkeypatch.setattr(
@@ -801,7 +813,7 @@ def test_results_window_rejects_svgz_for_funnel_export_before_r(
     artifact = results_window.PlotArtifact(
         "Contour Funnel Plot",
         str(tmp_path / "funnel.png"),
-        _plot_capability(plot_kind="contour_funnel", regenerator="funnel"),
+        _plot_capability_model(plot_kind="contour_funnel", regenerator="funnel"),
         params_path=str(tmp_path / "funnel-params"),
     )
     calls = []
