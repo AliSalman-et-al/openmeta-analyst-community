@@ -126,7 +126,7 @@ def write_comprehensive_golden_baseline_manifest(report_path, root_dir=None):
 
 def curated_golden_bundles(root_dir=None):
     root_dir = root_dir or os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..")
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
     )
 
     def sample(name):
