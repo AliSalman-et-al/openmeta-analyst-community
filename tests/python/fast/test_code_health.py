@@ -8,7 +8,15 @@ from pathlib import Path
 
 from complexipy import code_complexity
 
-from scripts.code_health import git_as_of, history_for_path, python_metrics
+from scripts.code_health import (
+    changed_lines,
+    gate,
+    git_as_of,
+    history_for_path,
+    load_config,
+    python_metrics,
+    runtime_changed_function_keys,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -111,3 +119,38 @@ def test_python_metrics_uses_complexipy_at_each_revision(tmp_path: Path) -> None
     assert baseline_metric.cognitive == code_complexity(baseline_source).functions[0].complexity
     assert head_metric.cognitive == code_complexity(head_source).functions[0].complexity
     assert head_metric.cognitive > baseline_metric.cognitive
+
+
+def test_gate_ignores_annotation_only_function_changes(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "src").mkdir()
+    source = tmp_path / "src/pkg.py"
+    body = "\n".join(["    if value:", "        value += 1"] * 16)
+    source.write_text(f"def calculate(value):\n{body}\n    return value\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "Add complex function", "2025-01-01T00:00:00+00:00")
+    source.write_text(
+        "from typing import Any, cast\n\n"
+        f"def calculate(value: Any) -> int:\n{body}\n    return cast(int, value)\n",
+        encoding="utf-8",
+    )
+    head = _commit(tmp_path, "Refine type annotations", "2025-01-02T00:00:00+00:00")
+
+    metrics = python_metrics(tmp_path, ["src/pkg.py"], head)
+    changed = changed_lines(tmp_path, baseline, head)
+    runtime_changed = runtime_changed_function_keys(tmp_path, baseline, head, metrics, changed)
+    result = gate(metrics, changed, load_config(ROOT), [], [], [], [], runtime_changed)
+
+    assert metrics[0].cyclomatic > 15
+    assert runtime_changed == set()
+    assert result["passed"] is True
+
+    source.write_text(
+        "from typing import Any, cast\n\n"
+        f"def calculate(value: Any) -> int:\n{body}\n    return cast(int, value + 1)\n",
+        encoding="utf-8",
+    )
+    runtime_head = _commit(tmp_path, "Change runtime result", "2025-01-03T00:00:00+00:00")
+    runtime_metrics = python_metrics(tmp_path, ["src/pkg.py"], runtime_head)
+    runtime_diff = changed_lines(tmp_path, head, runtime_head)
+
+    assert runtime_changed_function_keys(tmp_path, head, runtime_head, runtime_metrics, runtime_diff)

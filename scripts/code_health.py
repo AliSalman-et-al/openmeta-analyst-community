@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import copy
 import fnmatch
 import io
 import json
@@ -361,6 +362,210 @@ def history_for_path(root: Path, path: str, as_of: datetime, revision: str = "HE
     return result, defect_commits
 
 
+class _RuntimeNormalizer(ast.NodeTransformer):
+    """Remove Python constructs that do not change executable function bodies."""
+
+    def __init__(self, tree: ast.AST) -> None:
+        super().__init__()
+        self.cast_names = {"cast"}
+        self.typing_names = {"typing", "typing_extensions"}
+        self.type_checking_names = {"TYPE_CHECKING"}
+        self.type_only_constructors: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name in self.typing_names:
+                        self.typing_names.add(alias.asname or alias.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module in self.typing_names:
+                for alias in node.names:
+                    if alias.name == "cast":
+                        self.cast_names.add(alias.asname or alias.name)
+                    if alias.name == "TYPE_CHECKING":
+                        self.type_checking_names.add(alias.asname or alias.name)
+            elif isinstance(node, ast.ClassDef) and any(
+                (isinstance(base, ast.Name) and base.id == "TypedDict")
+                or (isinstance(base, ast.Attribute) and base.attr == "TypedDict")
+                for base in node.bases
+            ):
+                self.type_only_constructors.add(node.name)
+
+    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.FunctionDef | ast.AsyncFunctionDef:
+        node.returns = None
+        node.type_comment = None
+        for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
+            argument.annotation = None
+            argument.type_comment = None
+        if node.args.vararg:
+            node.args.vararg.annotation = None
+            node.args.vararg.type_comment = None
+        if node.args.kwarg:
+            node.args.kwarg.annotation = None
+            node.args.kwarg.type_comment = None
+        normalized = cast(ast.FunctionDef | ast.AsyncFunctionDef, self.generic_visit(node))
+        normalized.body = self._collapse_typed_dict_temps(normalized.body)
+        for statement in normalized.body:
+            self._collapse_nested_statement_lists(statement)
+        return normalized
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
+        return cast(ast.FunctionDef, self._visit_function(node))
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
+        return cast(ast.AsyncFunctionDef, self._visit_function(node))
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> ast.Assign | None:
+        if node.value is None:
+            return None
+        return ast.Assign(targets=[node.target], value=self.visit(node.value), type_comment=None)
+
+    def visit_If(self, node: ast.If) -> ast.If | None:
+        if self._is_type_checking_test(node.test):
+            return None
+        return cast(ast.If, self.generic_visit(node))
+
+    def visit_Expr(self, node: ast.Expr) -> ast.Expr | None:
+        if isinstance(node.value, ast.Call) and self._is_type_only_call(node.value):
+            return None
+        return cast(ast.Expr, self.generic_visit(node))
+
+    def visit_Call(self, node: ast.Call) -> ast.Call | ast.expr:
+        if self._is_cast_call(node) and len(node.args) >= 2 and not node.keywords:
+            return cast(ast.expr, self.visit(node.args[1]))
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in self.type_only_constructors
+            and not node.args
+            and all(keyword.arg is not None for keyword in node.keywords)
+        ):
+            result = ast.Dict(
+                keys=[ast.Constant(keyword.arg) for keyword in node.keywords],
+                values=[cast(ast.expr, self.visit(keyword.value)) for keyword in node.keywords],
+            )
+            setattr(result, "_type_only_dict", True)
+            return result
+        return cast(ast.Call, self.generic_visit(node))
+
+    def _collapse_typed_dict_temps(self, body: list[ast.stmt]) -> list[ast.stmt]:
+        result: list[ast.stmt] = []
+        index = 0
+        while index < len(body):
+            assignment = body[index]
+            following = body[index + 1] if index + 1 < len(body) else None
+            if (
+                isinstance(assignment, ast.Assign)
+                and len(assignment.targets) == 1
+                and isinstance(assignment.targets[0], ast.Name)
+                and isinstance(assignment.value, ast.Dict)
+                and getattr(assignment.value, "_type_only_dict", False)
+                and isinstance(following, ast.Expr)
+                and isinstance(following.value, ast.Call)
+                and isinstance(following.value.func, ast.Attribute)
+                and following.value.func.attr == "append"
+                and len(following.value.args) == 1
+                and isinstance(following.value.args[0], ast.Name)
+                and following.value.args[0].id == assignment.targets[0].id
+                and not following.value.keywords
+            ):
+                following.value.args[0] = assignment.value
+                result.append(following)
+                index += 2
+                continue
+            result.append(assignment)
+            index += 1
+        return result
+
+    def _collapse_nested_statement_lists(self, node: ast.AST) -> None:
+        for field, value in ast.iter_fields(node):
+            if isinstance(value, list) and all(isinstance(item, ast.stmt) for item in value):
+                statements = self._collapse_typed_dict_temps(value)
+                setattr(node, field, statements)
+                for statement in statements:
+                    self._collapse_nested_statement_lists(statement)
+            elif isinstance(value, ast.AST):
+                self._collapse_nested_statement_lists(value)
+
+    def _is_type_checking_test(self, node: ast.expr) -> bool:
+        return isinstance(node, ast.Name) and node.id in self.type_checking_names or (
+            isinstance(node, ast.Attribute)
+            and node.attr == "TYPE_CHECKING"
+            and isinstance(node.value, ast.Name)
+            and node.value.id in self.typing_names
+        )
+
+    def _is_cast_call(self, node: ast.Call) -> bool:
+        function = node.func
+        return isinstance(function, ast.Name) and function.id in self.cast_names or (
+            isinstance(function, ast.Attribute)
+            and function.attr == "cast"
+            and isinstance(function.value, ast.Name)
+            and function.value.id in self.typing_names
+        )
+
+    def _is_type_only_call(self, node: ast.Call) -> bool:
+        function = node.func
+        return isinstance(function, ast.Attribute) and function.attr in {"assert_type", "reveal_type"} and isinstance(function.value, ast.Name) and function.value.id in self.typing_names
+
+
+def _source_at_revision(root: Path, path: str, revision: str | None) -> str | None:
+    if revision is None:
+        try:
+            return (root / path).read_text(encoding="utf-8")
+        except OSError:
+            return None
+    try:
+        return run_git(root, "show", f"{revision}:{path}")
+    except CodeHealthError:
+        return None
+
+
+def _runtime_function_bodies(source: str) -> dict[str, list[str]]:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {}
+    normalized = _RuntimeNormalizer(tree).visit(copy.deepcopy(tree))
+    bodies: dict[str, list[str]] = {}
+    for node in ast.walk(normalized):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = ast.Module(body=node.body, type_ignores=[])
+            bodies.setdefault(node.name, []).append(ast.dump(body, annotate_fields=True, include_attributes=False))
+    return bodies
+
+
+def runtime_changed_function_keys(
+    root: Path,
+    base: str,
+    head: str,
+    metrics: list[FunctionMetric],
+    changed: dict[str, set[int]],
+) -> set[tuple[str, str, int, int]]:
+    """Return changed functions whose normalized executable bodies differ."""
+    current_revision = run_git(root, "rev-parse", "HEAD").strip()
+    base_revision = None if base in {"HEAD", current_revision} else base
+    head_revision = None if head in {"HEAD", current_revision} else head
+    paths = {metric.path for metric in metrics if metric.path.endswith(".py")}
+    baseline_bodies = {
+        path: _runtime_function_bodies(source)
+        for path in paths
+        if (source := _source_at_revision(root, path, base_revision)) is not None
+    }
+    head_bodies = {
+        path: _runtime_function_bodies(source)
+        for path in paths
+        if (source := _source_at_revision(root, path, head_revision)) is not None
+    }
+    result: set[tuple[str, str, int, int]] = set()
+    for metric in metrics:
+        if not any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set())):
+            continue
+        if not metric.path.endswith(".py"):
+            result.add((metric.path, metric.name, metric.line, metric.end_line))
+            continue
+        if baseline_bodies.get(metric.path, {}).get(metric.name) != head_bodies.get(metric.path, {}).get(metric.name):
+            result.add((metric.path, metric.name, metric.line, metric.end_line))
+    return result
+
+
 def import_name(node: ast.Import | ast.ImportFrom) -> str:
     if isinstance(node, ast.Import):
         return node.names[0].name.split(".")[0]
@@ -517,9 +722,20 @@ def changed_lines(root: Path, base: str, head: str) -> dict[str, set[int]]:
     return changed
 
 
-def gate(metrics: list[FunctionMetric], changed: dict[str, set[int]], config: HealthConfig, cycle_list: list[list[str]], baseline_cycles: list[list[str]], forbidden: list[str], baseline_forbidden: list[str]) -> dict[str, object]:
+def gate(
+    metrics: list[FunctionMetric],
+    changed: dict[str, set[int]],
+    config: HealthConfig,
+    cycle_list: list[list[str]],
+    baseline_cycles: list[list[str]],
+    forbidden: list[str],
+    baseline_forbidden: list[str],
+    runtime_changed: set[tuple[str, str, int, int]] | None = None,
+) -> dict[str, object]:
     limits = config["gates"]
     changed_functions = [metric for metric in metrics if any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set()))]
+    if runtime_changed is not None:
+        changed_functions = [metric for metric in changed_functions if (metric.path, metric.name, metric.line, metric.end_line) in runtime_changed]
     exceptions = config.get("complexity_exceptions", {})
     violations = [
         metric.as_dict()
@@ -589,6 +805,8 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
         })
     file_metrics.sort(key=lambda item: (-item["hotspot_score"], item["path"]))
     tooling = grimp_evidence(root, head_revision)
+    changed = changed_lines(root, base, head)
+    runtime_changed = runtime_changed_function_keys(root, base, head, functions, changed)
     return {
         "schema_version": 1,
         "generated_at": as_of.isoformat(),
@@ -603,7 +821,7 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
         "cognitive_complexity": {"functions": len(functions), "total": sum(metric.cognitive for metric in functions), "maximum": max((metric.cognitive for metric in functions), default=0)},
         "maintainability": {"note": "trend indicator; not a merge gate", "mean_function_lines": sum(metric.lines for metric in functions) / max(len(functions), 1)},
         "defect_history": {"files_with_defect_fixes": sum(1 for item in file_metrics if item["defect_history"]), "commits": sum(int(item["defect_history"]) for item in file_metrics)},
-        "gate": gate(functions, changed_lines(root, base, head), config, cycle_list, baseline_cycle_list, forbidden, baseline_forbidden),
+        "gate": gate(functions, changed, config, cycle_list, baseline_cycle_list, forbidden, baseline_forbidden, runtime_changed),
     }
 
 
