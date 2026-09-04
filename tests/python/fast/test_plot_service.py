@@ -77,10 +77,14 @@ def test_apply_funnel_edits_rolls_back_persisted_params_on_failure(tmp_path, mon
         Path(outpath).write_text("updated")
 
     monkeypatch.setattr(r_bridge, "update_plot_params", update)
+
+    def fail_to_regenerate(*_args, **_kwargs):
+        raise RuntimeError("R failed")
+
     monkeypatch.setattr(
         r_bridge,
         "regenerate_small_study_effects_funnel",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("R failed")),
+        fail_to_regenerate,
     )
 
     with pytest.raises(RuntimeError, match="R failed"):
