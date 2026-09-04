@@ -524,7 +524,7 @@ def curated_golden_bundles(root_dir=None):
 
 def parsed_numeric_sections(result: AnalysisResult):
     parsed = {}
-    for name, text in result.texts.items():
+    for name, text in _public_texts(result).items():
         values = _parse_summary(text)
         values.update(_parse_result_table(text))
         values.update(_parse_weights(text))
@@ -533,8 +533,18 @@ def parsed_numeric_sections(result: AnalysisResult):
     return parsed
 
 
+def _public_texts(result: AnalysisResult):
+    """Expose typed text sections by their public titles for the oracle."""
+    return {
+        section.title: result.texts[section.source_key]
+        for section in result.sections
+        if section.kind == "text"
+    }
+
+
 def compare_bundle(bundle, result: AnalysisResult):
     actual = parsed_numeric_sections(result)
+    public_texts = _public_texts(result)
     comparisons = []
     for section, expected_values in bundle["expected"].items():
         if not expected_values:
@@ -543,10 +553,10 @@ def compare_bundle(bundle, result: AnalysisResult):
                     "section": section,
                     "metric": "text_present",
                     "expected": True,
-                    "observed": section in result.texts,
+                    "observed": section in public_texts,
                     "tolerance": None,
                     "drift": None,
-                    "passed": section in result.texts,
+                    "passed": section in public_texts,
                 }
             )
         for metric, expected in expected_values.items():
@@ -689,7 +699,7 @@ def capture_bundle(
             {
                 "status": "success",
                 "outputs": parsed_numeric_sections(result),
-                "texts": result.texts,
+                "texts": _public_texts(result),
                 "artifacts": _capture_artifacts(bundle, result),
                 "plot_descriptors": _capture_plot_descriptors(bundle, result),
             }

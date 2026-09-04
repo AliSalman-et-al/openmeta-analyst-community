@@ -704,6 +704,30 @@ def test_golden_capture_maps_case_only_artifact_title_drift_to_typed_metadata(
     assert descriptor["capability"]["kind"] == "leave_one_out_forest"
 
 
+def test_golden_comparison_uses_public_text_title_for_stable_source_key():
+    result = _typed_result(
+        texts={"diagnostic.DOR.summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5"},
+        sections=[
+            {
+                "id": "diagnostic.DOR.summary",
+                "kind": "text",
+                "order": 0,
+                "title": "Odds Ratio Summary",
+                "source_key": "diagnostic.DOR.summary",
+            }
+        ],
+    )
+
+    assert verify_golden_compatibility.golden_analysis._public_texts(result) == {
+        "Odds Ratio Summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5"
+    }
+    comparisons = verify_golden_compatibility.golden_analysis.compare_bundle(
+        {"expected": {"Odds Ratio Summary": {}}, "artifacts": {}, "tolerances": {}},
+        result,
+    )
+    assert comparisons[0]["passed"] is True
+
+
 def test_current_golden_manifest_requires_exact_rpy2_identities():
     expected = dict(verify_golden_compatibility.REQUIRED_RPY2_IDENTITIES)
     case = {
@@ -1233,6 +1257,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         from rc_metastudio import analysis_adapter
 
         calls = []
+        backend_requests = []
 
         class DataSet(object):
             def get_covariate_values(self, covariate, ids_for_keys=False):
@@ -1279,7 +1304,8 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
             "run_versioned_analysis_request",
-            lambda request: _text_result("Summary", request["metric"]),
+            lambda request: backend_requests.append(request)
+            or _text_result("Summary", request["metric"]),
             raising=False,
         )
 
@@ -1300,6 +1326,8 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         assert data_call[1]["covs_to_include"][0].name == "golden_year"
         added_covariate = next(call[1] for call in calls if call[0] == "covariate")
         assert data_call[1]["covs_to_include"][0] is added_covariate
+        assert backend_requests[0]["params"]["to"] == "only0"
+        assert backend_requests[0]["params"]["adjust"] == 0.5
 
 
 def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(

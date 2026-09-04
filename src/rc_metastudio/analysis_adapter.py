@@ -452,6 +452,9 @@ def execute_meta_regression_request(
             "Unsupported meta-regression data family: %s" % request.data_type
         )
     parameters = request.parameter_values()
+    if request.data_type == "binary":
+        parameters.setdefault("to", "only0")
+        parameters.setdefault("adjust", 0.5)
     parameters.setdefault("conf.level", default_confidence_level)
     parameters["rm.method"] = (
         "FE" if fixed_effects else parameters.get("rm.method", "DL")
