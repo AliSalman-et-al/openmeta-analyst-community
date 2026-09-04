@@ -100,6 +100,7 @@ def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
         ),
     )
     window = MainWindow()
+    window.workspace.mark_saved()
 
     try:
         assert window.createPopupMenu() is None

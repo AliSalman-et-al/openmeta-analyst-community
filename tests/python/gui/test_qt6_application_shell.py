@@ -1163,7 +1163,7 @@ def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directi
         with monkeypatch.context() as context:
             context.setattr(
                 window,
-                "data_dirtied",
+                "_update_confidence_level_label",
                 lambda: (_ for _ in ()).throw(
                     RuntimeError("late continuous installation failure")
                 ),
@@ -1182,7 +1182,7 @@ def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directi
         with monkeypatch.context() as context:
             context.setattr(
                 window,
-                "data_dirtied",
+                "_update_confidence_level_label",
                 lambda: (_ for _ in ()).throw(
                     RuntimeError("late binary installation failure")
                 ),
