@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from rc_metastudio import r_bridge
+from rc_metastudio.r_backend import AnalysisBackendUnavailableError
 from rc_metastudio.study_effect_shapes import (
     effect_triplet,
     normalize_diagnostic_effects,
@@ -18,7 +19,7 @@ from rc_metastudio.study_effect_shapes import (
 
 
 def _unavailable(*_args: object, **_kwargs: object) -> None:
-    raise r_bridge.AnalysisBackendUnavailableError("R test double has no operation")
+    raise AnalysisBackendUnavailableError("R test double has no operation")
 
 
 def _scale(value: object, *_args: object, **_kwargs: object) -> object:
@@ -94,8 +95,18 @@ def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         "generate_small_study_effects_funnel": _unavailable,
         "run_diagnostic_multi": _unavailable,
         "run_diagnostic_workflow": _unavailable,
-        "run_versioned_analysis_request": lambda _request: {"texts": {}, "images": {}},
-        "run_versioned_analysis_requests": lambda _requests: [],
+        "run_versioned_analysis_request": lambda _request: {
+            "version": 1,
+            "texts": {},
+            "images": {},
+            "sections": [],
+        },
+        "run_versioned_analysis_requests": lambda _requests: {
+            "version": 1,
+            "texts": {},
+            "images": {},
+            "sections": [],
+        },
     }
     for name, function in functions.items():
         monkeypatch.setattr(r_bridge, name, function, raising=False)

@@ -15,6 +15,7 @@ from rc_metastudio import analysis_dataset
 from rc_metastudio import result_sections
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.analysis_errors import DiagnosticExecutionError
+from rc_metastudio.r_backend import AnalysisBackendUnavailableError
 
 
 AnalysisValue: TypeAlias = bool | int | float | str | None
@@ -145,30 +146,44 @@ class AnalysisService:
         self, model: object, data_type: str, *, var_name: str = "tmp_obj"
     ) -> None:
         if data_type == "binary":
-            r_bridge.dataset_to_simple_binary_r_object(model, var_name=var_name)
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_binary_r_object(
+                    model, var_name=var_name
+                )
+            )
             return
         if data_type == "continuous":
-            r_bridge.dataset_to_simple_continuous_r_object(model, var_name=var_name)
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_continuous_r_object(
+                    model, var_name=var_name
+                )
+            )
             return
         if data_type == "diagnostic":
-            r_bridge.dataset_to_simple_diagnostic_r_object(model, var_name=var_name)
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_diagnostic_r_object(
+                    model, var_name=var_name
+                )
+            )
             return
         raise ValueError(f"unsupported analysis data family: {data_type!r}")
 
     def available_methods(self, **query: object) -> Mapping[str, str]:
-        return r_bridge.get_available_methods(**query)
+        return _require_backend(lambda: r_bridge.get_available_methods(**query))
 
     def parameters(self, method: str):
-        return r_bridge.get_params(method)
+        return _require_backend(lambda: r_bridge.get_params(method))
 
     def method_description(self, method: str) -> str:
-        return r_bridge.get_method_description(method)
+        return _require_backend(lambda: r_bridge.get_method_description(method))
 
     def plot_capabilities(
         self, data_type: str, method: str, *, workflow: str
     ) -> list[Mapping[str, object]]:
-        return r_bridge.get_analysis_plot_capabilities(
-            data_type, method, workflow=workflow
+        return _require_backend(
+            lambda: r_bridge.get_analysis_plot_capabilities(
+                data_type, method, workflow=workflow
+            )
         )
 
     def select_studies_for_covariates(
@@ -223,6 +238,15 @@ class AnalysisService:
 
     def reset_working_directory(self) -> None:
         r_bridge.reset_r_working_directory()
+
+
+def _require_backend(operation):
+    try:
+        return operation()
+    except KeyError as error:
+        raise AnalysisBackendUnavailableError(
+            "The embedded RCMetaR function registry is unavailable."
+        ) from error
 
 
 def select_studies_for_covariates(
