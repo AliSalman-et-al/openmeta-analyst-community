@@ -1201,7 +1201,6 @@ def _inventory_directory(
     minimum_macos: str,
     r_delivery_kind: str,
     folded: dict[str, str],
-    
 ) -> tuple[list[dict], int]:
     records: list[dict] = []
     total_bytes = 0
