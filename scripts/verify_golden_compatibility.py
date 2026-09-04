@@ -17,13 +17,11 @@ import sys
 from typing import Any
 import zipfile
 
-SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "rc_metastudio"
-sys.path.insert(0, str(SOURCE_ROOT))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from tests.analysis_regression.golden.support import golden_analysis  # noqa: E402
-from rc_metastudio.analysis_regression_compare import (  # noqa: E402
+from tests.analysis_regression.golden.support.analysis_regression_compare import (  # noqa: E402
     compare_golden_baseline,
 )
 

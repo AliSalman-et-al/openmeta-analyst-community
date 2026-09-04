@@ -14,7 +14,7 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 ROOT = Path(__file__).resolve().parents[3]
 
-from rc_metastudio.analysis_regression_compare import (  # noqa: E402 - legacy module path bootstrap
+from tests.analysis_regression.golden.support.analysis_regression_compare import (  # noqa: E402
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
     MISSING_OUTPUT,
