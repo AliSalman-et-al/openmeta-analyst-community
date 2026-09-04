@@ -564,6 +564,30 @@ def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch)
     )
 
 
+def test_pft_outcome_edit_uses_first_arm_sample_size_for_scale_conversion(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    model.current_effect = "PFT"
+    analysis_unit = model.get_current_analysis_unit_for_study(0)
+    group = model.current_groups[0]
+    comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group].raw_data[:] = [1, 20]
+    analysis_unit.set_effect_for_source(
+        "entered", "PFT", comparison, 0.2, 0.1, 0.3
+    )
+    calls = []
+
+    def convert(value, effect, *, convert_to, n1=None):
+        calls.append((convert_to, n1))
+        return value
+
+    monkeypatch.setattr(model.editing_service.bridge, "binary_convert_scale", convert)
+
+    assert model.setData(model.index(0, model.OUTCOMES[0]), "0.2") is True
+    assert ("calc.scale", 20) in calls
+    assert ("display.scale", 20) in calls
+
+
 def test_unnamed_study_cannot_be_manually_included():
     model = _binary_model_with_blank_study()
     errors = []

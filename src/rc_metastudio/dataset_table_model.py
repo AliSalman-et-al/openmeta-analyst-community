@@ -1333,6 +1333,7 @@ class DatasetTableModel(QAbstractTableModel):
             reverse=reverse,
             directions_to_analysis_unit=directions_to_analysis_unit,
             confidence_multiplier=self.get_confidence_multiplier(),
+            effect_source=self._display_effect_source,
         )
         self.dataset.studies.sort(key=cmp_to_key(comparator), reverse=reverse)
 

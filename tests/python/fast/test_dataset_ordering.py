@@ -152,3 +152,28 @@ def test_dataset_model_sort_studies_uses_key_function(monkeypatch):
         model.sort_studies(column, reverse=False)
 
         assert _study_names(model) == expected_order
+
+
+def test_outcome_sort_uses_each_study_display_effect_source():
+    model = _sortable_dataset_model()
+    group_comparison = model.get_current_group_comparison()
+    studies = {study.name: study for study in model.dataset.studies}
+
+    for study in model.dataset.studies:
+        unit = study.get_analysis_unit("Mortality", "first")
+        for group in model.current_groups:
+            unit.groups[group].raw_data[:] = ["", ""]
+        unit.set_effect_for_source(
+            "entered", "OR", group_comparison,
+            {"Alpha": 1.0, "Beta": 2.0, "Gamma": 3.0}[study.name],
+            0.1,
+            4.0,
+        )
+
+    alpha = studies["Alpha"].get_analysis_unit("Mortality", "first")
+    alpha.groups[model.current_groups[0]].raw_data[:] = [1, 10]
+    alpha.set_effect_for_source("derived_preview", "OR", group_comparison, 9.0, 8.0, 10.0)
+
+    model.sort_studies(model.OUTCOMES[0], reverse=False)
+
+    assert _study_names(model) == ["Beta", "Gamma", "Alpha"]

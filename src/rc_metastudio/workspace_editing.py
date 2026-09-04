@@ -538,49 +538,78 @@ class WorkspaceEditingService:
         unit = self._analysis_unit(dataset, study, context)
         normalized_value, _ = qt_text.normalize_decimal_text(value)
         display_value = None if qt_text.is_blank(value) else float(normalized_value)
-        metric = context.current_effect
-        outcome_index = context.outcome_columns.index(target.column)
-        if context.data_type == DIAGNOSTIC:
-            metric = "Spec" if outcome_index >= 3 else "Sens"
-            outcome_index %= 3
+        metric, outcome_index = self._outcome_metric(target, context)
         if metric is None:
             return AppliedWorkspaceEdit(error="No effect metric is selected.")
-        calculation_value = self.to_calculation_scale(display_value, context.data_type, metric)
-        entered = unit.get_effect_for_source("entered", metric, context.group_comparison)
-        if outcome_index == 0:
-            unit.set_effect_for_source(
-                "entered", metric, context.group_comparison,
-                calculation_value, entered.lower, entered.upper, entered.standard_error,
-            )
-        elif outcome_index == 1:
-            if context.outcome_subtype == "generic_effect":
-                unit.set_effect_for_source(
-                    "entered", metric, context.group_comparison,
-                    entered.estimate, entered.lower, entered.upper, calculation_value,
-                )
-            else:
-                unit.set_effect_for_source(
-                    "entered", metric, context.group_comparison,
-                    entered.estimate, calculation_value, entered.upper, entered.standard_error,
-                )
-        else:
-            unit.set_effect_for_source(
-                "entered", metric, context.group_comparison,
-                entered.estimate, entered.lower, calculation_value, entered.standard_error,
-            )
-        if context.outcome_subtype != "generic_effect":
-            entered = unit.get_effect_for_source("entered", metric, context.group_comparison)
-            se = unit.calculate_se_if_possible(metric, context.group_comparison, confidence_multiplier=context.confidence_multiplier, source="entered") if None not in (entered.estimate, entered.lower, entered.upper) else None
-            unit.set_effect_for_source("entered", metric, context.group_comparison, entered.estimate, entered.lower, entered.upper, se)
+        n1 = self._outcome_sample_size(dataset, study, context)
+        calculation_value = self.to_calculation_scale(
+            display_value, context.data_type, metric, n1
+        )
+        self._set_entered_outcome(
+            unit, metric, outcome_index, calculation_value, context
+        )
+        self._recalculate_entered_outcome(unit, metric, context)
         unit.calculate_display_effect_and_ci(
             metric,
             context.group_comparison,
-            self.display_scale_converter(context.data_type, metric),
+            self.display_scale_converter(context.data_type, metric, n1),
             confidence_level=context.confidence_level,
             confidence_multiplier=context.confidence_multiplier,
             source="entered",
         )
         return AppliedWorkspaceEdit()
+
+    @staticmethod
+    def _outcome_metric(
+        target: WorkspaceEditTarget, context: WorkspaceEditingContext
+    ) -> tuple[str | None, int]:
+        outcome_index = context.outcome_columns.index(target.column)
+        if context.data_type == DIAGNOSTIC:
+            return ("Spec" if outcome_index >= 3 else "Sens", outcome_index % 3)
+        return context.current_effect, outcome_index
+
+    def _outcome_sample_size(self, dataset, study, context):
+        if context.current_effect != "PFT":
+            return None
+        return self._raw_data(dataset, study, context)[1]
+
+    @staticmethod
+    def _set_entered_outcome(
+        unit: AnalysisUnit,
+        metric: str,
+        outcome_index: int,
+        calculation_value,
+        context: WorkspaceEditingContext,
+    ) -> None:
+        entered = unit.get_effect_for_source("entered", metric, context.group_comparison)
+        if outcome_index == 0:
+            values = (calculation_value, entered.lower, entered.upper, entered.standard_error)
+        elif outcome_index == 1 and context.outcome_subtype == "generic_effect":
+            values = (entered.estimate, entered.lower, entered.upper, calculation_value)
+        elif outcome_index == 1:
+            values = (entered.estimate, calculation_value, entered.upper, entered.standard_error)
+        else:
+            values = (entered.estimate, entered.lower, calculation_value, entered.standard_error)
+        unit.set_effect_for_source("entered", metric, context.group_comparison, *values)
+
+    @staticmethod
+    def _recalculate_entered_outcome(
+        unit: AnalysisUnit, metric: str, context: WorkspaceEditingContext
+    ) -> None:
+        if context.outcome_subtype == "generic_effect":
+            return
+        entered = unit.get_effect_for_source("entered", metric, context.group_comparison)
+        values = (entered.estimate, entered.lower, entered.upper)
+        se = unit.calculate_se_if_possible(
+            metric,
+            context.group_comparison,
+            confidence_multiplier=context.confidence_multiplier,
+            source="entered",
+        ) if None not in values else None
+        unit.set_effect_for_source(
+            "entered", metric, context.group_comparison,
+            entered.estimate, entered.lower, entered.upper, se,
+        )
 
     def _edit_covariate(self, study: Study, context: WorkspaceEditingContext, value: object) -> AppliedWorkspaceEdit:
         if context.covariate_name is None:
