@@ -460,7 +460,7 @@ test_that("meta-regression supplies metafor digits when the request omits them",
          workflow = "meta-regression", stop.at.rma = TRUE)
   )
 
-  expect_s4_class(result, "rma")
+  expect_s3_class(result, "rma")
   expect_length(result$b, 2)
 })
 
