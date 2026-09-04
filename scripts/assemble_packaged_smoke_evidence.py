@@ -100,7 +100,12 @@ def main() -> int:
     if args.executable:
         if not args.runtime_probe or not args.surface_directory:
             parser.error("--executable requires --runtime-probe and --surface-directory")
-        capture_atomic_observations(args.executable, runtime_probe=args.runtime_probe, surface_directory=args.surface_directory)
+        records = capture_atomic_observations(args.executable, runtime_probe=args.runtime_probe, surface_directory=args.surface_directory)
+        combined = []
+        for record in records:
+            payload = json.loads(record.read_text(encoding="utf-8"))
+            combined.extend(payload.get("scales", []))
+        args.surface_records.write_text(json.dumps(combined, indent=2) + "\n", encoding="utf-8")
     assemble(
         workflow_observation=args.workflow_observation,
         surface_records=args.surface_records,
