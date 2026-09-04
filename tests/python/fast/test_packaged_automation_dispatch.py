@@ -25,9 +25,9 @@ import pytest
             ("wizard.json", "sample.rcms"),
         ),
         (
-            ["RCMetaStudio", "--automation-package-workflow-observation", "workflow.json", "sample.rcms"],
-            "start_package_workflow_observation",
-            ("workflow.json", "sample.rcms"),
+            ["RCMetaStudio", "--automation-package-operation", "operation.json", "sample.rcms", "analysis", "de_DE"],
+            "start_package_operation",
+            ("operation.json", "sample.rcms", "analysis", "de_DE"),
         ),
     ],
 )
@@ -56,8 +56,8 @@ def test_packaged_qualification_commands_validate_their_arguments():
         automation.dispatch(["RCMetaStudio", "--automation-package-surface-smoke"])
     with pytest.raises(SystemExit, match="startup-wizard-smoke requires"):
         automation.dispatch(["RCMetaStudio", "--automation-startup-wizard-smoke"])
-    with pytest.raises(SystemExit, match="workflow-observation requires"):
-        automation.dispatch(["RCMetaStudio", "--automation-package-workflow-observation"])
+    with pytest.raises(SystemExit, match="package-operation requires"):
+        automation.dispatch(["RCMetaStudio", "--automation-package-operation"])
 
 
 def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
@@ -72,8 +72,8 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
         "summary": "Binary Random-Effects Model\nEstimate 1",
         "svg_paths": {"forest": str(tmp_path / "forest.svg")},
         "locale_inputs": [
-            {"locale": "en_US", "input": "1.2", "canonical_value": 1.2},
-            {"locale": "de_DE", "input": "1,2", "canonical_value": 1.2},
+            {"locale": "en_US", "input": "1.2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
+            {"locale": "de_DE", "input": "1,2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
         ],
         "edit_observed": True,
         "analysis_observed": True,

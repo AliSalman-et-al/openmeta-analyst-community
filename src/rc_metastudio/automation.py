@@ -9,6 +9,7 @@ import importlib.metadata
 import os
 import platform
 import sys
+import tempfile
 from pathlib import Path
 from rc_metastudio.cocoa_accessibility import find_accessibility_element
 
@@ -80,21 +81,11 @@ def start_automation_smoke(
         if not window.open(os.path.abspath(sample_path), raise_on_error=True):
             raise RuntimeError("packaged smoke could not open the project")
         app.processEvents()
-        evidence_path = os.environ.get("RCMS_PACKAGE_SMOKE_EVIDENCE")
-        if evidence_path:
-            _write_json(
-                evidence_path,
-                {
-                    "schema_version": 1,
-                    "passed": True,
-                    "platform_plugin": app.platformName().lower(),
-                    "workflows": {
-                        "automation_entry_point": True,
-                        "converted_sample": Path(sample_path).name,
-                    },
-                    "scales": [],
-                },
-            )
+        _log("packaged-workflow:shell-created")
+        _log("packaged-workflow:project-open:start")
+        _log("packaged-workflow:project-open:return")
+        _force_table_paint(app, window)
+        _log("packaged-workflow:paint:complete")
         return 0
     finally:
         _mark_workspace_saved(window)
@@ -102,10 +93,11 @@ def start_automation_smoke(
         app.processEvents()
         _dispose_qobjects(app, (window,))
         app.quit()
+        _log("packaged-workflow:post-close")
 
 
-def start_package_workflow_observation(output_path: str, sample_path: str) -> int:
-    """Observe one packaged project operation for the developer assembler."""
+def start_package_operation(output_path: str, sample_path: str, operation: str, locale_name: str = "en_US") -> int:
+    """Perform one ordinary packaged-project operation for developer tooling."""
     from PyQt6 import QtCore
     from rc_metastudio import main_window
 
@@ -114,38 +106,47 @@ def start_package_workflow_observation(output_path: str, sample_path: str) -> in
         if not window.open(os.path.abspath(sample_path), raise_on_error=True):
             raise RuntimeError("packaged workflow observation could not open project")
         model = window.tableView.model()
-        name_index = model.index(0, model.NAME)
-        edited = model.setData(name_index, "Packaged Smoke – München")
-        raw_index = model.index(0, model.RAW_DATA[0])
-        raw_value = str(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-        parsed_value = float(raw_value.replace(",", "."))
-        captured = {}
-        dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
-        original = window.analysis
-        try:
-            dialog.current_method = "binary.random"
-            dialog.current_param_vals = {}
-            dialog.setup_params()
-            dialog.current_param_vals.update(dialog.current_defaults)
-            window.analysis = lambda result: captured.setdefault("result", result)
-            dialog.run_ma()
-        finally:
-            window.analysis = original
-            dialog.close()
-        result = captured.get("result")
-        if result is None:
-            raise RuntimeError("packaged workflow observation produced no analysis")
-        summary = result.texts.get("Summary", "")
+        model = window.tableView.model()
+        if operation == "edit":
+            observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
+        elif operation in {"analysis", "locale"}:
+            raw_index = model.index(0, model.RAW_DATA[0])
+            raw_value = float(str(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole)).replace(",", "."))
+            numeric_text = f"{raw_value:.1f}" if locale_name == "en_US" else f"{raw_value:.1f}".replace(".", ",")
+            observed = bool(model.setData(raw_index, numeric_text))
+            captured = {}
+            dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
+            original = window.analysis
+            try:
+                dialog.current_method = "binary.random"
+                dialog.current_param_vals = {}
+                dialog.setup_params()
+                dialog.current_param_vals.update(dialog.current_defaults)
+                window.analysis = lambda result: captured.setdefault("result", result)
+                dialog.run_ma()
+            finally:
+                window.analysis = original
+                dialog.close()
+            result = captured.get("result")
+            if result is None:
+                raise RuntimeError("packaged analysis operation produced no result")
+            observed = observed and bool(result.texts.get("Summary"))
+        elif operation == "save-reopen":
+            observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
+            handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
+            os.close(handle)
+            destination = Path(raw_destination)
+            destination.unlink()
+            window.out_path = str(destination)
+            observed = observed and window.save() is True and window.open(str(destination), raise_on_error=True)
+            destination.unlink(missing_ok=True)
+        else:
+            raise ValueError(f"unknown packaged operation: {operation}")
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        observation = {
-            "summary": summary,
-            "svg_paths": dict(result.display_images),
-            "edit_observed": bool(edited),
-            "analysis_observed": True,
-            "reopen_observed": bool(window.open(os.path.abspath(sample_path), raise_on_error=True)),
-            "locale_inputs": [{"locale": "en_US", "input": f"{parsed_value:.1f}", "canonical_value": parsed_value}, {"locale": "de_DE", "input": f"{parsed_value:.1f}".replace(".", ","), "canonical_value": parsed_value}],
-        }
+        observation = {"operation": operation, "observed": observed}
+        if operation in {"analysis", "locale"}:
+            observation.update({"locale": locale_name, "input": numeric_text, "canonical_value": raw_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)})
         destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return 0
     finally:
@@ -299,19 +300,8 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     record["native_file_dialog"] = _observe_native_file_dialog(window)
     record["critical_dialog"] = _observe_critical_dialog(window)
     record["cleanup"] = {"close_accepted": bool(window.close()), "window_visible": window.isVisible()}
-    evidence_path_obj = Path(evidence_path)
-    if evidence_path_obj.exists():
-        evidence = json.loads(evidence_path_obj.read_text(encoding="utf-8"))
-    else:
-        evidence = {
-            "schema_version": 1,
-            "passed": True,
-            "platform_plugin": platform_name,
-            "workflows": {},
-            "scales": [],
-        }
-    evidence.setdefault("scales", []).append(record)
-    _write_json(evidence_path, evidence)
+    _write_json(evidence_path, record)
+    _log("packaged-surface:scale-%s-passed" % expected_scale)
     app.quit()
     return 0
 
@@ -494,10 +484,11 @@ def dispatch(startup_argv: list[str]) -> int:
         if len(startup_argv) != 3:
             raise SystemExit("--automation-package-runtime-probe requires an output path.")
         return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-workflow-observation":
-        if len(startup_argv) != 4:
-            raise SystemExit("--automation-package-workflow-observation requires an output path and project path.")
-        return _run_automation_smoke(lambda: start_package_workflow_observation(startup_argv[2], startup_argv[3]))
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-operation":
+        if len(startup_argv) not in {5, 6}:
+            raise SystemExit("--automation-package-operation requires output, project, operation, and optional locale.")
+        locale = startup_argv[5] if len(startup_argv) == 6 else "en_US"
+        return _run_automation_smoke(lambda: start_package_operation(startup_argv[2], startup_argv[3], startup_argv[4], locale))
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
         if len(startup_argv) != 4:
             raise SystemExit("--automation-package-surface-smoke requires an evidence path and scale.")

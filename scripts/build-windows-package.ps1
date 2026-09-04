@@ -305,7 +305,7 @@ function Invoke-PackagedAppSmokeTest {
         if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
         $env:QT_SCALE_FACTOR = "1.25"
         $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
-            -ArgumentList @("--automation-package-workflow-observation", ('"{0}"' -f $workflowObservationPath), $quotedSamplePath) `
+            -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
             -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath
         if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
 
@@ -329,8 +329,10 @@ function Invoke-PackagedAppSmokeTest {
             --surface-records $surfaceDirectory `
             --sample-observations $sampleObservationsPath `
             --sample amino.rcms --sample-root (Join-Path $Root "sample_projects") `
+            --sample-path $samplePath `
             --executable $exePath --runtime-probe $runtimeProbePath `
-            --surface-directory $surfaceDirectory --output $smokeEvidencePath
+            --surface-directory $surfaceDirectory --log-path $smokeLogPath `
+            --output $smokeEvidencePath
         if ($LASTEXITCODE -ne 0) { throw "Packaged evidence assembly failed." }
         & $PythonExe scripts\inspect_windows_deployment.py finalize-smoke `
             --smoke-evidence $smokeEvidencePath --smoke-log $smokeLogPath
