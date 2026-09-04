@@ -306,7 +306,7 @@ function Invoke-PackagedAppSmokeTest {
         $env:QT_SCALE_FACTOR = "1.25"
         $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
             -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
-            -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath
+            -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath -Visible
         if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
 
         foreach ($scale in @("1.25", "1.50", "1.75")) {

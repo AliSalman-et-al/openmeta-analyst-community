@@ -239,6 +239,18 @@ def test_packaged_smoke_launches_visual_wizard_layout_gate():
     assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
 
 
+def test_native_packaged_smoke_launch_is_visible():
+    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
+    smoke = script.split("function Invoke-PackagedAppSmokeTest", 1)[1].split(
+        "function Invoke-PackagedAdaptiveLayoutEvidence", 1
+    )[0]
+
+    assert (
+        '-StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath -Visible'
+        in smoke
+    )
+
+
 def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():
     workflow = load_workflow(".github", "workflows", "fast-verification.yml")
     jobs = workflow["jobs"]
