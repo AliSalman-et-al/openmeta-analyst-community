@@ -1292,9 +1292,14 @@ def _semantic_value_aliases(producer_sections, kind):
 
 
 def _replace_source_key(sources, value_key, source_key):
-    for key, (source_name, child_index) in list(sources.items()):
+    remapped = {}
+    for key, (source_name, child_index) in sources.items():
         if source_name == value_key:
-            sources[key] = (source_key, child_index)
+            remapped[source_key] = (source_key, child_index)
+        else:
+            remapped[key] = (source_name, child_index)
+    sources.clear()
+    sources.update(remapped)
 
 
 def _result_metadata(result):
