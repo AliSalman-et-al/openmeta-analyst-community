@@ -646,10 +646,10 @@
     metadata <- c("eligibility", "tests.data", "Trim-and-fill data")
     text.names <- names(output)[vapply(output, function(value) !is.null(value), logical(1))]
     text.names <- setdiff(text.names, metadata)
-    sections <- Map(function(name, order) list(
+    sections <- unname(Map(function(name, order) list(
         id=.small.study.section.id(name), kind="text", order=as.integer(order),
         title=name, source_key=name
-    ), text.names, seq_along(text.names) - 1L)
+    ), text.names, seq_along(text.names) - 1L))
     image.names <- names(plots$images %||% character())
     if (length(image.names)) {
         kinds <- vapply(image.names, function(title) {
@@ -657,11 +657,11 @@
             as.character(kind)
         }, character(1))
         occurrences <- ave(seq_along(kinds), kinds, FUN=seq_along)
-        image.sections <- Map(function(title, kind, occurrence, order) list(
+        image.sections <- unname(Map(function(title, kind, occurrence, order) list(
             id=paste0("small-study.", kind, ".", occurrence), kind="image",
             order=as.integer(order), title=title, source_key=title
         ), image.names, kinds, occurrences,
-        length(sections) + seq_along(image.names) - 1L)
+        length(sections) + seq_along(image.names) - 1L))
         sections <- c(sections, image.sections)
     }
     sections

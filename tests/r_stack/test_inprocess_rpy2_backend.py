@@ -212,33 +212,38 @@ _DRIVER = textwrap.dedent(
     analysis_dir = tempfile.mkdtemp(prefix="rcmetastudio-display-contract-")
     forest_path = os.path.join(analysis_dir, "forest.png")
     forest_display_path = os.path.join(analysis_dir, "forest.display.svg")
-    continuous_result = r_bridge.run_continuous_analysis(
-        "continuous.random",
+    continuous_result = r_bridge.run_versioned_analysis_request(
         {
-            "conf.level": 95.0,
-            "digits": 3,
-            "measure": "MD",
-            "rm.method": "DL",
-            "fp_style": "default",
-            "fp_col1_str": "Study or Subgroup",
-            "fp_col2_str": "[default]",
-            "fp_col3_str": "Intervention",
-            "fp_col4_str": "Control",
-            "fp_xlabel": "[default]",
-            "fp_outpath": forest_path,
-            "fp_display_path": forest_display_path,
-            "fp_plot_lb": "[default]",
-            "fp_plot_ub": "[default]",
-            "fp_show_col1": True,
-            "fp_show_col2": True,
-            "fp_show_col3": True,
-            "fp_show_col4": True,
-            "fp_show_summary_line": True,
-            "fp_xticks": "[default]",
-            "create.plot": True,
-            "write.to.file": False,
+            "version": 1,
+            "request.version": 1,
+            "method": "continuous.random",
+            "workflow": "standard",
+            "params": {
+                "conf.level": 95.0,
+                "digits": 3,
+                "measure": "MD",
+                "rm.method": "DL",
+                "fp_style": "default",
+                "fp_col1_str": "Study or Subgroup",
+                "fp_col2_str": "[default]",
+                "fp_col3_str": "Intervention",
+                "fp_col4_str": "Control",
+                "fp_xlabel": "[default]",
+                "fp_outpath": forest_path,
+                "fp_display_path": forest_display_path,
+                "fp_plot_lb": "[default]",
+                "fp_plot_ub": "[default]",
+                "fp_show_col1": True,
+                "fp_show_col2": True,
+                "fp_show_col3": True,
+                "fp_show_col4": True,
+                "fp_show_summary_line": True,
+                "fp_xticks": "[default]",
+                "create.plot": True,
+                "write.to.file": False,
+            },
         },
-        continuous_data_name="issue146_continuous",
+        data_name="issue146_continuous",
     )
     assert continuous_result["images"]["Forest Plot"] == forest_path
     assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
@@ -882,6 +887,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             funnel_result <- rcmetar.run.small.study.effects(
               funnel_data,
               list(
+                version=1L,
                 data.type="continuous", metric="MD",
                 funnels=c("ordinary", "contour"),
                 tests=c("mixed-effects-egger", "begg-mazumdar"), conf.level=95,
