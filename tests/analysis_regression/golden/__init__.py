@@ -1,0 +1,1 @@
+"""Golden analysis test support."""

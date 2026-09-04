@@ -454,7 +454,7 @@ _DRIVER = textwrap.dedent(
     ''')
     assert all(bool(value) for value in invalid_confidence_level_checks)
 
-    from rc_metastudio import golden_analysis
+    from tests.analysis_regression.golden.support import golden_analysis
 
     subgroup_bundle = [
         bundle for bundle in golden_analysis.curated_golden_bundles()

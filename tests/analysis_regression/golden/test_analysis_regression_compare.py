@@ -1255,10 +1255,35 @@ def _import_legacy_golden_modules():
         sys.modules["meta_globals"] = globals_module
         r_boundary = ModuleType("r_bridge")
         setattr(r_boundary, "RLibraryLoader", lambda: None)
+        setattr(r_boundary, "run_diagnostic_multi", lambda *args, **kwargs: {})
+        setattr(r_boundary, "run_workflow_analysis", lambda *args, **kwargs: {})
+        def run_versioned(request):
+            params = request.get("params", {})
+            if request.get("workflow", "standard") == "standard":
+                runner = getattr(r_boundary, "run_binary_analysis", None)
+                if runner is None:
+                    runner = r_boundary.run_continuous_analysis
+                return runner(request["method"], params)
+            return r_boundary.run_workflow_analysis(
+                request["workflow"], request["method"], params
+            )
+
+        setattr(r_boundary, "run_versioned_analysis_request", run_versioned)
+        setattr(
+            r_boundary,
+            "run_versioned_analysis_requests",
+            lambda requests: r_boundary.run_diagnostic_multi(
+                [request["method"] for request in requests],
+                [request.get("params", {}) for request in requests],
+            ),
+        )
         sys.modules["rc_metastudio.r_bridge"] = r_boundary
-        from rc_metastudio import golden_analysis
-        from rc_metastudio import headless_analysis
+        from tests.analysis_regression.golden.support import golden_analysis
+        from tests.analysis_regression.golden.support import headless_analysis
         from rc_metastudio import meta_globals
+        import rc_metastudio.analysis_adapter as analysis_adapter
+
+        analysis_adapter.r_bridge = r_boundary
 
         yield golden_analysis, headless_analysis, meta_globals
     finally:

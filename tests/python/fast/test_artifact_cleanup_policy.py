@@ -148,8 +148,8 @@ def test_gitattributes_normalizes_text_and_keeps_rcms_fixtures_binary():
 def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("RCMS_ANALYSIS_SCRATCH_DIR", str(tmp_path / "scratch"))
 
-    from rc_metastudio import golden_analysis
-    from rc_metastudio import headless_analysis
+    from tests.analysis_regression.golden.support import golden_analysis
+    from tests.analysis_regression.golden.support import headless_analysis
     from rc_metastudio import analysis_adapter
 
     created = []

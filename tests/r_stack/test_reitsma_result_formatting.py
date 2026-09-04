@@ -147,7 +147,8 @@ _REAL_REITSMA_DRIVER = textwrap.dedent(
     from rc_metastudio import r_backend
     r_backend.install_r_backend()
     try:
-        from rc_metastudio import golden_analysis, headless_analysis, r_bridge
+        from tests.analysis_regression.golden.support import golden_analysis, headless_analysis
+        from rc_metastudio import r_bridge
         r_bridge.RLibraryLoader().load_rcmetar()
     except Exception as exc:
         sys.stdout.write("SKIP %s: %s\n" % (exc.__class__.__name__, exc))

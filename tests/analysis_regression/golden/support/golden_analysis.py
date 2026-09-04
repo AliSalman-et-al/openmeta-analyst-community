@@ -12,7 +12,7 @@ import sys
 import traceback
 import zipfile
 
-from rc_metastudio import headless_analysis
+from tests.analysis_regression.golden.support import headless_analysis
 from rc_metastudio import meta_globals
 from rc_metastudio import r_bridge
 from rc_metastudio.plot_defaults import FOREST_ARM_LABELS

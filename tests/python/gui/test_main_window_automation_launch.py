@@ -936,7 +936,7 @@ def test_meantime_sample_project_loads_native_factor_covariate():
     from rc_metastudio import r_backend
 
     r_backend.install_r_backend()
-    from rc_metastudio import headless_analysis
+    from tests.analysis_regression.golden.support import headless_analysis
 
     model = headless_analysis.load_dataset_model(_sample_project_path("meantime.rcms"))
     dataset = model.dataset
