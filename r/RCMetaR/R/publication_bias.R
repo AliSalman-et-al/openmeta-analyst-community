@@ -623,6 +623,51 @@
     paste(summary, collapse="\n")
 }
 
+.small.study.section.id <- function(name) {
+    fixed <- c(
+        Warning="small-study.warning",
+        `Data and eligibility`="small-study.data-eligibility",
+        Tests="small-study.tests",
+        `Pooled comparison`="small-study.pooled-comparison",
+        References="small-study.references",
+        Failures="small-study.failures",
+        `Method details`="small-study.method-details",
+        `Methods not applicable`="small-study.methods-not-applicable",
+        Extrapolation="small-study.extrapolation"
+    )
+    id <- fixed[[name]]
+    if (!is.null(id)) return(id)
+    if (startsWith(name, "Trim-and-fill "))
+        return(paste0("small-study.trim-and-fill.",
+                      gsub("[^a-z0-9]+", "-", tolower(sub("^Trim-and-fill ", "", name)))))
+    paste0("small-study.", gsub("[^a-z0-9]+", "-", tolower(name)))
+}
+
+.small.study.sections <- function(output, plots) {
+    metadata <- c("eligibility", "tests.data", "Trim-and-fill data")
+    text.names <- names(output)[vapply(output, function(value) !is.null(value), logical(1))]
+    text.names <- setdiff(text.names, metadata)
+    sections <- Map(function(name, order) list(
+        id=.small.study.section.id(name), kind="text", order=as.integer(order),
+        title=name, source_key=name
+    ), text.names, seq_along(text.names) - 1L)
+    image.names <- names(plots$images %||% character())
+    if (length(image.names)) {
+        kinds <- vapply(image.names, function(title) {
+            kind <- plots$plot_names[[tolower(title)]] %||% "plot"
+            as.character(kind)
+        }, character(1))
+        occurrences <- ave(seq_along(kinds), kinds, FUN=seq_along)
+        image.sections <- Map(function(title, kind, occurrence, order) list(
+            id=paste0("small-study.", kind, ".", occurrence), kind="image",
+            order=as.integer(order), title=title, source_key=title
+        ), image.names, kinds, occurrences,
+        length(sections) + seq_along(image.names) - 1L)
+        sections <- c(sections, image.sections)
+    }
+    sections
+}
+
 .small.study.render.plots <- function(om.data, prepared, trimfill) {
     if (prepared$diagnostic && !isTRUE(prepared$derived$raw))
         return(list(images=character(), plot_capabilities=list(), plot_names=character(),
@@ -665,6 +710,7 @@
     plot.failures <- c(trimfill.failures, plots$failures %||% character())
     if (length(plot.failures)) output$Failures <- paste(c(failures, plot.failures), collapse="\n")
     output$References <- .small.study.references(names(tests), names(plots$images))
+    output$sections <- .small.study.sections(output, plots)
     plots$failures <- NULL
     c(output, plots)
 }
@@ -1245,6 +1291,8 @@ publication.bias.effects <- function(om.data, params) {
 }
 
 rcmetar.run.small.study.effects <- function(om.data, params=list()) {
+    if (length(params$version) != 1L || !identical(params$version, 1L))
+        stop("Unsupported small-study effects request version.", call.=FALSE)
     if (!requireNamespace("meta", quietly=TRUE)) stop("RCMetaR requires meta 8.5-0 for small-study effects methods.")
     if (!identical(as.character(utils::packageDescription("meta")$Version), "8.5-0")) stop("RCMetaR requires meta 8.5-0; installed version differs.")
     data.type <- as.character(params$data.type %||% if (is(om.data, "DiagnosticData")) "diagnostic" else "")

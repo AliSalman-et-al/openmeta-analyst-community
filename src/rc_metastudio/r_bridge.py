@@ -8,7 +8,7 @@ import os
 import re
 import sys
 from collections.abc import Mapping
-from typing import Callable
+from typing import Callable, Literal, overload
 
 from rc_metastudio import r_runtime
 from rc_metastudio.analysis_method_labels import (
@@ -17,7 +17,7 @@ from rc_metastudio.analysis_method_labels import (
 )
 from rc_metastudio import result_sections
 from rc_metastudio.analysis_errors import DiagnosticExecutionError
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.study_effect_shapes import (
     effect_triplet as effect_triplet,
     normalize_diagnostic_effects,
@@ -798,6 +798,26 @@ def covariate_to_r_expression(
     return covariate_expression
 
 
+@overload
+def run_small_study_effects(
+    table_model,
+    request,
+    res_name="small_study_effects_result",
+    data_name="tmp_obj",
+    preview: Literal[False] = False,
+) -> AnalysisResult: ...
+
+
+@overload
+def run_small_study_effects(
+    table_model,
+    request,
+    res_name="small_study_effects_result",
+    data_name="tmp_obj",
+    preview: Literal[True] = True,
+) -> Mapping[str, object]: ...
+
+
 @serialized_r_call
 def run_small_study_effects(
     table_model,
@@ -805,7 +825,7 @@ def run_small_study_effects(
     res_name="small_study_effects_result",
     data_name="tmp_obj",
     preview=False,
-):
+) -> AnalysisResult | Mapping[str, object]:
     """Run the complete guided small-study effects workflow in one R call.
 
     Conversion is intentionally performed at this boundary.  RCMetaR then
@@ -814,6 +834,9 @@ def run_small_study_effects(
     """
     if not isinstance(request, dict):
         raise TypeError("small-study effects request must be a mapping")
+    version = request.get("version")
+    if type(version) is not int or version != 1:
+        raise ValueError("unsupported small-study effects request version")
     family = request.get("data.type")
     if family == "binary":
         dataset_to_simple_binary_r_object(table_model, var_name=data_name)

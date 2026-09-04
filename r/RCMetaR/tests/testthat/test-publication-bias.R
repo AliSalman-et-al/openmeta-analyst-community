@@ -12,6 +12,21 @@ test_that("publication-bias display helpers emit trimmed, readable values", {
   expect_identical(RCMetaR:::.small.study.text(NA_character_), "Not available")
 })
 
+test_that("small-study effects public entry requires exact request version", {
+  expect_error(
+    RCMetaR:::rcmetar.run.small.study.effects(NULL, list(data.type="continuous", metric="MD")),
+    "Unsupported small-study effects request version"
+  )
+  expect_error(
+    RCMetaR:::rcmetar.run.small.study.effects(NULL, list(version=2L, data.type="continuous", metric="MD")),
+    "Unsupported small-study effects request version"
+  )
+  expect_error(
+    RCMetaR:::rcmetar.run.small.study.effects(NULL, list(version=1, data.type="continuous", metric="MD")),
+    "Unsupported small-study effects request version"
+  )
+})
+
 test_that("publication-bias confidence level controls intervals and labels", {
   expect_equal(RCMetaR:::.small.study.meta.level(90), .9)
   expect_error(
@@ -75,7 +90,7 @@ test_that("generic entered effects produce one ordered ordinary funnel result", 
   device.before <- grDevices::dev.cur()
   result <- rcmetar.run.small.study.effects(
     data,
-    list(data.type="continuous", metric="MD", funnels="ordinary",
+    list(version=1L, data.type="continuous", metric="MD", funnels="ordinary",
          tests=character(), conf.level=90)
   )
 
@@ -97,6 +112,11 @@ test_that("generic entered effects produce one ordered ordinary funnel result", 
   expect_gt(file.info(result$images[[1]])$size, 0)
   expect_identical(result$plot_capabilities[[1]]$plot_kind, "funnel")
   expect_identical(result$plot_capabilities[[1]]$regenerator, "funnel")
+  expect_identical(result$sections[[1]]$id, "small-study.warning")
+  expect_identical(result$sections[[1]]$title, "Warning")
+  image.sections <- Filter(function(section) identical(section$kind, "image"), result$sections)
+  expect_identical(image.sections[[1]]$id, "small-study.funnel.1")
+  expect_identical(image.sections[[1]]$title, "Ordinary Funnel Plot")
   expect_identical(grDevices::dev.cur(), device.before)
   expect_true(any(grepl("Funnel plot axis choice", result$References, fixed=TRUE)))
   expect_true(any(grepl("Viechtbauer", result$References, fixed=TRUE)))
@@ -116,7 +136,7 @@ test_that("optional asymmetry failures remain beside a successful funnel", {
   )
   result <- rcmetar.run.small.study.effects(
     data,
-    list(data.type="continuous", metric="MD", funnels="ordinary",
+    list(version=1L, data.type="continuous", metric="MD", funnels="ordinary",
          tests=c("classical-egger", "invalid-method"), conf.level=95)
   )
 
@@ -136,7 +156,7 @@ test_that("one failed funnel does not discard successful plots", {
     years=as.integer(2011:2014)
   )
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
+    version=1L, data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
     tests=character(), `funnel.point.color`=c("black", "not-a-color")
   ))
 
@@ -160,7 +180,7 @@ test_that("ordinary and contour funnels persist their prepared geometry", {
   device.before <- grDevices::dev.cur()
   result <- rcmetar.run.small.study.effects(
     data,
-    list(data.type="continuous", metric="MD",
+    list(version=1L, data.type="continuous", metric="MD",
          funnels=c("ordinary", "contour"), tests=character(), conf.level=95,
          `funnel.contour.levels`="90,95,99",
          `funnel.pooled.overlay.visible`=TRUE,
@@ -221,7 +241,7 @@ test_that("ordinary and contour funnels persist their prepared geometry", {
   for (label.policy in c("none", "outside-pseudo-confidence-region", "all")) {
     labeled <- rcmetar.run.small.study.effects(
       data,
-      list(data.type="continuous", metric="MD", funnels="ordinary",
+      list(version=1L, data.type="continuous", metric="MD", funnels="ordinary",
            tests=character(), conf.level=95,
            `funnel.label.policy`=label.policy)
     )
@@ -241,7 +261,7 @@ test_that("references follow the methods and plots that produced the result", {
     years=as.integer(2011:2020)
   )
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
+    version=1L, data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
     tests=c("classical-egger", "mixed-effects-egger", "begg-mazumdar")
   ))
 
@@ -266,10 +286,10 @@ test_that("ordinary funnel sampling-region visibility is persisted for regenerat
               study.names=c("one", "two", "three", "four"),
               years=as.integer(2011:2014))
   visible <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels="ordinary", tests=character(),
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary", tests=character(),
     `funnel.sampling.region.visible`=TRUE))
   hidden <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels="ordinary", tests=character(),
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary", tests=character(),
     `funnel.sampling.region.visible`=FALSE))
   visible.path <- visible$plot_params_paths[["Ordinary Funnel Plot"]]
   hidden.path <- hidden$plot_params_paths[["Ordinary Funnel Plot"]]
@@ -295,7 +315,7 @@ test_that("funnel regeneration uses the persisted funnel index for vector settin
               study.names=c("one", "two", "three", "four"),
               years=as.integer(2011:2014))
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
+    version=1L, data.type="continuous", metric="MD", funnels=c("ordinary", "contour"),
     tests=character(), conf.level=95,
     `funnel.label.policy`=c("none", "all"),
     `funnel.contour.levels`=c("", "80,90"),
@@ -326,7 +346,7 @@ test_that("generic tests use distinct package-native Egger and Begg procedures",
   )
   result <- rcmetar.run.small.study.effects(
     data,
-    list(data.type="continuous", metric="MD", funnels="ordinary",
+    list(version=1L, data.type="continuous", metric="MD", funnels="ordinary",
          tests=c("classical-egger", "mixed-effects-egger", "begg-mazumdar"),
          conf.level=95)
   )
@@ -365,7 +385,7 @@ test_that("generic guardrails expose hard minimum and automatic k guard", {
     study.names=paste0("study-", seq_len(k)), years=as.integer(2011:(2010+k))
   )
   hard <- rcmetar.run.small.study.effects(make_data(2), list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger"), conf.level=95))
   expect_false(hard$eligibility$methods[[1]]$available)
   expect_match(hard$eligibility$methods[[1]]$reason, "fewer than 3")
@@ -374,7 +394,7 @@ test_that("generic guardrails expose hard minimum and automatic k guard", {
   expect_match(hard$Warning, "2 usable studies were available", fixed=TRUE)
 
   disabled <- rcmetar.run.small.study.effects(make_data(4), list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger"), conf.level=95))
   expect_false(disabled$eligibility$methods[[1]]$available)
   expect_match(disabled$eligibility$methods[[1]]$reason, "below 10")
@@ -390,13 +410,13 @@ test_that("generic guardrails expose hard minimum and automatic k guard", {
   expect_match(disabled$Warning, "the exact range is reported in the analysis summary", fixed=TRUE)
 
   automatic <- rcmetar.run.small.study.effects(make_data(4), list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger"), conf.level=95))
   expect_false(automatic$eligibility$methods[[1]]$available)
   expect_false("classical-egger" %in% names(automatic$tests.data))
 
   constant <- rcmetar.run.small.study.effects(make_data(4, rep(.2, 4)), list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger"), conf.level=95))
   expect_false(constant$eligibility$methods[[1]]$available)
   expect_match(constant$eligibility$methods[[1]]$reason, "variance is zero")
@@ -415,7 +435,7 @@ test_that("binary OR routes Harbord at low tau and Rucker AS+RE above the rule o
     c(1,3,4,2,3,2,5,4,6,1), c(9,17,16,18,17,8,15,16,14,19)
   )
   low.result <- rcmetar.run.small.study.effects(low, list(
-    data.type="binary", metric="OR", funnels="ordinary",
+    version=1L, data.type="binary", metric="OR", funnels="ordinary",
     tests=c("harbord", "rucker-as-re", "peters"),
     `correction.policy`="Studies with any zero cell",
     extrapolation=TRUE
@@ -454,7 +474,7 @@ test_that("binary OR routes Harbord at low tau and Rucker AS+RE above the rule o
     c(18,2,17,3,19,1,16,4,17,2), c(2,8,3,27,1,19,4,16,3,28)
   )
   high.result <- rcmetar.run.small.study.effects(high, list(
-    data.type="binary", metric="OR", funnels="ordinary",
+    version=1L, data.type="binary", metric="OR", funnels="ordinary",
     tests=c("harbord", "rucker-as-re", "peters")))
   expect_false(high.result$eligibility$methods[[1]]$available)
   expect_match(high.result$eligibility$methods[[1]]$reason, "above 0.1")
@@ -484,7 +504,7 @@ test_that("binary OR corrections preserve policy labels and exclude native doubl
   )
   for (policy in c("Studies with any zero cell", "All studies", "All studies if any zero exists")) {
     result <- rcmetar.run.small.study.effects(data, list(
-      data.type="binary", metric="OR", funnels="ordinary", tests=character(),
+      version=1L, data.type="binary", metric="OR", funnels="ordinary", tests=character(),
       `correction.policy`=policy
     ))
     expect_match(result$`Data and eligibility`, "Continuity correction:")
@@ -500,7 +520,7 @@ test_that("binary OR corrections preserve policy labels and exclude native doubl
   incomplete <- data
   incomplete@g2O2 <- incomplete@g2O2[-10]
   no.primary <- rcmetar.run.small.study.effects(incomplete, list(
-    data.type="binary", metric="OR", funnels="ordinary", tests=character()
+    version=1L, data.type="binary", metric="OR", funnels="ordinary", tests=character()
   ))
   expect_true(grepl("complete two-arm raw counts", paste(vapply(no.primary$eligibility$methods, `[[`, character(1), "reason"), collapse=" ")))
   expect_match(no.primary$`Data and eligibility`, "Primary test: None available")
@@ -519,11 +539,11 @@ test_that("independent two-group SMD uses native Pustejovsky-Rodgers", {
     N2=c(22,28,34,38,44,48,56,64,76,88), mean2=c(.8,1.0,.9,1.1,1.0,1.2,1.1,1.3,1.2,1.4), sd2=rep(1,10),
     y=rep(999,10), SE=rep(999,10), study.names=paste0("s",1:10), years=as.integer(2011:2020)
   )
-  automatic <- rcmetar.run.small.study.effects(data, list(data.type="continuous", metric="SMD", funnels="ordinary", tests=character()))
+  automatic <- rcmetar.run.small.study.effects(data, list(version=1L, data.type="continuous", metric="SMD", funnels="ordinary", tests=character()))
   expect_true(automatic$eligibility$methods[[1]]$available)
   expect_true("pustejovsky-rodgers" %in% names(automatic$tests.data))
   selected <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="SMD", funnels="ordinary", tests=c("pustejovsky-rodgers")))
+    version=1L, data.type="continuous", metric="SMD", funnels="ordinary", tests=c("pustejovsky-rodgers")))
   expect_true(selected$eligibility$methods[[1]]$available)
   expect_identical(selected$eligibility$methods[[1]]$role, "primary")
   expect_identical(selected$tests.data$`pustejovsky-rodgers`$package.version, "8.5-0")
@@ -535,7 +555,7 @@ test_that("independent two-group SMD uses native Pustejovsky-Rodgers", {
   missing <- data
   missing@N2 <- missing@N2[-10]
   missing.result <- rcmetar.run.small.study.effects(missing, list(
-    data.type="continuous", metric="SMD", funnels="ordinary", tests=character()))
+    version=1L, data.type="continuous", metric="SMD", funnels="ordinary", tests=character()))
   expect_false(missing.result$eligibility$methods[[1]]$available)
   expect_match(missing.result$eligibility$methods[[1]]$reason, "sample sizes")
   expect_match(missing.result$`Data and eligibility`, "Primary test: None available")
@@ -547,7 +567,7 @@ test_that("ordinary SMD Egger is a separate non-primary artifact", {
   data <- new("ContinuousData", y=seq(-.2,.2,length.out=10), SE=seq(.1,.2,length.out=10),
               study.names=paste0("s",1:10), years=as.integer(2011:2020))
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="SMD", funnels="ordinary", tests=c("classical-egger")))
+    version=1L, data.type="continuous", metric="SMD", funnels="ordinary", tests=c("classical-egger")))
   expect_true(result$eligibility$methods[[2]]$available)
   expect_identical(result$eligibility$methods[[2]]$role, "sensitivity")
   expect_match(result$eligibility$methods[[2]]$reason, "")
@@ -562,7 +582,7 @@ test_that("RR, RD, and one-arm proportion remain descriptive without automatic t
                 g2O1=c(1,3,5,7,9,11,13,15,17,19), g2O2=c(19,17,15,13,11,9,7,5,3,2),
                 y=rep(999,10), SE=rep(999,10), study.names=paste0("s",1:10), years=as.integer(2011:2020))
   for (metric in c("RR", "RD")) {
-    result <- rcmetar.run.small.study.effects(binary, list(data.type="binary", metric=metric, funnels="ordinary", tests=character()))
+    result <- rcmetar.run.small.study.effects(binary, list(version=1L, data.type="binary", metric=metric, funnels="ordinary", tests=character()))
     expect_match(result$`Data and eligibility`, "Primary test: None available")
     expect_true(all(vapply(result$eligibility$methods, function(x) !isTRUE(x$available), logical(1))))
     expect_match(paste(vapply(result$eligibility$methods, `[[`, character(1), "reason"), collapse=" "), "No automatic primary")
@@ -570,7 +590,7 @@ test_that("RR, RD, and one-arm proportion remain descriptive without automatic t
   one.arm <- binary
   one.arm@g2O1 <- numeric(); one.arm@g2O2 <- numeric()
   one.arm@y <- seq(.1,.5,length.out=10); one.arm@SE <- seq(.05,.15,length.out=10)
-  proportion <- rcmetar.run.small.study.effects(one.arm, list(data.type="binary", metric="PR", funnels="ordinary", tests=character()))
+  proportion <- rcmetar.run.small.study.effects(one.arm, list(version=1L, data.type="binary", metric="PR", funnels="ordinary", tests=character()))
   expect_match(proportion$`Data and eligibility`, "Primary test: None available")
   expect_match(paste(proportion$eligibility$warnings, collapse=" "), "one-arm|effect-SE", ignore.case=TRUE)
   expect_false(any(grepl("Peters", vapply(proportion$eligibility$methods, `[[`, character(1), "method"), fixed=TRUE)))
@@ -583,7 +603,7 @@ test_that("trim-and-fill uses native L0/R0 controls and persists augmented plots
               SE=c(.10, .11, .12, .13, .14, .15, .16, .17, .18, .19),
               study.names=paste0("s", 1:10), years=as.integer(2011:2020))
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels=c("ordinary", "contour"), tests=character(),
+    version=1L, data.type="continuous", metric="MD", funnels=c("ordinary", "contour"), tests=character(),
     `trim.and.fill`=TRUE, `trim.and.fill.estimator`="L0",
     `trim.and.fill.side`="auto", `trim.and.fill.model`="random",
     `funnel.reference.visible`=c(TRUE, FALSE),
@@ -618,7 +638,7 @@ test_that("trim-and-fill uses native L0/R0 controls and persists augmented plots
   )
 
   bilateral <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="SMD", funnels="ordinary", tests=character(),
+    version=1L, data.type="continuous", metric="SMD", funnels="ordinary", tests=character(),
     `trim.and.fill`=TRUE, `trim.and.fill.estimator`="R0",
     `trim.and.fill.side`="auto", `trim.and.fill.model`="common"
   ))
@@ -633,7 +653,7 @@ test_that("infinite-precision sensitivity reports only supported successful test
   data <- new("ContinuousData", y=seq(-.3, .4, length.out=10), SE=seq(.1, .2, length.out=10),
               study.names=paste0("s", 1:10), years=as.integer(2011:2020))
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger", "mixed-effects-egger"),
     extrapolation=TRUE
   ))
@@ -650,7 +670,7 @@ test_that("infinite-precision sensitivity reports only supported successful test
   short.data@study.names <- short.data@study.names[1:4]
   short.data@years <- short.data@years[1:4]
   short <- rcmetar.run.small.study.effects(short.data, list(
-    data.type="continuous", metric="MD", funnels="ordinary",
+    version=1L, data.type="continuous", metric="MD", funnels="ordinary",
     tests=c("classical-egger"),
     `extrapolation`=TRUE
   ))
@@ -668,7 +688,7 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
     y=rep(999, 10), SE=rep(.001, 10), study.names=paste0("d", 1:10), years=as.integer(2011:2020))
   # Diagnostic configuration selects only the Deeks plot and test.
   result <- rcmetar.run.small.study.effects(data, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks",
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks",
     tests=character()
   ))
   expect_true(result$eligibility$methods[[1]]$available)
@@ -704,7 +724,7 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
   expect_true(file.exists(rcmetar.regenerate.small.study.funnel(om.data, res, params, edited)))
   expect_gt(file.info(edited)$size, 0)
   custom <- rcmetar.run.small.study.effects(data, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=character(),
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=character(),
 
     `funnel.xlab`="Edited ESS axis", `funnel.ylab`="Edited log DOR axis"
   ))
@@ -713,7 +733,7 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
   expect_identical(params$`funnel.xlab`, "Edited ESS axis")
   expect_identical(params$`funnel.ylab`, "Edited log DOR axis")
   alternative <- rcmetar.run.small.study.effects(data, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks"),
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks"),
     correction.policy="Studies with any zero cell"
   ))
   expect_match(alternative$`Data and eligibility`, "Studies with any zero cell", fixed=TRUE)
@@ -724,11 +744,11 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
     methods::slot(small, field) <- methods::slot(small, field)[1:4]
   }
   disabled <- rcmetar.run.small.study.effects(small, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()
   ))
   expect_match(disabled$eligibility$methods[[1]]$reason, "below 10")
   automatic <- rcmetar.run.small.study.effects(small, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks")))
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks")))
   expect_false(automatic$eligibility$methods[[1]]$available)
   expect_false("deeks" %in% names(automatic$tests.data))
   hard <- small
@@ -736,7 +756,7 @@ test_that("diagnostic Deeks uses corrected DOR and effective-sample-size geometr
     methods::slot(hard, field) <- methods::slot(hard, field)[1:2]
   }
   hard.result <- rcmetar.run.small.study.effects(hard, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()
   ))
   expect_match(hard.result$eligibility$methods[[1]]$reason, "fewer than 3")
 })
@@ -747,7 +767,7 @@ test_that("diagnostic Deeks requires complete counts", {
   entered <- new("DiagnosticData", y=seq(.2, .8, length.out=10), SE=seq(.1, .2, length.out=10),
                  study.names=paste0("e", 1:10), years=as.integer(2011:2020))
   no.counts <- rcmetar.run.small.study.effects(entered, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks")))
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=c("deeks")))
   expect_false(no.counts$eligibility$methods[[1]]$available)
   expect_match(no.counts$eligibility$methods[[1]]$reason, "TP/FN/FP/TN")
   expect_match(no.counts$`Data and eligibility`, "Primary test: None available")
@@ -756,7 +776,7 @@ test_that("diagnostic Deeks requires complete counts", {
   incomplete <- new("DiagnosticData", TP=1:9, FN=rep(5, 9), FP=rep(2, 9), TN=rep(8, 9),
                     y=rep(99, 10), SE=rep(.1, 10), study.names=paste0("i", 1:10), years=as.integer(2011:2020))
   incomplete.result <- rcmetar.run.small.study.effects(incomplete, list(
-    data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()))
+    version=1L, data.type="diagnostic", metric="DOR", funnels="deeks", tests=character()))
   expect_false(incomplete.result$eligibility$methods[[1]]$available)
   expect_match(incomplete.result$eligibility$methods[[1]]$reason, "complete TP/FN/FP/TN")
 })

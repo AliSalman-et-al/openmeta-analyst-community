@@ -9,14 +9,14 @@ important: a request is serialized once and cannot change while R is running.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-import hashlib
-import json
 from typing import Literal, TypeAlias, TypeVar
 
-from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
+from rc_metastudio.analysis_results import AnalysisResult
 
 
 class CorrectionPolicy(str, Enum):
@@ -304,7 +304,7 @@ class SmallStudyEffectsRequest:
     version: int = 1
 
     def __post_init__(self) -> None:
-        if self.version != 1:
+        if type(self.version) is not int or self.version != 1:
             raise ValueError(
                 "unsupported small-study effects request version: %s" % self.version
             )
@@ -431,6 +431,7 @@ class SmallStudyEffectsRequest:
     def to_mapping(self) -> dict[str, object]:
         """Return the stable wire representation sent to RCMetaR."""
         result: dict[str, object] = {
+            "version": self.version,
             "data.type": self.data_type,
             "metric": self.metric,
             "conf.level": self.confidence_level,
@@ -705,7 +706,9 @@ def execute_small_study_effects(
     from rc_metastudio import r_bridge
 
     result = r_bridge.run_small_study_effects(model, request.to_mapping())
-    return parse_analysis_result(result)
+    if not isinstance(result, AnalysisResult):
+        raise TypeError("small-study effects execution returned an invalid result")
+    return result
 
 
 class SmallStudyEffectsService:

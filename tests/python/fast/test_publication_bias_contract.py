@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 
+from rc_metastudio import publication_bias, r_bridge
+from rc_metastudio.analysis_results import empty_analysis_result
 from rc_metastudio.publication_bias import (
     AsymmetryTestSpec,
     EligibilityReport,
@@ -25,8 +27,32 @@ def test_request_freezes_typed_test_ids_and_serializes_wire_names():
     request = SmallStudyEffectsRequest.create(
         data_type="binary", metric="OR", selected_tests=(TestMethod.HARBORD,)
     )
-    assert request.to_mapping()["tests"] == ["harbord"]
-    assert "options" not in request.to_mapping()
+    wire = request.to_mapping()
+    assert wire["version"] == 1
+    assert wire["tests"] == ["harbord"]
+    assert "options" not in wire
+
+
+def test_execute_small_study_effects_returns_typed_bridge_result(monkeypatch):
+    request = SmallStudyEffectsRequest.create(data_type="continuous", metric="MD")
+    expected = empty_analysis_result()
+    monkeypatch.setattr(
+        r_bridge, "run_small_study_effects", lambda *args, **kwargs: expected
+    )
+
+    result = publication_bias.execute_small_study_effects(object(), request)
+
+    assert result is expected
+
+
+@pytest.mark.parametrize("version", [None, True, 1.0, 2, "1"])
+def test_python_r_boundary_requires_exact_small_study_request_version(version):
+    request = {"data.type": "continuous", "metric": "MD"}
+    if version is not None:
+        request["version"] = version
+
+    with pytest.raises(ValueError, match="unsupported small-study effects request version"):
+        r_bridge.run_small_study_effects(object(), request)
 
 
 def test_small_study_request_has_versioned_semantic_identity():
@@ -42,6 +68,14 @@ def test_small_study_request_has_versioned_semantic_identity():
     with pytest.raises(ValueError, match="unsupported small-study effects test"):
         SmallStudyEffectsRequest.create(
             data_type="binary", metric="OR", selected_tests=("not-a-test",)
+        )
+
+
+@pytest.mark.parametrize("version", [True, 1.0, 2, "1"])
+def test_small_study_request_rejects_non_exact_versions(version):
+    with pytest.raises(ValueError, match="unsupported small-study effects request version"):
+        SmallStudyEffectsRequest(
+            data_type="continuous", metric="MD", version=version
         )
 
 

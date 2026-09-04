@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QStyle, QWidget
 
+from rc_metastudio.analysis_results import empty_analysis_result
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from test_types import required
 
@@ -368,17 +369,18 @@ def test_successful_run_delivers_results_and_closes_dialog(qapp, monkeypatch):
     delivered = []
     owner = _Owner()
     owner.analysis = delivered.append
+    expected = empty_analysis_result()
     monkeypatch.setattr(
         publication_bias,
         "execute_small_study_effects",
-        lambda *args, **kwargs: {"sections": []},
+        lambda *args, **kwargs: expected,
     )
     dialog = publication_bias_dialog.PublicationBiasDialog(
         _Model("continuous", "MD"), owner
     )
     try:
         dialog.run()
-        assert delivered == [{"sections": []}]
+        assert delivered == [expected]
         assert dialog.result() == QDialog.DialogCode.Accepted
     finally:
         dialog.close()
