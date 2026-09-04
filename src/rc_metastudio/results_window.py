@@ -54,7 +54,7 @@ from rc_metastudio import (
     r_bridge,
     result_sections,
 )
-from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 from rc_metastudio.plot_editor_dialog import EditPlotDialog
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
@@ -1133,22 +1133,20 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
 
 def _normalize_results(results: AnalysisResult) -> AnalysisResult:
-    normalized: AnalysisResult = {
+    normalized: dict[str, object] = {
         "texts": dict(results["texts"]),
         "images": dict(results["images"]),
         "display_images": dict(results["display_images"]),
         "image_var_names": dict(results["image_var_names"]),
         "image_params_paths": dict(results["image_params_paths"]),
-        "image_order": (
-            None if results["image_order"] is None else list(results["image_order"])
-        ),
+        "image_order": None if results["image_order"] is None else list(results["image_order"]),
         "plot_capabilities": dict(results["plot_capabilities"]),
     }
 
     if not normalized["texts"] and not normalized["images"]:
         normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE
 
-    return normalized
+    return parse_analysis_result(normalized)
 
 
 if __name__ == "__main__":

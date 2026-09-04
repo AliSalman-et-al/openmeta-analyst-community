@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Emit deterministic code-health metrics and changed-code gates.
+"""Emit deterministic Python and R code-health metrics and changed-code gates.
 
-The command deliberately uses only the Python standard library and Git.  Its
-JSON output is the durable evidence; the text report is a short review aid.
+The command uses the locked development analyzers for Python and a deterministic
+token pass for R. Its JSON output is the durable evidence; the text report is a
+short review aid.
 """
 
 from __future__ import annotations
@@ -159,6 +160,113 @@ def function_metric(path: str, node: ast.FunctionDef | ast.AsyncFunctionDef, cyc
     return FunctionMetric(path, node.name, start, end, end - start + 1, cyclomatic, cognitive, max_nesting)
 
 
+def _scan_r_string(source: str, index: int, line: int) -> tuple[int, int]:
+    quote = source[index]
+    index += 1
+    while index < len(source):
+        char = source[index]
+        if char == "\\":
+            index += 2
+            continue
+        index += 1
+        if char == quote:
+            break
+        if char == "\n":
+            line += 1
+    return index, line
+
+
+def _scan_r_identifier(source: str, index: int) -> tuple[str, int]:
+    start = index
+    while index < len(source) and (source[index].isalnum() or source[index] in "._"):
+        index += 1
+    return source[start:index], index
+
+
+def _r_tokens(source: str) -> list[tuple[str, int]]:
+    """Tokenize R structure without interpreting executable source text."""
+    tokens: list[tuple[str, int]] = []
+    index = 0
+    line = 1
+    while index < len(source):
+        token, index, line = _next_r_token(source, index, line)
+        if token is not None:
+            tokens.append((token, line))
+    return tokens
+
+
+def _next_r_token(source: str, index: int, line: int) -> tuple[str | None, int, int]:
+    char = source[index]
+    simple = _next_r_layout(source, index, line)
+    if simple is not None:
+        return simple
+    if char in "'\"`":
+        start_line = line
+        index, line = _scan_r_string(source, index, line)
+        return "<string>", index, start_line
+    if char.isalpha() or char in "._":
+        return (*_scan_r_identifier(source, index), line)
+    pair = source[index:index + 2]
+    if pair in {"<-", "->", "&&", "||"}:
+        return pair, index + 2, line
+    return char, index + 1, line
+
+
+def _next_r_layout(source: str, index: int, line: int) -> tuple[str | None, int, int] | None:
+    char = source[index]
+    if char == "\n":
+        return None, index + 1, line + 1
+    if char.isspace():
+        return None, index + 1, line
+    if char == "#":
+        newline = source.find("\n", index)
+        return None, len(source) if newline < 0 else newline, line
+    return None
+
+
+def _r_function_span(tokens: list[tuple[str, int]], start: int) -> tuple[int, int] | None:
+    opening = next((position for position in range(start + 3, len(tokens)) if tokens[position][0] == "{"), None)
+    if opening is None:
+        return None
+    depth = 0
+    for position in range(opening, len(tokens)):
+        token = tokens[position][0]
+        depth += token == "{"
+        depth -= token == "}"
+        if depth == 0:
+            return opening, position
+    return None
+
+
+def r_function_metrics(root: Path, paths: Iterable[str], revision: str | None = None) -> list[FunctionMetric]:
+    """Measure named R functions from balanced lexical structure."""
+    metrics: list[FunctionMetric] = []
+    for relative in paths:
+        if not relative.lower().endswith((".r",)):
+            continue
+        source = run_git(root, "show", f"{revision}:{relative}") if revision else (root / relative).read_text(encoding="utf-8")
+        tokens = _r_tokens(source)
+        for index in range(len(tokens) - 3):
+            name, line = tokens[index]
+            metric = _r_metric_at(tokens, index, relative, name, line)
+            if metric is not None:
+                metrics.append(metric)
+    return metrics
+
+
+def _r_metric_at(tokens: list[tuple[str, int]], index: int, path: str, name: str, line: int) -> FunctionMetric | None:
+    if tokens[index + 1][0] not in {"<-", "="} or tokens[index + 2][0] != "function":
+        return None
+    span = _r_function_span(tokens, index)
+    if span is None:
+        return None
+    opening, closing = span
+    body = [token for token, _line in tokens[opening + 1:closing]]
+    branches = sum(token in {"if", "for", "while", "switch", "&&", "||", "?"} for token in body)
+    end_line = tokens[closing][1]
+    return FunctionMetric(path, name, line, end_line, end_line - line + 1, 1 + branches, branches, 0)
+
+
 def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None) -> list[FunctionMetric]:
     metrics = []
     for relative in paths:
@@ -194,6 +302,19 @@ def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None
 def module_name(path: str) -> str:
     module = path[:-3].replace("/", ".")
     return module[4:] if module.startswith("src.") else module
+
+
+def _resolve_imported_module(module: str, imported: str, modules: set[str]) -> str | None:
+    candidates = [imported]
+    if imported == module.split(".")[0]:
+        candidates.extend(f"{module.split('.')[0]}.{part}" for part in imported.split(".")[1:])
+    for candidate in candidates:
+        if candidate in modules:
+            return candidate
+        matches = sorted(item for item in modules if item.startswith(candidate + "."))
+        if matches:
+            return matches[0]
+    return None
 
 
 def git_as_of(root: Path, requested: str | None) -> datetime:
@@ -269,13 +390,30 @@ def python_import_graph(root: Path, paths: list[str], config: HealthConfig, revi
                 for pattern, names in forbidden_rules.items():
                     if fnmatch.fnmatchcase(relative, pattern) and imported in names:
                         forbidden.append(f"{relative}: {imported}")
-            if isinstance(node, ast.ImportFrom) and node.level:
-                prefix = ".".join(module.split(".")[:-node.level])
-                target = ".".join(part for part in (prefix, node.module or "") if part)
-                if target in modules:
-                    graph[module].add(target)
-            elif imported and any(candidate == imported or candidate.startswith(imported + ".") for candidate in modules):
-                graph[module].add(imported)
+            if isinstance(node, ast.ImportFrom):
+                if node.level:
+                    prefix = ".".join(module.split(".")[:-node.level])
+                    target = ".".join(part for part in (prefix, node.module or "") if part)
+                    resolved = _resolve_imported_module(module, target, modules)
+                    if resolved:
+                        graph[module].add(resolved)
+                    for alias in node.names:
+                        resolved_name = _resolve_imported_module(module, f"{target}.{alias.name}", modules)
+                        if resolved_name:
+                            graph[module].add(resolved_name)
+                else:
+                    target = node.module or ""
+                    resolved = _resolve_imported_module(module, target, modules)
+                    if resolved:
+                        graph[module].add(resolved)
+                    for alias in node.names:
+                        resolved_name = _resolve_imported_module(module, f"{target}.{alias.name}", modules)
+                        if resolved_name:
+                            graph[module].add(resolved_name)
+            elif imported:
+                resolved = _resolve_imported_module(module, imported, modules)
+                if resolved:
+                    graph[module].add(resolved)
     return graph, sorted(set(forbidden))
 
 
@@ -320,7 +458,7 @@ def grimp_evidence() -> dict[str, object] | None:
 
 
 def changed_lines(root: Path, base: str, head: str) -> dict[str, set[int]]:
-    output = run_git(root, "diff", "--unified=0", base, head, "--", "*.py")
+    output = run_git(root, "diff", "--unified=0", base, head, "--", "*.py", "*.R", "*.r")
     changed: dict[str, set[int]] = {}
     current: str | None = None
     for line in output.splitlines():
@@ -379,6 +517,7 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
     head_revision = None if head in {"HEAD", current_revision} else head
     paths = tracked_paths(root, config, head_revision or current_revision)
     functions = python_metrics(root, paths, head_revision)
+    functions.extend(r_function_metrics(root, paths, head_revision))
     graph, forbidden = python_import_graph(root, paths, config, head_revision)
     cycle_list = cycles(graph)
     baseline_revision = None if base in {"HEAD", current_revision} else base
@@ -403,6 +542,7 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
             "churn": churn,
             "complexity": {"functions": len(function_subset), "cyclomatic": total_cyclomatic, "density": complexity_density},
             "maintainability_index": mi_visit(source, multi=True) if path.endswith(".py") else None,
+            "language": "python" if path.endswith(".py") else "r",
             "hotspot_score": normalized_churn * complexity_density,
             "defect_history": defect_count,
         })

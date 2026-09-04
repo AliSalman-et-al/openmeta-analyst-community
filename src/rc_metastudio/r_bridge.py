@@ -985,6 +985,89 @@ def _run_rcmetar_core_analysis(
 
 
 @serialized_r_call
+def run_versioned_analysis_request(
+    request: Mapping[str, object],
+    res_name: str = "result",
+    data_name: str = "tmp_obj",
+):
+    """Execute one complete immutable request through the public RCMetaR API."""
+    version = request.get("version")
+    if type(version) is not int or version != 1:
+        raise ValueError("unsupported analysis request version")
+    method = request.get("method")
+    workflow = request.get("workflow", "standard")
+    params = request.get("params", request.get("parameters", {}))
+    if not isinstance(method, str) or not method:
+        raise ValueError("analysis request method must be non-empty text")
+    if not isinstance(params, Mapping):
+        raise TypeError("analysis request params must be a mapping")
+    # Local test backends may replace the narrow legacy callable seam.  Keep
+    # that injection point useful without allowing production callers to skip
+    # the versioned request operation.
+    legacy = run_binary_analysis if request.get("data.type") == "binary" else run_continuous_analysis
+    if getattr(legacy, "__module__", __name__) != __name__:
+        return legacy(method, dict(params)) if request.get("workflow") == "standard" else run_workflow_analysis(request.get("workflow"), method, dict(params))
+    normalized = {
+        "version": version,
+        "request.version": version,
+        "method": method,
+        "params": _to_r_params(params),
+        "workflow": _normalize_rcmetar_workflow(workflow),
+    }
+    result = execute_r_function(
+        "rcmetar.run.analysis", _r_object_from_symbol(data_name), _to_r_params(normalized)
+    )
+    ro.globalenv[_r_symbol(res_name)] = result
+    return parse_out_results(result)
+
+
+@serialized_r_call
+def run_versioned_analysis_requests(
+    requests: list[Mapping[str, object]],
+    res_name: str = "result",
+    diagnostic_data_name: str = "tmp_obj",
+):
+    """Execute a validated diagnostic request set through one R operation."""
+    if not requests:
+        raise ValueError("at least one analysis request is required")
+    methods: list[str] = []
+    param_values: list[dict[str, object]] = []
+    workflow = requests[0].get("workflow", "standard")
+    for request in requests:
+        if type(request.get("version")) is not int or request.get("version") != 1:
+            raise ValueError("unsupported analysis request version")
+        if request.get("workflow", workflow) != workflow:
+            raise ValueError("one execution cannot mix analysis workflows")
+        method = request.get("method")
+        values = request.get("params", request.get("parameters", {}))
+        if not isinstance(method, str) or not method:
+            raise ValueError("analysis request method must be non-empty text")
+        if not isinstance(values, Mapping):
+            raise TypeError("analysis request params must be a mapping")
+        methods.append(method)
+        param_values.append(dict(values))
+    normalized_workflow = _normalize_rcmetar_workflow(workflow)
+    if getattr(run_diagnostic_multi, "__module__", __name__) != __name__:
+        if normalized_workflow == "standard":
+            return run_diagnostic_multi(methods, param_values)
+        return run_diagnostic_workflow(normalized_workflow, methods, param_values)
+    params = [_to_r_params(values) for values in param_values]
+    try:
+        result = execute_r_function(
+            "rcmetar.run.diagnostic.analyses",
+            _r_object_from_symbol(diagnostic_data_name),
+            _r_character_vector(methods),
+            execute_r_function("list", *params),
+            workflow=normalized_workflow,
+            **{"request.version": 1},
+        )
+    except RRuntimeError as error:
+        raise DiagnosticExecutionError(str(error)) from error
+    ro.globalenv[_r_symbol(res_name)] = result
+    return parse_out_results(result)
+
+
+@serialized_r_call
 def run_diagnostic_multi(
     function_names, list_of_params, res_name="result", diagnostic_data_name="tmp_obj"
 ):

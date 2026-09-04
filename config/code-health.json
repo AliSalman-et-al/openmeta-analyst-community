@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_roots": ["src/rc_metastudio", "scripts"],
+  "source_roots": ["src/rc_metastudio", "scripts", "r/RCMetaR/R"],
   "python_suffixes": [".py"],
   "r_suffixes": [".R", ".r"],
   "exclude_globs": [
@@ -57,6 +57,22 @@
     },
     "src/rc_metastudio/publication_bias.py": {
       "__post_init__": "validates the immutable small-study request's cross-field contract"
+    },
+    "r/RCMetaR/R/meta_methods.R": {
+      "bootstrap": "statistical resampling has independent method, seed, and result-shape branches"
+    },
+    "r/RCMetaR/R/plotting.R": {
+      "create.subgroup.plot.data.generic": "plot data must preserve the package's independent subgroup layouts"
+    },
+    "r/RCMetaR/R/rcmetar-core.R": {
+      "rcmetar.validate.analysis.request": "the public boundary validates independent request fields before dispatch"
+    },
+    "r/RCMetaR/R/reitsma_methods.R": {
+      "rcmetar.reitsma.draw": "the authority renderer handles device, geometry, and output-format branches",
+      "rcmetar.draw.reitsma.coefficient": "the authority renderer handles coefficient plot layouts"
+    },
+    "r/RCMetaR/R/results_display.R": {
+      "create.regression.display": "the display contract preserves independent coefficient and fit summary sections"
     }
   },
   "gates": {

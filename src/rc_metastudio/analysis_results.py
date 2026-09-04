@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, Self, SupportsIndex, TypedDict
+from typing import Literal, Self, SupportsIndex, TypedDict, overload
 
 
 PlotKind = Literal[
@@ -27,12 +28,39 @@ PlotComposition = Literal["single"]
 PlotRegenerator = Literal["forest", "regression", "funnel", "sroc", "none"]
 
 
-class PlotCapability(TypedDict):
+@dataclass(frozen=True, slots=True)
+class PlotCapability(Mapping[str, object]):
+    """Immutable capability data attached to one semantic plot artifact."""
+
     plot_kind: PlotKind
     editable: bool
     styleable: bool
     composition: PlotComposition
     regenerator: PlotRegenerator
+
+    def __getitem__(self, key: str) -> object:
+        if key == "plot_kind":
+            return self.plot_kind
+        if key == "editable":
+            return self.editable
+        if key == "styleable":
+            return self.styleable
+        if key == "composition":
+            return self.composition
+        if key == "regenerator":
+            return self.regenerator
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(("plot_kind", "editable", "styleable", "composition", "regenerator"))
+
+    def __len__(self) -> int:
+        return 5
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Mapping):
+            return dict(self.items()) == dict(other.items())
+        return super().__eq__(other)
 
 
 class RawAnalysisResult(TypedDict, total=False):
@@ -47,20 +75,95 @@ class RawAnalysisResult(TypedDict, total=False):
     plot_capabilities: dict[str, dict[str, object]]
 
 
-class AnalysisResult(TypedDict):
-    """Validated result shape consumed by result rendering and merging."""
+class FrozenStrings(Sequence[str]):
+    """Tuple-backed sequence that keeps the old list equality contract."""
 
-    texts: dict[str, str]
-    images: dict[str, str]
-    display_images: dict[str, str]
-    image_var_names: dict[str, str]
-    image_params_paths: dict[str, str]
-    image_order: list[str] | None
-    plot_capabilities: dict[str, PlotCapability]
+    def __init__(self, values: Iterable[str]) -> None:
+        self._values = tuple(values)
+
+    @overload
+    def __getitem__(self, index: int) -> str: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> tuple[str, ...]: ...
+
+    def __getitem__(self, index: int | slice) -> str | tuple[str, ...]:
+        return self._values[index]
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._values)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (list, tuple, FrozenStrings)):
+            return tuple(self) == tuple(other)
+        return False
+
+    def __repr__(self) -> str:
+        return repr(list(self._values))
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisResult:
+    """Validated immutable result contract consumed by application adapters."""
+
+    texts: Mapping[str, str]
+    images: Mapping[str, str]
+    display_images: Mapping[str, str]
+    image_var_names: Mapping[str, str]
+    image_params_paths: Mapping[str, str]
+    image_order: FrozenStrings | None
+    plot_capabilities: Mapping[str, PlotCapability]
+
+    @overload
+    def __getitem__(self, key: Literal["texts"]) -> Mapping[str, str]: ...
+
+    @overload
+    def __getitem__(self, key: Literal["images", "display_images", "image_var_names", "image_params_paths"]) -> Mapping[str, str]: ...
+
+    @overload
+    def __getitem__(self, key: Literal["image_order"]) -> FrozenStrings | None: ...
+
+    @overload
+    def __getitem__(self, key: Literal["plot_capabilities"]) -> Mapping[str, PlotCapability]: ...
+
+    @overload
+    def __getitem__(self, key: str) -> object: ...
+
+    def __getitem__(self, key: str) -> object:
+        if key == "texts":
+            return self.texts
+        if key == "images":
+            return self.images
+        if key == "display_images":
+            return self.display_images
+        if key == "image_var_names":
+            return self.image_var_names
+        if key == "image_params_paths":
+            return self.image_params_paths
+        if key == "image_order":
+            return self.image_order
+        if key == "plot_capabilities":
+            return self.plot_capabilities
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(("texts", "images", "display_images", "image_var_names", "image_params_paths", "image_order", "plot_capabilities"))
+
+    def __len__(self) -> int:
+        return 7
+
+    def get(self, key: str, default: object = None) -> object:
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
 
 class _FrozenList(list[str]):
-    """List-shaped immutable sequence retaining the v0.3.1 equality contract."""
+    """Deprecated private helper retained only for old callers during parsing."""
 
     def _immutable(self, *_args: object, **_kwargs: object) -> None:
         raise TypeError("analysis result values are immutable")
@@ -77,38 +180,28 @@ class _FrozenList(list[str]):
         raise TypeError("analysis result values are immutable")
 
 
-def _freeze_result(value: AnalysisResult) -> AnalysisResult:
-    frozen = {
-        "texts": MappingProxyType(dict(value["texts"])),
-        "images": MappingProxyType(dict(value["images"])),
-        "display_images": MappingProxyType(dict(value["display_images"])),
-        "image_var_names": MappingProxyType(dict(value["image_var_names"])),
-        "image_params_paths": MappingProxyType(dict(value["image_params_paths"])),
-        "image_order": (
-            None
-            if value["image_order"] is None
-            else _FrozenList(value["image_order"])
-        ),
-        "plot_capabilities": MappingProxyType(
-            {
-                key: MappingProxyType(dict(capability))
-                for key, capability in value["plot_capabilities"].items()
-            }
-        ),
-    }
-    return frozen  # type: ignore[return-value]
+def _freeze_result(
+    texts: Mapping[str, str],
+    images: Mapping[str, str],
+    display_images: Mapping[str, str],
+    image_var_names: Mapping[str, str],
+    image_params_paths: Mapping[str, str],
+    image_order: Iterable[str] | None,
+    plot_capabilities: Mapping[str, PlotCapability],
+) -> AnalysisResult:
+    return AnalysisResult(
+        texts=MappingProxyType(dict(texts)),
+        images=MappingProxyType(dict(images)),
+        display_images=MappingProxyType(dict(display_images)),
+        image_var_names=MappingProxyType(dict(image_var_names)),
+        image_params_paths=MappingProxyType(dict(image_params_paths)),
+        image_order=None if image_order is None else FrozenStrings(image_order),
+        plot_capabilities=MappingProxyType(dict(plot_capabilities)),
+    )
 
 
 def empty_analysis_result() -> AnalysisResult:
-    return {
-        "texts": {},
-        "images": {},
-        "display_images": {},
-        "image_var_names": {},
-        "image_params_paths": {},
-        "image_order": None,
-        "plot_capabilities": {},
-    }
+    return _freeze_result({}, {}, {}, {}, {}, None, {})
 
 
 def parse_analysis_result(value: object) -> AnalysisResult:
@@ -149,15 +242,15 @@ def parse_analysis_result(value: object) -> AnalysisResult:
             "Display artifacts have no matching plot artifact: %s"
             % ", ".join(extra_display_images)
         )
-    return _freeze_result({
-        "texts": raw["texts"],
-        "images": raw["images"],
-        "display_images": raw["display_images"],
-        "image_var_names": raw["image_var_names"],
-        "image_params_paths": raw["image_params_paths"],
-        "image_order": raw["image_order"],
-        "plot_capabilities": capabilities,
-    })
+    return _freeze_result(
+        raw["texts"],
+        raw["images"],
+        raw["display_images"],
+        raw["image_var_names"],
+        raw["image_params_paths"],
+        raw["image_order"],
+        capabilities,
+    )
 
 
 def _string_mapping(value: object, label: str) -> dict[str, str]:

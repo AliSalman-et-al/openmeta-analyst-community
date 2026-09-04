@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import sys
 from typing import NoReturn
 
 from rc_metastudio.study_effect_shapes import (
@@ -230,6 +231,8 @@ class _TestRBridge:
     run_diagnostic_multi: _BackendCallable
     run_workflow_analysis: _BackendCallable
     run_diagnostic_workflow: _BackendCallable
+    run_versioned_analysis_request: _BackendCallable
+    run_versioned_analysis_requests: _BackendCallable
     run_meta_regression: _BackendCallable
     ro: type[_TestRObjects]
     RLibraryLoader: type[_TestRLibraryLoader]
@@ -275,9 +278,45 @@ class _TestRBridge:
         self.run_diagnostic_multi = _analysis_unavailable
         self.run_workflow_analysis = _analysis_unavailable
         self.run_diagnostic_workflow = _analysis_unavailable
+        self.run_versioned_analysis_request = self._versioned_analysis_request
+        self.run_versioned_analysis_requests = self._versioned_analysis_requests
         self.run_meta_regression = _analysis_unavailable
         self.ro = _TestRObjects
         self.RLibraryLoader = _TestRLibraryLoader
+
+    def _versioned_analysis_request(self, request: object) -> object:
+        if not isinstance(request, dict) or request.get("version") != 1:
+            raise ValueError("unsupported analysis request version")
+        method = request.get("method")
+        params = request.get("params", request.get("parameters", {}))
+        if not isinstance(method, str) or not isinstance(params, dict):
+            raise TypeError("invalid analysis request")
+        workflow = request.get("workflow", "standard")
+        module = sys.modules.get("rc_metastudio.r_bridge")
+        backend = module if module is not None else self
+        if workflow == "standard":
+            runner = (
+                getattr(backend, "run_binary_analysis")
+                if request.get("data.type", request.get("data_type")) == "binary"
+                else getattr(backend, "run_continuous_analysis")
+            )
+            return runner(method, params)
+        return getattr(backend, "run_workflow_analysis")(workflow, method, params)
+
+    def _versioned_analysis_requests(self, requests: object) -> object:
+        if not isinstance(requests, list) or not requests:
+            raise ValueError("at least one analysis request is required")
+        first = requests[0]
+        if not isinstance(first, dict):
+            raise TypeError("invalid analysis request")
+        workflow = first.get("workflow", "standard")
+        module = sys.modules.get("rc_metastudio.r_bridge")
+        backend = module if module is not None else self
+        methods = [request.get("method") for request in requests if isinstance(request, dict)]
+        params = [request.get("params", request.get("parameters", {})) for request in requests if isinstance(request, dict)]
+        if workflow == "standard":
+            return getattr(backend, "run_diagnostic_multi")(methods, params)
+        return getattr(backend, "run_diagnostic_workflow")(workflow, methods, params)
 
 
 def install_r_backend():

@@ -548,7 +548,10 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
     .rcmetar.attach.request(result, request)
 }
 
-rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL) {
+rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL, request.version=1) {
+    if (length(request.version) != 1 || !identical(as.integer(request.version), 1L)) {
+        stop("Unsupported analysis request version.", call.=FALSE)
+    }
     if (!("DiagnosticData" %in% class(diagnostic.data))) {
         stop("DiagnosticData object expected.", call.=FALSE)
     }
@@ -627,6 +630,11 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (!is.null(request)) {
         if (!is.list(request)) {
             stop("Analysis request must be a named list.", call.=FALSE)
+        }
+        request.version <- .rcmetar.request.value(request, "request.version", NULL)
+        if (!is.null(request.version) &&
+                (length(request.version) != 1 || !identical(as.integer(request.version), 1L))) {
+            stop("Unsupported analysis request version.", call.=FALSE)
         }
         method <- .rcmetar.request.value(request, "method", method)
         params <- .rcmetar.request.value(request, "params", params)

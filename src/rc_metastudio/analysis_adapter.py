@@ -111,12 +111,17 @@ class AnalysisRequest:
 
     def to_mapping(self) -> dict[str, object]:
         """Return the explicit wire representation consumed by RCMetaR."""
+        parameters = self.parameter_values()
+        parameters.setdefault("measure", self.metric)
         return {
             "version": self.version,
+            "request.version": self.version,
             "data_type": self.data_type,
+            "data.type": self.data_type,
             "workflow": self.workflow,
             "method": self.method,
             "metric": self.metric,
+            "params": parameters,
             "parameters": self.parameter_values(),
         }
 
@@ -323,23 +328,27 @@ def execute_meta_regression_request(
 
 
 def _run_diagnostic_backend(workflow, method_names, parameter_values):
-    if workflow == "standard":
-        return r_bridge.run_diagnostic_multi(method_names, parameter_values)
-    return r_bridge.run_diagnostic_workflow(workflow, method_names, parameter_values)
+    requests = [
+        {
+            "version": 1,
+            "request.version": 1,
+            "data.type": "diagnostic",
+            "workflow": workflow,
+            "method": method,
+            "params": params,
+            "parameters": params,
+        }
+        for method, params in zip(method_names, parameter_values, strict=True)
+    ]
+    return r_bridge.run_versioned_analysis_requests(requests)
 
 
 def _run_binary_request(request):
-    parameters = request.parameter_values()
-    if request.workflow == "standard":
-        return r_bridge.run_binary_analysis(request.method, parameters)
-    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
+    return r_bridge.run_versioned_analysis_request(request.to_mapping())
 
 
 def _run_continuous_request(request):
-    parameters = request.parameter_values()
-    if request.workflow == "standard":
-        return r_bridge.run_continuous_analysis(request.method, parameters)
-    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
+    return r_bridge.run_versioned_analysis_request(request.to_mapping())
 
 
 def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
@@ -425,7 +434,7 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
     return parse_analysis_result(merged_result)
 
 
-def _empty_diagnostic_result() -> AnalysisResult:
+def _empty_diagnostic_result() -> dict[str, object]:
     return {
         "texts": {},
         "images": {},
@@ -438,7 +447,7 @@ def _empty_diagnostic_result() -> AnalysisResult:
 
 
 def _merge_diagnostic_result(
-    merged_result: AnalysisResult, metric_result: AnalysisResult
+    merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
     # References are a result-level collection rather than a metric-specific
     # section.  A plain mapping update would silently discard citations from

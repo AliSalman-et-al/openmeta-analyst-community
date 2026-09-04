@@ -186,13 +186,13 @@ def _validate_descriptor(title: str, descriptor: dict[str, object]) -> PlotCapab
         )
     if styleable and not option_groups(plot_kind):
         raise ValueError("Styleable plot %s requires option groups" % title)
-    return {
-        "plot_kind": plot_kind,
-        "editable": editable,
-        "styleable": styleable,
-        "composition": composition,
-        "regenerator": regenerator,
-    }
+    return PlotCapability(
+        plot_kind=plot_kind,
+        editable=editable,
+        styleable=styleable,
+        composition=composition,
+        regenerator=regenerator,
+    )
 
 
 def _plot_kind(value: object, title: str) -> PlotKind:
