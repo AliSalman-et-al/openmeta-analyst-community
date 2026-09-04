@@ -10,7 +10,7 @@
 import copy
 from contextlib import ExitStack
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard, cast
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QPalette
@@ -30,7 +30,10 @@ from rc_metastudio import calculator_routines as calc_fncs
 
 from rc_metastudio import app_error_handler
 from rc_metastudio import adaptive_window
-from rc_metastudio.calculator_service import CalculatorService
+from rc_metastudio.calculator_service import (
+    CalculatorService,
+    ContinuousValues,
+)
 from rc_metastudio import tabular_data
 from rc_metastudio.meta_globals import (
     CONTINUOUS_METRIC_NAMES,
@@ -89,12 +92,8 @@ def _is_true(x):
     return x == "TRUE"
 
 
-def is_list(x):
-    try:
-        list(x)
-        return True
-    except TypeError:
-        return False
+def is_list(x: object) -> TypeGuard[list[float | int | None] | tuple[float | int | None, ...]]:
+    return isinstance(x, (list, tuple))
 
 
 class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousDataDialog):
@@ -909,7 +908,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             results_from_r = self.calculator.impute_continuous_data(current_values, alpha)
 
             if results_from_r["succeeded"]:
-                computed_vals = results_from_r["output"]
+                computed_vals = cast(ContinuousValues, results_from_r["output"])
                 for var_index, var_name in enumerate(var_names):
                     self._set_val(
                         row_index,
@@ -989,7 +988,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             self._fit_tables_to_contents()
             return None
 
-        computed_vals = results_from_r["output"]
+        computed_vals = cast(ContinuousValues, results_from_r["output"])
 
         for var_index, var_name in enumerate(self.get_column_header_strs()):
             field_name = self._imputation_field_name(var_name)
@@ -1018,8 +1017,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             raise
 
         # also update the pre/post tables
-        pre_vals = results_from_r["pre"]
-        post_vals = results_from_r["post"]
+        pre_vals = cast(ContinuousValues, results_from_r["pre"])
+        post_vals = cast(ContinuousValues, results_from_r["post"])
         for var_index, var_name in enumerate(var_names):
             field_name = self._imputation_field_name(var_name)
             pre_val = pre_vals[field_name]
@@ -1416,14 +1415,14 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         # Write the data to the table
         var_names = self.get_column_header_strs()
         group1_data = {
-            "n": imputed["n1"],
-            "sd": imputed["sd1"],
-            "mean": imputed["mean1"],
+            "n": cast(float | int | None, imputed["n1"]),
+            "sd": cast(float | int | None, imputed["sd1"]),
+            "mean": cast(float | int | None, imputed["mean1"]),
         }
         group2_data = {
-            "n": imputed["n2"],
-            "sd": imputed["sd2"],
-            "mean": imputed["mean2"],
+            "n": cast(float | int | None, imputed["n2"]),
+            "sd": cast(float | int | None, imputed["sd2"]),
+            "mean": cast(float | int | None, imputed["mean2"]),
         }
         for row in range(len(self.current_groups)):
             for var_index, var_name in enumerate(var_names):

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import TypeAlias
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import NotRequired, TypeAlias, TypedDict, cast
 
 from rc_metastudio import r_bridge
 
@@ -12,7 +12,29 @@ Numeric: TypeAlias = float | int
 ScaleValue: TypeAlias = Numeric | tuple[Numeric | None, ...] | list[Numeric | None] | None
 EffectData: TypeAlias = Mapping[str, ScaleValue]
 MutableData: TypeAlias = Mapping[str, Scalar | bool]
-DiagnosticData: TypeAlias = Mapping[str, EffectData | ScaleValue]
+DiagnosticData: TypeAlias = Mapping[str, EffectData]
+BinaryImputationOption: TypeAlias = Mapping[str, Numeric | None]
+BinaryImputationResult: TypeAlias = Mapping[
+    str, BinaryImputationOption | Scalar | bool
+]
+ContinuousValues: TypeAlias = Mapping[str, Numeric | None]
+
+
+class ContinuousImputationResult(TypedDict):
+    succeeded: bool
+    output: NotRequired[ContinuousValues]
+
+
+class PrePostImputationResult(TypedDict):
+    succeeded: bool
+    output: NotRequired[ContinuousValues]
+    pre: NotRequired[ContinuousValues]
+    post: NotRequired[ContinuousValues]
+
+
+BackCalculationValue: TypeAlias = Numeric | Sequence[Numeric | None] | None
+BackCalculationResult: TypeAlias = MutableMapping[str, BackCalculationValue]
+DiagnosticImputationResult: TypeAlias = Mapping[str, Numeric | None]
 
 
 class CalculatorService:
@@ -42,17 +64,17 @@ class CalculatorService:
     def effect_triplet(self, effect_entry: EffectData, scale_name: str = "calc_scale", metric: str | None = None) -> tuple[Numeric | None, Numeric | None, Numeric | None]:
         return r_bridge.effect_triplet(effect_entry, scale_name, metric=metric)
 
-    def impute_binary_data(self, binary_data: MutableData) -> Mapping[str, Scalar | bool]:
-        return r_bridge.impute_binary_data(binary_data)
+    def impute_binary_data(self, binary_data: MutableData) -> BinaryImputationResult:
+        return cast(BinaryImputationResult, r_bridge.impute_binary_data(binary_data))
 
-    def impute_continuous_data(self, continuous_data: MutableData, alpha: float) -> Mapping[str, Scalar | bool]:
-        return r_bridge.impute_continuous_data(continuous_data, alpha)
+    def impute_continuous_data(self, continuous_data: MutableData, alpha: float) -> ContinuousImputationResult:
+        return cast(ContinuousImputationResult, r_bridge.impute_continuous_data(continuous_data, alpha))
 
-    def impute_pre_post_continuous_data(self, continuous_data: MutableData, correlation: Numeric, alpha: float) -> Mapping[str, Scalar | bool]:
-        return r_bridge.impute_pre_post_continuous_data(continuous_data, correlation, alpha)
+    def impute_pre_post_continuous_data(self, continuous_data: MutableData, correlation: Numeric, alpha: float) -> PrePostImputationResult:
+        return cast(PrePostImputationResult, r_bridge.impute_pre_post_continuous_data(continuous_data, correlation, alpha))
 
-    def back_calculate_continuous_data(self, group1_data: MutableData, group2_data: MutableData, effect_data: MutableData, confidence_level: float) -> Mapping[str, Scalar | bool]:
-        return r_bridge.back_calculate_continuous_data(group1_data, group2_data, effect_data, confidence_level)
+    def back_calculate_continuous_data(self, group1_data: MutableData, group2_data: MutableData, effect_data: MutableData, confidence_level: float) -> BackCalculationResult:
+        return cast(BackCalculationResult, r_bridge.back_calculate_continuous_data(group1_data, group2_data, effect_data, confidence_level))
 
-    def impute_diagnostic_data(self, diagnostic_data: MutableData) -> Mapping[str, Scalar | bool]:
-        return r_bridge.impute_diagnostic_data(diagnostic_data)
+    def impute_diagnostic_data(self, diagnostic_data: MutableData) -> DiagnosticImputationResult:
+        return cast(DiagnosticImputationResult, r_bridge.impute_diagnostic_data(diagnostic_data))

@@ -5,7 +5,7 @@
 import copy
 from contextlib import ExitStack
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
 from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette
@@ -22,7 +22,11 @@ from PyQt6.QtWidgets import (
 )
 
 from rc_metastudio import tabular_data
-from rc_metastudio.calculator_service import CalculatorService
+from rc_metastudio.calculator_service import (
+    BinaryImputationOption,
+    CalculatorService,
+    Numeric,
+)
 from rc_metastudio.meta_globals import (
     BINARY_METRIC_NAMES,
     BINARY_ONE_ARM_METRICS,
@@ -345,10 +349,11 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             for x in range(3):
                 self.clear_column(x)
             with QSignalBlocker(self.raw_data_table):
-                group_1_events = int(round(imputed[choice]["a"]))
-                group_1_total = int(round(imputed[choice]["b"]))
-                group_2_events = int(round(imputed[choice]["c"]))
-                group_2_total = int(round(imputed[choice]["d"]))
+                option = cast(BinaryImputationOption, imputed[choice])
+                group_1_events = int(round(cast(Numeric, option["a"])))
+                group_1_total = int(round(cast(Numeric, option["b"])))
+                group_2_events = int(round(cast(Numeric, option["c"])))
+                group_2_total = int(round(cast(Numeric, option["d"])))
                 self._set_val(0, 0, group_1_events)
                 self._set_val(0, 1, group_1_total - group_1_events)
                 self._set_val(1, 0, group_2_events)
