@@ -984,7 +984,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 value = (
                     validate_analysis_digits(spec.default)
                     if spec.name == "digits"
-                    else (_coerce_integer_default(spec.name, spec.default))
+                    else (
+                        _coerce_integer_default(spec.name, spec.default)
+                    )
                 )
                 control.setValue(value)
                 target[spec.name] = value
@@ -1429,21 +1431,12 @@ def _diagnostic_analysis_requests(specs_form):
     if "Sens" in configured and "Spec" in configured:
         sens_details = specs_form.diagnostic_analysis_details["Sens"]
         spec_details = specs_form.diagnostic_analysis_details["Spec"]
-        if (
-            sens_details
-            and spec_details
-            and sens_details[0] == spec_details[0] == "diagnostic.reitsma"
-        ):
+        if sens_details and spec_details and sens_details[0] == spec_details[0] == "diagnostic.reitsma":
             joint = (sens_details[0], sens_details[1])
-            configured = [
-                metric for metric in configured if metric not in ("Sens", "Spec")
-            ]
+            configured = [metric for metric in configured if metric not in ("Sens", "Spec")]
 
     pending = [("Sens", joint)] if joint is not None else []
-    pending.extend(
-        (metric, specs_form.diagnostic_analysis_details[metric])
-        for metric in configured
-    )
+    pending.extend((metric, specs_form.diagnostic_analysis_details[metric]) for metric in configured)
     for diagnostic_metric, details in pending:
         if details is None:
             missing_metrics.append(diagnostic_metric)

@@ -369,36 +369,58 @@ def _authoritative_qt_files(
     if not authoritative_files:
         _fail("deployment inventory is missing the authoritative PyQt6 Qt root")
     for path in records:
-        if path.startswith(
-            AUTHORITATIVE_QT_ROOT
-        ) and not _is_allowed_authoritative_qt_path(path):
+        if _is_unrecognized_authoritative_path(path):
             _fail(f"unrecognized payload inside the authoritative Qt root: {path}")
     if not any(_is_qt_core_binding(path, record) for path, record in records.items()):
         _fail("deployment inventory is missing the PyQt6 QtCore extension")
     return authoritative_files
 
 
+def _is_unrecognized_authoritative_path(path: str) -> bool:
+    return path.startswith(
+        AUTHORITATIVE_QT_ROOT
+    ) and not _is_allowed_authoritative_qt_path(path)
+
+
 def _validate_required_r_payload(
     records: dict[str, dict[str, Any]], lowered: list[str]
 ) -> None:
-    if not any("rinterface" in path for path in lowered):
+    if not _has_rinterface(lowered):
         _fail("deployment inventory is missing the packaged rpy2 native bridge")
     private_lib_r = "Contents/Frameworks/R.framework/Resources/lib/libR.dylib"
-    lib_r_paths = [path for path, record in records.items() if _is_lib_r(path, record)]
+    lib_r_paths = _lib_r_paths(records)
     if lib_r_paths != [private_lib_r]:
         _fail("deployment inventory must contain one private framework-owned libR")
-    for required_r_member in (
-        "Contents/Frameworks/R.framework/Resources/etc/Renviron",
-        "Contents/Frameworks/R.framework/Resources/include/R.h",
-    ):
-        if required_r_member not in records:
-            _fail("deployment inventory has an incomplete private R_HOME")
+    if not _has_required_r_members(records):
+        _fail("deployment inventory has an incomplete private R_HOME")
     flattened_compiler_runtime = re.compile(
         r"^Contents/Frameworks/lib(?:gfortran|quadmath|gcc_s)[^.]*[.]dylib$",
         re.IGNORECASE,
     )
-    if any(flattened_compiler_runtime.match(path) is not None for path in records):
+    if _has_flattened_compiler_runtime(records, flattened_compiler_runtime):
         _fail("deployment inventory contains a flattened R compiler runtime")
+
+
+def _has_rinterface(paths: list[str]) -> bool:
+    return any("rinterface" in path for path in paths)
+
+
+def _lib_r_paths(records: dict[str, dict[str, Any]]) -> list[str]:
+    return [path for path, record in records.items() if _is_lib_r(path, record)]
+
+
+def _has_required_r_members(records: dict[str, dict[str, Any]]) -> bool:
+    required = {
+        "Contents/Frameworks/R.framework/Resources/etc/Renviron",
+        "Contents/Frameworks/R.framework/Resources/include/R.h",
+    }
+    return required.issubset(records)
+
+
+def _has_flattened_compiler_runtime(
+    records: dict[str, dict[str, Any]], pattern: re.Pattern[str]
+) -> bool:
+    return any(pattern.match(path) is not None for path in records)
 
 
 def _is_lib_r(path: str, record: dict[str, Any]) -> bool:
@@ -674,10 +696,7 @@ def _validate_qt_file_alias(
     binding_extensions: dict[str, tuple[str, tuple[str, ...]]],
     binding_extension_paths: dict[str, str],
 ) -> None:
-    if (
-        path.startswith(AUTHORITATIVE_QT_ROOT)
-        or path in binding_extension_paths.values()
-    ):
+    if _is_canonical_qt_payload(path, binding_extension_paths):
         return
     name = Path(path).name
     identity = _record_identity(record)
@@ -686,15 +705,29 @@ def _validate_qt_file_alias(
         return
     if _validate_binding_file_alias(path, name, identity, binding_extensions):
         return
-    if re.fullmatch(r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path):
+    if _is_translation_alias(path):
         return
     if path.startswith("Contents/Resources/PyQt6/"):
         _fail(f"unrecognized PyQt6 resource alias: {path}")
-    if (
-        path.startswith(("Contents/Frameworks/", "Contents/Resources/"))
-        and re.fullmatch(r"Qt[A-Za-z0-9]+", name)
-    ) or _classify_macos_qt_payload(path) is not None:
+    if _is_second_qt_payload(path, name):
         _fail(f"deployment inventory contains a second Qt payload: {path}")
+
+
+def _is_canonical_qt_payload(path: str, binding_paths: dict[str, str]) -> bool:
+    return path.startswith(AUTHORITATIVE_QT_ROOT) or path in binding_paths.values()
+
+
+def _is_translation_alias(path: str) -> bool:
+    return re.fullmatch(
+        r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path
+    ) is not None
+
+
+def _is_second_qt_payload(path: str, name: str) -> bool:
+    root_alias = path.startswith(
+        ("Contents/Frameworks/", "Contents/Resources/")
+    ) and re.fullmatch(r"Qt[A-Za-z0-9]+", name)
+    return bool(root_alias or _classify_macos_qt_payload(path) is not None)
 
 
 def _validate_inventory_artifacts(
@@ -837,6 +870,12 @@ def _validate_runner(value: object, expected_machine: str) -> None:
     runner = _mapping(value, "runner")
     if set(runner) != RUNNER_KEYS:
         _fail("runner identity contains missing or unknown fields")
+    _validate_runner_platform_identity(runner)
+    _validate_runner_architecture(runner, expected_machine)
+    _validate_runner_environment(runner)
+
+
+def _validate_runner_platform_identity(runner: dict[str, Any]) -> None:
     if runner.get("system") != "Darwin":
         _fail("runner system must be Darwin")
     release = runner.get("release")
@@ -845,12 +884,20 @@ def _validate_runner(value: object, expected_machine: str) -> None:
     platform_identity = runner.get("platform")
     if not _valid_runner_platform(platform_identity):
         _fail("runner platform is not a recognized macOS identity")
+
+
+def _validate_runner_architecture(
+    runner: dict[str, Any], expected_machine: str
+) -> None:
     if runner.get("machine") != expected_machine:
         _fail(f"runner architecture must be {expected_machine}")
     if runner.get("python_machine") != expected_machine:
         _fail(f"Python architecture must be {expected_machine}")
     if runner.get("rosetta_translated") is not False:
         _fail("Rosetta translation is forbidden")
+
+
+def _validate_runner_environment(runner: dict[str, Any]) -> None:
     if not _valid_github_runner(runner):
         _fail("GitHub runner OS or architecture identity is inconsistent")
     runner_image = runner.get("runner_image")
@@ -918,6 +965,19 @@ def _validate_package_smoke(
     value: object, expected_machine: str
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     package = _mapping(value, "package")
+    _validate_package_identity(package, expected_machine)
+    _validate_package_runtime(package)
+    executable = _mapping(package.get("executable"), "package.executable")
+    cocoa_plugin = _mapping(
+        package.get("cocoa_plugin_artifact"), "package.cocoa_plugin_artifact"
+    )
+    _validate_package_architectures(executable, cocoa_plugin, expected_machine)
+    return package, executable, cocoa_plugin
+
+
+def _validate_package_identity(
+    package: dict[str, Any], expected_machine: str
+) -> None:
     if package.get("target_arch") != expected_machine:
         _fail(f"packaged target architecture must be {expected_machine}")
     if package.get("qt_dependency_collector") != "PyInstaller":
@@ -929,6 +989,9 @@ def _validate_package_smoke(
     }
     if package.get("dependencies") != expected_dependencies:
         _fail("packaged dependency identities do not match the locked stack")
+
+
+def _validate_package_runtime(package: dict[str, Any]) -> None:
     if package.get("r_home") != "Contents/Frameworks/R.framework/Resources":
         _fail("packaged smoke did not report its private framework-owned R_HOME")
     if package.get("rpy2_mode") != "API":
@@ -936,15 +999,17 @@ def _validate_package_smoke(
     _validate_smoke_flags(package, "packaged")
     if package.get("r_result") != 7.5:
         _fail("packaged R result did not match the representative call")
-    executable = _mapping(package.get("executable"), "package.executable")
-    cocoa_plugin = _mapping(
-        package.get("cocoa_plugin_artifact"), "package.cocoa_plugin_artifact"
-    )
+
+
+def _validate_package_architectures(
+    executable: dict[str, Any],
+    cocoa_plugin: dict[str, Any],
+    expected_machine: str,
+) -> None:
     if executable.get("architectures") != [expected_machine]:
         _fail("packaged executable must be a thin native binary")
     if expected_machine not in cocoa_plugin.get("architectures", []):
         _fail("packaged Cocoa plugin has no native architecture slice")
-    return package, executable, cocoa_plugin
 
 
 def _valid_packaged_cocoa(package: dict[str, Any]) -> bool:
@@ -1007,14 +1072,25 @@ def _validate_diagnostics(value: object, evidence_dir: Path | None) -> None:
 
 def _validate_diagnostic(name: str, value: object, evidence_dir: Path | None) -> None:
     record = _mapping(value, f"diagnostics.{name}")
+    path, digest = _diagnostic_identity(name, record)
+    if evidence_dir is not None:
+        _validate_retained_diagnostic(name, path, digest, evidence_dir)
+
+
+def _diagnostic_identity(name: str, record: dict[str, Any]) -> tuple[str, str]:
+    path = record.get("path")
     digest = record.get("sha256")
-    if not isinstance(record.get("path"), str) or not isinstance(digest, str):
+    if not isinstance(path, str) or not isinstance(digest, str):
         _fail(f"diagnostic {name} has no path or digest")
     if not _valid_sha256(digest):
         _fail(f"diagnostic {name} has an invalid SHA-256 digest")
-    if evidence_dir is None:
-        return
-    relative = Path(record["path"])
+    return path, digest
+
+
+def _validate_retained_diagnostic(
+    name: str, path: str, digest: str, evidence_dir: Path
+) -> None:
+    relative = Path(path)
     if relative.is_absolute() or ".." in relative.parts:
         _fail(f"diagnostic {name} path must remain within the evidence directory")
     diagnostic_path = evidence_dir / relative
