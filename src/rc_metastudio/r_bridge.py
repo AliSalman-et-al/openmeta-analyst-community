@@ -1431,7 +1431,11 @@ def _section_semantic_id(kind, source_key, supplied, child_index):
 
 def _section_display_fields(title, supplied, child_index):
     if supplied is not None and child_index == 0:
-        return supplied["title"], supplied["source_key"]
+        # A producer section may describe a named container (for example,
+        # ``Summary``) that renders into several text values.  Keep its
+        # semantic title, but point at the first rendered child value so the
+        # validated result still has exactly one section per value.
+        return supplied["title"], title
     return title, title
 
 
