@@ -976,27 +976,29 @@ def run_versioned_analysis_request(
 def _validated_versioned_request(
     request: Mapping[str, object],
 ) -> tuple[str, str, str, object, Mapping[str, object]]:
-    version = request.get("version")
-    if type(version) is not int or version != 1:
+    if request.get("version") != 1 or type(request.get("version")) is not int:
         raise ValueError("unsupported analysis request version")
-    data_type = request.get("data_type")
-    method = request.get("method")
-    metric = request.get("metric")
-    workflow = request.get("workflow")
+    return (
+        _required_request_text(request, "data_type"),
+        _required_request_text(request, "method"),
+        _required_request_text(request, "metric"),
+        _required_request_text(request, "workflow"),
+        _request_params(request),
+    )
+
+
+def _required_request_text(request: Mapping[str, object], name: str) -> str:
+    value = request.get(name)
+    if not isinstance(value, str) or not value:
+        raise ValueError("analysis request %s must be non-empty text" % name)
+    return value
+
+
+def _request_params(request: Mapping[str, object]) -> Mapping[str, object]:
     params = request.get("params")
-    if not isinstance(data_type, str) or not data_type:
-        raise ValueError("analysis request data_type must be non-empty text")
-    if not isinstance(method, str) or not method:
-        raise ValueError("analysis request method must be non-empty text")
-    if not isinstance(metric, str) or not metric:
-        raise ValueError("analysis request metric must be non-empty text")
-    if not isinstance(workflow, str) or not workflow:
-        raise ValueError("analysis request workflow must be non-empty text")
     if not isinstance(params, Mapping):
         raise TypeError("analysis request params must be a mapping")
-    return data_type, method, metric, workflow, {
-        str(key): value for key, value in params.items()
-    }
+    return {str(key): value for key, value in params.items()}
 
 
 def _execute_versioned_request(
@@ -1267,22 +1269,32 @@ def parse_out_results(result):
 
 def _apply_text_value_keys(texts, sources, producer_sections):
     """Map producer display fields to their stable semantic source keys."""
-    aliases = {
-        section["value_key"]: section["source_key"]
-        for section in producer_sections
-        if section.get("kind") == "text"
-        and isinstance(section.get("value_key"), str)
-        and isinstance(section.get("source_key"), str)
-    }
+    aliases = _semantic_value_aliases(producer_sections, "text")
     for value_key, source_key in aliases.items():
         display_key = _display_section_name(value_key)
         if display_key not in texts or source_key in texts:
             continue
         texts[source_key] = texts.pop(display_key)
-        for key, (source_name, child_index) in list(sources.items()):
-            if source_name == value_key:
-                sources[key] = (source_key, child_index)
+        _replace_source_key(sources, value_key, source_key)
     return texts, sources
+
+
+def _semantic_value_aliases(producer_sections, kind):
+    aliases = {}
+    for section in producer_sections:
+        if section.get("kind") != kind:
+            continue
+        value_key = section.get("value_key")
+        source_key = section.get("source_key")
+        if isinstance(value_key, str) and isinstance(source_key, str):
+            aliases[value_key] = source_key
+    return aliases
+
+
+def _replace_source_key(sources, value_key, source_key):
+    for key, (source_name, child_index) in list(sources.items()):
+        if source_name == value_key:
+            sources[key] = (source_key, child_index)
 
 
 def _result_metadata(result):
@@ -1392,27 +1404,35 @@ def _text_section_metadata(sources, producer_sections):
     for order, (title, source) in enumerate(sources.items()):
         source_key, child_index = source
         supplied = by_source.get(source_key)
-        semantic_id = (
-            supplied["id"]
-            if supplied is not None
-            else _result_section_id("text", source_key)
+        semantic_id = _section_semantic_id("text", source_key, supplied, child_index)
+        section_title, section_source = _section_display_fields(
+            title, supplied, child_index
         )
-        if child_index:
-            semantic_id = f"{semantic_id}:{child_index + 1}"
         sections.append(
             {
                 "id": semantic_id,
                 "kind": "text",
                 "order": order,
-                "title": supplied["title"]
-                if supplied is not None and child_index == 0
-                else title,
-                "source_key": supplied["source_key"]
-                if supplied is not None and child_index == 0
-                else title,
+                "title": section_title,
+                "source_key": section_source,
             }
         )
     return sections
+
+
+def _section_semantic_id(kind, source_key, supplied, child_index):
+    semantic_id = (
+        supplied["id"] if supplied is not None else _result_section_id(kind, source_key)
+    )
+    if child_index:
+        return f"{semantic_id}:{child_index + 1}"
+    return semantic_id
+
+
+def _section_display_fields(title, supplied, child_index):
+    if supplied is not None and child_index == 0:
+        return supplied["title"], supplied["source_key"]
+    return title, title
 
 
 def _image_section_metadata(
@@ -1425,32 +1445,44 @@ def _image_section_metadata(
     }
     sections = []
     used_ids = set()
-    ordered_keys = [key for key in (image_order or images) if key in images]
+    ordered_keys = _ordered_image_keys(images, image_order)
     for index, image_key in enumerate(ordered_keys):
         supplied = by_source.get(image_key)
         capability = capabilities.get(image_key, {})
-        semantic_key = variable_names.get(
-            image_key,
-            variable_names.get(
-                image_key.lower(), capability.get("plot_kind", "plot")
-            ),
-        )
-        semantic_id = (
-            supplied["id"]
-            if supplied is not None
-            else _unique_result_section_id("image", semantic_key, used_ids)
-        )
+        semantic_key = _image_semantic_key(image_key, variable_names, capability)
+        semantic_id = _image_section_id(supplied, semantic_key, used_ids)
         used_ids.add(semantic_id)
         sections.append(
             {
                 "id": semantic_id,
                 "kind": "image",
                 "order": offset + index,
-                "title": supplied["title"] if supplied is not None else image_key,
+                "title": _image_section_title(supplied, image_key),
                 "source_key": image_key,
             }
         )
     return sections
+
+
+def _ordered_image_keys(images, image_order):
+    return [key for key in (image_order or images) if key in images]
+
+
+def _image_semantic_key(image_key, variable_names, capability):
+    return variable_names.get(
+        image_key,
+        variable_names.get(image_key.lower(), capability.get("plot_kind", "plot")),
+    )
+
+
+def _image_section_id(supplied, semantic_key, used_ids):
+    if supplied is not None:
+        return supplied["id"]
+    return _unique_result_section_id("image", semantic_key, used_ids)
+
+
+def _image_section_title(supplied, image_key):
+    return supplied["title"] if supplied is not None else image_key
 
 
 def _unique_result_section_id(kind, source_key, used_ids):

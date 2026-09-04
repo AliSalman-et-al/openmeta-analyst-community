@@ -575,6 +575,36 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
     .rcmetar.attach.request(result, request)
 }
 
+.rcmetar.prepare.diagnostic.request.list <- function(diagnostic.data, request.list) {
+    if (!is.list(request.list) || !length(request.list)) {
+        stop("Diagnostic request list must contain at least one request.", call.=FALSE)
+    }
+    validated <- lapply(request.list, function(request) {
+        checked <- rcmetar.validate.analysis.request(diagnostic.data, request=request)
+        request$version <- 1L
+        request$data_type <- checked$data.type
+        request$method <- checked$method
+        request$metric <- as.character(request$metric %||% checked$params$measure %||% "")
+        request$params <- checked$params
+        request$workflow <- checked$workflow
+        request$selected.cov <- checked$selected.cov
+        request$cond.means.data <- checked$cond.means.data
+        request$stop.at.rma <- checked$stop.at.rma
+        request
+    })
+    workflows <- unique(vapply(validated, function(request) as.character(request$workflow), character(1)))
+    if (length(workflows) != 1L) {
+        stop("Diagnostic request list cannot mix analysis workflows.", call.=FALSE)
+    }
+    list(
+        requests=validated,
+        methods=vapply(validated, function(request) as.character(request$method), character(1)),
+        params.list=lapply(validated, function(request) request$params),
+        workflow=workflows[[1L]],
+        selected.cov=validated[[1L]]$selected.cov
+    )
+}
+
 rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, params.list=NULL, workflow="standard", selected.cov=NULL, version=1, request.list=NULL) {
     if (length(version) != 1 || !identical(as.integer(version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
@@ -582,31 +612,14 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, param
     if (!("DiagnosticData" %in% class(diagnostic.data))) {
         stop("DiagnosticData object expected.", call.=FALSE)
     }
+    validated.requests <- NULL
     if (!is.null(request.list)) {
-        if (!is.list(request.list) || !length(request.list)) {
-            stop("Diagnostic request list must contain at least one request.", call.=FALSE)
-        }
-        validated.requests <- lapply(request.list, function(request) {
-            checked <- rcmetar.validate.analysis.request(diagnostic.data, request=request)
-            request$version <- 1L
-            request$data_type <- checked$data.type
-            request$method <- checked$method
-            request$metric <- as.character(request$metric %||% checked$params$measure %||% "")
-            request$params <- checked$params
-            request$workflow <- checked$workflow
-            request$selected.cov <- checked$selected.cov
-            request$cond.means.data <- checked$cond.means.data
-            request$stop.at.rma <- checked$stop.at.rma
-            request
-        })
-        methods <- vapply(validated.requests, function(request) as.character(request$method), character(1))
-        params.list <- lapply(validated.requests, function(request) request$params)
-        workflows <- unique(vapply(validated.requests, function(request) as.character(request$workflow), character(1)))
-        if (length(workflows) != 1L) {
-            stop("Diagnostic request list cannot mix analysis workflows.", call.=FALSE)
-        }
-        workflow <- workflows[[1L]]
-        selected.cov <- validated.requests[[1L]]$selected.cov
+        prepared <- .rcmetar.prepare.diagnostic.request.list(diagnostic.data, request.list)
+        validated.requests <- prepared$requests
+        methods <- prepared$methods
+        params.list <- prepared$params.list
+        workflow <- prepared$workflow
+        selected.cov <- prepared$selected.cov
     } else if (length(methods) != length(params.list)) {
         stop("Diagnostic methods and parameter lists must have the same length.", call.=FALSE)
     }
