@@ -269,7 +269,15 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
             events.append(("set-auto-quit", enabled))
 
     class FailingWindow:
-        current_data_unsaved = True
+        workspace_is_dirty = True
+
+        class Workspace:
+            is_dirty = True
+
+            def mark_saved(self):
+                self.is_dirty = False
+
+        workspace = Workspace()
 
         def close(self):
             events.append("close")
@@ -279,7 +287,8 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
     with pytest.raises(RuntimeError, match="close failed"):
         smoke.close_automation_window(FakeApplication(), window)
 
-    assert window.current_data_unsaved is False
+    assert window.workspace.is_dirty is False
+    assert window.workspace_is_dirty is False
     assert events == [
         "read-auto-quit",
         ("set-auto-quit", False),

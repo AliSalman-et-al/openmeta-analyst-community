@@ -42,7 +42,12 @@ def test_main_window_standard_binary_action_opens_setup_dialog(monkeypatch):
 
     class SpecsDialog(object):
         def __init__(
-            self, model, analysis_type=None, parent=None, confidence_level=None
+            self,
+            model,
+            analysis_type=None,
+            parent=None,
+            confidence_level=None,
+            analysis_service=None,
         ):
             calls.append(
                 (

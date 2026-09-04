@@ -1380,9 +1380,7 @@ def _expected_packaged_summary_sha256(sample_path):
     try:
         return PACKAGED_SUMMARY_SHA256_BY_SAMPLE[sample_name]
     except KeyError as exc:
-        raise SystemExit(
-            "Unsupported packaged smoke sample: %s" % sample_name
-        ) from exc
+        raise SystemExit("Unsupported packaged smoke sample: %s" % sample_name) from exc
 
 
 def _packaged_result_identity(result, expected_summary_sha256):
@@ -1889,5 +1887,3 @@ def _force_table_paint(app, meta):
     view.horizontalHeader().grab()
     view.verticalHeader().grab()
     app.processEvents()
-
-

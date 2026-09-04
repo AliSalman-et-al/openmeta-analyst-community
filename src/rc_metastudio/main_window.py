@@ -76,6 +76,7 @@ from rc_metastudio import about_legal_dialog
 from rc_metastudio.analysis_results import AnalysisResult
 from rc_metastudio.workspace_session import WorkspaceSession
 
+
 def _qt_item_text(value):
     return qt_text.to_native_text(value)
 
@@ -324,7 +325,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         load_settings()
         self.populate_open_recent_menu()
 
-
     def createPopupMenu(self):
         return None
 
@@ -395,6 +395,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if choice == QMessageBox.StandardButton.Yes:
             return self.save() is True
         return choice == QMessageBox.StandardButton.No
+
     def _update_recent_project_nonfatal(self, path, operation):
         try:
             add_file_to_recent_files(path)
@@ -1161,7 +1162,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             # Covariate names must remain unique.
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
             self._commit_model_operation(
-                self._make_add_covariate_command(new_covariate_name, new_covariate_type).redo
+                self._make_add_covariate_command(
+                    new_covariate_name, new_covariate_type
+                ).redo
             )
 
     def _make_add_covariate_command(self, covariate_name, covariate_type):
@@ -1881,7 +1884,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
-        self.workspace.replace(_document_from_model(self.model), path=destination, record_history=False)
+        self.workspace.replace(
+            _document_from_model(self.model), path=destination, record_history=False
+        )
         self.workspace.mark_saved()
         self.workspace_is_dirty = self.workspace.is_dirty
         if durability_error is not None:

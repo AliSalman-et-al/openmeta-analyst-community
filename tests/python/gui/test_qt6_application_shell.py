@@ -476,7 +476,7 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         QtWidgets.QMessageBox,
         "critical",
         lambda _parent, title, message: pytest.fail(f"{title}: {message}"),
-        )
+    )
     try:
         for sample in sorted((ROOT / "sample_projects").glob("*.rcms")):
             source = project_format.load_project(sample).project
@@ -674,8 +674,9 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
         monkeypatch.setattr(
             QtWidgets.QMessageBox,
             "warning",
-            lambda _parent, _title, message, *_args: import_errors.append(message)
-            or QtWidgets.QMessageBox.StandardButton.Ok,
+            lambda _parent, _title, message, *_args: (
+                import_errors.append(message) or QtWidgets.QMessageBox.StandardButton.Ok
+            ),
         )
         try:
             result = {
@@ -737,7 +738,6 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
                 assert window.workspace.is_dirty is True
         finally:
             _close_shell(app, window)
-            monkeypatch.undo()
 
 
 def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(

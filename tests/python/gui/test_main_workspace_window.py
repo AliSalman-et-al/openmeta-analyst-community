@@ -301,7 +301,6 @@ try:
     }
     print("QT6_SCALE_EVIDENCE=" + json.dumps(evidence, sort_keys=True))
 finally:
-    window.current_data_unsaved = False
     window.close()
     app.processEvents()
 """

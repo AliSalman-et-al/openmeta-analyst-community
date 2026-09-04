@@ -122,7 +122,9 @@ def close_automation_window(
     previous_auto_quit = app.quitOnLastWindowClosed()
     app.setQuitOnLastWindowClosed(False)
     try:
-        setattr(window, "current_data_unsaved", False)
+        workspace = window.workspace
+        workspace.mark_saved()
+        window.workspace_is_dirty = False
         _phase("close-entry")
         window.close()
         _phase("close-return")
@@ -340,7 +342,8 @@ def _run_main() -> int:
             before = list(unit.get_raw_data_for_group(model.current_groups[0]))
             table_view.undoStack.clear()
             table_view.undoStack.setClean()
-            window.current_data_unsaved = False
+            window.workspace.mark_saved()
+            window.workspace_is_dirty = False
             captured: list[dict[str, object]] = []
             callback_errors: list[BaseException] = []
 
@@ -484,7 +487,7 @@ def _run_main() -> int:
                 raise RuntimeError(
                     "calculator transaction created the wrong undo state"
                 )
-            if window.current_data_unsaved is not accepted:
+            if window.workspace.is_dirty is not accepted:
                 raise RuntimeError(
                     "calculator transaction created the wrong dirty state"
                 )

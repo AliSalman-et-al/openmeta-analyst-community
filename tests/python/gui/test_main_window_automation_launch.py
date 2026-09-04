@@ -34,6 +34,12 @@ def _sample_project_path(name):
     return os.path.join(REPO_ROOT, "sample_projects", name)
 
 
+def _mark_workspace_saved(window):
+    if window.workspace.document is not None:
+        window.workspace.mark_saved()
+    window.workspace_is_dirty = False
+
+
 def _window_archetype(widget):
     from rc_metastudio import adaptive_window
 
@@ -108,6 +114,19 @@ def _analysis_result(payload):
         )
         payload["sections"] = sections
     return parse_analysis_result(payload)
+
+
+def _result_sections(*items):
+    return [
+        {
+            "id": f"fixture.{kind}.{index}",
+            "kind": kind,
+            "order": index,
+            "title": title,
+            "source_key": source_key,
+        }
+        for index, (kind, title, source_key) in enumerate(items)
+    ]
 
 
 def _assert_compact_table_fits_visible_cells(table):
@@ -315,7 +334,7 @@ def test_full_app_import_pads_ragged_csv_rows_into_dataset():
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -344,7 +363,7 @@ def test_automation_launch_shows_main_window_maximized():
         assert window.isMaximized()
     finally:
         # This test owns window state, not the interactive save prompt.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -387,9 +406,12 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
         # The automation shell begins with an empty unsaved dataset. This test is
         # about replacing that dataset in the same window, so authorize the open
         # without driving the separate interactive save-confirmation contract.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         project_path = _sample_project_path("amino.rcms")
-        expected_dataset = project_format.load_project(project_path).project["dataset"]
+        project = project_format.load_project(project_path).project
+        expected_dataset = project_adapter.dataset_to_project(
+            project_adapter.project_to_dataset(project)
+        )["dataset"]
         assert window.open(project_path) is True, critical_messages
         app.processEvents()
 
@@ -409,7 +431,7 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
         assert observed_dataset == expected_dataset
     finally:
         # This test owns window identity, not the interactive save prompt.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -833,7 +855,7 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
         window.undo()
         assert _cell_text(window.model, 0, window.model.NAME) == original_name
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1336,7 +1358,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         finally:
             dialog.close()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1367,7 +1389,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
         delegate.initStyleOption(option, factor_index)
         assert option.text == "North"
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1381,7 +1403,12 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
 
     class SpecsDialog(object):
         def __init__(
-            self, model, analysis_type=None, parent=None, confidence_level=None
+            self,
+            model,
+            analysis_type=None,
+            parent=None,
+            confidence_level=None,
+            analysis_service=None,
         ):
             calls.append(
                 (
@@ -1432,9 +1459,11 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def show(self):
                 shown.append("shown")
 
-        def run(method, params, _method=method_name):
-            calls.append(method)
-            return {"texts": {"Summary": "%s model" % _method}, "images": {}}
+        def run(request):
+            calls.append(request["method"])
+            return _analysis_result(
+                {"texts": {"Summary": "%s model" % request["method"]}, "images": {}}
+            )
 
         app, window = automation.start_automation()
         main_window = sys.modules["rc_metastudio.main_window"]
@@ -1467,8 +1496,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             lambda model, **kwargs: None,
             raising=False,
         )
-        monkeypatch.setattr(r_bridge, "run_binary_analysis", run, raising=False)
-        monkeypatch.setattr(r_bridge, "run_continuous_analysis", run, raising=False)
+        monkeypatch.setattr(r_bridge, "run_versioned_analysis_request", run)
 
         try:
             assert window.open(_sample_project_path(name)) is True
@@ -2137,7 +2165,7 @@ def test_advanced_analysis_actions_require_dataset_readiness_and_covariates():
         assert window.action_meta_regression.isEnabled()
         assert window.action_subgroup_ma.isEnabled()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2166,7 +2194,7 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
         assert window.action_meta_regression.isEnabled()
         assert window.action_subgroup_ma.isEnabled()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2216,7 +2244,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
             "Select a factor covariate before running subgroup analysis.",
         )
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2244,7 +2272,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
             for index in range(form.covariate_combo_box.count())
         ] == ["region"]
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2368,7 +2396,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot"]
+        assert nav_titles == ["Summary", "Forest Plot"]
         assert not hasattr(window, "psuedo_console")
         assert window.findChild(QtWidgets.QTextEdit, "psuedo_console") is None
         assert any(
@@ -2425,6 +2453,11 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
                         plot_kind="cumulative_forest", editable=False
                     ),
                 },
+                "sections": _result_sections(
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("image", "Cumulative Forest Plot", "Cumulative Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -2670,6 +2703,11 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         )
 
     write_svg(400, 200)
+    sections = _result_sections(
+        ("text", "Summary", "Summary"),
+        ("image", "Forest Plot", "Forest Plot"),
+        ("text", "Weights", "Weights"),
+    )
     window = results_window.ResultsWindow(
         _analysis_result(
             {
@@ -2682,6 +2720,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
                 "plot_capabilities": {
                     "Forest Plot": _plot_capability(editable=False),
                 },
+                "sections": sections,
             }
         )
     )
@@ -2756,6 +2795,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
                     "plot_capabilities": {
                         "Forest Plot": _plot_capability(editable=False),
                     },
+                    "sections": sections,
                 }
             )
         )
@@ -2809,6 +2849,11 @@ def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
                 "plot_capabilities": {
                     "Forest Plot": _plot_capability(editable=False),
                 },
+                "sections": _result_sections(
+                    ("text", "Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "Weights", "Weights"),
+                ),
             }
         )
     )
@@ -2873,6 +2918,11 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
                 "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability()},
+                "sections": _result_sections(
+                    ("text", "Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -2885,7 +2935,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
+        assert nav_titles == ["Summary", "Forest Plot", "References"]
 
         sections = {
             item.toPlainText(): item
@@ -4110,6 +4160,16 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
         def _selected_covariates(self):
             return [covariate]
 
+        def _meta_regression_metric(self):
+            return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_metric(
+                self
+            )
+
+        def _meta_regression_request(self):
+            return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_request(
+                self
+            )
+
         def parent(self):
             return self._parent
 
@@ -4154,23 +4214,23 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     form.show_prediction_interval.setChecked(True)
     form.show_legend = QtWidgets.QCheckBox()
     form.show_legend.setChecked(True)
+    form.analysis_service = analysis_setup_dialog.analysis_adapter.AnalysisService()
 
+    r_bridge = analysis_setup_dialog.analysis_adapter.r_bridge
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
+        r_bridge,
         "dataset_to_simple_binary_r_object",
         lambda *args, **kwargs: calls.append(("prepare", args, kwargs)),
-        raising=False,
     )
 
-    def run_meta_regression(*args, **kwargs):
-        calls.append(("run", args, kwargs))
-        return {"texts": {"Summary": "meta-regression"}, "images": {}}
+    def run_meta_regression(request):
+        calls.append(("run", request))
+        return _analysis_result({"texts": {"Summary": "meta-regression"}, "images": {}})
 
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
-        "run_meta_regression",
+        r_bridge,
+        "run_versioned_analysis_request",
         run_meta_regression,
-        raising=False,
     )
 
     analysis_setup_dialog.AnalysisSetupDialog.run_meta_regression(
@@ -4179,13 +4239,19 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
 
     assert calls[0][0] == "prepare"
     assert calls[1][0] == "run"
-    assert calls[1][1][1:4] == (studies, [covariate], "OR")
-    assert calls[1][2]["fixed_effects"] is True
-    assert calls[1][2]["confidence_level"] == 90.0
-    assert calls[1][2]["params"]["rm.method"] == "SJ"
-    assert calls[1][2]["params"]["digits"] == 4
-    assert calls[1][2]["params"]["bp_style"] == "revman"
-    assert calls[1][2]["params"]["bp_outpath"] == "bubble.png"
+    assert calls[0][2] == {
+        "include_raw_data": False,
+        "covs_to_include": (covariate,),
+        "studies": tuple(studies),
+    }
+    request = calls[1][1]
+    assert request["workflow"] == "meta-regression"
+    assert request["metric"] == "OR"
+    assert request["params"]["rm.method"] == "FE"
+    assert request["params"]["conf.level"] == 90.0
+    assert request["params"]["digits"] == 4
+    assert request["params"]["bp_style"] == "revman"
+    assert request["params"]["bp_outpath"] == "bubble.png"
     assert calls[-2][0] == "analysis"
     assert calls[-1] == ("accepted",)
     app.processEvents()
@@ -4402,6 +4468,10 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
                 "image_params_paths": {"Forest Plot": params_path},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability()},
+                "sections": _result_sections(
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -4482,7 +4552,7 @@ def test_results_window_ignores_missing_image_order_entries():
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Meta-Analysis Summary"]
+        assert nav_titles == ["Summary"]
         assert not any(
             isinstance(item, results_window.QGraphicsPixmapItem)
             for item in window.scene.items()
@@ -4517,6 +4587,11 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                 "images": {"Forest Plot": plot_paths["forest"]},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability(editable=False)},
+                "sections": _result_sections(
+                    ("text", "Meta-Analysis Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "Weights", "Weights"),
+                ),
             }
         )
     )
@@ -4553,6 +4628,12 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                         regenerator="none",
                     ),
                 },
+                "sections": _result_sections(
+                    ("text", "Summary operating point", "Summary operating point"),
+                    ("text", "Marginal prediction", "Marginal prediction"),
+                    ("text", "Model information", "Model information"),
+                    ("image", "Summary ROC Plot", "SROC"),
+                ),
             }
         )
     )
@@ -4593,7 +4674,7 @@ def test_main_window_save_as_round_trips_representative_projects(tmp_path, monke
 
             window.save_as()
             assert os.path.exists(saved_path)
-            assert window.current_data_unsaved is False
+            assert window.workspace.is_dirty is False
             main_window = sys.modules["rc_metastudio.main_window"]
             reopened, _state, _restored_selection = (
                 main_window._load_structured_project(saved_path)
@@ -4854,7 +4935,7 @@ def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monke
         assert events[3:] == ["deleted", "shown", "raised", "activated"]
         assert window._startup_wizard is None
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
 

@@ -88,7 +88,6 @@ def _publish_workspace_snapshot(view, before, main_gui):
     after = _workspace_snapshot(view.model())
     if after is not None:
         main_gui.record_workspace_change(before, after)
-    def data_error(self, message: str) -> None: ...
 
 
 _newlines_re = QRegularExpression("\r\n?")
@@ -794,7 +793,9 @@ class DatasetTableView(QtWidgets.QTableView):
             self._report_model_data_error(failure)
             return False
         model = self.model()
-        candidate = type(model)(dataset=copy.deepcopy(model.dataset), add_blank_study=False)
+        candidate = type(model)(
+            dataset=copy.deepcopy(model.dataset), add_blank_study=False
+        )
         candidate.set_state(copy.deepcopy(model.get_state()))
         required_rows = origin_row + len(source_content)
         while candidate.rowCount() < required_rows:

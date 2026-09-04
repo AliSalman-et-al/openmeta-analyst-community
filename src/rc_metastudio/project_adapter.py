@@ -84,7 +84,9 @@ def _entered_effects(
     return result
 
 
-def _project_outcomes(dataset: analysis_dataset.Dataset) -> tuple[list[JsonValue], set[str]]:
+def _project_outcomes(
+    dataset: analysis_dataset.Dataset,
+) -> tuple[list[JsonValue], set[str]]:
     outcomes: list[JsonValue] = []
     families = set()
     for name in dataset.get_outcome_names():
@@ -293,7 +295,9 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             ]
         dataset.follow_up_stable_ids_by_outcome[outcome_name] = {
             follow_up: stable_id
-            for follow_up, stable_id in zip(mapping.values(), follow_up_ids, strict=True)
+            for follow_up, stable_id in zip(
+                mapping.values(), follow_up_ids, strict=True
+            )
             if follow_up is not None and stable_id is not None
         }
 
@@ -350,12 +354,13 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 for group in group_items
             ]
             follow_up = _optional_text(unit_data["follow_up"], "unit follow-up")
-            follow_up_id = dataset.follow_up_stable_ids_by_outcome[
-                outcome_name
-            ].get(follow_up)
-            unit_id = _optional_text(
-                unit_data.get("stable_id"), "analysis unit stable id"
-            ) or f"{outcome.stable_id}:{follow_up_id or 'default'}"
+            follow_up_id = dataset.follow_up_stable_ids_by_outcome[outcome_name].get(
+                follow_up
+            )
+            unit_id = (
+                _optional_text(unit_data.get("stable_id"), "analysis unit stable id")
+                or f"{outcome.stable_id}:{follow_up_id or 'default'}"
+            )
             unit = analysis_unit.AnalysisUnit(
                 outcome,
                 raw_data=raw_data,
@@ -367,9 +372,12 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 unit.groups[group_name].id = _integer(
                     group_data["id"], "analysis group id"
                 )
-                unit.groups[group_name].stable_id = _optional_text(
-                    group_data.get("stable_id"), "analysis group stable id"
-                ) or f"{unit_id}:group:{group_index}"
+                unit.groups[group_name].stable_id = (
+                    _optional_text(
+                        group_data.get("stable_id"), "analysis group stable id"
+                    )
+                    or f"{unit_id}:group:{group_index}"
+                )
             entered_effects = _object(unit_data["entered_effects"], "entered effects")
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")

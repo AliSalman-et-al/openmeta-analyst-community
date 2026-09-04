@@ -535,7 +535,6 @@ def test_opening_non_project_payload_reports_invalid_project(monkeypatch, tmp_pa
     app, window = automation.start_automation()
     shown = []
     try:
-        window.current_data_unsaved = False
         monkeypatch.setattr(
             main_window.QMessageBox,
             "critical",
