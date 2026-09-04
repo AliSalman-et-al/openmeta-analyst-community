@@ -131,13 +131,6 @@ def inject_calculator_boundary(
     inject_python_boundary: None,
 ) -> None:
     """Expose the canonical boundary to direct R-dependent test seams."""
-    from rc_metastudio import (
-        calculator_routines,
-        dataset_table_model,
-    )
+    from rc_metastudio import calculator_routines
 
-    for module in (
-        dataset_table_model,
-        calculator_routines,
-    ):
-        module.r_bridge = r_bridge
+    calculator_routines.r_bridge = r_bridge

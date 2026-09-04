@@ -18,6 +18,8 @@ from PyQt6.QtGui import QColor
 from rc_metastudio import dataset_table_model
 from rc_metastudio import analysis_dataset
 from rc_metastudio import meta_globals
+from rc_metastudio import r_bridge
+from rc_metastudio import workspace_editing
 
 
 def _derived_effect_and_ci(analysis_unit, metric, group_comparison):
@@ -78,7 +80,7 @@ def test_direct_outcomes_use_the_shared_strict_decimal_parser(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -542,7 +544,7 @@ def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch)
     errors = []
     model.dataError.connect(errors.append)
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -577,7 +579,7 @@ def test_named_direct_effect_entry_still_auto_includes_study(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -636,7 +638,7 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -651,7 +653,7 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
         }
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -685,7 +687,7 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -701,7 +703,7 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
         }
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -747,7 +749,7 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
     model.dataset.studies[0].include = True
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -782,12 +784,12 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "effect_for_study",
         lambda *args, **kwargs: {"calc_scale": 0.5},
     )
@@ -815,12 +817,12 @@ def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "continuous_effect_for_study",
         lambda *args, **kwargs: {"calc_scale": 1.25},
     )
@@ -856,7 +858,7 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
         raise RuntimeError("simulated diagnostic calculation failure")
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -877,10 +879,10 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
 
 
 def test_effect_normalizer_preserves_triplets_and_expands_scalars():
-    effect = dataset_table_model.r_bridge.normalize_effect_result(
+    effect = r_bridge.normalize_effect_result(
         {"calc_scale": 1.25, "display_scale": [1.25, 1.0, 1.5]},
     )
-    effects = dataset_table_model.r_bridge.normalize_diagnostic_effects(
+    effects = r_bridge.normalize_diagnostic_effects(
         {
             "Sens": {"calc_scale": 0.75},
             "Spec": {"calc_scale": [0.95, 0.88, 0.99]},
@@ -900,7 +902,7 @@ def test_effect_normalizer_can_require_diagnostic_triplets():
         ValueError,
         match="Expected calc_scale study effect for Sens to contain 3 values; got scalar",
     ):
-        dataset_table_model.r_bridge.normalize_diagnostic_effects(
+        r_bridge.normalize_diagnostic_effects(
             {"Sens": {"calc_scale": 0.75}},
             require_triplets=True,
         )
@@ -909,7 +911,7 @@ def test_effect_normalizer_can_require_diagnostic_triplets():
         ValueError,
         match="Expected calc_scale study effect for Spec to contain 3 values; got 1",
     ):
-        dataset_table_model.r_bridge.normalize_diagnostic_effects(
+        r_bridge.normalize_diagnostic_effects(
             {"Spec": {"calc_scale": [0.95]}},
             require_triplets=True,
         )

@@ -43,10 +43,6 @@ from rc_metastudio.workspace_column_identity import (
     stable_covariate_identity,
 )
 
-# Compatibility export for callers that used to patch the bridge through this
-# module. The model itself delegates all bridge calls to ``editing_service``.
-r_bridge = workspace_editing.r_bridge
-
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
 DUMMY_ROWS = 20
