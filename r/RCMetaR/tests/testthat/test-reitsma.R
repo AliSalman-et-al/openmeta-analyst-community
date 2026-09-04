@@ -354,6 +354,21 @@ testthat::test_that("Reitsma coefficient regeneration restores categorical refer
   testthat::expect_true(any(grepl("quality = A (reference)", bundle$labels, fixed=TRUE)))
 })
 
+testthat::test_that("saved Reitsma geometry regenerates without calling mada extractors", {
+  library(RCMetaR)
+  geometry <- list(
+    kind="sroc", fpr=c(.1, .2), sensitivity=c(.8, .7), sample.size=c(20, 30),
+    study.names=c("a", "b"), curve=cbind(c(.1, .2), c(.8, .7)),
+    confidence.region=NULL, prediction.region=NULL, auc=NULL,
+    summary.point=list(sensitivity=c(estimate=.8), specificity=c(estimate=.9)),
+    style=list(xlabel="False Positive Rate", ylabel="Sensitivity")
+  )
+  params <- list(reitsma.sroc.geometry=geometry, fp_xlabel="Edited FPR")
+  regenerated <- RCMetaR:::rcmetar.regenerate.plot.data(NULL, NULL, params)
+  testthat::expect_identical(regenerated$curve, geometry$curve)
+  testthat::expect_identical(regenerated$style$xlabel, "Edited FPR")
+})
+
 testthat::test_that("Reitsma legend stores sample-size markers and omits unavailable lines", {
   library(RCMetaR)
   testthat::skip_if_not_installed("mada")
