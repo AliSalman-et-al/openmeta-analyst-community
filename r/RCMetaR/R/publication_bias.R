@@ -240,9 +240,6 @@
     confidence.level <- prepared$confidence.level
     meta.level <- .small.study.meta.level(confidence.level)
     diagnostic <- prepared$diagnostic
-    metric <- prepared$metric
-    confidence.level <- prepared$confidence.level
-    diagnostic <- prepared$diagnostic
     params <- prepared$params
     derived <- prepared$derived
     keep <- prepared$keep
