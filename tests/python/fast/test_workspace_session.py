@@ -33,6 +33,27 @@ def test_session_replaces_and_undoes_one_complete_snapshot() -> None:
     assert edited["dataset"]["title"] == "Edited"
 
 
+def test_nested_transactions_publish_one_history_entry() -> None:
+    document = load_project(ROOT / "sample_projects" / "amino.rcms")
+    session = WorkspaceSession(document)
+    runtime = session.runtime
+    assert runtime is not None
+
+    session.begin_change()
+    runtime.dataset.title = "outer"
+    session.begin_change()
+    runtime.dataset.notes = "inner"
+    session.end_change()
+    assert not session.can_undo
+    session.end_change()
+
+    assert session.undo()
+    assert session.runtime is not None
+    assert session.runtime.dataset.title != "outer"
+    assert session.runtime.dataset.notes != "inner"
+    assert not session.can_undo
+
+
 def test_failed_open_preserves_document_history_and_path(tmp_path: Path) -> None:
     document = load_project(ROOT / "sample_projects" / "amino.rcms")
     session = WorkspaceSession(document, ROOT / "sample_projects" / "amino.rcms")

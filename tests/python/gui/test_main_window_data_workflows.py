@@ -115,12 +115,12 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (0.5, 0.25, 1.0)},
         )
@@ -220,7 +220,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
@@ -230,7 +230,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -245,7 +245,7 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -358,7 +358,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "continuous_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -376,7 +376,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "continuous_effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
@@ -386,7 +386,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -520,7 +520,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -540,7 +540,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             },
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             lambda *args, metrics, **kwargs: {
                 metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
@@ -552,7 +552,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -1036,7 +1036,7 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
         table.set_data_in_model(model.index(0, model.NAME), _variant("Kinderman"))
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -1052,7 +1052,7 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
             }
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             diagnostic_effects_for_study,
         )
@@ -1116,12 +1116,12 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
         window.data_dirtied()
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             lambda *args, **kwargs: {
                 "Sens": {"calc_scale": (0.800, 0.490, 0.943)},
@@ -1791,7 +1791,7 @@ def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(
             raise AssertionError("invalid confidence level reached R multiplier")
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "get_confidence_multiplier_from_r",
             fail_if_called,
         )

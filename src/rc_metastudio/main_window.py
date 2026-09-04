@@ -428,6 +428,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     ):
 
         data_model = analysis_dataset.Dataset(title=name, is_diagnostic=is_diagnostic)
+        # A new workspace needs one durable study for outcome setup. The table
+        # model's editable trailing row remains presentation-only.
+        data_model.add_study(analysis_dataset.Study(data_model.max_study_id() + 1))
         existing_model = getattr(self, "model", None)
         if existing_model is not None:
             if use_undo_framework:
@@ -571,6 +574,13 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 parent=self,
             )
         )
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.workspaceEditCommitted,
+                self._workspace_edit_committed,
+                parent=self,
+            )
+        )
 
         # Model resets clear the active editor, so restore its index explicitly.
         self._model_signal_connections.append(
@@ -694,6 +704,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.workspace.mark_dirty()
         else:
             self.workspace.update_live_state(runtime)
+
+    def _workspace_edit_committed(self, _edit):
+        self.data_dirtied()
+        self.workspace.checkpoint()
 
     def record_workspace_change(self, before, after):
         """Publish the already-mutated session-owned graph as one change."""
@@ -832,30 +846,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             if runtime is not None:
                 self._install_workspace_runtime(runtime)
 
-    def _install_workspace_document(self, document):
-        self._install_workspace_runtime(
-            project_adapter.document_to_runtime_project(document)
-        )
-
     def _install_workspace_runtime(self, runtime):
         target_digest = self.workspace.runtime_digest
         current = self.tableView.currentIndex()
         position = (current.row(), current.column()) if current.isValid() else None
-        previous_model = self.model
-        observers = self.__dict__.setdefault("_workspace_model_observers", [])
-        if previous_model not in observers:
-            observers.append(previous_model)
         self._set_model_adapter(
             runtime.dataset,
             runtime.model_state,
             preserve_state_selection=runtime.restored_selection,
             recalculate_outcomes=False,
         )
-        # Keep observers holding the Qt adapter's model reference coherent
-        # while the view itself follows the newly decoded workspace snapshot.
-        for observer in observers:
-            observer.dataset = self.model.dataset
-            observer.set_state(runtime.model_state)
         self.workspace.update_live_state(runtime)
         self.workspace.checkpoint(expected_digest=target_digest)
         self.out_path = str(self.workspace.path) if self.workspace.path else None

@@ -114,7 +114,8 @@ def _sortable_dataset_model():
 
 
 def _study_names(model):
-    return [study.name for study in model.dataset.studies]
+    studies = {study.id: study for study in model.dataset.studies}
+    return [studies[study_id].name for study_id in model.get_ordered_study_ids()]
 
 
 def test_follow_up_navigation_handles_removed_middle_index():
@@ -177,3 +178,26 @@ def test_outcome_sort_uses_each_study_display_effect_source():
     model.sort_studies(model.OUTCOMES[0], reverse=False)
 
     assert _study_names(model) == ["Beta", "Gamma", "Alpha"]
+
+
+def test_sort_only_changes_table_presentation_order():
+    model = _sortable_dataset_model()
+    canonical_order = [study.id for study in model.dataset.studies]
+
+    model.sort_studies(model.NAME, reverse=False)
+
+    assert [study.id for study in model.dataset.studies] == canonical_order
+    assert model.get_ordered_study_ids() != canonical_order
+
+
+def test_edit_after_sort_targets_the_visible_study():
+    model = _sortable_dataset_model()
+    model.sort_studies(model.NAME, reverse=False)
+    index = model.index(0, model.NAME)
+
+    assert model.setData(index, "Alpha revised")
+    assert [study.name for study in model.dataset.studies] == [
+        "Gamma",
+        "Alpha revised",
+        "Beta",
+    ]

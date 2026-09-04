@@ -300,6 +300,22 @@ def _model_with_real_study_and_empty_new_entry_row(data_type):
     return model
 
 
+def test_blank_entry_row_stays_out_of_the_durable_dataset_until_named():
+    model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
+
+    assert len(model.dataset.studies) == 1
+    blank_row = len(model.dataset.studies)
+    blank_study = model._study_for_row(blank_row)
+    assert blank_study not in model.dataset.studies
+    assert model.get_ordered_study_ids() == [1]
+
+    assert model.setData(model.index(blank_row, model.NAME), "Beta") is True
+
+    assert [study.name for study in model.dataset.studies] == ["Alpha", "Beta"]
+    assert model._study_for_row(len(model.dataset.studies)) not in model.dataset.studies
+    assert model.get_ordered_study_ids() == [1, 2]
+
+
 def _continuous_model_with_named_study():
     dataset = analysis_dataset.Dataset()
     study = analysis_dataset.Study(1, name="Alpha", year=None)
@@ -511,8 +527,8 @@ def test_named_new_entry_row_keeps_populated_study_chrome(qapp):
 
     qt6_resources.ensure_application_resources()
     model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
-    model.dataset.studies[1].name = "Beta"
-    model.dataset.studies[1].include = True
+    model._study_for_row(1).name = "Beta"
+    model._study_for_row(1).include = True
 
     assert (
         model.headerData(
@@ -632,9 +648,7 @@ def test_study_name_edit_on_placeholder_row_creates_study():
     assert model.setData(model.index(1, model.NAME), "Beta") is True
 
     assert model.dataset.studies[1].name == "Beta"
-    assert len(model.dataset.studies) == 3
-    assert model.dataset.studies[2].name == ""
-    assert model.dataset.studies[2].include is False
+    assert len(model.dataset.studies) == 2
 
 
 def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():

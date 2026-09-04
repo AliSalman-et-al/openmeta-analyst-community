@@ -63,6 +63,7 @@ class WorkspaceSession:
         self._redo: list[WorkspaceChange] = []
         self._forced_dirty = False
         self._transaction_checkpoint: RuntimeProject | None = None
+        self._transaction_depth = 0
         document = self.document
         self._saved_digest = _document_digest(document) if document else None
 
@@ -132,11 +133,17 @@ class WorkspaceSession:
         """Start one atomic UI operation."""
         if self._runtime is None:
             raise ValueError("cannot edit an empty workspace")
-        if self._transaction_checkpoint is None:
+        if self._transaction_depth == 0:
             self._transaction_checkpoint = _copy_runtime(self._runtime)
+        self._transaction_depth += 1
 
     def end_change(self) -> None:
         """Publish the current graph as one history entry."""
+        if self._transaction_depth == 0:
+            return
+        self._transaction_depth -= 1
+        if self._transaction_depth:
+            return
         checkpoint = self._transaction_checkpoint
         self._transaction_checkpoint = None
         if checkpoint is None or self._runtime is None:
