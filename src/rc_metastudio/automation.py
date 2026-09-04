@@ -140,7 +140,7 @@ def _observe_locale_analysis(window, operation: str, locale_name: str) -> dict:
     raw_value, valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
     if not valid:
         raise RuntimeError("packaged locale operation could not parse the product value")
-    numeric_text = locale.toString(raw_value, "f", 1)
+    numeric_text = format(raw_value, ".1f").replace(".", locale.decimalPoint())
     edited = model.setData(raw_index, numeric_text)
     canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
     result = _run_binary_analysis(window, main_window)

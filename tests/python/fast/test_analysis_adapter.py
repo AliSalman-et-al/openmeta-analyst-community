@@ -108,11 +108,12 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
         if metric == "Sens":
             raise DiagnosticExecutionError("Sens conversion failed")
 
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "dataset_to_simple_diagnostic_r_object",
-        convert_metric,
-    )
+    class FakeDiagnosticBridge:
+        @staticmethod
+        def dataset_to_simple_diagnostic_r_object(_model, metric):
+            return convert_metric(_model, metric)
+
+    monkeypatch.setattr(analysis_adapter, "r_bridge", FakeDiagnosticBridge())
     monkeypatch.setattr(
         analysis_adapter,
         "_run_diagnostic_backend",

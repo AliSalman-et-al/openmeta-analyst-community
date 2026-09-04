@@ -177,21 +177,20 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
             },
         )(),
     )
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "dataset_to_simple_binary_r_object",
-        lambda _model, **_kwargs: None,
-    )
-
     def fake_versioned_request(request):
         captured_params.append(request["params"])
         return {"version": 1, "texts": {}, "images": {}, "sections": []}
 
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "run_versioned_analysis_request",
-        fake_versioned_request,
-    )
+    class FakeBinaryBridge:
+        @staticmethod
+        def dataset_to_simple_binary_r_object(_model, **_kwargs):
+            return None
+
+        @staticmethod
+        def run_versioned_analysis_request(request):
+            return fake_versioned_request(request)
+
+    monkeypatch.setattr(analysis_adapter, "r_bridge", FakeBinaryBridge())
 
     bundle = golden_analysis.curated_golden_bundles(root_dir=ROOT)[0]
     case = headless_analysis.HeadlessAnalysisCase(
