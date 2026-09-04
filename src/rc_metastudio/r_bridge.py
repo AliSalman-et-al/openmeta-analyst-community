@@ -1032,48 +1032,52 @@ def run_versioned_analysis_requests(
     diagnostic_data_name: str = "tmp_obj",
 ):
     """Execute a validated diagnostic request set through one R operation."""
-    methods, param_values, workflow = _validated_versioned_requests(requests)
-    normalized_workflow = _normalize_rcmetar_workflow(workflow)
+    validated_requests = _validated_versioned_requests(requests)
     return _execute_versioned_requests(
-        methods, param_values, normalized_workflow, res_name, diagnostic_data_name
+        validated_requests, res_name, diagnostic_data_name
     )
 
 
 def _validated_versioned_requests(
     requests: list[Mapping[str, object]],
-) -> tuple[list[str], list[dict[str, object]], str]:
+) -> list[dict[str, object]]:
     if not requests:
         raise ValueError("at least one analysis request is required")
-    methods: list[str] = []
-    param_values: list[dict[str, object]] = []
     first = _validated_versioned_request(requests[0])
     data_type, _, _, workflow, _ = first
+    validated: list[dict[str, object]] = []
     for request in requests:
-        current_data_type, method, _, current_workflow, values = (
+        current_data_type, method, metric, current_workflow, values = (
             _validated_versioned_request(request)
         )
         if current_data_type != data_type or current_workflow != workflow:
             raise ValueError("one execution cannot mix analysis workflows")
-        methods.append(method)
-        param_values.append(dict(values))
-    return methods, param_values, str(workflow)
+        validated.append(
+            {
+                "version": 1,
+                "data_type": current_data_type,
+                "method": method,
+                "metric": metric,
+                "params": dict(values),
+                "workflow": current_workflow,
+            }
+        )
+    return validated
 
 
 def _execute_versioned_requests(
-    methods: list[str],
-    param_values: list[dict[str, object]],
-    normalized_workflow: str,
+    requests: list[dict[str, object]],
     res_name: str,
     diagnostic_data_name: str,
 ) -> object:
-    params = [_to_r_params(values) for values in param_values]
+    request_list = execute_r_function(
+        "list", *[_to_r_params(request) for request in requests]
+    )
     try:
         result = execute_r_function(
             "rcmetar.run.diagnostic.analyses",
             _r_object_from_symbol(diagnostic_data_name),
-            _r_character_vector(methods),
-            execute_r_function("list", *params),
-            workflow=normalized_workflow,
+            **{"request.list": request_list},
             version=1,
         )
     except RRuntimeError as error:
@@ -1216,6 +1220,9 @@ def parse_out_results(result):
         for index, key in enumerate(key for key in text_d if key not in text_sources):
             text_sources[key] = (text_n, index)
 
+    text_d, text_sources = _apply_text_value_keys(
+        text_d, text_sources, metadata["sections"]
+    )
     sections = _text_section_metadata(text_sources, metadata["sections"])
     image_offset = len(sections)
     sections.extend(
@@ -1240,6 +1247,26 @@ def parse_out_results(result):
         "sections": sections,
     }
     return parse_analysis_result(to_return)
+
+
+def _apply_text_value_keys(texts, sources, producer_sections):
+    """Map producer display fields to their stable semantic source keys."""
+    aliases = {
+        section["value_key"]: section["source_key"]
+        for section in producer_sections
+        if section.get("kind") == "text"
+        and isinstance(section.get("value_key"), str)
+        and isinstance(section.get("source_key"), str)
+    }
+    for value_key, source_key in aliases.items():
+        display_key = _display_section_name(value_key)
+        if display_key not in texts or source_key in texts:
+            continue
+        texts[source_key] = texts.pop(display_key)
+        for key, (source_name, child_index) in list(sources.items()):
+            if source_name == value_key:
+                sources[key] = (source_key, child_index)
+    return texts, sources
 
 
 def _result_metadata(result):
@@ -1757,22 +1784,6 @@ def _summary_section_name(parent_name, child_name):
 
 
 def _display_section_name(name):
-    stable_titles = {
-        "small-study-warning": "Warning",
-        "small-study-data-eligibility": "Data and eligibility",
-        "small-study-tests": "Tests",
-        "small-study-pooled-comparison": "Pooled comparison",
-        "small-study-references": "References",
-        "small-study-failures": "Failures",
-        "small-study-method-details": "Method details",
-        "small-study-methods-not-applicable": "Methods not applicable",
-        "small-study-extrapolation": "Extrapolation",
-    }
-    if name in stable_titles:
-        return stable_titles[name]
-    if str(name).startswith("small-study.trim-and-fill."):
-        suffix = str(name).rsplit(".", 1)[-1]
-        return "Trim-and-fill " + suffix.title()
     return method_display_label(str(name))
 
 

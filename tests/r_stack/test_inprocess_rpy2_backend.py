@@ -52,6 +52,7 @@ _DRIVER = textwrap.dedent(
 
     def raise_workflow_r_error(name, *args, **kwargs):
         if name == "rcmetar.run.diagnostic.analyses":
+            assert "request.list" in kwargs
             raise r_bridge.RRuntimeError("workflow execution failed")
         return original_execute_r_function(name, *args, **kwargs)
 
@@ -515,6 +516,14 @@ _NULL_RESULT_DRIVER = textwrap.dedent(
     assert "Trim-and-fill data" not in parsed_nested_section.texts
     assert parsed_nested_section.texts["Warning"] == "kept"
     assert parsed_nested_section.texts["Summary"] == "kept summary"
+    semantic_section_result = r_bridge.ro.r(
+        "list(Warning='kept', sections=list(list(id='small-study.warning', "
+        "kind='text', order=0L, title='Warning', source_key='small-study.warning', "
+        "value_key='Warning')))"
+    )
+    parsed_semantic_section = r_bridge.parse_out_results(semantic_section_result)
+    assert parsed_semantic_section.texts["small-study.warning"] == "kept"
+    assert parsed_semantic_section.sections[0].title == "Warning"
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()

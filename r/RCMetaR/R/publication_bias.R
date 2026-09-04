@@ -642,34 +642,17 @@
     paste0("small-study.", gsub("[^a-z0-9]+", "-", tolower(name)))
 }
 
-.small.study.section.title <- function(key) {
-    fixed <- c(
-        "small-study.warning"="Warning",
-        "small-study.data-eligibility"="Data and eligibility",
-        "small-study.tests"="Tests",
-        "small-study.pooled-comparison"="Pooled comparison",
-        "small-study.references"="References",
-        "small-study.failures"="Failures",
-        "small-study.method-details"="Method details",
-        "small-study.methods-not-applicable"="Methods not applicable",
-        "small-study.extrapolation"="Extrapolation"
-    )
-    if (key %in% names(fixed)) return(unname(fixed[[key]]))
-    if (startsWith(key, "small-study.trim-and-fill.")) {
-        suffix <- sub("^small-study.trim-and-fill.", "", key)
-        return(paste0("Trim-and-fill ", tools::toTitleCase(suffix)))
-    }
-    key
-}
-
 .small.study.sections <- function(output, plots) {
     metadata <- c("eligibility", "tests.data", "Trim-and-fill data")
     text.names <- names(output)[vapply(output, function(value) !is.null(value), logical(1))]
     text.names <- setdiff(text.names, metadata)
-    sections <- unname(Map(function(key, order) list(
-        id=key, kind="text", order=as.integer(order),
-        title=.small.study.section.title(key), source_key=key
-    ), text.names, seq_along(text.names) - 1L))
+    sections <- unname(Map(function(name, order) {
+        key <- .small.study.section.id(name)
+        list(
+            id=key, kind="text", order=as.integer(order), title=name,
+            source_key=key, value_key=name
+        )
+    }, text.names, seq_along(text.names) - 1L))
     image.names <- names(plots$images %||% character())
     if (length(image.names)) {
         kinds <- vapply(image.names, function(key) {
@@ -730,10 +713,6 @@
     plot.failures <- c(trimfill.failures, plots$failures %||% character())
     if (length(plot.failures)) output$Failures <- paste(c(failures, plot.failures), collapse="\n")
     output$References <- .small.study.references(names(tests), names(plots$images))
-    visible.names <- setdiff(names(output), c("eligibility", "tests.data", "Trim-and-fill data", "sections"))
-    names(output)[match(visible.names, names(output))] <- vapply(
-        visible.names, .small.study.section.id, character(1)
-    )
     output$sections <- .small.study.sections(output, plots)
     plots$failures <- NULL
     c(output, plots)
