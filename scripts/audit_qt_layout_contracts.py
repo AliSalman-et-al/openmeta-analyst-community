@@ -140,7 +140,7 @@ SOURCE_EXCEPTION_RULES = {
         },
     },
     "verification-layout-fixture": {
-        "paths": {"adaptive_layout_evidence.py", "automation.py"},
+        "paths": {"adaptive_layout_evidence.py"},
         "methods": {"adjustSize", "move", "resize"},
     },
 }

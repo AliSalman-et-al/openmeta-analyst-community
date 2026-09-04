@@ -88,7 +88,7 @@ def test_hosted_package_workflow_does_not_require_native_layout_evidence():
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():
-    runner = _text("src", "rc_metastudio", "adaptive_layout_evidence.py")
+    runner = _text("scripts", "adaptive_layout_evidence.py")
 
     for archetype in ("workspace", "workflow", "transactional", "transient"):
         assert f'"{archetype}"' in runner
@@ -346,3 +346,4 @@ def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
     assert '"--automation-native-smoke"' in launch
     assert "start_automation_smoke" in launch
     assert "adaptive_layout" not in launch
+

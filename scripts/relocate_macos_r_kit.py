@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
+from scripts.qt6_macos_feasibility_impl import is_macho_candidate
 
 
 def dependencies(path: Path) -> list[str]:
@@ -118,3 +118,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

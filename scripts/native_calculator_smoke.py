@@ -104,9 +104,9 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
 
 def install_native_test_backend() -> Any:
     """Create the calculator smoke's explicit local test backend."""
-    from rc_metastudio import r_backend
+    from scripts.local_r_test_backend import create
 
-    backend = r_backend.make_test_backend()
+    backend = create()
     if "rpy2.rinterface" in sys.modules:
         raise RuntimeError(
             "rpy2.rinterface loaded before native calculator GUI imports"
@@ -202,7 +202,12 @@ def _run_main() -> int:
         continuous_data_dialog,
         diagnostic_data_dialog,
         dataset_table_model,
+        r_bridge,
     )
+    for name, implementation in vars(backend).items():
+        setattr(r_bridge, name, implementation)
+    for dialog_module in (binary_data_dialog, continuous_data_dialog, diagnostic_data_dialog):
+        setattr(dialog_module, "r_bridge", r_bridge)
 
     _install_backend_test_double(
         binary_data_dialog.r_bridge,

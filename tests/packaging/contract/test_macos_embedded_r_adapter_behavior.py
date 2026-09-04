@@ -360,7 +360,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "package": "pkg",
             "version": "1.0",
             "archive_url": inspector.DIRECT_R_PPM_SNAPSHOT
-            + "/bin/macosx/big-sur-x86_64/contrib/4.6/pkg_1.0.tgz",
+                + "/bin/macosx/sonoma-arm64/contrib/4.6/pkg_1.0.tgz",
             "sha256": hashlib.sha256(ppm_payload).hexdigest(),
             "size": len(ppm_payload),
         }
@@ -370,14 +370,14 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "schema_version": 1,
             "github_actions": "true",
             "runner_image": "macos15",
-            "runner_label": "macos-15-intel",
+                "runner_label": "macos-15",
             "runner_os": "macOS",
-            "runner_arch": "X64",
+                "runner_arch": "ARM64",
             "macos_version": "15.5",
             "macos_build": "24F74",
             "uname_system": "Darwin",
-            "uname_machine": "x86_64",
-            "python_machine": "x86_64",
+                "uname_machine": "arm64",
+                "python_machine": "arm64",
         }
     ).encode()
     valid_local_runner = {
@@ -386,26 +386,26 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         "runner_image": "local",
         "runner_label": "local",
         "runner_os": "macOS",
-        "runner_arch": "x86_64",
+            "runner_arch": "arm64",
         "macos_version": "15.5",
         "macos_build": "24F74",
         "uname_system": "Darwin",
-        "uname_machine": "x86_64",
-        "python_machine": "x86_64",
+            "uname_machine": "arm64",
+            "python_machine": "arm64",
     }
-    inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
-    inspector.validate_direct_build_runner(json.loads(runner), target="macos-x64")
+    inspector.validate_direct_build_runner(valid_local_runner, target="macos-arm64")
+    inspector.validate_direct_build_runner(json.loads(runner), target="macos-arm64")
     wrong_label = json.loads(runner)
-    wrong_label["runner_label"] = "macos-15"
+    wrong_label["runner_label"] = "macos-14"
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError, match="hosted direct-build runner"
     ):
-        inspector.validate_direct_build_runner(wrong_label, target="macos-x64")
-    valid_local_runner["uname_machine"] = "arm64"
+        inspector.validate_direct_build_runner(wrong_label, target="macos-arm64")
+    valid_local_runner["uname_machine"] = "riscv64"
     with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="native macos-x64"
+        inspector.MacOSDeploymentInspectionError, match="native macos-arm64"
     ):
-        inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
+        inspector.validate_direct_build_runner(valid_local_runner, target="macos-arm64")
     ppm = json.dumps(
         {
             "schema_version": 1,
@@ -419,13 +419,13 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "source_commit": "c" * 40,
             "pyinstaller_version": "6.21.0",
             "system": "Darwin",
-            "machine": "x86_64",
+            "machine": "arm64",
             "aliases": {
-                "Versions/Current": "4.6-x86_64",
+                "Versions/Current": "4.6-arm64",
                 "Resources": "Versions/Current/Resources",
                 "R": "Versions/Current/R",
-                "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-                "Versions/4.6-x86_64/Resources/R": "bin/R",
+                "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+                "Versions/4.6-arm64/Resources/R": "bin/R",
             },
             "passed": True,
         }
@@ -475,11 +475,11 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
     manifest = {
         "schema_version": 1,
         "kind": "rc-metastudio-direct-macos-target-build",
-        "target": "macos-x64",
+        "target": "macos-arm64",
         "source_commit": "c" * 40,
         "official_r": {
-            "url": inspector.DIRECT_R_OFFICIAL_URL,
-            "sha256": inspector.DIRECT_R_OFFICIAL_SHA256,
+                "url": inspector.DIRECT_R_OFFICIAL_INPUTS["macos-arm64"]["url"],
+                "sha256": inspector.DIRECT_R_OFFICIAL_INPUTS["macos-arm64"]["sha256"],
         },
         "ppm_snapshot": inspector.DIRECT_R_PPM_SNAPSHOT,
         "ppm_archives": ppm_archives,
@@ -499,7 +499,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             },
         },
     }
-    inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+    inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
     archive = tmp_path / "inputs.zip"
     prefix = "artifact/"
     with zipfile.ZipFile(archive, "w") as bundle:
@@ -512,7 +512,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             prefix=prefix,
             names=bundle.namelist(),
             manifest=manifest,
-            target="macos-x64",
+            target="macos-arm64",
         )
         manifest["inputs"]["adapter_script"]["sha256"] = "0" * 64
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match="differs"):
@@ -521,7 +521,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
         manifest["inputs"]["adapter_script"] = inputs["adapter_script"]
         del manifest["inputs"]["runtime_probe"]
@@ -529,7 +529,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             inspector.MacOSDeploymentInspectionError,
             match="complete hashed input inventory",
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["inputs"]["runtime_probe"] = {
             "sha256": hashlib.sha256(
                 payload_by_relative[
@@ -546,13 +546,13 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         with pytest.raises(
             inspector.MacOSDeploymentInspectionError, match="PPM archive inventory"
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["ppm_archives"] = ppm_archives
         manifest["rcmetar_source"]["archive"]["sha256"] = "0" * 64
         with pytest.raises(
             inspector.MacOSDeploymentInspectionError, match="RCMetaR source provenance"
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["rcmetar_source"]["archive"]["sha256"] = hashlib.sha256(rcmetar_payload).hexdigest()
         adapter_payload = payload_by_relative[
             inspector.DIRECT_BUILD_INPUT_MEMBERS["adapter_script"]
@@ -590,7 +590,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=missing_bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
         substituted = tmp_path / "substituted-post-sign.zip"
         with zipfile.ZipFile(substituted, "w") as substituted_bundle:
@@ -615,7 +615,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=substituted_bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
 
 
@@ -728,3 +728,5 @@ def test_pyinstaller_preserves_miniature_cran_framework_toc():
         / "scripts/verify_macos_r_pyinstaller_toc.py"
     )
     subprocess.run([sys.executable, str(script)], check=True)
+
+

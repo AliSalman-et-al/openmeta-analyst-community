@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from rc_metastudio.qt6_macos_feasibility import is_macho_candidate
+from scripts.qt6_macos_feasibility_impl import is_macho_candidate
 
 
 SYSTEM_ROOTS = ("/usr/lib/", "/System/Library/")
@@ -681,3 +681,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

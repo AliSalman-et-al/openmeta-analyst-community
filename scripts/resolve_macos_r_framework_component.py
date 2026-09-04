@@ -9,7 +9,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 
-IDENTIFIER = "org.R-project.x86_64.R.fw.pkg"
+IDENTIFIER = "org.R-project.arm64.R.fw.pkg"
 INSTALL_LOCATION = "/Library/Frameworks"
 LOCKED_VERSION = "4.6.1"
 MAX_PACKAGE_INFO_FILES = 128

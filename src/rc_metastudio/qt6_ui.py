@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import sys
 
-from rc_metastudio.qt6_build import CANONICAL_FORMS
+from rc_metastudio.ui_form_manifest import CANONICAL_FORMS
 
 
 BUILD_ROOT_ENV = "RCMS_QT6_BUILD_ROOT"

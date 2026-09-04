@@ -11,7 +11,8 @@ import tomllib
 
 import pytest
 
-from rc_metastudio import qt6_build, qt6_resources
+from scripts import qt6_build_impl as qt6_build
+from rc_metastudio import qt6_resources
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -162,7 +163,7 @@ def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(
     )
 
     digest = hashlib.sha256(payload).hexdigest()
-    with pytest.raises(RuntimeError, match="architecture mismatch"):
+    with pytest.raises(RuntimeError, match="invalid architecture slices"):
         qt6_build.validate_rcc(candidate, expected_digest=digest)
 
 
@@ -180,7 +181,7 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
     rcc.write_bytes(b"official macOS rcc fixture")
     responses = {
         "version": "rcc 6.11.1",
-        "architectures": "arm64 x86_64",
+        "architectures": "arm64",
     }
 
     def completed(command, **_kwargs):
@@ -561,3 +562,4 @@ def test_timeout_runner_kills_sigterm_ignoring_grandchild(tmp_path):
     while time.monotonic() < deadline and not marker.exists():
         time.sleep(0.05)
     assert not marker.exists()
+

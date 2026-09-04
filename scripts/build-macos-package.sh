@@ -734,11 +734,11 @@ Path(sys.argv[1]).write_text(json.dumps({
     "system": "Darwin",
     "machine": __import__("platform").machine(),
     "aliases": {
-        "Versions/Current": "4.6-x86_64",
+        "Versions/Current": "4.6-arm64",
         "Resources": "Versions/Current/Resources",
         "R": "Versions/Current/R",
-        "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-        "Versions/4.6-x86_64/Resources/R": "bin/R",
+        "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+        "Versions/4.6-arm64/Resources/R": "bin/R",
     },
     "passed": True,
 }, indent=2, sort_keys=True) + "\n", encoding="utf-8")

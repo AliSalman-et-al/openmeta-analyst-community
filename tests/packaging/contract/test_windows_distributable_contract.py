@@ -702,7 +702,7 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
 
 
 def test_generated_ui_collection_matches_the_canonical_package_manifest(tmp_path):
-    from rc_metastudio.qt6_build import CANONICAL_FORMS
+    from scripts.qt6_build_impl import CANONICAL_FORMS
 
     build_root = tmp_path / "qt6"
     generated_root = build_root / "generated"
@@ -1982,3 +1982,4 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             inspector.inspect_archive(
                 bad_archive, archive_root_name=root, embedded_files=embedded
             )
+

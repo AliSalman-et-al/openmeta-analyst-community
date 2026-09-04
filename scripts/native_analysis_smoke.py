@@ -64,12 +64,11 @@ def _install_backend_test_double(
 def main() -> int:
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
-    from rc_metastudio import r_backend, r_bridge
-
-    backend_fake = r_backend.make_test_backend()
-    for name in dir(backend_fake):
-        if not name.startswith("_"):
-            setattr(r_bridge, name, getattr(backend_fake, name))
+    from scripts.local_r_test_backend import create
+    backend_fake = create()
+    from rc_metastudio import r_bridge
+    for name, implementation in vars(backend_fake).items():
+        setattr(r_bridge, name, implementation)
     _phase("backend-installed")
     from rc_metastudio import app_error_handler, analysis_setup_dialog, progress_dialog
 

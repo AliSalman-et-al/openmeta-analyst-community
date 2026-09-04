@@ -1494,7 +1494,7 @@ def start_shell_failure_smoke(stage):
 
 def start_adaptive_layout_evidence(output_dir, sample_path):
     """Run the packaged native adaptive-layout evidence workflow."""
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     adaptive_layout_evidence.configure_isolated_evidence_settings(output_dir)
     app, meta = start_automation()
@@ -1884,3 +1884,5 @@ def _force_table_paint(app, meta):
     view.horizontalHeader().grab()
     view.verticalHeader().grab()
     app.processEvents()
+
+

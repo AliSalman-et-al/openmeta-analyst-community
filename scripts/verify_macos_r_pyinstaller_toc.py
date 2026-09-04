@@ -18,11 +18,11 @@ from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[1]
 ALIASES = {
-    "Versions/Current": "4.6-x86_64",
+    "Versions/Current": "4.6-arm64",
     "Resources": "Versions/Current/Resources",
     "R": "Versions/Current/R",
-    "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-    "Versions/4.6-x86_64/Resources/R": "bin/R",
+    "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+    "Versions/4.6-arm64/Resources/R": "bin/R",
 }
 
 
@@ -46,7 +46,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="rcms-r-toc-") as raw:
         work = Path(raw)
         framework = work / "source/R.framework"
-        resources = framework / "Versions/4.6-x86_64/Resources"
+        resources = framework / "Versions/4.6-arm64/Resources"
         (resources / "lib").mkdir(parents=True)
         (resources / "bin").mkdir()
         (resources / "lib/libR.dylib").write_bytes(b"fixture-libR\n")
@@ -78,9 +78,9 @@ def main() -> int:
                     f"a=Analysis([{str(entry)!r}], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], hooksconfig={{}}, runtime_hooks=[], excludes=[], noarchive=False, optimize=0)",
                     "a.datas.extend((e['destination'], e['source'], e['type']) for e in entries)",
                     "pyz=PYZ(a.pure)",
-                    "exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Fixture',console=True,target_arch='x86_64',codesign_identity=None,entitlements_file=None)",
+                    "exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Fixture',console=True,target_arch='arm64',codesign_identity=None,entitlements_file=None)",
                     "coll=COLLECT(exe,a.binaries,a.datas,name='Fixture')",
-                    "app=BUNDLE(coll,name='Fixture.app',bundle_identifier='org.rcms.fixture',target_arch='x86_64',codesign_identity=None,entitlements_file=None)",
+                    "app=BUNDLE(coll,name='Fixture.app',bundle_identifier='org.rcms.fixture',target_arch='arm64',codesign_identity=None,entitlements_file=None)",
                 )
             )
             + "\n",
@@ -111,7 +111,7 @@ def main() -> int:
         for relative in ALIASES:
             (bundled / relative).resolve(strict=True).relative_to(bundled.resolve())
         lib_r = list((work / "dist/Fixture.app").rglob("libR.dylib"))
-        expected = bundled / "Versions/4.6-x86_64/Resources/lib/libR.dylib"
+        expected = bundled / "Versions/4.6-arm64/Resources/lib/libR.dylib"
         if len(lib_r) != 1 or lib_r[0] != expected:
             raise RuntimeError(
                 f"PyInstaller produced a duplicate/cross-topology libR: {lib_r}"

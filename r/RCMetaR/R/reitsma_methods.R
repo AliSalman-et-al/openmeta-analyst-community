@@ -878,7 +878,10 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
     fit.ml <- rcmetar.reitsma.require.value(fit.ml.capture, "Reitsma full ML likelihood-ratio fit")
     warnings <- c(warnings, rcmetar.reitsma.warning.messages(fit.ml.capture, "Full ML likelihood-ratio fit: "))
     intercept.data <- data
-    intercept.formula <- stats::as.formula("cbind(tsens, tfpr) ~ 1")
+    intercept.formula <- stats::reformulate(
+        termlabels=NULL,
+        response="cbind(tsens, tfpr)"
+    )
     reduced.ml.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
         data=intercept.data, formula=intercept.formula, correction=adjust,
         correction.control=control, method="ml"))

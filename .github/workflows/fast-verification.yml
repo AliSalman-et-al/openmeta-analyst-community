@@ -412,8 +412,7 @@ jobs:
         run: |
           uv run pytest -q \
             tests/packaging/contract/test_macos_embedded_r_adapter_behavior.py::test_pyinstaller_preserves_miniature_cran_framework_toc \
-            tests/packaging/contract/test_macos_x64_distributable_contract.py::test_macos_r_relocator_enforces_private_root_before_mutation_and_is_idempotent \
-            tests/packaging/contract/test_macos_x64_distributable_contract.py::test_bounded_process_kills_stubborn_grandchild
+            tests/packaging/contract/test_macos_native_pipeline_contract.py
 
       - name: Prune uv cache
         if: ${{ always() }}
@@ -489,3 +488,4 @@ jobs:
             exit 1
           fi
           echo "Required classified Qt6 verification passed."
+
