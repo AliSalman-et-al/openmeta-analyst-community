@@ -1080,7 +1080,7 @@ def _execute_versioned_requests(
             "rcmetar.run.diagnostic.analyses",
             _r_object_from_symbol(diagnostic_data_name),
             **{"request.list": request_list},
-            version=1,
+            **{"request.version": 1},
         )
     except RRuntimeError as error:
         raise DiagnosticExecutionError(str(error)) from error

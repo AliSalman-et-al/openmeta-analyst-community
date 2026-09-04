@@ -628,8 +628,8 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
     result
 }
 
-rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, params.list=NULL, workflow="standard", selected.cov=NULL, version=1, request.list=NULL) {
-    if (length(version) != 1 || !identical(as.integer(version), 1L)) {
+rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, params.list=NULL, workflow="standard", selected.cov=NULL, request.version=1, request.list=NULL) {
+    if (length(request.version) != 1 || !identical(as.integer(request.version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
     }
     if (!("DiagnosticData" %in% class(diagnostic.data))) {
