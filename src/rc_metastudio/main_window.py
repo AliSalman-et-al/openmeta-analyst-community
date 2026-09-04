@@ -887,7 +887,15 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
-        self.workspace_is_dirty = True
+        if self.model.dataset.get_outcome_names():
+            document = _document_from_model(self.model)
+            if self.workspace.document is None:
+                self.workspace.new(document)
+            elif document != self.workspace.document:
+                self.workspace.replace(document)
+            self.workspace_is_dirty = self.workspace.is_dirty
+        else:
+            self.workspace_is_dirty = True
 
     def record_workspace_change(self, before, after):
         """Publish one adapter edit as one immutable workspace change."""
