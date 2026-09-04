@@ -412,7 +412,24 @@ rcmetar.diagnostic.study.effects <- function(tp, fn, fp, tn, metrics=c("Spec", "
     effects
 }
 
-rcmetar.regenerate.plot.data <- function(om.data, res, params) {
+.rcmetar.regenerate.reitsma.coefficient <- function(res, params) {
+    coefficients <- summary(
+        res, level=as.numeric(params$conf.level %||% 95) / 100)$coefficients
+    specificity <- identical(
+        as.character(params$reitsma.coefficient.scale), "Specificity")
+    selected <- coefficients[
+        grepl(if (specificity) "tfpr" else "tsens", rownames(coefficients), fixed=TRUE),
+        , drop=FALSE]
+    selected <- rcmetar.reitsma.coefficient.table(
+        selected, specificity=specificity)
+    coding <- params$reitsma.moderator.coding %||% list()
+    selected <- rcmetar.reitsma.restore.coefficient.labels(selected, coding)
+    selected <- rcmetar.reitsma.add.reference.rows(selected, coding)
+    rcmetar.reitsma.coefficient.bundle(
+        selected, as.character(params$reitsma.coefficient.scale), params)
+}
+
+.rcmetar.regenerate.reitsma.plot.data <- function(om.data, res, params) {
     if (is.list(params) && is.list(params$reitsma.coefficient.geometry)) {
         bundle <- params$reitsma.coefficient.geometry
         bundle$params <- params
@@ -422,17 +439,7 @@ rcmetar.regenerate.plot.data <- function(om.data, res, params) {
         return(rcmetar.reitsma.apply.saved.style(params$reitsma.sroc.geometry, params))
     }
     if (is.list(params) && !is.null(params$reitsma.coefficient.scale) && inherits(res, "reitsma")) {
-        coefficients <- summary(res, level=as.numeric(params$conf.level %||% 95) / 100)$coefficients
-        specificity <- identical(as.character(params$reitsma.coefficient.scale), "Specificity")
-        selected <- coefficients[grepl(if (specificity) "tfpr" else "tsens", rownames(coefficients), fixed=TRUE),,drop=FALSE]
-        selected <- rcmetar.reitsma.coefficient.table(selected, specificity=specificity)
-        selected <- rcmetar.reitsma.restore.coefficient.labels(
-            selected, params$reitsma.moderator.coding %||% list()
-        )
-        selected <- rcmetar.reitsma.add.reference.rows(
-            selected, params$reitsma.moderator.coding %||% list()
-        )
-        return(rcmetar.reitsma.coefficient.bundle(selected, as.character(params$reitsma.coefficient.scale), params))
+        return(.rcmetar.regenerate.reitsma.coefficient(res, params))
     }
     if (inherits(res, "reitsma")) {
         level <- as.numeric(params$conf.level %||% 95) / 100
@@ -440,6 +447,10 @@ rcmetar.regenerate.plot.data <- function(om.data, res, params) {
                                          extrapolate=isTRUE(params$fp_extrapolate %||% params$sroc_extrapolate %||% FALSE),
                                          params=params))
     }
+    NULL
+}
+
+.rcmetar.regenerate.sequential.plot.data <- function(om.data, res, params) {
     if (inherits(res, "rcmetar_forest_regeneration_state")) {
         res <- rcmetar.validate.forest.regeneration.state(res)
         variant <- as.character(res$variant)
@@ -454,6 +465,14 @@ rcmetar.regenerate.plot.data <- function(om.data, res, params) {
             ))
         }
     }
+    NULL
+}
+
+rcmetar.regenerate.plot.data <- function(om.data, res, params) {
+    reitsma <- .rcmetar.regenerate.reitsma.plot.data(om.data, res, params)
+    if (!is.null(reitsma)) return(reitsma)
+    sequential <- .rcmetar.regenerate.sequential.plot.data(om.data, res, params)
+    if (!is.null(sequential)) return(sequential)
     data.type <- .rcmetar.data.type(om.data)
     switch(
         data.type,
