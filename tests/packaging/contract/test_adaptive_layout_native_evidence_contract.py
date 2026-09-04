@@ -345,4 +345,4 @@ def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
 
     assert '"--automation-native-smoke"' in launch
     assert "start_automation_smoke" in launch
-    assert "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG" in launch
+    assert "adaptive_layout" not in launch
