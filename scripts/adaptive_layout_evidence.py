@@ -106,6 +106,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
     results = results_window.ResultsWindow(
         parse_analysis_result(
             {
+                "version": 1,
                 "texts": {
                     "Summary": (
                         "Native adaptive-layout package evidence\n\n"
@@ -123,6 +124,22 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
                         "composition": "single",
                     }
                 },
+                "sections": [
+                    {
+                        "id": "adaptive.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "adaptive.aspect-ratio-plot",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Aspect-Ratio Plot",
+                        "source_key": "Aspect-Ratio Plot",
+                    },
+                ],
             }
         ),
         parent=main_window,
