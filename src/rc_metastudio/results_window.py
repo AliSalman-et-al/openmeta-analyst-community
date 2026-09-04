@@ -4,10 +4,7 @@
 
 import gzip
 import re
-import shutil
-import tempfile
 from collections import namedtuple
-from pathlib import Path
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import (
     QByteArray,
@@ -60,6 +57,7 @@ from rc_metastudio.analysis_results import (
 )
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 from rc_metastudio.plot_editor_dialog import EditPlotDialog
+from rc_metastudio.plot_service import PlotService
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 from rc_metastudio.settings import (
     restore_results_window_state,
@@ -276,6 +274,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.buffer_size = 2
         self.borders = []
         self._active_text_context_menu = None
+        self.plot_service = PlotService()
 
         self.nav_tree.itemClicked.connect(
             app_error_handler.safe_slot(self.item_clicked, parent=self)
@@ -885,10 +884,8 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self._edit_sroc_plot(artifact, plot_item)
 
     def _edit_sroc_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self._plots().load_params(artifact.params_path)
+        if plot_params is None:
             return
         dialog = EditPlotDialog(
             plot_params, artifact.image_path, parent=self, plot_type="sroc"
@@ -904,21 +901,17 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_sroc_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("fp_outpath") or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self._plots().apply_edits(
+            regenerator="sroc",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_plot_data()
-        r_bridge.generate_sroc_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _edit_funnel_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self._plots().load_params(artifact.params_path)
+        if plot_params is None:
             return
         dialog = FunnelPlotEditorDialog(
             plot_params, artifact.image_path, parent=self, plot_type=artifact.plot_kind
@@ -934,64 +927,26 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_funnel_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("funnel.outpath") or artifact.image_path
-        target_path = Path(outpath)
-        if target_path.suffix.lower() == ".svgz":
+        if str(outpath).lower().endswith(".svgz"):
             raise ValueError(
                 "SVGZ output is not supported when editing funnel plots; use SVG instead."
             )
-        transaction_dir = Path(
-            tempfile.mkdtemp(prefix=".rcms-funnel-", dir=str(target_path.parent))
-        )
-        temporary_base = transaction_dir / "plot"
-        temporary_output = transaction_dir / ("render" + (target_path.suffix or ".png"))
-        persisted_params = Path("%s.params" % artifact.params_path)
-        persisted_backup = transaction_dir / "params.backup"
-        had_persisted_params = persisted_params.exists()
         try:
-            for suffix in ("data", "res"):
-                source = Path("%s.%s" % (artifact.params_path, suffix))
-                shutil.copyfile(source, "%s.%s" % (temporary_base, suffix))
-            r_bridge.update_plot_params(
-                updated_params,
-                plot_params_name="params",
-                write_them_out=True,
-                outpath="%s.params" % temporary_base,
+            self._plots().apply_edits(
+                regenerator="funnel",
+                params_path=artifact.params_path,
+                updated_params=updated_params,
+                output_path=outpath,
             )
-            if had_persisted_params:
-                shutil.copyfile(persisted_params, persisted_backup)
-            r_bridge.regenerate_small_study_effects_funnel(
-                str(temporary_base), output_path=str(temporary_output)
-            )
-            r_bridge.update_plot_params(
-                updated_params,
-                plot_params_name="params",
-                write_them_out=True,
-                outpath=str(persisted_params),
-            )
-            os.replace(str(temporary_output), str(target_path))
         except Exception:
             dialog.mark_commit_failed()
-            if had_persisted_params and persisted_backup.exists():
-                try:
-                    shutil.copyfile(persisted_backup, persisted_params)
-                except Exception:
-                    pass
-            elif not had_persisted_params and persisted_params.exists():
-                try:
-                    persisted_params.unlink()
-                except OSError:
-                    pass
             raise
-        finally:
-            shutil.rmtree(transaction_dir, ignore_errors=True)
         self._refresh_plot_item(plot_item, artifact, outpath)
         dialog.mark_commit_succeeded()
 
     def _edit_forest_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self._plots().load_params(artifact.params_path)
+        if plot_params is None:
             return
 
         dialog = EditPlotDialog(plot_params, artifact.image_path, parent=self)
@@ -1004,10 +959,8 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         dialog.exec()
 
     def edit_regression_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self._plots().load_params(artifact.params_path)
+        if plot_params is None:
             return
 
         dialog = EditPlotDialog(
@@ -1024,27 +977,23 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_regression_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["bp_outpath"] or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self._plots().apply_edits(
+            regenerator="regression",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_regression_plot_data()
-        r_bridge.generate_reg_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _apply_forest_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self._plots().apply_edits(
+            regenerator="forest",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_plot_data()
-        r_bridge.generate_forest_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
 
         self._refresh_plot_item(plot_item, artifact, outpath)
 
@@ -1106,15 +1055,11 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 file_path = _path_with_export_extension(
                     file_path, export_format, allow_svgz=allow_svgz
                 )
-                if regenerator == "funnel":
-                    r_bridge.load_vars_for_plot(artifact.params_path)
-                else:
-                    # Loading the artifact exposes its conventional ``plot.data`` object.
-                    r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
-                function_name = plot_capabilities.regenerator_name(regenerator)
-                if function_name is None:
-                    raise ValueError("Plot is not regeneratable: %s" % artifact.title)
-                getattr(r_bridge, function_name)(file_path)
+                self._plots().export(
+                    regenerator=regenerator,
+                    params_path=artifact.params_path,
+                    output_path=file_path,
+                )
         else:
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
@@ -1130,6 +1075,9 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
     def position(self):
         return QPointF(float(self.x_coord), float(self.y_coord))
+
+    def _plots(self) -> PlotService:
+        return self.__dict__.get("plot_service") or PlotService()
 
     def _viewport_width(self) -> int:
         viewport = self.graphics_view.viewport()
