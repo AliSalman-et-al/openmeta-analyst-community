@@ -664,20 +664,14 @@ rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, par
          warnings=warnings)
 }
 
-diagnostic.reitsma <- function(diagnostic.data, params) {
-    if (!requireNamespace("mada", quietly=TRUE)) stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
-    if (as.character(packageVersion("mada")) != "0.5.12") stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
-    prepared <- rcmetar.reitsma.prepare(diagnostic.data, params)
+rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
+    diagnostic.data <- prepared$data
     params <- prepared$params
     level <- prepared$level
     digits <- prepared$digits
     method <- prepared$method
     adjust <- prepared$adjust
     policy <- prepared$policy
-    control <- prepared$control
-    counts <- prepared$counts
-    fitted <- rcmetar.reitsma.fit(prepared)
-    fit.capture <- fitted$capture
     fit.warnings <- fitted$warnings
     fit <- fitted$fit
     section.warnings <- character()
@@ -828,6 +822,23 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     list(images=images, image_order=names(images), plot_names=plot.names, plot_params_paths=plot.paths,
          plot_capabilities=capabilities, Summary=summary,
          References=rcmetar.unique.references(c(rcmetar.method.references("reitsma"), rcmetar.method.references("rutter.gatsonis"))))
+}
+
+rcmetar.reitsma.require.package <- function() {
+    if (!requireNamespace("mada", quietly=TRUE)) {
+        stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
+    }
+    if (as.character(packageVersion("mada")) != "0.5.12") {
+        stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
+    }
+    invisible(TRUE)
+}
+
+diagnostic.reitsma <- function(diagnostic.data, params) {
+    rcmetar.reitsma.require.package()
+    prepared <- rcmetar.reitsma.prepare(diagnostic.data, params)
+    fitted <- rcmetar.reitsma.fit(prepared)
+    rcmetar.reitsma.extract.standard(prepared, fitted)
 }
 
 diagnostic.reitsma.parameters <- function() {

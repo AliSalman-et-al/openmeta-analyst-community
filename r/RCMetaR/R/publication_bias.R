@@ -235,13 +235,11 @@
     selected
 }
 
-publication.bias.effects <- function(om.data, params) {
-    metric <- as.character(params$metric %||% "MD")
-    confidence.level <- .small.study.confidence.level(params)
+.small.study.fit.report <- function(om.data, params, prepared) {
+    metric <- prepared$metric
+    confidence.level <- prepared$confidence.level
     meta.level <- .small.study.meta.level(confidence.level)
-    diagnostic <- is(om.data, "DiagnosticData") && metric == "DOR"
-    if (diagnostic) params$funnels <- "deeks"
-    prepared <- .small.study.prepare(om.data, params)
+    diagnostic <- prepared$diagnostic
     metric <- prepared$metric
     confidence.level <- prepared$confidence.level
     diagnostic <- prepared$diagnostic
@@ -494,6 +492,11 @@ publication.bias.effects <- function(om.data, params) {
     plots$failures <- NULL
     output <- c(output, plots)
     output
+}
+
+publication.bias.effects <- function(om.data, params) {
+    prepared <- .small.study.prepare(om.data, params)
+    .small.study.fit.report(om.data, prepared$params, prepared)
 }
 
 .small.study.native.model <- function(om.data, params, metric, keep, y, se) {
