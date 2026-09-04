@@ -66,17 +66,22 @@ def _numeric(value: object, operation: str) -> Numeric:
 def _scale_value(value: object, operation: str) -> ScaleValue:
     if value is None:
         return None
+    if isinstance(value, (list, tuple)):
+        return _scale_sequence(value, operation)
+    return _scale_number(value, operation)
+
+
+def _scale_number(value: object, operation: str) -> Numeric:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return _numeric(value, operation)
-    if isinstance(value, list):
-        return [
-            _numeric(item, operation) if item is not None else None for item in value
-        ]
-    if isinstance(value, tuple):
-        return tuple(
-            _numeric(item, operation) if item is not None else None for item in value
-        )
     raise _boundary_error(operation, "expected a number, numeric sequence, or null")
+
+
+def _scale_sequence(value: Sequence[object], operation: str) -> ScaleValue:
+    scaled = tuple(
+        _numeric(item, operation) if item is not None else None for item in value
+    )
+    return scaled if isinstance(value, tuple) else list(scaled)
 
 
 def _effect_data(value: object, operation: str) -> EffectData:
@@ -140,43 +145,84 @@ def _continuous_result(value: object, operation: str) -> ContinuousImputationRes
 
 def _pre_post_result(value: object, operation: str) -> PrePostImputationResult:
     raw = _mapping(value, operation)
-    unknown = set(raw) - {"succeeded", "output", "pre", "post", "comment"}
-    if unknown:
-        raise _boundary_error(operation, f"unexpected fields: {sorted(unknown)}")
+    _check_result_fields(raw, {"succeeded", "output", "pre", "post", "comment"}, operation)
     succeeded = raw.get("succeeded")
     if type(succeeded) is not bool:
         raise _boundary_error(operation, "succeeded must be boolean")
     result: PrePostImputationResult = {"succeeded": succeeded}
-    for field in ("output", "pre", "post"):
-        if field in raw:
-            result[field] = _continuous_values(raw[field], operation)
-    if "comment" in raw:
-        comment = raw["comment"]
-        if not isinstance(comment, str):
-            raise _boundary_error(operation, "comment must be text")
-        result["comment"] = comment
-    if succeeded and not {"output", "pre", "post"}.issubset(result):
-        raise _boundary_error(operation, "succeeded results require output, pre, and post")
+    result.update(_optional_continuous_fields(raw, ("output", "pre", "post"), operation))
+    result.update(_optional_comment(raw, operation))
+    _require_success_fields(
+        succeeded,
+        result,
+        {"output", "pre", "post"},
+        operation,
+        "succeeded results require output, pre, and post",
+    )
     return result
 
 
 def _back_calculation_result(value: object, operation: str) -> BackCalculationResult:
-    result: dict[str, BackCalculationValue] = {}
-    for key, item in _mapping(value, operation).items():
-        if isinstance(item, (list, tuple)):
-            result[key] = tuple(
-                _numeric(part, operation) if part is not None else None
-                for part in item
-            )
-        elif item is None:
-            result[key] = None
-        elif type(item) is bool:
-            if key != "FAIL" or not item:
-                raise _boundary_error(operation, "boolean values are only valid for FAIL")
-            result[key] = item
-        else:
-            result[key] = _numeric(item, operation)
-    return result
+    return {
+        key: _back_calculation_item(key, item, operation)
+        for key, item in _mapping(value, operation).items()
+    }
+
+
+def _check_result_fields(
+    raw: Mapping[str, object], allowed: set[str], operation: str
+) -> None:
+    unknown = set(raw) - allowed
+    if unknown:
+        raise _boundary_error(operation, f"unexpected fields: {sorted(unknown)}")
+
+
+def _optional_continuous_fields(
+    raw: Mapping[str, object], fields: tuple[str, ...], operation: str
+) -> dict[str, ContinuousValues]:
+    return {
+        field: _continuous_values(raw[field], operation)
+        for field in fields
+        if field in raw
+    }
+
+
+def _optional_comment(
+    raw: Mapping[str, object], operation: str
+) -> dict[str, str]:
+    if "comment" not in raw:
+        return {}
+    comment = raw["comment"]
+    if not isinstance(comment, str):
+        raise _boundary_error(operation, "comment must be text")
+    return {"comment": comment}
+
+
+def _require_success_fields(
+    succeeded: bool,
+    result: Mapping[str, object],
+    required: set[str],
+    operation: str,
+    detail: str,
+) -> None:
+    if succeeded and not required.issubset(result):
+        raise _boundary_error(operation, detail)
+
+
+def _back_calculation_item(
+    key: str, item: object, operation: str
+) -> BackCalculationValue:
+    if isinstance(item, (list, tuple)):
+        return tuple(
+            _numeric(part, operation) if part is not None else None for part in item
+        )
+    if item is None:
+        return None
+    if type(item) is bool:
+        if key != "FAIL" or not item:
+            raise _boundary_error(operation, "boolean values are only valid for FAIL")
+        return item
+    return _numeric(item, operation)
 
 
 def _diagnostic_imputation_result(value: object, operation: str) -> DiagnosticImputationResult:

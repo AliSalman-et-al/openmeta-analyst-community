@@ -190,19 +190,50 @@ def load_R_libraries(app, splash=None, phase_callback=None):
     _emit_automation_phase(phase_callback, "r-library:grid:complete")
 
 
-def start():
-    qt6_resources.ensure_application_resources()
-    app_error_handler.install_global_exception_handler()
-    pid_path = os.environ.get("RCMS_AUTOMATION_PID_FILE")
-    startup_argv = _resolve_startup_argv()
-    pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
+def _write_automation_pid(startup_argv):
+    pid_path = _argument_value(startup_argv, "--automation-pid-file") or os.environ.get(
+        "RCMS_AUTOMATION_PID_FILE"
+    )
     if pid_path:
         Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
-    if (
+
+
+def _is_automation_command(startup_argv):
+    return (
         len(startup_argv) > 1
         and startup_argv[1].startswith("--automation-")
         and startup_argv[1] != "--automation-startup-project-smoke"
-    ):
+    )
+
+
+def _open_startup_project(app, meta, project_path, startup_argv):
+    opened = meta.open(project_path)
+    smoke_requested = (
+        os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
+        or "--automation-startup-project-smoke" in startup_argv
+    )
+    if not smoke_requested:
+        return False, None
+
+    from rc_metastudio.automation import assert_opened_project_for_startup_smoke
+
+    return True, assert_opened_project_for_startup_smoke(
+        app,
+        meta,
+        project_path,
+        opened,
+        completion_marker=_argument_value(
+            startup_argv, "--automation-startup-completion-marker"
+        ),
+    )
+
+
+def start():
+    qt6_resources.ensure_application_resources()
+    app_error_handler.install_global_exception_handler()
+    startup_argv = _resolve_startup_argv()
+    _write_automation_pid(startup_argv)
+    if _is_automation_command(startup_argv):
         from rc_metastudio import automation
 
         return automation.dispatch(startup_argv)
@@ -214,24 +245,11 @@ def start():
         settings.setup_directories()
         meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
         if startup_project_path:
-            opened = meta.open(startup_project_path)
-            if (
-                os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
-                or "--automation-startup-project-smoke" in startup_argv
-            ):
-                from rc_metastudio.automation import (
-                    assert_opened_project_for_startup_smoke,
-                )
-
-                return assert_opened_project_for_startup_smoke(
-                    app,
-                    meta,
-                    startup_project_path,
-                    opened,
-                    completion_marker=_argument_value(
-                        startup_argv, "--automation-startup-completion-marker"
-                    ),
-                )
+            handled, result = _open_startup_project(
+                app, meta, startup_project_path, startup_argv
+            )
+            if handled:
+                return result
         else:
             if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
                 raise SystemExit(

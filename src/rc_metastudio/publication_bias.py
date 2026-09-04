@@ -289,6 +289,69 @@ def _text_values(value: object, field_name: str) -> tuple[object, ...]:
     raise ValueError(f"{field_name} must be a sequence or scalar text value")
 
 
+_PLOT_WIRE_FIELDS = (
+    ("funnels", "kind"),
+    ("funnel.conf.levels", "confidence_level"),
+    ("funnel.show.reference", "reference_line_visible"),
+    ("funnel.sampling.region.visible", "show_sampling_region"),
+    ("funnel.reverse.se.axis", "reverse_standard_error_axis"),
+    ("funnel.label.policy", "label_policy"),
+    ("funnel.sampling.conf.level", "sampling_confidence_level"),
+    ("funnel.include.tau2", "include_tau2"),
+    ("funnel.point.size", "point_size"),
+    ("funnel.reference.visible", "reference_line_visible"),
+    ("funnel.pooled.overlay.visible", "pooled_overlay_visible"),
+    ("funnel.style", "style"),
+    ("funnel.point.symbol", "point_symbol"),
+    ("funnel.point.color", "point_color"),
+    ("funnel.reference.color", "reference_color"),
+    ("funnel.region.color", "region_color"),
+    ("funnel.background.color", "background_color"),
+)
+
+
+def _plot_wire_value(spec: FunnelPlotSpec, field: str) -> object:
+    value = getattr(spec, field)
+    return value.value if isinstance(value, Enum) else value
+
+
+def _plot_wire_mapping(
+    specs: tuple[FunnelPlotSpec, ...],
+) -> dict[str, object]:
+    result = {
+        wire_name: [_plot_wire_value(spec, field) for spec in specs]
+        for wire_name, field in _PLOT_WIRE_FIELDS
+    }
+    result["funnel.contour.levels"] = [
+        ",".join(format(level, "g") for level in spec.contour_levels)
+        for spec in specs
+    ]
+    return result
+
+
+def _sensitivity_wire_mapping(
+    specs: tuple[SensitivitySpec, ...],
+) -> dict[str, object]:
+    enabled = next((spec for spec in specs if spec.trim_and_fill), None)
+    return {
+        "trim.and.fill": enabled is not None,
+        "trim.and.fill.side": (
+            enabled.side.value if enabled is not None else TrimAndFillSide.AUTO.value
+        ),
+        "trim.and.fill.estimator": (
+            enabled.estimator.value
+            if enabled is not None
+            else TrimAndFillEstimator.L0.value
+        ),
+        "trim.and.fill.model": (
+            enabled.model.value
+            if enabled is not None
+            else TrimAndFillModel.RANDOM.value
+        ),
+        "extrapolation": any(spec.extrapolation for spec in specs),
+    }
+
+
 @dataclass(frozen=True)
 class SmallStudyEffectsRequest:
     """One complete serialized small-study effects execution request."""
@@ -436,74 +499,11 @@ class SmallStudyEffectsRequest:
             "metric": self.metric,
             "conf.level": self.confidence_level,
             "tests": [spec.method.value for spec in self.test_specs],
-            "funnels": [spec.kind.value for spec in self.plot_specs],
-            "funnel.conf.levels": [spec.confidence_level for spec in self.plot_specs],
-            "funnel.show.reference": [
-                spec.reference_line_visible for spec in self.plot_specs
-            ],
-            "funnel.sampling.region.visible": [
-                spec.show_sampling_region for spec in self.plot_specs
-            ],
-            "funnel.reverse.se.axis": [
-                spec.reverse_standard_error_axis for spec in self.plot_specs
-            ],
-            "funnel.label.policy": [
-                spec.label_policy.value for spec in self.plot_specs
-            ],
-            "funnel.sampling.conf.level": [
-                spec.sampling_confidence_level for spec in self.plot_specs
-            ],
-            "funnel.include.tau2": [spec.include_tau2 for spec in self.plot_specs],
-            "funnel.point.size": [spec.point_size for spec in self.plot_specs],
-            "funnel.reference.visible": [
-                spec.reference_line_visible for spec in self.plot_specs
-            ],
-            "funnel.contour.levels": [
-                ",".join(format(level, "g") for level in spec.contour_levels)
-                for spec in self.plot_specs
-            ],
-            "funnel.pooled.overlay.visible": [
-                spec.pooled_overlay_visible for spec in self.plot_specs
-            ],
-            "funnel.style": [spec.style.value for spec in self.plot_specs],
-            "funnel.point.symbol": [spec.point_symbol for spec in self.plot_specs],
-            "funnel.point.color": [spec.point_color for spec in self.plot_specs],
-            "funnel.reference.color": [
-                spec.reference_color for spec in self.plot_specs
-            ],
-            "funnel.region.color": [spec.region_color for spec in self.plot_specs],
-            "funnel.background.color": [
-                spec.background_color for spec in self.plot_specs
-            ],
-            "trim.and.fill": any(spec.trim_and_fill for spec in self.sensitivity_specs),
-            "trim.and.fill.side": next(
-                (
-                    spec.side.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillSide.AUTO.value,
-            ),
-            "trim.and.fill.estimator": next(
-                (
-                    spec.estimator.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillEstimator.L0.value,
-            ),
-            "trim.and.fill.model": next(
-                (
-                    spec.model.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillModel.RANDOM.value,
-            ),
-            "extrapolation": any(spec.extrapolation for spec in self.sensitivity_specs),
-            "pooled.display.model": self.pooled_display.model.value,
-            "pooled.display.tau": self.pooled_display.method_tau,
         }
+        result.update(_plot_wire_mapping(self.plot_specs))
+        result.update(_sensitivity_wire_mapping(self.sensitivity_specs))
+        result["pooled.display.model"] = self.pooled_display.model.value
+        result["pooled.display.tau"] = self.pooled_display.method_tau
         if self.correction_policy is not None:
             result["correction.policy"] = self.correction_policy.value
         return result

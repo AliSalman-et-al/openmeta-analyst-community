@@ -28,6 +28,11 @@ EXPECTED_NATIVE_ARCHITECTURES = {
     "win32": {"amd64", "x86_64"},
     "darwin": {"arm64"},
 }
+EXPECTED_NATIVE_ARCHITECTURE_LABELS = {"win32": "x64", "darwin": "Apple silicon arm64"}
+
+
+def _normalized_platform_value(value, fallback):
+    return str(value or fallback).strip().lower()
 
 
 def _requested_scale_factor():
@@ -52,35 +57,39 @@ def configure_isolated_evidence_settings(output_dir):
 
 def validate_native_platform(platform_plugin=None, system=None, machine=None):
     """Fail closed when a supported-platform run cannot prove native paint."""
-    plugin = (
-        str(platform_plugin or QtGui.QGuiApplication.platformName()).strip().lower()
+    plugin = _normalized_platform_value(
+        platform_plugin, QtGui.QGuiApplication.platformName()
     )
-    host = str(system or sys.platform).strip().lower()
-    architecture = str(machine or platform.machine()).strip().lower()
-    if plugin in NON_NATIVE_PLUGINS:
-        raise RuntimeError(
-            "Adaptive-layout package evidence requires a native Qt platform "
-            "plugin; got %s." % plugin
-        )
+    host = _normalized_platform_value(system, sys.platform)
+    architecture = _normalized_platform_value(machine, platform.machine())
     expected = EXPECTED_NATIVE_PLUGINS.get(host)
-    if expected is None:
-        raise RuntimeError(
+    expected_architectures = EXPECTED_NATIVE_ARCHITECTURES.get(host, ())
+    expected_architecture = EXPECTED_NATIVE_ARCHITECTURE_LABELS.get(host, "")
+    failures = (
+        (
+            plugin in NON_NATIVE_PLUGINS,
+            "Adaptive-layout package evidence requires a native Qt platform "
+            "plugin; got %s." % plugin,
+        ),
+        (
+            expected is None,
             "Adaptive-layout package evidence is release-gated only on Windows "
-            "x64 and Apple silicon macOS; got %s." % host
-        )
-    if plugin != expected:
-        raise RuntimeError(
+            "x64 and Apple silicon macOS; got %s." % host,
+        ),
+        (
+            expected is not None and plugin != expected,
             "Adaptive-layout package evidence expected Qt platform %s on %s; "
-            "got %s." % (expected, host, plugin)
-        )
-    if architecture not in EXPECTED_NATIVE_ARCHITECTURES[host]:
-        expected_architecture = (
-            "x64" if host == "win32" else "Apple silicon arm64"
-        )
-        raise RuntimeError(
+            "got %s." % (expected, host, plugin),
+        ),
+        (
+            bool(expected_architectures) and architecture not in expected_architectures,
             "Adaptive-layout package evidence requires an %s host; got %s."
-            % (expected_architecture, architecture)
-        )
+            % (expected_architecture, architecture),
+        ),
+    )
+    for failed, message in failures:
+        if failed:
+            raise RuntimeError(message)
     return plugin
 
 
