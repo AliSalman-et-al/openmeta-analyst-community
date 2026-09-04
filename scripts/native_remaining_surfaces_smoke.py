@@ -1028,9 +1028,9 @@ def _observe_wizard_actions(
         _delete_window(app, reject_wizard)
 
 
-def _observe_accept_cancel_actions(
+def _observe_accept_action(
     app: QtWidgets.QApplication, factory: SurfaceFactory
-) -> dict[str, object]:
+) -> tuple[bool, bool]:
     accept_dialog = factory()
     if not isinstance(accept_dialog, QtWidgets.QDialog):
         raise RuntimeError("accept surface factory did not return a dialog")
@@ -1053,6 +1053,15 @@ def _observe_accept_cancel_actions(
         accepted_observed = accepted == [True] and not accept_dialog.isVisible()
     finally:
         _delete_window(app, accept_dialog)
+    return default_accept, accepted_observed
+
+
+def _observe_cancel_action(
+    app: QtWidgets.QApplication,
+    factory: SurfaceFactory,
+    accepted_observed: bool,
+    default_accept: bool,
+) -> dict[str, object]:
     reject_dialog = factory()
     if not isinstance(reject_dialog, QtWidgets.QDialog):
         raise RuntimeError("cancel surface factory did not return a dialog")
@@ -1083,6 +1092,13 @@ def _observe_accept_cancel_actions(
         }
     finally:
         _delete_window(app, reject_dialog)
+
+
+def _observe_accept_cancel_actions(
+    app: QtWidgets.QApplication, factory: SurfaceFactory
+) -> dict[str, object]:
+    default_accept, accepted_observed = _observe_accept_action(app, factory)
+    return _observe_cancel_action(app, factory, accepted_observed, default_accept)
 
 
 def _observe_actions(
