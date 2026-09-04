@@ -274,6 +274,9 @@ function Invoke-PackagedAppSmokeTest {
     $exePath = Join-Path $Root "RCMetaStudio.exe"
     $samplePath = Join-Path $Root "sample_projects\amino.rcms"
     $smokeEvidencePath = Join-Path $Root "qualification\packaged-smoke.json"
+    $workflowObservationPath = Join-Path $Root "qualification\workflow-observation.json"
+    $surfaceDirectory = Join-Path $Root "qualification\surface-records"
+    $sampleObservationsPath = Join-Path $Root "qualification\sample-observations.json"
     $smokeLogPath = Join-Path $Root "qualification\packaged-smoke.log"
     $smokeStdoutPath = Join-Path $Root "qualification\packaged-smoke.stdout.log"
     $smokeStderrPath = Join-Path $Root "qualification\packaged-smoke.stderr.log"
@@ -294,7 +297,7 @@ function Invoke-PackagedAppSmokeTest {
     try {
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "API"
-        $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $smokeEvidencePath
+        $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $workflowObservationPath
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
         $env:RCMS_AUTOMATION_HANG_TRACE = $hangTracePath
         $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
@@ -308,8 +311,10 @@ function Invoke-PackagedAppSmokeTest {
 
         foreach ($scale in @("1.25", "1.50", "1.75")) {
             $env:QT_SCALE_FACTOR = $scale
+            $surfacePath = Join-Path $surfaceDirectory ("surface-{0}.json" -f $scale)
+            New-Item -ItemType Directory -Force -Path $surfaceDirectory | Out-Null
             $surfaceExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
-                "--automation-package-surface-smoke", $quotedSmokeEvidencePath, $scale
+                "--automation-package-surface-smoke", ('"{0}"' -f $surfacePath), $scale
             )
             if ($surfaceExitCode -ne 0) {
                 throw "Packaged Qt surface smoke failed at scale $scale with exit code $surfaceExitCode."
@@ -319,6 +324,14 @@ function Invoke-PackagedAppSmokeTest {
         $env:RCMS_STARTUP_PROJECT_SMOKE = "1"
         $startupExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @($quotedSamplePath)
         if ($startupExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $startupExitCode." }
+        & $PythonExe scripts\assemble_packaged_smoke_evidence.py `
+            --workflow-observation $workflowObservationPath `
+            --surface-records $surfaceDirectory `
+            --sample-observations $sampleObservationsPath `
+            --sample amino.rcms --sample-root (Join-Path $Root "sample_projects") `
+            --executable $exePath --runtime-probe $runtimeProbePath `
+            --surface-directory $surfaceDirectory --output $smokeEvidencePath
+        if ($LASTEXITCODE -ne 0) { throw "Packaged evidence assembly failed." }
         & $PythonExe scripts\inspect_windows_deployment.py finalize-smoke `
             --smoke-evidence $smokeEvidencePath --smoke-log $smokeLogPath
         if ($LASTEXITCODE -ne 0) { throw "Packaged smoke finalization failed after clean process exits." }

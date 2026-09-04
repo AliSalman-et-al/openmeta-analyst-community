@@ -40,12 +40,40 @@ def capture_atomic_observations(
     return records
 
 
+def capture_sample_observations(
+    executable: Path, *, sample_root: Path, output: Path
+) -> None:
+    """Open every shipped sample through the executable and record identities."""
+    manifest = json.loads((sample_root / "manifest.json").read_text(encoding="utf-8"))
+    records = []
+    for item in manifest["projects"]:
+        path = sample_root / item["file"]
+        result = subprocess.run(
+            [str(executable), "--automation-native-smoke", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        records.append({
+            "project": path.name,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "semantic_sha256": item["semantic_sha256"],
+            "opened_in_packaged_application": result.returncode == 0,
+        })
+    output.write_text(json.dumps({"passed": all(item["opened_in_packaged_application"] for item in records), "manifest_sha256": hashlib.sha256((sample_root / "manifest.json").read_bytes()).hexdigest(), "projects": records}, indent=2) + "\n", encoding="utf-8")
+
+
 def assemble(
     *, workflow_observation: Path, surface_records: Path, sample_observations: Path,
     sample: str, output: Path,
 ) -> dict:
     observation = json.loads(workflow_observation.read_text(encoding="utf-8"))
-    surfaces = json.loads(surface_records.read_text(encoding="utf-8"))
+    if surface_records.is_dir():
+        surfaces = []
+        for path in sorted(surface_records.glob("surface-*.json")):
+            surfaces.extend(json.loads(path.read_text(encoding="utf-8")).get("scales", []))
+    else:
+        surfaces = json.loads(surface_records.read_text(encoding="utf-8"))
     samples = json.loads(sample_observations.read_text(encoding="utf-8"))
     summary = str(observation["summary"])
     normalized_hash = _sha256(normalize_packaged_summary_identity(summary))
@@ -96,6 +124,7 @@ def main() -> int:
     parser.add_argument("--executable", type=Path)
     parser.add_argument("--runtime-probe", type=Path)
     parser.add_argument("--surface-directory", type=Path)
+    parser.add_argument("--sample-root", type=Path)
     args = parser.parse_args()
     if args.executable:
         if not args.runtime_probe or not args.surface_directory:
@@ -106,6 +135,8 @@ def main() -> int:
             payload = json.loads(record.read_text(encoding="utf-8"))
             combined.extend(payload.get("scales", []))
         args.surface_records.write_text(json.dumps(combined, indent=2) + "\n", encoding="utf-8")
+        if args.sample_root:
+            capture_sample_observations(args.executable, sample_root=args.sample_root, output=args.sample_observations)
     assemble(
         workflow_observation=args.workflow_observation,
         surface_records=args.surface_records,

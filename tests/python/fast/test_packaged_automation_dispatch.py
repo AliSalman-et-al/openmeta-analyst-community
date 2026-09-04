@@ -93,3 +93,19 @@ def test_frozen_hook_contains_no_scenario_or_result_comparison_logic():
     source = Path("src/rc_metastudio/automation.py").read_text(encoding="utf-8")
     for marker in ("locale_variants", "expected_normalized_summary_sha256", "normalize_packaged_summary_identity", "raw_summary_sha256"):
         assert marker not in source
+
+
+def test_package_pipelines_assemble_atomic_observations_before_validation():
+    windows = Path("scripts/build-windows-package.ps1").read_text(encoding="utf-8")
+    macos = Path("scripts/build-macos-package.sh").read_text(encoding="utf-8")
+    for script in (windows, macos):
+        assert "assemble_packaged_smoke_evidence.py" in script
+        assert "workflow-observation" in script
+        assert "sample-observations" in script
+        assert "surface-records" in script
+        assert "--workflow-observation" in script
+        assert "--surface-records" in script
+        assert "--sample-observations" in script
+        assert "--sample-root" in script
+        assert "--executable" in script
+        assert "--output" in script
