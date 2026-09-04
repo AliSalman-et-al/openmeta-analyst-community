@@ -163,7 +163,7 @@ def test_rcc_wrong_architecture_is_rejected_even_with_matching_digest(
     )
 
     digest = hashlib.sha256(payload).hexdigest()
-    with pytest.raises(RuntimeError, match="invalid architecture slices"):
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
         qt6_build.validate_rcc(candidate, expected_digest=digest)
 
 
@@ -203,7 +203,7 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
 
     responses["version"] = "rcc 6.11.1"
     responses["architectures"] = "x86_64"
-    with pytest.raises(RuntimeError, match="architecture mismatch"):
+    with pytest.raises(RuntimeError, match="invalid architecture slices"):
         qt6_build.validate_macos_rcc(rcc)
 
 

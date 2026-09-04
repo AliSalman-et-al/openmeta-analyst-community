@@ -56,7 +56,7 @@ class _TestLoader:
     def load_grid(self) -> None: pass
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Inject a local, explicit test capability at the R boundary."""
     functions = {
@@ -101,9 +101,26 @@ def inject_python_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(r_bridge, name, function, raising=False)
     monkeypatch.setattr(r_bridge, "ro", _TestObjects, raising=False)
     monkeypatch.setattr(r_bridge, "RLibraryLoader", _TestLoader, raising=False)
-    # Legacy test helpers patch the seam object; the application dialogs still
-    # receive CalculatorService and never import this bridge attribute.
-    from rc_metastudio import binary_data_dialog, continuous_data_dialog, diagnostic_data_dialog
 
-    for dialog_module in (binary_data_dialog, continuous_data_dialog, diagnostic_data_dialog):
-        monkeypatch.setattr(dialog_module, "r_bridge", r_bridge, raising=False)
+
+@pytest.fixture
+def inject_calculator_boundary(
+    inject_python_boundary: None,
+) -> None:
+    """Expose the canonical boundary to legacy calculator UI test seams."""
+    from rc_metastudio import (
+        binary_data_dialog,
+        continuous_data_dialog,
+        diagnostic_data_dialog,
+        dataset_table_model,
+        calculator_routines,
+    )
+
+    for module in (
+        binary_data_dialog,
+        continuous_data_dialog,
+        diagnostic_data_dialog,
+        dataset_table_model,
+        calculator_routines,
+    ):
+        module.r_bridge = r_bridge

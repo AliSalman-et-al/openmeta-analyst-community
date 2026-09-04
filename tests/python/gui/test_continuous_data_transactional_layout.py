@@ -7,7 +7,6 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 from rc_metastudio import adaptive_window
 
-pytestmark = pytest.mark.usefixtures("inject_gui_boundary")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

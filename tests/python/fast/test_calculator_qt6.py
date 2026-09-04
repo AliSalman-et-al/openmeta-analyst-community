@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+
+pytestmark = pytest.mark.usefixtures("inject_calculator_boundary")
 from PIL import Image
 from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import (
@@ -559,6 +561,9 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
     form.current_groups = ["Group 1", "Group 2"]
     form.confidence_level = 95.0
     form.analysis_unit = object()
+    from rc_metastudio.calculator_service import CalculatorService
+
+    form.calculator = CalculatorService()
 
     form.simple_table.setItem(0, 0, QTableWidgetItem("10"))
     form.simple_table.setItem(0, 1, QTableWidgetItem("94"))

@@ -8,7 +8,10 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 import pytest
 
-pytestmark = pytest.mark.qsettings
+pytestmark = [
+    pytest.mark.usefixtures("inject_python_boundary"),
+    pytest.mark.qsettings,
+]
 
 
 def test_save_settings_never_constructs_or_syncs_qsettings(monkeypatch):
