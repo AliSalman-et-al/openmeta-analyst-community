@@ -646,6 +646,24 @@ rcmetar.reitsma.fit <- function(prepared) {
          capture=fit.capture)
 }
 
+rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, params) {
+    empty <- list(images=character(), paths=character(), capabilities=list(), warnings=character())
+    if (!isTRUE(params$create.plot %||% TRUE) || is.null(plot.data)) return(empty)
+    path <- as.character(params$fp_outpath %||% params$roc_outpath %||% params$sroc_outpath %||% "./r_tmp/reitsma_sroc.svg")
+    capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.draw(plot.data, path))
+    warnings <- rcmetar.reitsma.operation.messages(capture, "SROC plot")
+    if (is.null(capture$value)) {
+        empty$warnings <- warnings
+        return(empty)
+    }
+    params$fp_outpath <- path
+    params$reitsma.sroc.geometry <- plot.data
+    saved <- save.data(diagnostic.data, fit, params, plot.data)
+    list(images=c(SROC=path), paths=c(SROC=saved),
+         capabilities=list(SROC=.rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)),
+         warnings=warnings)
+}
+
 diagnostic.reitsma <- function(diagnostic.data, params) {
     if (!requireNamespace("mada", quietly=TRUE)) stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
     if (as.character(packageVersion("mada")) != "0.5.12") stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
@@ -697,24 +715,11 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     section.warnings <- c(section.warnings,
         rcmetar.reitsma.operation.messages(plot.capture, "SROC-derived geometry"))
     if (!is.null(plot.data$warnings)) section.warnings <- c(section.warnings, plot.data$warnings)
-    images <- character()
-    plot.paths <- character()
-    capabilities <- list()
-    if (isTRUE(params$create.plot %||% TRUE) && !is.null(plot.data)) {
-        path <- as.character(params$fp_outpath %||% params$roc_outpath %||% params$sroc_outpath %||% "./r_tmp/reitsma_sroc.svg")
-        draw.capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.draw(plot.data, path))
-        section.warnings <- c(section.warnings,
-            rcmetar.reitsma.operation.messages(draw.capture, "SROC plot"))
-        if (is.null(draw.capture$value)) plot.data <- NULL
-    }
-    if (isTRUE(params$create.plot %||% TRUE) && !is.null(plot.data)) {
-        params$fp_outpath <- path
-        params$reitsma.sroc.geometry <- plot.data
-        plot.params.path <- save.data(diagnostic.data, fit, params, plot.data)
-        images[["SROC"]] <- path
-        plot.paths[["SROC"]] <- plot.params.path
-        capabilities[["SROC"]] <- .rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)
-    }
+    rendered <- rcmetar.reitsma.render.standard(plot.data, diagnostic.data, fit, params)
+    images <- rendered$images
+    plot.paths <- rendered$paths
+    capabilities <- rendered$capabilities
+    section.warnings <- c(section.warnings, rendered$warnings)
     # mada's full AUC uses .01 through .99, while its normalized partial AUC
     # uses the observed FPR range clipped to those same endpoints.
     observed.fpr <- fit$freqdata$FP / (fit$freqdata$FP + fit$freqdata$TN)
