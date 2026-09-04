@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, MutableMapping
 from dataclasses import dataclass
 import copy
 from typing import Literal, NewType
@@ -30,6 +31,28 @@ class EffectEstimate:
     lower: float | None
     upper: float | None
     standard_error: float | None = None
+
+
+class _EnteredEffectsView(MutableMapping):
+    """Compatibility mapping that forwards legacy ``effects`` access."""
+
+    def __init__(self, unit: "AnalysisUnit"):
+        self._unit = unit
+
+    def __getitem__(self, key):
+        return self._unit.entered_effects[key]
+
+    def __setitem__(self, key, value):
+        self._unit.entered_effects[key] = value
+
+    def __delitem__(self, key):
+        del self._unit.entered_effects[key]
+
+    def __iter__(self) -> Iterator:
+        return iter(self._unit.entered_effects)
+
+    def __len__(self):
+        return len(self._unit.entered_effects)
 
 
 class AnalysisUnit:
@@ -74,8 +97,7 @@ class AnalysisUnit:
 
         raw_data = raw_data or [[""] * self.raw_data_length for _ in group_names]
 
-        self.effects = {}
-        self.entered_effects = self.effects
+        self.entered_effects = {}
         self.derived_effect_previews = {}
         self.analysis_effects = {}
 
@@ -84,7 +106,7 @@ class AnalysisUnit:
                 meta_globals.BINARY_TWO_ARM_METRICS
                 + meta_globals.BINARY_ONE_ARM_METRICS
             ):
-                self.effects[effect] = {}
+                self.entered_effects[effect] = {}
         elif self.outcome.data_type == CONTINUOUS:
             # Continuous display effects are limited to the implemented mean
             # difference and standardized mean difference metrics.
@@ -92,10 +114,10 @@ class AnalysisUnit:
                 meta_globals.CONTINUOUS_TWO_ARM_METRICS
                 + meta_globals.CONTINUOUS_ONE_ARM_METRICS
             ):
-                self.effects[effect] = {}
+                self.entered_effects[effect] = {}
         elif self.outcome.data_type == DIAGNOSTIC:
             for effect in meta_globals.DIAGNOSTIC_METRICS:
-                self.effects[effect] = {}
+                self.entered_effects[effect] = {}
 
         identities = group_stable_ids or [None] * len(group_names)
         for i, group in enumerate(group_names):
@@ -105,6 +127,21 @@ class AnalysisUnit:
     @property
     def groups_by_id(self):
         return self._groups_by_id
+
+    @property
+    def effects(self):
+        """Compatibility view of manually entered effects.
+
+        New code should select an authority explicitly with
+        :meth:`get_effect_for_source`.  Keeping this read/write view avoids
+        breaking the v1 application model while ensuring calculated previews
+        never appear as entered data.
+        """
+        return _EnteredEffectsView(self)
+
+    @effects.setter
+    def effects(self, value):
+        self.entered_effects = value
 
     @property
     def groups(self):
@@ -141,8 +178,7 @@ class AnalysisUnit:
         for identity, group in tuple(existing_groups.items()):
             if group.name not in candidate.groups:
                 existing_groups.pop(identity)
-        self.effects = copy.deepcopy(candidate.effects)
-        self.entered_effects = self.effects
+        self.entered_effects = copy.deepcopy(candidate.entered_effects)
         self.derived_effect_previews = copy.deepcopy(candidate.derived_effect_previews)
         self.analysis_effects = copy.deepcopy(candidate.analysis_effects)
 
@@ -194,6 +230,18 @@ class AnalysisUnit:
                 "SE": standard_error,
             }
         )
+
+    def _store_for_read(self, effect, group_comparison):
+        """Return the highest-authority value available for this cell."""
+        for store in (
+            self.analysis_effects,
+            self.derived_effect_previews,
+            self.entered_effects,
+        ):
+            entry = store.get(effect, {}).get(group_comparison)
+            if entry and any(value is not None for value in entry.values()):
+                return store
+        return self.entered_effects
 
     def get_effect_for_source(
         self, source: EffectSource, effect: str, group_comparison: str
@@ -248,12 +296,13 @@ class AnalysisUnit:
         if confidence_multiplier is None:
             raise ValueError("Mult must be specified")
 
+        entry = self._store_for_read(effect, group_comparison)[effect][group_comparison]
         if est is None:
-            est = self.effects[effect][group_comparison]["est"]
+            est = entry["est"]
         if lower is None:
-            lower = self.effects[effect][group_comparison]["lower"]
+            lower = entry["lower"]
         if upper is None:
-            upper = self.effects[effect][group_comparison]["upper"]
+            upper = entry["upper"]
 
         if upper is not None and est is not None:
             return (upper - est) / confidence_multiplier
@@ -276,16 +325,24 @@ class AnalysisUnit:
         self.effects[effect][group_comparison]["SE"] = se
 
     def set_display_effect(self, effect, group_comparison, value):
-        self.effects[effect][group_comparison]["display_est"] = value
+        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+            "display_est"
+        ] = value
 
     def set_display_lower(self, effect, group_comparison, lower):
-        self.effects[effect][group_comparison]["display_lower"] = lower
+        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+            "display_lower"
+        ] = lower
 
     def set_display_upper(self, effect, group_comparison, upper):
-        self.effects[effect][group_comparison]["display_upper"] = upper
+        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+            "display_upper"
+        ] = upper
 
     def set_display_se(self, effect, group_comparison, se):
-        self.effects[effect][group_comparison]["display_se"] = se
+        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+            "display_se"
+        ] = se
 
     def calculate_display_effect_and_ci(
         self,
@@ -323,19 +380,29 @@ class AnalysisUnit:
         self.set_display_lower(effect, group_comparison, display_lower)
         self.set_display_upper(effect, group_comparison, display_upper)
         self.set_display_se(effect, group_comparison, display_standard_error)
-        self.effects[effect][group_comparison]["display_conf_level"] = confidence_level
+        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+            "display_conf_level"
+        ] = confidence_level
 
     def get_display_effect(self, effect, group_comparison):
-        return self.effects[effect][group_comparison].get("display_est")
+        return self._store_for_read(effect, group_comparison)[effect][
+            group_comparison
+        ].get("display_est")
 
     def get_display_lower(self, effect, group_comparison):
-        return self.effects[effect][group_comparison].get("display_lower")
+        return self._store_for_read(effect, group_comparison)[effect][
+            group_comparison
+        ].get("display_lower")
 
     def get_display_upper(self, effect, group_comparison):
-        return self.effects[effect][group_comparison].get("display_upper")
+        return self._store_for_read(effect, group_comparison)[effect][
+            group_comparison
+        ].get("display_upper")
 
     def get_display_se(self, effect, group_comparison):
-        return self.effects[effect][group_comparison].get("display_se")
+        return self._store_for_read(effect, group_comparison)[effect][
+            group_comparison
+        ].get("display_se")
 
     def get_display_effect_and_ci(self, effect, group_comparison):
         return (
@@ -356,7 +423,9 @@ class AnalysisUnit:
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
 
-        display_confidence_level = self.effects[effect][group_comparison].get(
+        display_confidence_level = self._store_for_read(effect, group_comparison)[
+            effect
+        ][group_comparison].get(
             "display_conf_level"
         )
         return display_confidence_level is None or not meta_globals.equal_close_enough(
@@ -364,7 +433,9 @@ class AnalysisUnit:
         )
 
     def get_estimate(self, effect, group_comparison):
-        return self.effects[effect][group_comparison].get("est")
+        return self._store_for_read(effect, group_comparison)[effect][
+            group_comparison
+        ].get("est")
 
     def get_lower(self, effect, group_comparison, confidence_multiplier):
         return self._helper_get_upper_lower(
@@ -386,7 +457,9 @@ class AnalysisUnit:
             raise Exception("Boundary must be one of 'upper' or 'lower'")
 
         if self.get_se(effect, group_comparison, confidence_multiplier) is None:
-            return self.effects[effect][group_comparison][boundary]
+            return self._store_for_read(effect, group_comparison)[effect][
+                group_comparison
+            ][boundary]
         est = self.get_estimate(effect, group_comparison)
         se = self.get_se(effect, group_comparison, confidence_multiplier)
         if est is None or se is None:
@@ -398,7 +471,8 @@ class AnalysisUnit:
         )
 
     def get_se(self, effect, group_comparison, confidence_multiplier):
-        standard_error = self.effects[effect][group_comparison].get("SE")
+        entry = self._store_for_read(effect, group_comparison)[effect][group_comparison]
+        standard_error = entry.get("SE")
         if standard_error is not None:
             return standard_error
         return self.calculate_se_if_possible(
@@ -408,19 +482,34 @@ class AnalysisUnit:
     def set_effect_and_ci(
         self, effect, group_comparison, est, lower, upper, confidence_multiplier
     ):
-        self.set_effect(effect, group_comparison, est)
-        self.effects[effect][group_comparison]["lower"] = lower
-        self.effects[effect][group_comparison]["upper"] = upper
-
-        se = self.calculate_se_if_possible(
+        # Raw-data calculations are previews.  They must not overwrite values
+        # explicitly entered by the user or values published by a meta-analysis.
+        self.set_effect_for_source(
+            "derived_preview",
             effect,
             group_comparison,
             est,
             lower,
             upper,
-            confidence_multiplier=confidence_multiplier,
         )
-        self.set_standard_error(effect, group_comparison, se)
+
+        if upper is not None and est is not None:
+            se = (upper - est) / confidence_multiplier
+        elif est is not None and lower is not None:
+            se = (est - lower) / confidence_multiplier
+        elif upper is not None and lower is not None:
+            se = (upper - lower) / (2 * confidence_multiplier)
+        else:
+            se = None
+        self.set_effect_for_source(
+            "derived_preview",
+            effect,
+            group_comparison,
+            est,
+            lower,
+            upper,
+            standard_error=se,
+        )
 
     def get_effect_and_ci(self, effect, group_comparison, confidence_multiplier):
         return (
@@ -436,10 +525,11 @@ class AnalysisUnit:
         )
 
     def get_entered_effect_and_ci(self, effect, group_comparison):
+        entry = self.entered_effects[effect][group_comparison]
         return (
-            self.effects[effect][group_comparison]["est"],
-            self.effects[effect][group_comparison]["lower"],
-            self.effects[effect][group_comparison]["upper"],
+            entry["est"],
+            entry["lower"],
+            entry["upper"],
         )
 
     def get_group_strings(self, effect):
@@ -462,6 +552,18 @@ class AnalysisUnit:
     def remove_group(self, name):
         group = self.groups[name]
         self._groups_by_id.pop(group.stable_id, None)
+        remaining_groups = list(self.groups)
+        removed_keys = {name}
+        for other in remaining_groups:
+            removed_keys.update((f"{name}-{other}", f"{other}-{name}"))
+        for store in (
+            self.entered_effects,
+            self.derived_effect_previews,
+            self.analysis_effects,
+        ):
+            for effect_values in store.values():
+                for key in removed_keys:
+                    effect_values.pop(key, None)
 
     def rename_group(self, old_name, new_name):
         if old_name == new_name:
@@ -476,8 +578,13 @@ class AnalysisUnit:
         replacements = _group_key_replacements(
             original_group_names, old_name, new_name
         )
-        for effect_values in self.effects.values():
-            _rename_effect_keys(effect_values, replacements)
+        for store in (
+            self.entered_effects,
+            self.derived_effect_previews,
+            self.analysis_effects,
+        ):
+            for effect_values in store.values():
+                _rename_effect_keys(effect_values, replacements)
 
     def get_raw_data_for_group(self, group_name):
         return self.groups[group_name].raw_data

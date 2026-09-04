@@ -194,7 +194,7 @@ def has_entered_data(analysis_unit: AnalysisUnit) -> bool:
         for value in group.raw_data
     ) or any(
         value not in EMPTY_VALS
-        for effect_groups in analysis_unit.effects.values()
+        for effect_groups in analysis_unit.entered_effects.values()
         for effect_data in effect_groups.values()
         for value in effect_data.values()
     )

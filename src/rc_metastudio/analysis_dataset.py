@@ -4,6 +4,7 @@
 
 import copy
 import uuid
+from collections.abc import Callable
 
 from rc_metastudio import two_way_dict
 from rc_metastudio.analysis_unit import AnalysisUnit
@@ -463,6 +464,7 @@ class Dataset:
         ordered_list=None,
         directions_to_analysis_unit=None,
         confidence_multiplier=None,
+        convert_to_display_scale: Callable[[object, str, object], object] | None = None,
     ):
         """Compare studies in various ways -- pass the returned function
         to the (built-in) sort function.
@@ -516,7 +518,11 @@ class Dataset:
         elif compare_by == "outcomes":
             if confidence_multiplier is None:
                 raise ValueError("confidence multiplier must be specified")
-            from rc_metastudio import r_bridge
+            # Sorting remains useful in a pure domain context.  UI callers can
+            # inject the display-scale conversion; identity is the safe domain
+            # default and keeps sorting independent of the R bridge.
+            if convert_to_display_scale is None:
+                convert_to_display_scale = lambda value, _effect, _n1: value
 
             def compare_outcomes(study_a, study_b):
                 analysis_unit_a = study_a.get_analysis_unit(outcome_name, follow_up)
@@ -527,21 +533,15 @@ class Dataset:
                 if outcome_type is BINARY:
 
                     def to_display_scale(x):
-                        return r_bridge.binary_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 elif outcome_type is CONTINUOUS:
 
                     def to_display_scale(x):
-                        return r_bridge.continuous_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 elif outcome_type is DIAGNOSTIC:
 
                     def to_display_scale(x):
-                        return r_bridge.diagnostic_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 else:
                     raise ValueError(f"Unsupported outcome type: {outcome_type!r}")
 

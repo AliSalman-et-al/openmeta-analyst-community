@@ -145,7 +145,7 @@ def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
                         }
                         for name, group in sorted(unit.groups.items())
                     ],
-                    "entered_effects": _entered_effects(unit.effects),
+                    "entered_effects": _entered_effects(unit.entered_effects),
                 }
             )
         studies.append(
@@ -371,12 +371,12 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")
                 for comparison, values_value in comparisons.items():
-                    if comparison not in unit.effects[metric]:
+                    if comparison not in unit.entered_effects.get(metric, {}):
                         raise ProjectAdapterError(
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
                     values = _object(values_value, "effect values")
-                    unit.effects[metric][comparison].update(copy.deepcopy(values))
+                    unit.entered_effects[metric][comparison].update(copy.deepcopy(values))
             study.add_analysis_unit(unit)
         dataset.studies.append(study)
     return dataset
