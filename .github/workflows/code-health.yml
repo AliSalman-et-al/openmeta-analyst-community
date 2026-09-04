@@ -25,7 +25,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11.9
-      - run: uv sync --frozen
+      - run: uv venv --python 3.11.9
+      - name: Install code-health analyzers
+        run: >-
+          uv pip install
+          complexipy==7.0.1
+          grimp==3.16
+          radon==6.0.1
       - name: Resolve comparison base
         id: base
         shell: bash
@@ -47,7 +53,7 @@ jobs:
           echo "sha=$base" >> "$GITHUB_OUTPUT"
       - name: Emit stable baseline evidence
         run: >-
-          uv run python scripts/code_health.py
+          uv run --no-sync python scripts/code_health.py
           --base "$STABLE_BASELINE"
           --head "$STABLE_BASELINE"
           --allow-fail
@@ -55,7 +61,7 @@ jobs:
           --report artifacts/code-health/baseline.txt
       - name: Enforce changed-code gates
         run: >-
-          uv run python scripts/code_health.py
+          uv run --no-sync python scripts/code_health.py
           --base "${{ steps.base.outputs.sha }}"
           --head "$GITHUB_SHA"
           --output artifacts/code-health/final.json
