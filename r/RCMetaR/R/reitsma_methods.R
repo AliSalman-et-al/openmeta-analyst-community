@@ -583,9 +583,7 @@ rcmetar.draw.reitsma.coefficient <- function(plot.data, outpath) {
     invisible(outpath)
 }
 
-diagnostic.reitsma <- function(diagnostic.data, params) {
-    if (!requireNamespace("mada", quietly=TRUE)) stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
-    if (as.character(packageVersion("mada")) != "0.5.12") stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
+rcmetar.reitsma.prepare <- function(diagnostic.data, params) {
     params <- .rcmetar.as.params.list(params)
     level <- as.numeric(params$conf.level %||% 95) / 100
     validate.conf.level(level * 100)
@@ -597,15 +595,40 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     policy <- as.character(params$correction.policy %||% "All studies if any zero exists")
     control <- rcmetar.reitsma.correction.control(policy)
     counts <- rcmetar.reitsma.validate.counts(diagnostic.data)
-    if (control == "none" && any(counts$TP == 0 | counts$FN == 0 | counts$FP == 0 | counts$TN == 0)) {
+    if (control == "none" && any(counts$TP == 0 | counts$FN == 0 | counts$FP == 0 | counts$TN == 0))
         stop("Correction policy None cannot fit boundary proportions; choose a correction factor and policy.", call.=FALSE)
-    }
+    list(data=diagnostic.data, params=params, level=level, digits=digits,
+         method=method, adjust=adjust, policy=policy, control=control, counts=counts)
+}
+
+rcmetar.reitsma.fit <- function(prepared) {
     fit.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
-        data=data.frame(TP=counts$TP, FN=counts$FN, FP=counts$FP, TN=counts$TN),
-        correction=adjust, correction.control=control, method=method))
-    fit.warnings <- rcmetar.reitsma.warning.messages(fit.capture, "Reitsma fit: ")
+        data=data.frame(TP=prepared$counts$TP, FN=prepared$counts$FN,
+                        FP=prepared$counts$FP, TN=prepared$counts$TN),
+        correction=prepared$adjust, correction.control=prepared$control,
+        method=prepared$method))
     fit <- rcmetar.reitsma.require.value(fit.capture, "Reitsma fit")
     rcmetar.reitsma.validate.fit(fit)
+    list(fit=fit, warnings=rcmetar.reitsma.warning.messages(fit.capture, "Reitsma fit: "),
+         capture=fit.capture)
+}
+
+diagnostic.reitsma <- function(diagnostic.data, params) {
+    if (!requireNamespace("mada", quietly=TRUE)) stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
+    if (as.character(packageVersion("mada")) != "0.5.12") stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
+    prepared <- rcmetar.reitsma.prepare(diagnostic.data, params)
+    params <- prepared$params
+    level <- prepared$level
+    digits <- prepared$digits
+    method <- prepared$method
+    adjust <- prepared$adjust
+    policy <- prepared$policy
+    control <- prepared$control
+    counts <- prepared$counts
+    fitted <- rcmetar.reitsma.fit(prepared)
+    fit.capture <- fitted$capture
+    fit.warnings <- fitted$warnings
+    fit <- fitted$fit
     section.warnings <- character()
     summary.capture <- rcmetar.reitsma.capture.warnings(summary(fit, level=level))
     sm <- rcmetar.reitsma.require.value(summary.capture, "mada Reitsma summary")

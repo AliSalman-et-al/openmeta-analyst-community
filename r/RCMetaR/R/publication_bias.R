@@ -191,34 +191,65 @@
     rcmetar.unique.references(unlist(lapply(unique(keys), rcmetar.method.references)))
 }
 
+.small.study.prepare <- function(om.data, params) {
+    metric <- as.character(params$metric %||% "MD")
+    confidence.level <- .small.study.confidence.level(params)
+    diagnostic <- is(om.data, "DiagnosticData") && metric == "DOR"
+    if (diagnostic) params$funnels <- "deeks"
+    derived <- .small.study.reconstruct(om.data, metric, params)
+    keep <- is.finite(derived$y) & is.finite(derived$se) & derived$se > 0
+    if (!any(keep)) stop("Small-study effects analysis requires finite effects and standard errors.")
+    y <- derived$y[keep]
+    se <- derived$se[keep]
+    names(y) <- om.data@study.names[keep]
+    prepared.model <- .small.study.prepared.model(y, se, names(y), metric, confidence.level)
+    native.model <- .small.study.native.model(om.data, params, metric, keep, y, se)
+    pooled <- if (metric == "OR") prepared.model else native.model
+    metafor.pooled <- metafor::rma.uni(yi=y, sei=se, method="REML", level=confidence.level)
+    params$reml.tau2 <- pooled$tau2 %||% NA_real_
+    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
+    eligibility$raw.data.available <- isTRUE(derived$raw)
+    list(metric=metric, confidence.level=confidence.level, diagnostic=diagnostic,
+         derived=derived, keep=keep, y=y, se=se, prepared.model=prepared.model,
+         native.model=native.model, pooled=pooled, metafor.pooled=metafor.pooled,
+         eligibility=eligibility, params=params)
+}
+
+.small.study.select.methods <- function(eligibility, params, metric, diagnostic) {
+    selected <- as.character(params$tests %||% character())
+    if (diagnostic) selected <- intersect(selected, "deeks")
+    if (!length(selected)) {
+        primary <- vapply(eligibility$methods,
+                          function(x) identical(x$role, "primary") && isTRUE(x$available),
+                          logical(1))
+        selected <- vapply(eligibility$methods[primary], `[[`, character(1), "method")
+    }
+    selected
+}
+
 publication.bias.effects <- function(om.data, params) {
     metric <- as.character(params$metric %||% "MD")
     confidence.level <- .small.study.confidence.level(params)
     meta.level <- .small.study.meta.level(confidence.level)
     diagnostic <- is(om.data, "DiagnosticData") && metric == "DOR"
     if (diagnostic) params$funnels <- "deeks"
-    derived <- .small.study.reconstruct(om.data, metric, params)
-    y <- derived$y
-    se <- derived$se
-    keep <- is.finite(y) & is.finite(se) & se > 0
-    if (!any(keep)) stop("Small-study effects analysis requires finite effects and standard errors.")
-    y <- y[keep]; se <- se[keep]; names(y) <- om.data@study.names[keep]
-    prepared.model <- .small.study.prepared.model(y, se, names(y), metric, confidence.level)
-    native.model <- .small.study.native.model(om.data, params, metric, keep, y, se)
-    pooled <- if (metric == "OR") prepared.model else native.model
-    metafor.pooled <- metafor::rma.uni(yi=y, sei=se, method="REML", level=confidence.level)
+    prepared <- .small.study.prepare(om.data, params)
+    metric <- prepared$metric
+    confidence.level <- prepared$confidence.level
+    diagnostic <- prepared$diagnostic
+    params <- prepared$params
+    derived <- prepared$derived
+    keep <- prepared$keep
+    y <- prepared$y
+    se <- prepared$se
+    native.model <- prepared$native.model
+    pooled <- prepared$pooled
+    metafor.pooled <- prepared$metafor.pooled
     tau2 <- pooled$tau2 %||% NA_real_
-    params$reml.tau2 <- tau2
-    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
-    eligibility$raw.data.available <- isTRUE(derived$raw)
+    eligibility <- prepared$eligibility
     tests <- list(); failures <- character()
     asd.keep <- which(keep)
-    selected <- as.character(params$tests %||% character())
-    if (diagnostic) selected <- intersect(selected, "deeks")
-    if (!length(selected)) {
-        primary <- vapply(eligibility$methods, function(x) identical(x$role, "primary") && isTRUE(x$available), logical(1))
-        selected <- vapply(eligibility$methods[primary], `[[`, character(1), "method")
-    }
+    selected <- .small.study.select.methods(eligibility, params, metric, diagnostic)
     for (method in selected) {
         tryCatch({
             entry <- eligibility$methods[vapply(eligibility$methods, function(x) identical(x$method, method), logical(1))][[1L]]

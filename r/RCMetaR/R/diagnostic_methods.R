@@ -143,6 +143,50 @@ get.res.for.one.diag.study <- function(diagnostic.data, params){
     res
 }
 
+rcmetar.diagnostic.prepare <- function(diagnostic.data, params) {
+    if (!is(diagnostic.data, "DiagnosticData")) stop("Diagnostic data expected.", call.=FALSE)
+    compute.diag.point.estimates(diagnostic.data, params)
+}
+
+rcmetar.diagnostic.fit <- function(prepared.data, method, params) {
+    if (!is(prepared.data, "DiagnosticData")) stop("Prepared diagnostic data expected.", call.=FALSE)
+    if (!is.character(method) || length(method) != 1L || !nzchar(method))
+        stop("Diagnostic method must be one method name.", call.=FALSE)
+    .rcmetar.call.method(method, prepared.data, params)
+}
+
+rcmetar.diagnostic.extract <- function(fit, params) {
+    if (!is.list(fit)) stop("Diagnostic authority result must be a list.", call.=FALSE)
+    metric <- as.character(params$measure %||% "")
+    summary.title <- paste(diagnostic.summary.metric.name(metric), "Summary", sep=" ")
+    plot.title <- paste(diagnostic.summary.metric.name(metric), "Forest Plot", sep=" ")
+    summary <- if (!is.null(fit$Summary)) stats::setNames(list(fit$Summary), summary.title) else list()
+    images <- if (!is.null(fit$images)) stats::setNames(fit$images, plot.title) else character()
+    plot.paths <- if (!is.null(fit$plot_params_paths)) stats::setNames(fit$plot_params_paths, plot.title) else character()
+    capabilities <- fit$plot_capabilities %||% list()
+    if (length(images) && !length(capabilities)) {
+        capabilities <- stats::setNames(list(.rcmetar.plot.descriptor.for.kind(
+            "forest", has.params=length(plot.paths) > 0)), names(images))
+    }
+    list(summary=summary, images=images, plot.paths=plot.paths,
+         plot.names=fit$plot_names %||% character(),
+         plot.capabilities=capabilities,
+         references=fit$References %||% character(),
+         image.order=fit$image_order %||% names(images))
+}
+
+rcmetar.diagnostic.report <- function(extracted, results, images, image.order,
+                                      plot.names, plot.paths, plot.capabilities,
+                                      references) {
+    list(results=c(results, extracted$summary),
+         images=c(images, extracted$images),
+         image.order=c(image.order, extracted$image.order),
+         plot.names=c(plot.names, extracted$plot.names),
+         plot.params.paths=c(plot.paths, extracted$plot.paths),
+         plot.capabilities=c(plot.capabilities, extracted$plot.capabilities),
+         references=c(references, extracted$references))
+}
+
 multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
 
     results <- list()
@@ -183,25 +227,22 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
 
     if (length(params.list) > 0) {
         for (count in 1:length(params.list)) {
-            prepared_diagnostic_data <- compute.diag.point.estimates(diagnostic.data, params.list[[count]])
-            analysis_result <- .rcmetar.call.method(fnames[count], prepared_diagnostic_data, params.list[[count]])
-            analysis_images <- analysis_result$images
-            names(analysis_images) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
-            images <- c(images, analysis_images)
-            plot.capabilities[[names(analysis_images)[[1]]]] <- .rcmetar.plot.descriptor.for.kind(
-                "forest",
-                has.params=length(analysis_result$plot_params_paths) > 0
-            )
-            image.order <- c(image.order, names(analysis_images))
-            analysis_plot_paths <- analysis_result$plot_params_paths
-            names(analysis_plot_paths) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Forest Plot", sep="")
-            plot.params.paths <- c(plot.params.paths, analysis_plot_paths)
-            plot.names <- c(plot.names, analysis_result$plot_names)
-            analysis_summary <- list("Summary"=analysis_result$Summary)
-            names(analysis_summary) <- paste(diagnostic.summary.metric.name(as.character(params.list[[count]]$measure)), " Summary", sep="")
-
-		    references <- c(references, analysis_result$References)
-			results <- c(results, analysis_summary)
+            prepared_diagnostic_data <- rcmetar.diagnostic.prepare(
+                diagnostic.data, params.list[[count]])
+            analysis_result <- rcmetar.diagnostic.fit(
+                prepared_diagnostic_data, fnames[count], params.list[[count]])
+            extracted <- rcmetar.diagnostic.extract(
+                analysis_result, params.list[[count]])
+            reported <- rcmetar.diagnostic.report(
+                extracted, results, images, image.order, plot.names,
+                plot.params.paths, plot.capabilities, references)
+            results <- reported$results
+            images <- reported$images
+            image.order <- reported$image.order
+            plot.names <- reported$plot.names
+            plot.params.paths <- reported$plot.params.paths
+            plot.capabilities <- reported$plot.capabilities
+            references <- reported$references
         }
     }
 
