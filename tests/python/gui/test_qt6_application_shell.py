@@ -52,7 +52,6 @@ def _close_shell(app: QtWidgets.QApplication, window) -> None:
         window.workspace.new(_document_from_model(window.model))
     elif window.workspace.document is not None:
         window.workspace.mark_saved()
-    window.workspace_is_dirty = False
     window.close()
     app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
@@ -240,7 +239,6 @@ def test_close_cancel_and_failed_save_keep_owned_shell_alive(qapp, monkeypatch):
 
     app, window = automation.start_automation()
     window.workspace.mark_dirty()
-    window.workspace_is_dirty = True
     monkeypatch.setattr(
         window,
         "prompt_to_save_unsaved_data",

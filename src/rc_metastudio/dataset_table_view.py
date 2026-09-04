@@ -52,7 +52,6 @@ if TYPE_CHECKING:
 
 class MainWindowProtocol(Protocol):
     model: "DatasetTableModel"
-    workspace_is_dirty: bool | None
     oneArmMetricMenu: QMenu
     twoArmMetricMenu: QMenu
 

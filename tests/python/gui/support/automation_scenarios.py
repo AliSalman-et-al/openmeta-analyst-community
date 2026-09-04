@@ -259,7 +259,8 @@ def start_automation_smoke(sample_path, require_native_window=False):
                 # Automation owns this disposable window.  Never let an earlier
                 # smoke failure become an unattended save-confirmation dialog that
                 # masks the real error until the outer watchdog expires.
-                meta.workspace_is_dirty = False
+                if meta.workspace.document is not None:
+                    meta.workspace.mark_saved()
                 _write_automation_smoke_log("packaged-workflow:teardown:close:start")
                 meta.close()
                 _write_automation_smoke_log("packaged-workflow:teardown:close:return")
@@ -1442,7 +1443,8 @@ def start_shell_smoke(require_native_window=False):
             % app.platformName().lower()
         )
     finally:
-        meta.workspace_is_dirty = False
+        if meta.workspace.document is not None:
+            meta.workspace.mark_saved()
         meta.close()
         app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
         app.processEvents()
@@ -1755,7 +1757,8 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
                 encoding="utf-8",
             )
             result["completed"] = True
-            meta.workspace_is_dirty = False
+            if meta.workspace.document is not None:
+                meta.workspace.mark_saved()
             meta.close()
             app.exit(0 if not failures else 1)
 

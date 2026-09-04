@@ -36,6 +36,12 @@ def _log(message: str) -> None:
             output.write(message + "\n")
 
 
+def _mark_workspace_saved(window) -> None:
+    workspace = getattr(window, "workspace", None)
+    if workspace is not None and workspace.document is not None:
+        workspace.mark_saved()
+
+
 def start_automation(phase_callback=None):
     """Construct the ordinary application composition for tests and packaging."""
     qt6_resources.ensure_application_resources()
@@ -66,7 +72,7 @@ def start_automation_smoke(sample_path: str) -> int:
         app.processEvents()
         return 0
     finally:
-        window.workspace_is_dirty = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         _dispose_qobjects(app, (window,))
@@ -82,7 +88,7 @@ def assert_opened_project_for_startup_smoke(
     if completion_marker:
         with open(completion_marker, "w", encoding="utf-8") as marker:
             json.dump({"project": os.path.basename(project_path)}, marker)
-    window.workspace_is_dirty = False
+    _mark_workspace_saved(window)
     window.close()
     app.processEvents()
     app.quit()

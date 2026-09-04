@@ -96,8 +96,7 @@
     "src/rc_metastudio/main_window.py": {
       "add_new": "the three dimension-specific editors have intentionally distinct validation and selection transitions",
       "open": "interface boundary coordinates prompt, decode, replacement, and recent-project updates",
-      "save": "interface boundary coordinates save-as prompts, serialization, and recent-project updates",
-      "__setattr__": "the legacy dirty-state property is a narrow UI compatibility boundary that synchronizes validated workspace state"
+      "save": "interface boundary coordinates save-as prompts, serialization, and recent-project updates"
     },
     "src/rc_metastudio/adaptive_window.py": {
       "eventFilter": "Qt event filtering preserves the adaptive window lifecycle across native resize and teardown events"

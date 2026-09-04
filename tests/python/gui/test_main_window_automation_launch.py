@@ -37,7 +37,6 @@ def _sample_project_path(name):
 def _mark_workspace_saved(window):
     if window.workspace.document is not None:
         window.workspace.mark_saved()
-    window.workspace_is_dirty = False
 
 
 def _window_archetype(widget):

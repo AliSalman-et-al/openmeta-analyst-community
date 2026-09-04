@@ -276,7 +276,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.new_dataset()
 
         self.workspace = WorkspaceSession()
-        self.workspace_is_dirty = False
 
         self.tableView.setModel(self.model)
         self.tableView.setItemDelegate(dataset_table_view.StudyDelegate(self.tableView))
@@ -715,8 +714,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self.workspace.mark_dirty()
             elif document != self.workspace.document:
                 self.workspace.replace(document)
-        self.workspace_is_dirty = self.workspace.is_dirty
-
     def record_workspace_change(self, before, after):
         """Publish one adapter edit as one immutable workspace change."""
         before_document = (
@@ -732,10 +729,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if self.workspace.document is None:
             self.workspace.new(before_document)
         if before_document == after_document:
-            self.workspace_is_dirty = self.workspace.is_dirty
             return
         self.workspace.replace(after_document)
-        self.workspace_is_dirty = self.workspace.is_dirty
 
     def _commit_model_operation(self, operation):
         """Run one already validated UI operation as one workspace change."""
@@ -751,11 +746,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if before is not None and after is not None:
             if self.workspace.document != after:
                 self.record_workspace_change(before, after)
-        self.workspace_is_dirty = self.workspace.is_dirty
 
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
-        self.workspace_is_dirty = not bool(is_clean)
         if not is_clean:
             self._notify_user_that_data_is_unsaved()
 
@@ -896,7 +889,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             observer.dataset = self.model.dataset
             observer.set_state(runtime.model_state)
         self.out_path = str(self.workspace.path) if self.workspace.path else None
-        self.workspace_is_dirty = self.workspace.is_dirty
         if position is not None:
             self.tableView.setCurrentIndex(self.model.index(*position))
 
@@ -1492,7 +1484,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = file_path
         self.model.analysis_source_path = file_path
         self.dataset_file_lbl.setText("Open Project: %s" % file_path)
-        self.workspace_is_dirty = self.workspace.is_dirty
         self._update_recent_project_nonfatal(file_path, "opened")
         return True
 
@@ -1855,7 +1846,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
-        self.workspace_is_dirty = self.workspace.is_dirty
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
         self._update_recent_project_nonfatal(destination, "saved")

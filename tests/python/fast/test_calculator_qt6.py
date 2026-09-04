@@ -270,8 +270,6 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
             events.append(("set-auto-quit", enabled))
 
     class FailingWindow:
-        workspace_is_dirty = True
-
         class Workspace:
             is_dirty = True
 
@@ -289,7 +287,6 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
         smoke.close_automation_window(FakeApplication(), window)
 
     assert window.workspace.is_dirty is False
-    assert window.workspace_is_dirty is False
     assert events == [
         "read-auto-quit",
         ("set-auto-quit", False),
