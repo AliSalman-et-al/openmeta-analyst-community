@@ -14,10 +14,10 @@ from typing import NewType, TypeAlias, cast
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
-StudyId = NewType("StudyId", int)
+StudyId = NewType("StudyId", str)
 OutcomeId = NewType("OutcomeId", str)
 FollowUpId = NewType("FollowUpId", str)
-GroupId = NewType("GroupId", int)
+GroupId = NewType("GroupId", str)
 CovariateId = NewType("CovariateId", str)
 
 
@@ -432,14 +432,26 @@ def _wire_pairs(value: Mapping[str, object]) -> tuple[tuple[str, JsonValue], ...
     return tuple((key, cast(JsonValue, copy.deepcopy(item))) for key, item in value.items())
 
 
-def _typed_outcome(value: Mapping[str, object]) -> OutcomeSnapshot:
+def _typed_outcome(value: Mapping[str, object], index: int) -> OutcomeSnapshot:
     label = cast(str, value["name"])
+    identity = OutcomeId(cast(str, value.get("stable_id") or f"outcome:{index}"))
+    labels = cast(list[str], value["follow_ups"])
+    stored_ids = cast(list[object], value.get("follow_up_ids") or [])
     follow_ups = tuple(
-        FollowUpSnapshot(FollowUpId(f"{label}:{name}"), name)
-        for name in cast(list[str], value["follow_ups"])
+        FollowUpSnapshot(
+            FollowUpId(
+                cast(str, stored_ids[follow_up_index])
+                if follow_up_index < len(stored_ids)
+                and isinstance(stored_ids[follow_up_index], str)
+                and stored_ids[follow_up_index]
+                else f"{identity}:follow-up:{follow_up_index}"
+            ),
+            name,
+        )
+        for follow_up_index, name in enumerate(labels)
     )
     return OutcomeSnapshot(
-        OutcomeId(cast(str, value.get("stable_id") or label)),
+        identity,
         label,
         cast(int, value["data_type"]),
         cast(str | None, value["sub_type"]),
@@ -448,10 +460,10 @@ def _typed_outcome(value: Mapping[str, object]) -> OutcomeSnapshot:
     )
 
 
-def _typed_covariate(value: Mapping[str, object]) -> CovariateSnapshot:
+def _typed_covariate(value: Mapping[str, object], index: int) -> CovariateSnapshot:
     label = cast(str, value["name"])
     return CovariateSnapshot(
-        CovariateId(cast(str, value.get("stable_id") or label)),
+        CovariateId(cast(str, value.get("stable_id") or f"covariate:{index}")),
         label,
         cast(int, value["data_type"]),
         _wire_pairs(value),
@@ -461,25 +473,40 @@ def _typed_covariate(value: Mapping[str, object]) -> CovariateSnapshot:
 def _typed_unit(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]) -> UnitSnapshot:
     outcome = cast(str, value["outcome"])
     follow_up = cast(str | None, value["follow_up"])
+    outcome_snapshot = outcomes[outcome]
+    follow_up_snapshot = next(
+        (item for item in outcome_snapshot.follow_ups if item.label == follow_up), None
+    )
+    unit_identity = cast(
+        str,
+        value.get("stable_id")
+        or f"{outcome_snapshot.identity}:{follow_up_snapshot.identity if follow_up_snapshot else 'default'}",
+    )
     groups = tuple(
         GroupSnapshot(
-            GroupId(cast(int, group["id"])),
+            GroupId(cast(str, group.get("stable_id") or f"{unit_identity}:group:{index}")),
             cast(str, group["name"]),
             tuple(cast(JsonValue, copy.deepcopy(item)) for item in cast(list[object], group["raw_data"])),
             _wire_pairs(group),
         )
-        for group in (_object(item, "group") for item in _array(value["groups"], "groups"))
+        for index, group in enumerate(
+            _object(item, "group") for item in _array(value["groups"], "groups")
+        )
     )
     return UnitSnapshot(
-        outcomes[outcome].identity,
-        None if follow_up is None else FollowUpId(f"{outcome}:{follow_up}"),
+        outcome_snapshot.identity,
+        None if follow_up_snapshot is None else follow_up_snapshot.identity,
         groups,
         cast(Mapping[str, JsonValue], copy.deepcopy(_object(value["entered_effects"], "entered_effects"))),
         _wire_pairs(value),
     )
 
 
-def _typed_study(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]) -> StudySnapshot:
+def _typed_study(
+    value: Mapping[str, object],
+    outcomes: Mapping[str, OutcomeSnapshot],
+    index: int,
+) -> StudySnapshot:
     name = cast(str, value["name"])
     year = cast(int | None, value["year"])
     sample_size = cast(float | None, value["sample_size"])
@@ -488,7 +515,7 @@ def _typed_study(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnap
         for item in _array(value["analysis_units"], "analysis_units")
     )
     return StudySnapshot(
-        StudyId(cast(int, value["id"])),
+        StudyId(cast(str, value.get("stable_id") or f"study:{index}")),
         name,
         year,
         cast(bool, value["include"]),
@@ -505,8 +532,8 @@ def reconstruct_analysis_dataset(
     validate_project_semantics(project, state)
     dataset = _object(project["dataset"], "project.json/dataset")
     typed_outcomes = tuple(
-        _typed_outcome(_object(value, "outcome"))
-        for value in _array(dataset["outcomes"], "outcomes")
+        _typed_outcome(_object(value, "outcome"), index)
+        for index, value in enumerate(_array(dataset["outcomes"], "outcomes"))
     )
     outcomes_by_label = {item.label: item for item in typed_outcomes}
     return AnalysisDataset(
@@ -514,12 +541,12 @@ def reconstruct_analysis_dataset(
         title=cast(str, dataset["title"]),
         outcomes=typed_outcomes,
         covariates=tuple(
-            _typed_covariate(_object(value, "covariate"))
-            for value in _array(dataset["covariates"], "covariates")
+            _typed_covariate(_object(value, "covariate"), index)
+            for index, value in enumerate(_array(dataset["covariates"], "covariates"))
         ),
         studies=tuple(
-            _typed_study(_object(value, "study"), outcomes_by_label)
-            for value in _array(dataset["studies"], "studies")
+            _typed_study(_object(value, "study"), outcomes_by_label, index)
+            for index, value in enumerate(_array(dataset["studies"], "studies"))
         ),
         is_diagnostic=cast(bool, dataset["is_diagnostic"]),
         notes=cast(str, dataset["notes"]),
