@@ -2238,9 +2238,11 @@ class DatasetTableModel(QAbstractTableModel):
         ).get_raw_data_for_groups(self.current_groups)
 
     def set_current_analysis_unit_for_study(self, study_index, new_analysis_unit):
-        self.dataset.studies[study_index].analysis_units_by_outcome[
-            self.current_outcome_name
-        ][self.get_current_follow_up_name()] = new_analysis_unit
+        self.dataset.studies[study_index].replace_analysis_unit(
+            self.current_outcome_name,
+            self.get_current_follow_up_name(),
+            new_analysis_unit,
+        )
 
     def get_current_analysis_unit_for_study(self, study_index):
         """Return or create the study's currently selected analysis unit."""

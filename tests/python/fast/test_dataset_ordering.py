@@ -31,18 +31,13 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
         dataset = analysis_dataset.Dataset()
         outcome = analysis_dataset.Outcome("Mortality", meta_globals.BINARY)
         study = analysis_dataset.Study(1, "Alpha")
-        study.add_outcome(outcome, group_names=["tx A", "tx B", "tx C", "tx D"])
-        study.add_follow_up_to_outcome(
-            outcome,
-            "week 4",
-            group_names=["tx A", "tx B", "tx C", "tx D"],
-        )
         dataset.add_study(study)
-        dataset.follow_ups_by_outcome["Mortality"] = {
-            0: "baseline",
-            1: "week 4",
-            2: "week 8",
-        }
+        dataset.add_outcome(outcome)
+        dataset.add_group("tx C", "Mortality")
+        dataset.add_group("tx D", "Mortality")
+        dataset.change_follow_up_name("Mortality", "first", "baseline")
+        dataset.add_follow_up_to_outcome("Mortality", "week 4")
+        dataset.add_follow_up_to_outcome("Mortality", "week 8")
 
         print(json.dumps({
             "all_groups": dataset.get_group_names(),

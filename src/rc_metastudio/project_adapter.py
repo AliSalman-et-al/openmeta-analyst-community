@@ -363,11 +363,16 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 follow_up
             )
             unit_id = f"{outcome.stable_id}:{follow_up_id or 'default'}"
+            group_stable_ids = [
+                f"{unit_id}:group:{group_index}"
+                for group_index in range(len(group_items))
+            ]
             unit = analysis_unit.AnalysisUnit(
                 outcome,
                 raw_data=raw_data,
                 group_names=group_names,
                 stable_id=unit_id,
+                group_stable_ids=group_stable_ids,
             )
             unit.follow_up_id = follow_up_id
             unit.follow_up_label = follow_up
@@ -376,7 +381,6 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 unit.groups[group_name].id = _integer(
                     group_data["id"], "analysis group id"
                 )
-                unit.groups[group_name].stable_id = f"{unit_id}:group:{group_index}"
             entered_effects = _object(unit_data["entered_effects"], "entered effects")
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")

@@ -36,7 +36,12 @@ class AnalysisUnit:
     """Store one outcome at one follow-up, potentially across several groups."""
 
     def __init__(
-        self, outcome, raw_data=None, group_names=None, stable_id=None
+        self,
+        outcome,
+        raw_data=None,
+        group_names=None,
+        stable_id=None,
+        group_stable_ids=None,
     ):
         """Create the analysis unit for one study outcome and follow-up.
 
@@ -93,8 +98,9 @@ class AnalysisUnit:
             for effect in meta_globals.DIAGNOSTIC_METRICS:
                 self.effects[effect] = {}
 
+        identities = group_stable_ids or [None] * len(group_names)
         for i, group in enumerate(group_names):
-            self.add_group(group)
+            self.add_group(group, stable_id=identities[i])
             self.groups[group].raw_data = raw_data[i]
 
     def adopt_calculated_state(self, candidate: "AnalysisUnit") -> None:
@@ -432,7 +438,7 @@ class AnalysisUnit:
     def get_effect_names(self):
         return list(self.effects.keys())
 
-    def add_group(self, name, raw_data=None):
+    def add_group(self, name, raw_data=None, stable_id=None):
         if not self.groups:
             group_id = 0
         else:
@@ -440,7 +446,7 @@ class AnalysisUnit:
         if raw_data is None:
             raw_data = [""] * self.raw_data_length
         self._add_effect_entries_for_group(name)
-        group = Group(group_id, name, raw_data)
+        group = Group(group_id, name, raw_data, stable_id=stable_id)
         self.groups[name] = group
         self.groups_by_id[group.stable_id] = group
 

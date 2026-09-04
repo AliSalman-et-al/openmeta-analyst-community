@@ -682,6 +682,7 @@ class Study:
         follow_up,
     ):
         outcome_id = outcome.stable_id if isinstance(outcome, Outcome) else None
+        legacy_first = None
         for unit in self.analysis_units:
             if outcome_id is not None and unit.outcome.stable_id != outcome_id:
                 continue
@@ -692,10 +693,10 @@ class Study:
                 getattr(unit, "follow_up_label", None),
             }:
                 return unit
-            # The mutable outcome owns no label map; the presentation index
-            # remains the only place that translates an identity to a label.
             if follow_up == "first" and getattr(unit, "follow_up_id", None) is None:
-                return unit
+                legacy_first = unit
+        if legacy_first is not None:
+            return legacy_first
         try:
             return self.analysis_units_by_outcome[outcome][follow_up]
         except KeyError as exc:
