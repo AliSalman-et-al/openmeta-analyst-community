@@ -5,7 +5,6 @@
 from dataclasses import dataclass
 from functools import cmp_to_key
 
-from PyQt6 import QtCore
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
@@ -29,7 +28,6 @@ from rc_metastudio.meta_globals import (
     DEFAULT_GROUP_NAMES,
     DIAGNOSTIC,
     DIAGNOSTIC_METRIC_LABELS,
-    FACTOR,
     NUM_DIGITS,
     ONE_ARM_METRICS,
     OTHER,
@@ -170,7 +168,6 @@ class WorkspaceEdit:
     changed_top_left: QModelIndex
     changed_bottom_right: QModelIndex
     roles: tuple[int, ...]
-    before_workspace_snapshot: tuple[object, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -320,11 +317,16 @@ class DatasetTableModel(QAbstractTableModel):
 
     def _sync_display_studies(self):
         canonical = list(self.dataset.studies)
-        canonical_ids = {id(study) for study in canonical}
-        visible = [study for study in self._display_studies if id(study) in canonical_ids]
-        visible_ids = {id(study) for study in visible}
-        visible.extend(study for study in canonical if id(study) not in visible_ids)
-        if self._blank_study is not None and id(self._blank_study) not in canonical_ids:
+        canonical_by_identity = {id(study): study for study in canonical}
+        visible = []
+        seen = set()
+        for study in self._display_studies:
+            identity = id(study)
+            if identity in canonical_by_identity:
+                visible.append(canonical_by_identity[identity])
+                seen.add(identity)
+        visible.extend(study for study in canonical if id(study) not in seen)
+        if self._blank_study is not None and id(self._blank_study) not in canonical_by_identity:
             visible.append(self._blank_study)
         self._display_studies = visible
 
@@ -434,11 +436,9 @@ class DatasetTableModel(QAbstractTableModel):
         return bool(self.OUTCOMES) and column != self.INCLUDE_STUDY and column > max(self.OUTCOMES)
 
     def _raw_cell_data(self, index, role, study):
-        if (
-            self._is_blank_study(study)
-            or self.current_outcome_name is None
-            or self.current_outcome_name not in study.analysis_units_by_outcome
-        ):
+        if self._is_blank_study(study) or self.current_outcome_name is None:
+            return _item_data("")
+        if self.current_outcome_name not in study.analysis_units_by_outcome:
             return _item_data("")
         raw_data = self.get_current_analysis_unit_for_study(
             study_index=self.dataset.studies.index(study)
@@ -449,22 +449,27 @@ class DatasetTableModel(QAbstractTableModel):
         value = raw_data[adjusted_index]
         if value in ("", None):
             return _item_data("")
+        if self.get_current_outcome_type(get_str=False) == CONTINUOUS:
+            return self._continuous_raw_cell_data(index, role, value)
         try:
-            sample_size_columns = (self.RAW_DATA[0], self.RAW_DATA[3])
-            precise = role == Qt.ItemDataRole.EditRole
-            if self.get_current_outcome_type(get_str=False) == CONTINUOUS and index.column() not in sample_size_columns:
-                digits = 12 if precise else None
-                return _item_data(str(self.format_float(value, num_digits=digits)))
             return _item_data(round(value, self.NUM_DIGITS))
         except (TypeError, ValueError):
             return _item_data(_to_native_text(value))
 
+    def _continuous_raw_cell_data(self, index, role, value):
+        if index.column() in (self.RAW_DATA[0], self.RAW_DATA[3]):
+            try:
+                return _item_data(round(value, self.NUM_DIGITS))
+            except (TypeError, ValueError):
+                return _item_data(_to_native_text(value))
+        digits = 12 if role == Qt.ItemDataRole.EditRole else None
+        try:
+            return _item_data(str(self.format_float(value, num_digits=digits)))
+        except (TypeError, ValueError):
+            return _item_data(_to_native_text(value))
+
     def _outcome_cell_data(self, index, role, study):
-        if (
-            self._is_blank_study(study)
-            or self.current_outcome_name is None
-            or self.get_current_follow_up_name() is None
-        ):
+        if not self._outcome_cell_is_available(study):
             return _item_data("")
         unit = self.get_analysis_unit(study=study, outcome=self.current_outcome_name,
                                       follow_up=self.get_current_follow_up_name(),
@@ -472,19 +477,23 @@ class DatasetTableModel(QAbstractTableModel):
         source = self._display_effect_source(unit)
         comparison = self.get_current_group_comparison()
         outcome_index = index.column() - self.OUTCOMES[0]
-        data_type = self.get_current_outcome_type(get_str=False)
-        subtype = self.get_current_outcome_subtype()
-        effect = self.current_effect
         if self.is_diagnostic():
             return self._diagnostic_outcome_cell_data(unit, source, comparison, outcome_index, role)
-        if data_type == CONTINUOUS and subtype == "generic_effect":
-            values = unit.get_display_effect_and_se_for_source(source, effect, comparison)
-        else:
-            values = unit.get_display_effect_and_ci_for_source(source, effect, comparison)
+        getter = unit.get_display_effect_and_ci_for_source
+        if self.get_current_outcome_type(get_str=False) == CONTINUOUS and self.get_current_outcome_subtype() == "generic_effect":
+            getter = unit.get_display_effect_and_se_for_source
+        values = getter(source, self.current_effect, comparison)
         value = values[outcome_index]
         if value is None:
             return _item_data("")
         return _item_data(self.format_float(value, num_digits=12 if role == Qt.ItemDataRole.EditRole else None))
+
+    def _outcome_cell_is_available(self, study):
+        if self._is_blank_study(study):
+            return False
+        if self.current_outcome_name is None:
+            return False
+        return self.get_current_follow_up_name() is not None
 
     def _diagnostic_outcome_cell_data(self, unit, source, comparison, outcome_index, role):
         effect = "Spec" if outcome_index >= 3 else "Sens"
@@ -662,30 +671,10 @@ class DatasetTableModel(QAbstractTableModel):
         inclusion_value, valid = self._inclusion_value_for_edit(index, value, role)
         if not valid:
             return False
-        if (
-            not index.isValid()
-            or index.model() is not self
-            or not 0 <= index.row() < self.rowCount()
-            or not 0 <= index.column() < self.columnCount()
-        ):
-            return self._reject_edit("Cannot edit that cell.")
-        context = self._editing_context(index.column())
-        visible_study = (
-            self._study_for_row(index.row())
-            if index.row() < len(self._display_studies)
-            else None
-        )
-        is_blank_study = self._is_blank_study(visible_study)
-        study = None if is_blank_study else visible_study
-        old_value = (
-            StudyInclusionState(
-                include=bool(study.include),
-                manually_excluded=bool(study.manually_excluded),
-            )
-            if index.column() == self.INCLUDE_STUDY and study is not None
-            else self.data(index, Qt.ItemDataRole.EditRole)
-        )
-        canonical_row = self.dataset.studies.index(study) if study is not None else index.row()
+        target = self._edit_target(index)
+        if target is None:
+            return False
+        context, old_value, canonical_row, is_blank_study = target
         edit_target = workspace_editing.WorkspaceEditTarget(
             row=canonical_row, column=index.column(), old_value=old_value
         )
@@ -708,7 +697,7 @@ class DatasetTableModel(QAbstractTableModel):
             self._blank_study = Study(self.max_study_id() + 1, include=False)
             self.study_auto_added = self._blank_study.id
         self._sync_display_studies()
-        target = _EditTarget(
+        edit = _EditTarget(
             study=(
                 self._study_for_row(index.row())
                 if index.row() < len(self._display_studies)
@@ -719,10 +708,36 @@ class DatasetTableModel(QAbstractTableModel):
             data_type=context.data_type,
             outcome_subtype=context.outcome_subtype,
         )
-        self._publish_workspace_edit(
-            index, target, added_study_id
-        )
+        self._publish_workspace_edit(index, edit, added_study_id)
         return True
+
+    def _edit_target(self, index):
+        if not self._valid_edit_index(index):
+            self._reject_edit("Cannot edit that cell.")
+            return None
+        visible_study = (
+            self._study_for_row(index.row())
+            if index.row() < len(self._display_studies)
+            else None
+        )
+        is_blank_study = self._is_blank_study(visible_study)
+        study = None if is_blank_study else visible_study
+        old_value = self.data(index, Qt.ItemDataRole.EditRole)
+        if index.column() == self.INCLUDE_STUDY and study is not None:
+            old_value = StudyInclusionState(
+                include=bool(study.include),
+                manually_excluded=bool(study.manually_excluded),
+            )
+        canonical_row = self.dataset.studies.index(study) if study is not None else index.row()
+        return self._editing_context(index.column()), old_value, canonical_row, is_blank_study
+
+    def _valid_edit_index(self, index):
+        return (
+            index.isValid()
+            and index.model() is self
+            and 0 <= index.row() < self.rowCount()
+            and 0 <= index.column() < self.columnCount()
+        )
 
     @staticmethod
     def _basic_horizontal_header_data(
@@ -823,183 +838,96 @@ class DatasetTableModel(QAbstractTableModel):
 
         return None
 
-    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if orientation == Qt.Orientation.Horizontal:
-            if not 0 <= section < self.columnCount():
-                return None
-        elif orientation == Qt.Orientation.Vertical:
-            if not 0 <= section < self.rowCount():
-                return None
+    def _raw_header_tooltip(self, section, outcome_type, outcome_subtype):
+        if outcome_type == CONTINUOUS and outcome_subtype == "generic_effect":
+            return ""
+        position = self.RAW_DATA.index(section)
+        suffix = "\nSort on this column by right-clicking the column header and selecting 'sort studies by <column>'"
+        if outcome_type == DIAGNOSTIC:
+            return ("# True Positives", "# False Negatives", "# False Positives", "# True Negatives")[position] + suffix
+        group = self.current_groups[position // (2 if outcome_type == BINARY else 3)]
+        if outcome_type == BINARY:
+            label = ("# of Events in group {0} (numerator)", "# of Subjects in group {0} (numerator)")[position % 2]
         else:
+            label = ("# Subjects in group {0}", "Mean of group {0}", "Standard Deviation of group {0}")[position % 3]
+            if position % 3 == 2:
+                return label.format(group)
+        rename = "\nRename group by right-clicking the column header and selecting 'rename group <name>'"
+        return label.format(group) + rename + suffix
+
+    def _outcome_header_tooltip(self, section, outcome_type, outcome_subtype):
+        position = self.OUTCOMES.index(section)
+        confidence = self.confidence_level / 100.0
+        lower = f"Lower bound of {confidence:.1%} confidence interval"
+        upper = f"Upper bound of {confidence:.1%} confidence interval\n"
+        if outcome_type == BINARY:
+            return (BINARY_METRIC_NAMES[self.current_effect], lower, upper)[position]
+        if outcome_type == CONTINUOUS:
+            if outcome_subtype == "generic_effect":
+                return (CONTINUOUS_METRIC_NAMES[self.current_effect], "Standard Error")[position]
+            return (CONTINUOUS_METRIC_NAMES[self.current_effect], lower, upper)[position]
+        if position in (1, 4):
+            return lower
+        if position in (2, 5):
+            return upper
+        return DIAGNOSTIC_METRIC_LABELS["Sens" if position == 0 else "Spec"]
+
+    def _horizontal_header_tooltip(self, section):
+        fixed = {
+            self.INCLUDE_STUDY: "Check if you want to include this study in the meta-analysis",
+            self.NAME: "Name to identify the study",
+            self.YEAR: "Year of publication",
+        }
+        if section in fixed:
+            return fixed[section]
+        if self.current_outcome_name is None:
             return None
+        outcome_type = self.get_current_outcome_type(get_str=False)
+        subtype = self.get_current_outcome_subtype()
+        if section in self.RAW_DATA:
+            return self._raw_header_tooltip(section, outcome_type, subtype)
+        if section in self.OUTCOMES:
+            return self._outcome_header_tooltip(section, outcome_type, subtype)
+        return None
 
-        if (
-            orientation == Qt.Orientation.Horizontal
-            and role == WORKSPACE_COLUMN_IDENTITY_ROLE
-        ):
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        limit = self.columnCount() if orientation == Qt.Orientation.Horizontal else self.rowCount()
+        if orientation not in (Qt.Orientation.Horizontal, Qt.Orientation.Vertical) or not 0 <= section < limit:
+            return None
+        if orientation == Qt.Orientation.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
             return self.workspace_column_identity(section)
-
-        outcome_type = self.dataset.get_outcome_type(self.current_outcome_name)
-        outcome_subtype = self.dataset.get_outcome_subtype(self.current_outcome_name)
-        length_dataset = len(self._display_studies)
-
-        section_is_valid = section < length_dataset
         if role == Qt.ItemDataRole.ToolTipRole:
-            if orientation == QtCore.Qt.Orientation.Horizontal:
-                if section == self.INCLUDE_STUDY:
-                    return (
-                        "Check if you want to include this study in the meta-analysis"
-                    )
-                elif section == self.NAME:
-                    return "Name to identify the study"
-                elif section == self.YEAR:
-                    return "Year of publication"
-                elif self.current_outcome_name is not None and section in self.RAW_DATA:
-                    # switch on the outcome type
-                    current_group = self.current_groups[0]  # i.e., the first group
-
-                    rename_col_msg = "\nRename group by right-clicking the column header and selecting 'rename group <name>'"
-                    sort_msg = "\nSort on this column by right-clicking the column header and selecting 'sort studies by <column>'"
-                    if outcome_type == BINARY:
-                        if section in self.RAW_DATA[2:]:
-                            current_group = self.current_groups[1]
-
-                        if section in (self.RAW_DATA[0], self.RAW_DATA[2]):
-                            num_events_msg = (
-                                "# of Events in group {0} (numerator)".format(
-                                    current_group
-                                )
-                            )
-                            return num_events_msg + rename_col_msg + sort_msg
-                        else:
-                            subject_count_message = (
-                                "# of Subjects in group {0} (numerator)".format(
-                                    current_group
-                                )
-                            )
-                            return subject_count_message + rename_col_msg + sort_msg
-                    elif outcome_type == CONTINUOUS:
-                        # continuous data
-                        if outcome_subtype == "generic_effect":
-                            # Logic note: generic-effect continuous outcomes do not expose raw data columns.
-                            return ""
-
-                        else:  # normal case with no outcome subtype
-                            if section in self.RAW_DATA[3:]:
-                                current_group = self.current_groups[1]
-
-                            if section in (self.RAW_DATA[0], self.RAW_DATA[3]):
-                                subject_count_message = (
-                                    "# Subjects in group {0}".format(current_group)
-                                )
-                                return subject_count_message + rename_col_msg + sort_msg
-                            elif section in (self.RAW_DATA[1], self.RAW_DATA[4]):
-                                mean_msg = "Mean of group %s" % current_group
-                                return mean_msg + rename_col_msg + sort_msg
-                            else:
-                                sd_msg = (
-                                    "Standard Deviation of group %s" % current_group
-                                )
-                                return sd_msg
-                    elif outcome_type == DIAGNOSTIC:
-                        if section == self.RAW_DATA[0]:
-                            return "# True Positives" + sort_msg
-                        elif section == self.RAW_DATA[1]:
-                            return "# False Negatives" + sort_msg
-                        elif section == self.RAW_DATA[2]:
-                            return "# False Positives" + sort_msg
-                        else:
-                            return "# True Negatives" + sort_msg
-                elif section in self.OUTCOMES:
-                    lower_msg = "Lower bound of {0:.1%} confidence interval".format(
-                        self.confidence_level / 100.0
-                    )
-                    upper_msg = "Upper bound of {0:.1%} confidence interval\n".format(
-                        self.confidence_level / 100.0
-                    )
-                    se_msg = "Standard Error"
-
-                    if outcome_type == BINARY:
-                        # effect size, lower CI, upper CI
-                        if section == self.OUTCOMES[0]:
-                            return BINARY_METRIC_NAMES[self.current_effect]
-                        elif section == self.OUTCOMES[1]:
-                            return lower_msg
-                        else:
-                            return upper_msg
-                    elif outcome_type == CONTINUOUS:
-                        if outcome_subtype == "generic_effect":
-                            if section == self.OUTCOMES[0]:
-                                return CONTINUOUS_METRIC_NAMES[self.current_effect]
-                            if section == self.OUTCOMES[1]:
-                                return se_msg
-                        else:  # normal case with no outcome_subtype
-                            if section == self.OUTCOMES[0]:
-                                return CONTINUOUS_METRIC_NAMES[self.current_effect]
-                            elif section == self.OUTCOMES[1]:
-                                return lower_msg
-                            elif section == self.OUTCOMES[2]:
-                                return upper_msg
-
-                    elif outcome_type == DIAGNOSTIC:
-                        if section in (self.OUTCOMES[1], self.OUTCOMES[4]):
-                            return lower_msg
-                        elif section in (self.OUTCOMES[2], self.OUTCOMES[5]):
-                            return upper_msg
-                        else:  # in metric name
-                            if section == self.OUTCOMES[0]:  # Sens
-                                return DIAGNOSTIC_METRIC_LABELS["Sens"]
-                            elif section == self.OUTCOMES[3]:  # Spec
-                                return DIAGNOSTIC_METRIC_LABELS["Spec"]
-
-            else:  # vertical
-                if section_is_valid and self._study_has_entered_data(section):
-                    return "Use calculator to fill-in missing information"
-
-        if role == Qt.ItemDataRole.DecorationRole:
-            if orientation == Qt.Orientation.Vertical:
-                if section_is_valid and self._study_has_entered_data(section):
-                    return QIcon(":/icons/table/calculator.svg")
-                return _item_data()
-
-        if role == Qt.ItemDataRole.TextAlignmentRole:
-            return _item_data(
-                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            )
-
-        if role == Qt.ItemDataRole.DisplayRole:
             if orientation == Qt.Orientation.Horizontal:
-                res = self._basic_horizontal_header_data(
-                    section,
-                    data_type=outcome_type,
-                    sub_type=outcome_subtype,
-                    raw_columns=self.RAW_DATA,
-                    outcome_columns=self.OUTCOMES,
-                    current_effect=self.current_effect,
-                    groups=self.current_groups,
-                    outcome_is_present=self.current_outcome_name is not None,
-                )
-                if res:
-                    return res
-                elif self.current_outcome_name is not None and section > max(
-                    self.OUTCOMES
-                ):
-                    # then the column is to the right of the outcomes, and must
-                    # be a covariate.
-                    current_covariate = self.get_covariate_for_column(section)
-                    if current_covariate is None:
-                        return _item_data("")
-
-                    covariate_name = current_covariate.name
-                    covariate_type = current_covariate.get_type_str()
-                    # Use the initial because the full covariate type does not fit.
-                    return _item_data("%s (%s)" % (covariate_name, covariate_type[0]))
-                else:
-                    return _item_data("")
-            else:  # vertical case
-                # Vertical headers display one-based row numbers.
-                return _item_data(int(section + 1))
-
+                return self._horizontal_header_tooltip(section)
+            if self._study_has_entered_data(section):
+                return "Use calculator to fill-in missing information"
+        if role == Qt.ItemDataRole.DecorationRole and orientation == Qt.Orientation.Vertical:
+            return QIcon(":/icons/table/calculator.svg") if self._study_has_entered_data(section) else _item_data()
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Vertical:
+                return _item_data(section + 1)
+            result = self._basic_horizontal_header_data(
+                section,
+                data_type=self.get_current_outcome_type(get_str=False),
+                sub_type=self.get_current_outcome_subtype(),
+                raw_columns=self.RAW_DATA,
+                outcome_columns=self.OUTCOMES,
+                current_effect=self.current_effect,
+                groups=self.current_groups,
+                outcome_is_present=self.current_outcome_name is not None,
+            )
+            if result:
+                return result
+            covariate = (
+                self.get_covariate_for_column(section)
+                if self.current_outcome_name is not None and section > max(self.OUTCOMES)
+                else None
+            )
+            if covariate is not None:
+                return _item_data(f"{covariate.name} ({covariate.get_type_str()[0]})")
+            return _item_data("")
         return _item_data()
 
     def workspace_column_identity(self, section):
@@ -1551,40 +1479,17 @@ class DatasetTableModel(QAbstractTableModel):
 
     def data_for_only_one_arm(self):
         """Really this should read 'data for one *and only one* arm."""
-        data_for_arm_one, data_for_arm_two = False, False
-
         data_type = self.get_current_outcome_type(get_str=False)
         per_group_raw_data_size = 2 if data_type == BINARY else 3
-
+        arms_have_data = [False, False]
         for study_index in range(len(self.dataset.studies)):
             current_raw_data = self._get_canonical_raw_data_for_study(study_index)
-
-            if (
-                len(
-                    [
-                        x
-                        for x in current_raw_data[:per_group_raw_data_size]
-                        if x is not None and x != ""
-                    ]
+            for arm, start in enumerate((0, per_group_raw_data_size)):
+                arms_have_data[arm] |= any(
+                    value not in (None, "")
+                    for value in current_raw_data[start : start + per_group_raw_data_size]
                 )
-                > 0
-            ):
-                data_for_arm_one = True
-            if (
-                len(
-                    [
-                        x
-                        for x in current_raw_data[per_group_raw_data_size:]
-                        if x is not None and x != ""
-                    ]
-                )
-                > 0
-            ):
-                data_for_arm_two = True
-
-        return (data_for_arm_one and not data_for_arm_two) or (
-            data_for_arm_two and not data_for_arm_one
-        )
+        return arms_have_data[0] != arms_have_data[1]
 
     def try_to_update_outcomes(self):
         for study_index in range(len(self.dataset.studies)):
@@ -1742,14 +1647,12 @@ class DatasetTableModel(QAbstractTableModel):
         self, study=None, study_index=None, outcome=None, follow_up=None, groups=None
     ):
         """Return or create an analysis unit for named outcome and follow-up values."""
-        if study is not None and study_index is not None:
-            if study != self._study_for_row(study_index):
-                raise ValueError("study and study index don't match")
-
-        if study is None:  # you can specify a study OR a study index
+        if study is None:
             if study_index is None:
                 raise ValueError("study or study_index must be specified")
             study = self._study_for_row(study_index)
+        elif study_index is not None and study != self._study_for_row(study_index):
+            raise ValueError("study and study index don't match")
 
         if outcome is None or follow_up is None:
             raise ValueError("outcome and follow_up must be specified")

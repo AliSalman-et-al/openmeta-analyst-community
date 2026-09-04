@@ -46,10 +46,8 @@ def _json_list(value: object) -> list[object]:
 
 
 def _close_shell(app: QtWidgets.QApplication, window) -> None:
-    if window.workspace.document is None and window.workspace.is_dirty:
-        from rc_metastudio.main_window import _document_from_model
-
-        window.workspace.new(_document_from_model(window.model))
+    if window.workspace.is_dirty:
+        window.workspace.mark_saved()
     elif window.workspace.document is not None:
         window.workspace.mark_saved()
     window.close()

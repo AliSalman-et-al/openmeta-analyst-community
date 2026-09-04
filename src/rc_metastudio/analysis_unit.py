@@ -218,19 +218,17 @@ class AnalysisUnit:
 
     def _add_effect_entries_for_group(self, new_group):
         group_names = list(self.groups)
-        if self.outcome.data_type == BINARY:
-            two_arm_metrics = meta_globals.BINARY_TWO_ARM_METRICS
-            one_arm_metrics = meta_globals.BINARY_ONE_ARM_METRICS
-        elif self.outcome.data_type == CONTINUOUS:
-            two_arm_metrics = meta_globals.CONTINUOUS_TWO_ARM_METRICS
-            one_arm_metrics = meta_globals.CONTINUOUS_ONE_ARM_METRICS
-        elif self.outcome.data_type == DIAGNOSTIC:
+        metric_sets = {
+            BINARY: (meta_globals.BINARY_TWO_ARM_METRICS, meta_globals.BINARY_ONE_ARM_METRICS),
+            CONTINUOUS: (meta_globals.CONTINUOUS_TWO_ARM_METRICS, meta_globals.CONTINUOUS_ONE_ARM_METRICS),
+        }
+        if self.outcome.data_type == DIAGNOSTIC:
             for effect in meta_globals.DIAGNOSTIC_METRICS:
                 self.entered_effects[effect][new_group] = self._new_effect_entry()
             return
-        else:
+        if self.outcome.data_type not in metric_sets:
             return
-
+        two_arm_metrics, one_arm_metrics = metric_sets[self.outcome.data_type]
         for effect in two_arm_metrics:
             for group in group_names:
                 for group_comparison in (
@@ -263,12 +261,13 @@ class AnalysisUnit:
         if upper is None:
             upper = entry["upper"]
 
-        if upper is not None and est is not None:
-            return (upper - est) / confidence_multiplier
-        if est is not None and lower is not None:
-            return (est - lower) / confidence_multiplier
-        if upper is not None and lower is not None:
-            return (upper - lower) / (2 * confidence_multiplier)
+        for high, low, divisor in (
+            (upper, est, confidence_multiplier),
+            (est, lower, confidence_multiplier),
+            (upper, lower, 2 * confidence_multiplier),
+        ):
+            if high is not None and low is not None:
+                return (high - low) / divisor
         return None
 
     def set_effect(self, effect, group_comparison, value):

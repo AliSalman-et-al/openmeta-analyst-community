@@ -32,8 +32,6 @@ from rc_metastudio import diagnostic_data_dialog
 from rc_metastudio import app_error_handler
 from rc_metastudio import qt_layout
 from rc_metastudio import meta_globals
-from rc_metastudio import project_adapter
-from rc_metastudio import analysis_dataset
 from rc_metastudio import qt_text
 from rc_metastudio import tabular_data
 from rc_metastudio.analysis_dataset import Study
@@ -57,7 +55,6 @@ class MainWindowProtocol(Protocol):
 
     def data_dirtied(self) -> None: ...
     def data_error(self, message: str) -> None: ...
-    def record_workspace_change(self, before, after) -> None: ...
     def delete_study(self, study, *, study_index: int) -> None: ...
     def edit_group_name(self, group: str) -> None: ...
     def rename_covariate(self, covariate) -> None: ...
@@ -70,23 +67,6 @@ class MainWindowProtocol(Protocol):
     def set_model(self, dataset, state_dict=None) -> None: ...
     def undo(self) -> None: ...
     def redo(self) -> None: ...
-
-
-def _workspace_snapshot(model):
-    if not isinstance(model.dataset, analysis_dataset.Dataset):
-        return None
-    return (
-        project_adapter.dataset_to_project(model.dataset),
-        project_adapter.model_to_state(model),
-    )
-
-
-def _publish_workspace_snapshot(view, before, main_gui):
-    if before is None:
-        return
-    after = _workspace_snapshot(view.model())
-    if after is not None:
-        main_gui.record_workspace_change(before, after)
 
 
 _newlines_re = QRegularExpression("\r\n?")
@@ -532,7 +512,6 @@ class DatasetTableView(QtWidgets.QTableView):
 
             # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
-                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -554,9 +533,8 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    _publish_workspace_snapshot(self, before, self._main_gui())
+                    self.dataDirtied.emit()
             elif data_type == "continuous":
-                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group_name in current_groups:
                     cur_raw_data_dict[group_name] = list(
@@ -578,10 +556,9 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    _publish_workspace_snapshot(self, before, self._main_gui())
+                    self.dataDirtied.emit()
             else:
                 # then this is diagnostic data
-                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -602,28 +579,15 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    _publish_workspace_snapshot(self, before, self._main_gui())
+                    self.dataDirtied.emit()
         finally:
             del signal_blocker
 
-    def cell_content_changed(self, edit):
-        index = edit.index
-        old_val = edit.old_value
-        new_val = edit.new_value
-        study_added = edit.added_study_id
-        if not self._batch_editing and edit.before_workspace_snapshot is not None:
-            after = _workspace_snapshot(self.model())
-            if after is not None:
-                self._main_gui().record_workspace_change(
-                    edit.before_workspace_snapshot, after
-                )
+    def cell_content_changed(self, _edit):
         # Only make a cell edit if the old values and new values are different
         # DatasetTableModel has already applied the edit.  The owning window's
         # data-dirtied boundary snapshots it into WorkspaceSession, which is
         # the only durable history.
-        self._enable_analysis_menus_if_appropriate()
-
-        # make analysis menus change even when checkbox is (un)checked
         self._enable_analysis_menus_if_appropriate()
 
     def _new_eq_old(self, old, new):
@@ -691,11 +655,10 @@ class DatasetTableView(QtWidgets.QTableView):
         # current table view; rebuild it when covariate columns move or vanish.
         if column not in self.reverse_column_sorts:
             self.reverse_column_sorts[column] = False
-        before = _workspace_snapshot(self.model())
         self.model().sort_studies(column, self.reverse_column_sorts[column])
         self.model().reset_model()
         self.reverse_column_sorts[column] = not self.reverse_column_sorts[column]
-        _publish_workspace_snapshot(self, before, self._main_gui())
+        self.dataDirtied.emit()
 
     def _normalize_newlines(self, qstr_text):
         if isinstance(qstr_text, str):
@@ -814,17 +777,10 @@ class DatasetTableView(QtWidgets.QTableView):
         except (IndexError, TypeError, ValueError) as exc:
             self._report_model_data_error(str(exc))
             return False
-        before = _workspace_snapshot(model)
-        after = _workspace_snapshot(candidate)
-        if self.main_gui is not None and before is not None and after is not None:
-            model.dataset = candidate.dataset
-            model.set_state(candidate.get_state())
-            model.reset_model()
-            self._main_gui().record_workspace_change(before, after)
-        else:
-            model.dataset = candidate.dataset
-            model.set_state(candidate.get_state())
-            model.reset_model()
+        model.dataset = candidate.dataset
+        model.set_state(candidate.get_state())
+        model.reset_model()
+        self.dataDirtied.emit()
         return True
 
     def set_data_in_model(self, index, val):

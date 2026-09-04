@@ -704,17 +704,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.workspace.mark_dirty()
         else:
             self.workspace.update_live_state(runtime)
+            self.workspace.checkpoint()
 
     def _workspace_edit_committed(self, _edit):
         self.data_dirtied()
-        self.workspace.checkpoint()
-
-    def record_workspace_change(self, before, after):
-        """Publish the already-mutated session-owned graph as one change."""
-        if before == after:
-            return
-        self.data_dirtied()
-        self.workspace.checkpoint()
 
     def _commit_model_operation(self, operation):
         """Run one already validated UI operation as one workspace change."""

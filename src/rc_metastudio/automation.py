@@ -10,7 +10,9 @@ import os
 import platform
 import sys
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 from rc_metastudio.cocoa_accessibility import find_accessibility_element
 
 from rc_metastudio import app_error_handler, qt6_resources, settings
@@ -245,9 +247,15 @@ def start_package_runtime_probe(output_path: str) -> int:
     primary = app.primaryScreen()
     if primary is None:
         raise SystemExit("Packaged runtime probe found no primary screen.")
-    r_home = str(robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)")[0])
-    r_version = str(robjects.r("as.character(getRversion())")[0])
-    r_library_paths = [str(item) for item in robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")]
+
+    def evaluate(expression: str) -> Sequence[object]:
+        return cast(Sequence[object], robjects.r(expression))
+
+    r_home = str(evaluate("normalizePath(R.home(), winslash='/', mustWork=TRUE)")[0])
+    r_version = str(evaluate("as.character(getRversion())")[0])
+    r_library_paths = [
+        str(item) for item in evaluate("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")
+    ]
     api_bridge_path = Path(str(api_bridge.__file__)).resolve()
     shared_path = Path(configured.get("R_HOME", "")) / "bin" / "x64" / "R.dll"
     if sys.platform == "darwin":
@@ -256,8 +264,8 @@ def start_package_runtime_probe(output_path: str) -> int:
         raise RuntimeError("Packaged runtime has no private R shared library.")
     macos_profile = None
     if sys.platform == "darwin":
-        png_path = Path(str(robjects.r("output <- tempfile(fileext='.png'); grDevices::png(output); graphics::plot(1, 1); grDevices::dev.off(); output")[0]))
-        macos_profile = {"tcltk_available": bool(robjects.r("isTRUE(requireNamespace('tcltk', quietly=TRUE))")[0]), "tcltk_loaded": bool(robjects.r("'tcltk' %in% loadedNamespaces()")[0]), "aqua": bool(robjects.r("capabilities('aqua')")[0]), "bitmap_type": str(robjects.r("getOption('bitmapType')")[0]), "default_png": {"size": png_path.stat().st_size, "sha256": hashlib.sha256(png_path.read_bytes()).hexdigest()}}
+        png_path = Path(str(evaluate("output <- tempfile(fileext='.png'); grDevices::png(output); graphics::plot(1, 1); grDevices::dev.off(); output")[0]))
+        macos_profile = {"tcltk_available": bool(evaluate("isTRUE(requireNamespace('tcltk', quietly=TRUE))")[0]), "tcltk_loaded": bool(evaluate("'tcltk' %in% loadedNamespaces()")[0]), "aqua": bool(evaluate("capabilities('aqua')")[0]), "bitmap_type": str(evaluate("getOption('bitmapType')")[0]), "default_png": {"size": png_path.stat().st_size, "sha256": hashlib.sha256(png_path.read_bytes()).hexdigest()}}
         png_path.unlink(missing_ok=True)
     probe = {
             "schema_version": 1,
@@ -464,7 +472,8 @@ def _observe_cocoa_accessibility(widget):
     def text(receiver, name):
         value = send(receiver, name)
         raw = send(value, "UTF8String") if value else None
-        return ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8") if raw else ""
+        encoded = ctypes.cast(raw, ctypes.c_char_p).value if raw else None
+        return encoded.decode("utf-8") if encoded is not None else ""
 
     def responds(receiver, name):
         message.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]

@@ -1832,24 +1832,37 @@ def _workflow_header_valid(
 def _workflow_locale_valid(
     workflows: dict, locale_variants: list, expected_summary: str | None
 ) -> bool:
+    return (
+        _locale_inputs_valid(locale_variants)
+        and _locale_identity_valid(workflows, locale_variants, expected_summary)
+    )
+
+
+def _locale_inputs_valid(locale_variants: list) -> bool:
     if [item.get("locale") for item in locale_variants] != ["en_US", "de_DE"]:
         return False
-    if (
-        locale_variants[0].get("decimal_point") != "."
-        or locale_variants[1].get("decimal_point") != ","
-        or "." not in str(locale_variants[0].get("input"))
-        or "," not in str(locale_variants[1].get("input"))
-        or locale_variants[0].get("canonical_value")
-        != locale_variants[1].get("canonical_value")
-        or locale_variants[0].get("svg_sha256")
-        != locale_variants[1].get("svg_sha256")
-        or locale_variants[0].get("svg_sha256") != workflows.get("svg_sha256")
-    ):
-        return False
-    return all(
-        item.get("normalized_summary_sha256") == expected_summary
-        and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-        for item in locale_variants
+    en, de = locale_variants
+    return (
+        en.get("decimal_point") == "."
+        and de.get("decimal_point") == ","
+        and "." in str(en.get("input"))
+        and "," in str(de.get("input"))
+        and en.get("canonical_value") == de.get("canonical_value")
+    )
+
+
+def _locale_identity_valid(
+    workflows: dict, locale_variants: list, expected_summary: str | None
+) -> bool:
+    en, de = locale_variants
+    return (
+        en.get("svg_sha256") == de.get("svg_sha256")
+        and en.get("svg_sha256") == workflows.get("svg_sha256")
+        and all(
+            item.get("normalized_summary_sha256") == expected_summary
+            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
+            for item in locale_variants
+        )
     )
 
 

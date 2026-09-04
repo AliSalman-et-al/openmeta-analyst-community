@@ -35,30 +35,11 @@ def runtime_project_to_document(runtime: RuntimeProject) -> ProjectDocument:
     """Serialize the live runtime graph at a project-format boundary."""
     dataset = runtime.dataset
     model_state = runtime.model_state
-    outcome = model_state.get("current_outcome_name")
-    follow_up = None
-    if isinstance(outcome, str):
-        follow_ups = dataset.follow_ups_by_outcome.get(outcome, {})
-        follow_up_index = model_state.get("current_follow_up_index")
-        if isinstance(follow_up_index, int):
-            follow_up = follow_ups.get(follow_up_index)
-    raw_groups = model_state.get("current_groups")
-    groups = (
-        [item for item in raw_groups if isinstance(item, str)]
-        if isinstance(raw_groups, list)
-        else []
-    )
+    outcome, follow_up, groups, model_effect = _runtime_selection(dataset, model_state)
     raw_confidence = model_state.get("confidence_level", 95.0)
     confidence = (
         float(raw_confidence) if isinstance(raw_confidence, (int, float)) else 95.0
     )
-    if not dataset.get_outcome_names():
-        outcome = None
-        follow_up = None
-        groups = []
-        model_effect = None
-    else:
-        model_effect = model_state.get("current_effect")
     state: JsonObject = {
         "schema_version": 1,
         "active_outcome": outcome if isinstance(outcome, str) else None,
@@ -68,6 +49,34 @@ def runtime_project_to_document(runtime: RuntimeProject) -> ProjectDocument:
         "confidence_level": confidence,
     }
     return ProjectDocument(1, dataset_to_project(dataset), state)
+
+
+def _runtime_selection(
+    dataset: analysis_dataset.Dataset, model_state: JsonObject
+) -> tuple[str | None, str | None, list[str], str | None]:
+    outcome = model_state.get("current_outcome_name")
+    follow_up = _runtime_follow_up(
+        dataset, outcome, model_state.get("current_follow_up_index")
+    )
+    groups = _runtime_groups(model_state.get("current_groups"))
+    if not dataset.get_outcome_names():
+        return None, None, [], None
+    raw_effect = model_state.get("current_effect")
+    effect = raw_effect if isinstance(raw_effect, str) else None
+    return outcome if isinstance(outcome, str) else None, follow_up, groups, effect
+
+
+def _runtime_follow_up(dataset, outcome, follow_up_index) -> str | None:
+    if not isinstance(outcome, str) or not isinstance(follow_up_index, int):
+        return None
+    candidate = dataset.follow_ups_by_outcome.get(outcome, {}).get(follow_up_index)
+    return candidate if isinstance(candidate, str) else None
+
+
+def _runtime_groups(raw_groups) -> list[str]:
+    if not isinstance(raw_groups, list):
+        return []
+    return [item for item in raw_groups if isinstance(item, str)]
 
 
 class ProjectStateModel(Protocol):

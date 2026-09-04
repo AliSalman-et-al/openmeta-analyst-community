@@ -148,6 +148,18 @@ def test_workspace_model_rejects_invalid_headers_and_flags():
         assert model.headerData(section, Qt.Orientation.Vertical) is None
 
 
+def test_diagnostic_raw_header_tooltips_keep_single_group_safe():
+    model = _diagnostic_model_with_empty_cells()
+
+    assert model.headerData(
+        model.RAW_DATA[3], Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole
+    ) == (
+        "# True Negatives\n"
+        "Sort on this column by right-clicking the column header and selecting "
+        "'sort studies by <column>'"
+    )
+
+
 @pytest.mark.parametrize("invalid_kind", ("foreign", "row", "column"))
 def test_workspace_model_rejects_non_owned_indexes_and_valid_parents(invalid_kind):
     model = _diagnostic_model_with_empty_cells()

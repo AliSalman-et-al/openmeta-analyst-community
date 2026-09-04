@@ -647,6 +647,11 @@ class FakeAnalysisUnit:
     def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return 1.0, 0.5, 2.0
 
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
     def set_effect_and_ci(self, *args, **kwargs):
         pass
 
@@ -1169,6 +1174,11 @@ class FakeDiagnosticAnalysisUnit:
     def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return None, None, None
 
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
     def set_effect_and_ci(self, *args, **kwargs):
         pass
 
@@ -1352,6 +1362,11 @@ class FakeContinuousAnalysisUnit:
 
     def get_effect_and_ci(self, *args, **kwargs):
         return None, None, None
+
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
 
     def set_effect_and_ci(self, *args, **kwargs):
         pass

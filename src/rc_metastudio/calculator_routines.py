@@ -376,26 +376,18 @@ def set_current_effect_from_value(
     if confidence_multiplier is None:
         raise ValueError("confidence multiplier must be specified")
 
-    if data_type == "binary":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.binary_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    elif data_type == "continuous":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.continuous_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    elif data_type == "diagnostic":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.diagnostic_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    else:
-        raise Exception("data_type unrecognized")
+    converters = {
+        "binary": r_bridge.binary_convert_scale,
+        "continuous": r_bridge.continuous_convert_scale,
+        "diagnostic": r_bridge.diagnostic_convert_scale,
+    }
+    try:
+        converter = converters[data_type]
+    except KeyError as exc:
+        raise ValueError("data_type unrecognized") from exc
+    conv_to_disp_scale = lambda value: converter(
+        value, current_effect, convert_to="display.scale"
+    )
     effect_tbox, lower_tbox, upper_tbox = [
         txt_boxes[box_name] for box_name in ("effect", "lower", "upper")
     ]
@@ -416,17 +408,14 @@ def set_current_effect_from_value(
         else:
             txt_box.setText("")
         txt_box.blockSignals(False)
+    semantic_samples = {
+        "binary": binary_effect_display_samples,
+        "continuous": continuous_effect_display_samples,
+        "diagnostic": diagnostic_effect_display_samples,
+    }[data_type](current_effect)
     fit_effect_ci_line_edits_to_contents(
         [effect_tbox, lower_tbox, upper_tbox],
-        semantic_samples=(
-            binary_effect_display_samples(current_effect)
-            if data_type == "binary"
-            else (
-                continuous_effect_display_samples(current_effect)
-                if data_type == "continuous"
-                else diagnostic_effect_display_samples(current_effect)
-            )
-        ),
+        semantic_samples=semantic_samples,
     )
 
 

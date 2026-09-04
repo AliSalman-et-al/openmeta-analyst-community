@@ -114,31 +114,67 @@ def assemble(
     sample: str, output: Path, log_path: Path | None = None,
 ) -> dict:
     observation = json.loads(workflow_observation.read_text(encoding="utf-8"))
-    if surface_records.is_dir():
-        surfaces = []
-        for path in sorted(surface_records.glob("surface-*.json")):
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            surfaces.extend(payload.get("scales", [payload]))
-    else:
-        surfaces = json.loads(surface_records.read_text(encoding="utf-8"))
+    surfaces = _load_surfaces(surface_records)
     samples = json.loads(sample_observations.read_text(encoding="utf-8"))
-    if not all(observation[key] for key in ("edit_observed", "analysis_observed", "reopen_observed", "analysis_after_reopen_observed")):
+    _validate_workflow_observation(observation)
+    workflows = _workflow_payload(observation, sample, samples)
+    evidence = {"schema_version": 1, "passed": True, "workflows": workflows,
+                "scales": surfaces}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _append_log(log_path)
+    return evidence
+
+
+def _load_surfaces(surface_records: Path) -> list:
+    if not surface_records.is_dir():
+        return json.loads(surface_records.read_text(encoding="utf-8"))
+    surfaces = []
+    for path in sorted(surface_records.glob("surface-*.json")):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        surfaces.extend(payload.get("scales", [payload]))
+    return surfaces
+
+
+def _validate_workflow_observation(observation: dict) -> None:
+    if not _workflow_flags_valid(observation):
         raise ValueError("workflow observation contains an unsuccessful operation")
-    base_identity = _identity(observation)
-    locale_variants = observation["locale_inputs"]
-    if [item["locale"] for item in locale_variants] != ["en_US", "de_DE"]:
+    variants = observation["locale_inputs"]
+    if [item["locale"] for item in variants] != ["en_US", "de_DE"]:
         raise ValueError("workflow observation must contain both locale variants")
-    if [item.get("operation") for item in locale_variants] != ["analysis", "locale"]:
+    if not _locale_operations_valid(variants):
         raise ValueError("workflow observation must contain distinct locale operations")
-    if (
-        locale_variants[0]["decimal_point"] != "."
-        or locale_variants[1]["decimal_point"] != ","
-        or "." not in locale_variants[0]["input"]
-        or "," not in locale_variants[1]["input"]
-        or locale_variants[0]["canonical_value"] != locale_variants[1]["canonical_value"]
-    ):
+    if not _locale_values_valid(variants):
         raise ValueError("workflow observation did not exercise distinct locale inputs")
-    workflows = {
+
+
+def _workflow_flags_valid(observation: dict) -> bool:
+    required = ("edit_observed", "analysis_observed", "reopen_observed", "analysis_after_reopen_observed")
+    return all(observation[key] for key in required)
+
+
+def _locale_operations_valid(variants: list[dict]) -> bool:
+    return [item.get("operation") for item in variants] == ["analysis", "locale"]
+
+
+def _locale_values_valid(variants: list[dict]) -> bool:
+    en, de = variants
+    return (
+        en["decimal_point"] == "."
+        and de["decimal_point"] == ","
+        and "." in en["input"]
+        and "," in de["input"]
+        and en["canonical_value"] == de["canonical_value"]
+    )
+
+
+def _workflow_payload(observation: dict, sample: str, samples: dict) -> dict:
+    base_identity = _identity(observation)
+    variants = [
+        {"operation": item["operation"], "locale": item["locale"], "decimal_point": item["decimal_point"], "input": item["input"], "canonical_value": item["canonical_value"], **_identity(item)}
+        for item in observation["locale_inputs"]
+    ]
+    return {
         "automation_entry_point": True,
         "converted_sample": sample,
         "representative_edit": bool(observation["edit_observed"]),
@@ -146,27 +182,23 @@ def assemble(
         "result_text": True,
         "expected_normalized_summary_sha256": base_identity["normalized_summary_sha256"],
         **base_identity,
-        "locale_variants": [
-            {"operation": item["operation"], "locale": item["locale"], "decimal_point": item["decimal_point"], "input": item["input"], "canonical_value": item["canonical_value"], **_identity(item)}
-            for item in locale_variants
-        ],
+        "locale_variants": variants,
         "save_reopen": bool(observation["reopen_observed"]),
         "analysis_after_reopen": bool(observation["analysis_after_reopen_observed"]),
         "sample_projects": samples,
     }
-    evidence = {"schema_version": 1, "passed": True, "workflows": workflows,
-                "scales": surfaces}
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    if log_path is not None:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as stream:
-            stream.write("packaged-workflow:project-exercise:complete\n")
-            stream.write("packaged-workflow:evidence-written\n")
-            stream.write("packaged-workflow:post-close\n")
-            stream.write("startup-project:normal-entry-point-passed\n")
-            stream.write("packaged-workflow:process-exit:0\n")
-    return evidence
+
+
+def _append_log(log_path: Path | None) -> None:
+    if log_path is None:
+        return
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as stream:
+        stream.write("packaged-workflow:project-exercise:complete\n")
+        stream.write("packaged-workflow:evidence-written\n")
+        stream.write("packaged-workflow:post-close\n")
+        stream.write("startup-project:normal-entry-point-passed\n")
+        stream.write("packaged-workflow:process-exit:0\n")
 
 
 def _identity(observation: dict) -> dict:

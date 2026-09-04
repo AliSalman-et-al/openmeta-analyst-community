@@ -771,10 +771,6 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
             call.=FALSE
         )
     }
-    if (!exists(method, mode="function")) {
-        stop(sprintf("Method implementation '%s' is not available.", method), call.=FALSE)
-    }
-
     if (!is.null(params$conf.level)) {
         validate.conf.level(params$conf.level)
     }

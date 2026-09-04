@@ -3,6 +3,7 @@ import sys
 import json
 from pathlib import Path
 import subprocess
+from typing import cast
 
 import pytest
 
@@ -57,6 +58,49 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
         window.hide()
         window.deleteLater()
         qapp.processEvents()
+
+
+def test_direct_table_view_mutation_is_checkpointed_for_one_undo(qapp):
+    from rc_metastudio import analysis_dataset, dataset_table_model
+    from rc_metastudio import main_window, project_adapter, workspace_session
+    from rc_metastudio.meta_globals import BINARY
+
+    dataset = analysis_dataset.Dataset()
+    dataset.add_outcome(analysis_dataset.Outcome("Outcome", BINARY))
+    dataset.add_study(analysis_dataset.Study(1, name="Beta"))
+    dataset.add_study(analysis_dataset.Study(2, name="Alpha"))
+    model = dataset_table_model.DatasetTableModel(dataset=dataset, add_blank_study=False)
+    model.current_outcome_name = "Outcome"
+    model.update_column_indices()
+    model.current_groups = []
+    initial = project_adapter.RuntimeProject(
+        dataset=model.dataset,
+        model_state=model.get_state(),
+        restored_selection=True,
+    )
+
+    class BoundaryOwner:
+        def __init__(self):
+            self.model = model
+            self.workspace = workspace_session.WorkspaceSession(
+                project_adapter.runtime_project_to_document(initial)
+            )
+
+        def _notify_user_that_data_is_unsaved(self):
+            pass
+
+    owner = BoundaryOwner()
+    model.order_studies([2, 1])
+    main_window.MainWindow.data_dirtied(cast(main_window.MainWindow, owner))
+    assert [study.name for study in model.dataset.studies] == ["Alpha", "Beta"]
+    assert owner.workspace.undo() is True
+    runtime = owner.workspace.runtime
+    assert runtime is not None
+    assert [study.name for study in runtime.dataset.studies] == [
+        "Beta",
+        "Alpha",
+    ]
+    assert owner.workspace.undo() is False
 
 
 def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
