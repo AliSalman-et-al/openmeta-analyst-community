@@ -1621,22 +1621,38 @@ def _workflow_locale_valid(
 
 
 def _workflow_samples_valid(sample_projects: dict, sample_records: object) -> bool:
-    if (
-        sample_projects.get("passed") is not True
-        or not _valid_sha256(sample_projects.get("manifest_sha256"))
-        or not isinstance(sample_records, list)
-        or not sample_records
-    ):
+    return _sample_manifest_valid(sample_projects) and _sample_records_valid(
+        sample_records
+    )
+
+
+def _sample_manifest_valid(sample_projects: dict) -> bool:
+    return sample_projects.get("passed") is True and _valid_sha256(
+        sample_projects.get("manifest_sha256")
+    )
+
+
+def _sample_records_valid(sample_records: object) -> bool:
+    if not isinstance(sample_records, list) or not sample_records:
         return False
-    typed_records: list[dict[str, object]] = []
-    for item in sample_records:
-        if not _string_keyed_dict(item):
-            return False
-        typed_records.append(item)
+    typed_records = _typed_sample_records(cast(list[object], sample_records))
+    if typed_records is None:
+        return False
     projects = {item.get("project") for item in typed_records}
     return len(projects) == len(typed_records) and all(
         _valid_sample_record(item) for item in typed_records
     )
+
+
+def _typed_sample_records(
+    sample_records: list[object],
+) -> list[dict[str, object]] | None:
+    typed_records: list[dict[str, object]] = []
+    for item in sample_records:
+        if not _string_keyed_dict(item):
+            return None
+        typed_records.append(item)
+    return typed_records
 
 
 def _valid_sample_record(item: object) -> bool:
@@ -1841,17 +1857,23 @@ def validate_direct_build_runner(runner: dict, *, target: str) -> None:
 
 
 def _is_native_runner(runner: dict, architecture: str) -> bool:
-    return (
-        runner.get("schema_version") == 1
-        and runner.get("runner_os") == "macOS"
-        and runner.get("uname_system") == "Darwin"
-        and runner.get("uname_machine") == architecture
-        and runner.get("python_machine") == architecture
-        and isinstance(runner.get("macos_version"), str)
-        and bool(runner.get("macos_version"))
-        and isinstance(runner.get("macos_build"), str)
-        and bool(runner.get("macos_build"))
+    required_fields = (
+        ("schema_version", 1),
+        ("runner_os", "macOS"),
+        ("uname_system", "Darwin"),
+        ("uname_machine", architecture),
+        ("python_machine", architecture),
     )
+    return all(
+        runner.get(field) == expected for field, expected in required_fields
+    ) and all(
+        _non_empty_text(runner.get(field))
+        for field in ("macos_version", "macos_build")
+    )
+
+
+def _non_empty_text(value: object) -> bool:
+    return isinstance(value, str) and bool(value)
 
 
 def _validate_hosted_runner(runner: dict, target: str) -> None:
