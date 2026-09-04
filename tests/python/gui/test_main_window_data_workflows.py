@@ -29,6 +29,7 @@ def test_data_table_return_moves_vertically_from_selected_cells():
     app, window = automation.start_automation()
     try:
         _create_binary_dataset(window)
+        assert window.model.dataset is window.workspace.runtime.dataset
         table = window.tableView
         model = window.model
 
@@ -788,11 +789,13 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         )
         assert window.save_as() is True
         assert critical_messages == []
+        assert window.model.dataset is window.workspace.runtime.dataset
 
         # Exercise the real project install boundary so both the normalized
         # dataset and project-scoped workspace selection are covered.
         assert window.open(file_path=saved_path) is True
         reopened = window.model.dataset
+        assert reopened is window.workspace.runtime.dataset
 
         assert [
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
@@ -822,6 +825,7 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         _create_binary_dataset(window)
         model = window.model
         table = window.tableView
+        assert model.dataset is window.workspace.runtime.dataset
 
         table.paste_contents(
             model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
@@ -854,6 +858,7 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         )
 
         window.undo()
+        assert window.model.dataset is window.workspace.runtime.dataset
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
         assert not window.workspace.is_dirty
@@ -863,6 +868,7 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         )
 
         window.redo()
+        assert window.model.dataset is window.workspace.runtime.dataset
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
         assert window.workspace.is_dirty
@@ -873,6 +879,7 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
 
         window.out_path = str(tmp_path / "workspace-edits.rcms")
         assert window.save() is True
+        assert window.model.dataset is window.workspace.runtime.dataset
         assert not window.workspace.is_dirty
 
         window.undo()
@@ -1179,12 +1186,7 @@ def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
 
     try:
         _create_binary_dataset(window)
-        state = window.tableView.model().get_state()
         command = main_window.ImportCsvCommand(
-            original_dataset=copy.deepcopy(window.model.dataset),
-            old_state_dict=state,
-            new_dataset=copy.deepcopy(window.model.dataset),
-            new_state_dict=state,
             imported_data=[["Alpha", "2020", "1", "10", "2", "12"]],
             main_form=window,
             covariate_names=[],

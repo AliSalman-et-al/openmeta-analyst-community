@@ -47,12 +47,7 @@ def _document_digest(document: ProjectDocument) -> str:
 
 
 def _validated_runtime(document: ProjectDocument) -> RuntimeProject:
-    candidate = ProjectDocument(
-        document.format_version,
-        copy.deepcopy(document.project),
-        copy.deepcopy(document.state),
-    )
-    return project_adapter.document_to_runtime_project(candidate)
+    return project_adapter.document_to_runtime_project(document)
 
 
 class WorkspaceSession:
@@ -76,9 +71,7 @@ class WorkspaceSession:
         if self._runtime is None:
             return None
         try:
-            return project_adapter.runtime_project_to_document(
-                _copy_runtime(self._runtime)
-            )
+            return project_adapter.runtime_project_to_document(self._runtime)
         except project_adapter.ProjectAdapterError:
             return None
 
@@ -127,7 +120,7 @@ class WorkspaceSession:
         if self._transaction_checkpoint is not None:
             return
         assert self._checkpoint is not None
-        if self._runtime_digest() == self._checkpoint_digest():
+        if current_digest == self._checkpoint_digest():
             return
         before = _copy_runtime(self._checkpoint)
         after = _copy_runtime(self._runtime)
@@ -164,22 +157,6 @@ class WorkspaceSession:
         self._redo.clear()
         self._checkpoint = _copy_runtime(self._runtime)
 
-    def replace_runtime(
-        self,
-        runtime: RuntimeProject,
-        *,
-        path: str | Path | None = None,
-        record_history: bool = True,
-    ) -> None:
-        candidate = _copy_runtime(runtime)
-        if self._runtime is not None and record_history:
-            self._history.append(WorkspaceChange(self.snapshot(), candidate))
-            self._redo.clear()
-        self._runtime = candidate
-        self._checkpoint = _copy_runtime(candidate)
-        if path is not None:
-            self._path = Path(path)
-
     def _runtime_digest(self) -> str:
         assert self._runtime is not None
         return _document_digest(
@@ -204,7 +181,12 @@ class WorkspaceSession:
     def is_dirty(self) -> bool:
         if self._runtime is None:
             return self._forced_dirty
-        return self._forced_dirty or self._runtime_digest() != self._saved_digest
+        if self._forced_dirty:
+            return True
+        try:
+            return self._runtime_digest() != self._saved_digest
+        except project_adapter.ProjectAdapterError:
+            return True
 
     @property
     def can_undo(self) -> bool:
@@ -251,7 +233,7 @@ class WorkspaceSession:
         """
         candidate = _validated_runtime(project_format.load_project(path))
         if install is not None:
-            previous_runtime = _copy_runtime(self._runtime) if self._runtime else None
+            previous_runtime = self._runtime
             previous_checkpoint = (
                 _copy_runtime(self._checkpoint) if self._checkpoint else None
             )
@@ -299,42 +281,25 @@ class WorkspaceSession:
     def save(
         self,
         path: str | Path | None = None,
-        *,
-        document: ProjectDocument | None = None,
     ) -> Path:
-        """Persist one validated document and publish it only after replacement.
-
-        A document supplied by an adapter is validated and written as one
-        transaction.  ``ProjectDurabilityError`` means the replacement already
-        happened, so the in-memory save metadata is committed before the error
-        is re-raised for the UI to report.
-        """
+        """Persist the canonical live runtime without changing its identity."""
         current = self._runtime
-        if current is None and document is None:
+        if current is None:
             raise ValueError("cannot save an empty workspace")
         destination = Path(path) if path is not None else self._path
         if destination is None:
             raise ValueError("save path is required for an unnamed workspace")
-        candidate = _validated_runtime(document) if document is not None else current
-        assert candidate is not None
-        serialized = project_adapter.runtime_project_to_document(
-            _copy_runtime(candidate)
-        )
+        serialized = project_adapter.runtime_project_to_document(current)
         try:
             project_format.save_project(
                 destination, serialized.project, serialized.state
             )
         except ProjectDurabilityError:
-            if document is not None:
-                self._runtime = candidate
-                self._checkpoint = _copy_runtime(candidate)
-                self._path = destination
-                self._saved_digest = self._runtime_digest()
-                self._forced_dirty = False
+            self._path = destination
+            self._saved_digest = self._runtime_digest()
+            self._checkpoint = _copy_runtime(current)
+            self._forced_dirty = False
             raise
-        if document is not None:
-            self._runtime = candidate
-            self._checkpoint = _copy_runtime(candidate)
         self._path = destination
         self._saved_digest = self._runtime_digest()
         self._forced_dirty = False

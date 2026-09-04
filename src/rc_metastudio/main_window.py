@@ -1841,7 +1841,6 @@ class ImportCsvCommand:
         covariate_names=None,
         covariate_types=None,
         description="Import a CSV file",
-        **_legacy_snapshots,
     ):
         if main_form is None:
             raise ValueError("CSV import requires a main form")
@@ -1852,9 +1851,6 @@ class ImportCsvCommand:
 
     def redo(self):
         self._import_data_into_new_dataset()
-
-    def undo(self):
-        self.main_form.undo()
 
     def _import_data_into_new_dataset(self):
         num_rows = len(self.imported_data)

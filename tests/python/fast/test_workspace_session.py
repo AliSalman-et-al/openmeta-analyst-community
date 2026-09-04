@@ -60,6 +60,7 @@ def test_failed_install_preserves_document_history_and_path(tmp_path: Path) -> N
     dataset["title"] = "Edited before failed install"
     session.commit(project, state)
     before = session.document
+    previous_runtime = session.runtime
 
     with pytest.raises(RuntimeError, match="adapter failed"):
         session.open(
@@ -70,6 +71,7 @@ def test_failed_install_preserves_document_history_and_path(tmp_path: Path) -> N
         )
 
     assert session.document == before
+    assert session.runtime is previous_runtime
     assert session.path == source
     assert session.is_dirty
     assert session.can_undo
@@ -87,7 +89,9 @@ def test_durability_failure_commits_the_installed_document(
     dataset = project["dataset"]
     assert isinstance(dataset, dict)
     dataset["title"] = "Installed despite uncertainty"
-    candidate = type(document)(document.format_version, project, state)
+    runtime = session.runtime
+    assert runtime is not None
+    runtime.dataset.title = "Installed despite uncertainty"
 
     def uncertain(_destination: Path) -> None:
         raise project_format.ProjectDurabilityError(
@@ -96,7 +100,7 @@ def test_durability_failure_commits_the_installed_document(
 
     monkeypatch.setattr(project_format, "_fsync_parent_directory", uncertain)
     with pytest.raises(project_format.ProjectDurabilityError):
-        session.save(destination, document=candidate)
+        session.save(destination)
 
     assert session.path == destination
     assert not session.is_dirty
