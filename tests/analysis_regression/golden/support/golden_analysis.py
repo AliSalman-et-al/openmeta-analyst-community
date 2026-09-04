@@ -603,7 +603,7 @@ def _artifact_source_key(result: AnalysisResult, label, images):
     for section in result.sections:
         if (
             section.kind == "image"
-            and section.title == label
+            and section.title.casefold() == str(label).casefold()
             and section.source_key in images
         ):
             return section.source_key

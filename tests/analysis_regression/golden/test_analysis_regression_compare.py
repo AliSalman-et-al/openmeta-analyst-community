@@ -664,6 +664,46 @@ def test_golden_capture_uses_public_title_for_semantic_image_descriptor(tmp_path
     assert descriptor["capability"]["kind"] == "forest"
 
 
+def test_golden_capture_maps_case_only_artifact_title_drift_to_typed_metadata(
+    tmp_path,
+):
+    image_path = tmp_path / "loo.png"
+    image_path.write_bytes(b"png")
+    display_path = tmp_path / "loo.display.svg"
+    display_path.write_text("<svg />", encoding="utf-8")
+    result = _typed_result(
+        images={"analysis.leave-one-out.loo.1": str(image_path)},
+        display_images={"analysis.leave-one-out.loo.1": str(display_path)},
+        capabilities={
+            "analysis.leave-one-out.loo.1": {
+                "plot_kind": "leave_one_out_forest",
+                "editable": True,
+                "styleable": True,
+                "composition": "single",
+                "regenerator": "forest",
+            }
+        },
+        image_params_paths={"analysis.leave-one-out.loo.1": "loo.params"},
+        sections=[
+            {
+                "id": "analysis.leave-one-out.loo.1",
+                "kind": "image",
+                "order": 0,
+                "title": "Leave-one-out Forest Plot",
+                "source_key": "analysis.leave-one-out.loo.1",
+            }
+        ],
+    )
+
+    descriptor = verify_golden_compatibility.golden_analysis._capture_plot_descriptors(
+        {"artifacts": {"Leave-one-out Forest plot": str(image_path)}}, result
+    )[0]
+
+    assert descriptor["display"]["identity"] == "Leave-one-out Forest plot"
+    assert descriptor["display"]["name"] == "loo.display.svg"
+    assert descriptor["capability"]["kind"] == "leave_one_out_forest"
+
+
 def test_current_golden_manifest_requires_exact_rpy2_identities():
     expected = dict(verify_golden_compatibility.REQUIRED_RPY2_IDENTITIES)
     case = {
@@ -1258,6 +1298,8 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         assert data_call[1]["include_raw_data"] is False
         assert data_call[1]["studies"] == model.studies
         assert data_call[1]["covs_to_include"][0].name == "golden_year"
+        added_covariate = next(call[1] for call in calls if call[0] == "covariate")
+        assert data_call[1]["covs_to_include"][0] is added_covariate
 
 
 def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
