@@ -12,13 +12,6 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
 
-from rc_metastudio import r_backend, r_bridge
-
-_test_backend = r_backend.make_test_backend()
-for _name in dir(_test_backend):
-    if not _name.startswith("_"):
-        setattr(r_bridge, _name, getattr(_test_backend, _name))
-
 _QAPPLICATION = None
 
 

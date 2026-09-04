@@ -386,7 +386,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         dialog.update_back_calculation_button()
         table_before = _binary_table_snapshot(dialog)
         model_before = copy.deepcopy(dialog.analysis_unit)
-        dirty_before = window.current_data_unsaved
+        dirty_before = window.workspace.is_dirty
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.back_calculate_button.isEnabled()
 
@@ -398,7 +398,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
             model_before.get_raw_data_for_groups(dialog.current_groups)
         )
         assert dialog.analysis_unit.effects == model_before.effects
-        assert window.current_data_unsaved is dirty_before
+        assert window.workspace.is_dirty is dirty_before
         assert dialog.result() == 0
         assert ok.isEnabled()
     finally:

@@ -1141,6 +1141,16 @@ def _normalize_results(results: AnalysisResult) -> AnalysisResult:
         "image_params_paths": dict(results["image_params_paths"]),
         "image_order": None if results["image_order"] is None else list(results["image_order"]),
         "plot_capabilities": dict(results["plot_capabilities"]),
+        "sections": [
+            {
+                "id": section.semantic_id,
+                "kind": section.kind,
+                "order": section.order,
+                "title": section.title,
+                "source_key": section.source_key,
+            }
+            for section in results.sections
+        ],
     }
 
     if not normalized["texts"] and not normalized["images"]:
