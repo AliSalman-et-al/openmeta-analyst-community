@@ -92,6 +92,15 @@ rcmetar.reitsma.interval.to.specificity <- function(interval) {
     out
 }
 
+# Keep the FPR-to-specificity ordering in one place.  Both the operating
+# point and marginal prediction intervals are reported as estimate/lower/upper
+# on the clinical specificity scale.
+rcmetar.reitsma.fpr.interval.to.specificity <- function(fpr) {
+    if (is.null(fpr)) return(NULL)
+    c(lower=1 - fpr[["upper"]], estimate=1 - fpr[["estimate"]],
+      upper=1 - fpr[["lower"]])
+}
+
 rcmetar.reitsma.covariance.to.specificity <- function(covariance) {
     if (is.null(covariance)) return(NULL)
     covariance <- as.matrix(covariance)
@@ -119,8 +128,7 @@ rcmetar.reitsma.marginal.prediction <- function(fit, level) {
     }
     fpr <- interval(2L, fit$alphafpr)
     list(sensitivity=interval(1L, fit$alphasens),
-         specificity=c(lower=1 - fpr[["upper"]], estimate=1 - fpr[["estimate"]],
-                       upper=1 - fpr[["lower"]]),
+         specificity=rcmetar.reitsma.fpr.interval.to.specificity(fpr),
          false.positive.rate=fpr,
          covariance=fit$Psi + covariance)
 }
@@ -145,7 +153,7 @@ rcmetar.reitsma.summary.point <- function(fit, level) {
     fpr <- to.proportion("tfpr", fit$alphafpr)
     list(
         sensitivity=sens,
-        specificity=c(estimate=1-fpr[["estimate"]], lower=1-fpr[["upper"]], upper=1-fpr[["lower"]]),
+        specificity=rcmetar.reitsma.fpr.interval.to.specificity(fpr),
         false.positive.rate=fpr
     )
 }
@@ -519,6 +527,31 @@ rcmetar.reitsma.draw <- function(plot.data, outpath) {
     invisible(outpath)
 }
 
+rcmetar.reitsma.apply.saved.style <- function(plot.data, params) {
+    # Re-rendering is deliberately geometry-preserving: mutable presentation
+    # controls are overlaid onto the captured SROC bundle, never re-extracted
+    # from the fitted model.
+    style <- plot.data$style %||% list()
+    fields <- c(curve.color="fp_curve_color", confidence.color="fp_confidence_color",
+        prediction.color="fp_prediction_color", accent.color="fp_accent_color",
+        point.size.multiplier="fp_point_size_multiplier", show.confidence="fp_show_confidence",
+        show.prediction="fp_show_prediction", show.summary="fp_show_summary", show.auc="fp_show_auc",
+        point.area.by.sample.size="fp_point_area_by_sample_size", show.legend="fp_show_legend",
+        show.marker.legend="fp_show_marker_legend", marker.area="fp_marker_area", xlabel="fp_xlabel",
+        ylabel="fp_ylabel", plot.lb="fp_plot_lb", plot.ub="fp_plot_ub", xticks="fp_xticks",
+        y.plot.lb="fp_sroc_plot_lb", y.plot.ub="fp_sroc_plot_ub", yticks="fp_sroc_yticks",
+        curve.lty="fp_curve_lty", confidence.lty="fp_confidence_lty", prediction.lty="fp_prediction_lty",
+        text.cex="fp_text_cex", point.pch="fp_point_pch", show.labels="fp_show_labels")
+    for (field in names(fields)) {
+        value <- params[[fields[[field]]]]
+        if (!is.null(value) && length(value)) style[[field]] <- value
+    }
+    plot.data$style <- style
+    plot.data$display.path <- rcmetar.plot.scalar_path(params$fp_display_path %||% plot.data$display.path)
+    plot.data$legend <- NULL
+    plot.data
+}
+
 rcmetar.reitsma.coefficient.bundle <- function(coefficients, scale, params=list()) {
     if (is.null(coefficients) || !nrow(coefficients)) stop(sprintf("No %s moderator coefficients were returned by mada.", scale), call.=FALSE)
     list(kind="forest", render_engine="reitsma.coefficient", fp_style="default",
@@ -631,11 +664,14 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     fit <- fitted$fit
     section.warnings <- character()
     summary.capture <- rcmetar.reitsma.capture.warnings(summary(fit, level=level))
-    sm <- rcmetar.reitsma.require.value(summary.capture, "mada Reitsma summary")
+    # A converged fit remains authoritative when an optional extractor fails.
+    # Keep every independently available result instead of replacing it with
+    # an estimator fallback or failing the entire report.
+    sm <- summary.capture$value
     summary.warnings <- rcmetar.reitsma.warning.messages(summary.capture, "mada summary: ")
     if (!is.null(summary.capture$error)) section.warnings <- c(section.warnings, paste("mada summary unavailable:", summary.capture$error))
     point.capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.summary.point(fit, level))
-    point <- rcmetar.reitsma.require.value(point.capture, "Summary operating point")
+    point <- point.capture$value
     section.warnings <- c(section.warnings,
         rcmetar.reitsma.operation.messages(point.capture, "Summary operating point"))
     # Keep mada's sampling-based ratios reproducible without exposing an RNG
@@ -673,6 +709,7 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     }
     if (isTRUE(params$create.plot %||% TRUE) && !is.null(plot.data)) {
         params$fp_outpath <- path
+        params$reitsma.sroc.geometry <- plot.data
         plot.params.path <- save.data(diagnostic.data, fit, params, plot.data)
         images[["SROC"]] <- path
         plot.paths[["SROC"]] <- plot.params.path
@@ -949,6 +986,7 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
             plot.params$reitsma.coefficient.scale <- scale
             plot.params$reitsma.moderator.coding <- coding
             bundle <- rcmetar.reitsma.coefficient.bundle(spec$data, scale, plot.params)
+            plot.params$reitsma.coefficient.geometry <- bundle
             rcmetar.draw.reitsma.coefficient(bundle, path)
             saved <- save.data(reg.data, fit, plot.params, bundle)
             title <- paste(scale, "Moderator Coefficients")

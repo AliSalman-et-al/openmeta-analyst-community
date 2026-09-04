@@ -413,6 +413,14 @@ rcmetar.diagnostic.study.effects <- function(tp, fn, fp, tn, metrics=c("Spec", "
 }
 
 rcmetar.regenerate.plot.data <- function(om.data, res, params) {
+    if (is.list(params) && is.list(params$reitsma.coefficient.geometry)) {
+        bundle <- params$reitsma.coefficient.geometry
+        bundle$params <- params
+        return(bundle)
+    }
+    if (is.list(params) && is.list(params$reitsma.sroc.geometry)) {
+        return(rcmetar.reitsma.apply.saved.style(params$reitsma.sroc.geometry, params))
+    }
     if (is.list(params) && !is.null(params$reitsma.coefficient.scale) && inherits(res, "reitsma")) {
         coefficients <- summary(res, level=as.numeric(params$conf.level %||% 95) / 100)$coefficients
         specificity <- identical(as.character(params$reitsma.coefficient.scale), "Specificity")

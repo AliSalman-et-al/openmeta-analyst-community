@@ -199,9 +199,10 @@
     diagnostic <- is(om.data, "DiagnosticData") && metric == "DOR"
     if (diagnostic) params$funnels <- "deeks"
     derived <- .small.study.reconstruct(om.data, metric, params)
-    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
-    keep <- logical(length(derived$y))
-    keep[eligibility$included.indices] <- TRUE
+    # This is the sole study-set decision for an executed analysis.  Every
+    # authority-package fit below receives these exact rows; individual
+    # methods may reject that set but may not silently complete-case it again.
+    keep <- is.finite(derived$y) & is.finite(derived$se) & derived$se > 0
     if (!any(keep)) stop("Small-study effects analysis requires finite effects and standard errors.")
     y <- derived$y[keep]
     se <- derived$se[keep]
@@ -211,11 +212,12 @@
     pooled <- if (metric == "OR") prepared.model else native.model
     metafor.pooled <- metafor::rma.uni(yi=y, sei=se, method="REML", level=confidence.level)
     params$reml.tau2 <- pooled$tau2 %||% NA_real_
+    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
     eligibility$raw.data.available <- isTRUE(derived$raw)
     list(metric=metric, confidence.level=confidence.level, diagnostic=diagnostic,
          derived=derived, keep=keep, y=y, se=se, prepared.model=prepared.model,
          native.model=native.model, pooled=pooled, metafor.pooled=metafor.pooled,
-         eligibility=eligibility, params=params)
+        eligibility=eligibility, params=params)
 }
 
 .small.study.select.methods <- function(eligibility, params, metric, diagnostic) {
@@ -826,6 +828,12 @@ publication.bias.effects <- function(om.data, params) {
             run.params$deeks.ess <- effective[keep.deeks]
             run.params$deeks.predictor <- 1 / sqrt(effective[keep.deeks])
             run.params$deeks.weights <- effective[keep.deeks]
+            # Store the fitted line, not merely its inputs.  Regeneration is
+            # presentation-only and must not run a second regression.
+            deeks.line <- stats::lm(prepared$y[keep.deeks] ~ run.params$deeks.predictor,
+                                    weights=run.params$deeks.weights)
+            run.params$deeks.line <- c(intercept=unname(stats::coef(deeks.line)[[1L]]),
+                                       slope=unname(stats::coef(deeks.line)[[2L]]))
             run.params$deeks.correction.policy <- as.character(params$correction.policy %||% "All studies if any zero exists")
         }
         rendered <- tryCatch({
@@ -1065,12 +1073,14 @@ rcmetar.regenerate.small.study.funnel <- function(om.data, res, params, output.p
     if (identical(kind, "deeks") && is(om.data, "DiagnosticData")) {
         effective <- as.numeric(params$deeks.ess %||% numeric())
         predictor <- as.numeric(params$deeks.predictor %||% numeric())
-        weights <- as.numeric(params$deeks.weights %||% effective)
         keep <- is.finite(y) & is.finite(se) & se > 0
         if (length(effective) != sum(keep)) stop("persisted Deeks effective sample sizes do not match prepared effects")
         plot(predictor, y[keep], xlab=xlab, ylab=ylab, xlim=xlim, xaxt=if (is.null(at)) "s" else "n", pch=point.symbol, cex=point.size, col=point.color, bg=point.color)
         if (!is.null(at)) axis(1, at=at)
-        if (show.regression && length(predictor) >= 3L) abline(stats::lm(y[keep] ~ predictor, weights=weights), col=reference.color)
+        line <- as.numeric(params$deeks.line %||% c(NA_real_, NA_real_))
+        if (show.regression && length(line) == 2L && all(is.finite(line))) {
+            abline(a=line[[1L]], b=line[[2L]], col=reference.color)
+        }
         if (label.policy == "all") text(predictor, y[keep], labels=om.data@study.names[keep], pos=4, cex=.7)
     } else if (identical(kind, "trimfill")) {
         keep <- is.finite(y) & is.finite(se) & se > 0
