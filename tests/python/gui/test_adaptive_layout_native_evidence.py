@@ -23,15 +23,15 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
         adaptive_layout_evidence.validate_native_platform("offscreen", "win32", "AMD64")
     with pytest.raises(RuntimeError, match="expected Qt platform cocoa"):
         adaptive_layout_evidence.validate_native_platform("windows", "darwin", "x86_64")
-    with pytest.raises(RuntimeError, match="requires an x64 host"):
-        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "arm64")
+    with pytest.raises(RuntimeError, match="requires an Apple silicon arm64 host"):
+        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "x86_64")
 
     assert (
         adaptive_layout_evidence.validate_native_platform("windows", "win32", "AMD64")
         == "windows"
     )
     assert (
-        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "x86_64")
+        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "arm64")
         == "cocoa"
     )
 

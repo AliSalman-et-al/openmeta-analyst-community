@@ -24,6 +24,10 @@ CONSTRAINED_WORKSPACE = QtCore.QSize(800, 600)
 FULL_USABILITY_WORKSPACE = QtCore.QSize(1024, 640)
 NON_NATIVE_PLUGINS = {"offscreen", "minimal", "minimalegl", "vnc"}
 EXPECTED_NATIVE_PLUGINS = {"win32": "windows", "darwin": "cocoa"}
+EXPECTED_NATIVE_ARCHITECTURES = {
+    "win32": {"amd64", "x86_64"},
+    "darwin": {"arm64"},
+}
 
 
 def _requested_scale_factor():
@@ -62,17 +66,20 @@ def validate_native_platform(platform_plugin=None, system=None, machine=None):
     if expected is None:
         raise RuntimeError(
             "Adaptive-layout package evidence is release-gated only on Windows "
-            "x64 and macOS Intel x64; got %s." % host
+            "x64 and Apple silicon macOS; got %s." % host
         )
     if plugin != expected:
         raise RuntimeError(
             "Adaptive-layout package evidence expected Qt platform %s on %s; "
             "got %s." % (expected, host, plugin)
         )
-    if architecture not in {"amd64", "x86_64"}:
+    if architecture not in EXPECTED_NATIVE_ARCHITECTURES[host]:
+        expected_architecture = (
+            "x64" if host == "win32" else "Apple silicon arm64"
+        )
         raise RuntimeError(
-            "Adaptive-layout package evidence requires an x64 host; got %s."
-            % architecture
+            "Adaptive-layout package evidence requires an %s host; got %s."
+            % (expected_architecture, architecture)
         )
     return plugin
 
