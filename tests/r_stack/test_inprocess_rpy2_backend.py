@@ -252,8 +252,17 @@ _DRIVER = textwrap.dedent(
         },
         data_name="issue146_continuous",
     )
-    assert continuous_result.images["Forest Plot"] == forest_path
-    assert continuous_result.display_images["Forest Plot"] == forest_display_path
+    forest_section = next(
+        section
+        for section in continuous_result.sections
+        if section.title == "Forest Plot"
+    )
+    assert forest_section.semantic_id == "analysis.standard.forest.1"
+    assert continuous_result.images[forest_section.source_key] == forest_path
+    assert (
+        continuous_result.display_images[forest_section.source_key]
+        == forest_display_path
+    )
 
     from PyQt6 import QtWidgets
     from rc_metastudio import results_window
@@ -934,8 +943,8 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
         parsed_funnel_result = r_bridge.parse_out_results(
             ro.globalenv["funnel_result"]
         )
-        assert "Method details" in parsed_funnel_result.texts
-        method_details = parsed_funnel_result.texts["Method details"]
+        assert "small-study.method-details" in parsed_funnel_result.texts
+        method_details = parsed_funnel_result.texts["small-study.method-details"]
         assert "Package:" in method_details
         assert (
             "Weighting: inverse-variance weights with REML heterogeneity"

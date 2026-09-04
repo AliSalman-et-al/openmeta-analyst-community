@@ -71,7 +71,7 @@ _DRIVER = textwrap.dedent(
             )'''
         )
         parsed = r_bridge.parse_out_results(result)
-        texts = parsed["texts"]
+        texts = parsed.texts
         assert list(texts) == [
             "Summary operating point",
             "SROC AUC",
@@ -96,17 +96,17 @@ _DRIVER = textwrap.dedent(
         assert "quality:" in texts["Moderator coding"], texts["Moderator coding"]
         assert "p-value: < 0.001" in texts["Overall ML likelihood-ratio test"], texts["Overall ML likelihood-ratio test"]
         assert "quality:" in texts["Moderator block tests"], texts["Moderator block tests"]
-        assert parsed["image_var_names"] == {}
-        assert parsed["image_params_paths"] == {}
-        assert parsed["plot_capabilities"] == {}
+        assert parsed.image_var_names == {}
+        assert parsed.image_params_paths == {}
+        assert parsed.plot_capabilities == {}
 
         auc_only = r_bridge.ro.r(
             'list(`SROC AUC`=list(AUC=.88, `normalized.partial.AUC`=.42, '
             'confidence.interval="Not provided by mada::AUC(); no invented AUC CI."))'
         )
         parsed_auc = r_bridge.parse_out_results(auc_only)
-        assert "[1]" not in parsed_auc["texts"]["SROC AUC"]
-        assert "AUC: 0.88" in parsed_auc["texts"]["SROC AUC"]
+        assert "[1]" not in parsed_auc.texts["SROC AUC"]
+        assert "AUC: 0.88" in parsed_auc.texts["SROC AUC"]
 
         for wrapped in (False, True):
             result_expr = (
@@ -115,7 +115,7 @@ _DRIVER = textwrap.dedent(
                 else "list(Summary=list(MAResults=list(b=.8, ci.lb=.7, ci.ub=.9, se=.05)))"
             )
             one_study = r_bridge.parse_out_results(r_bridge.ro.r(result_expr))
-            one_text = one_study["texts"]["Summary"]
+            one_text = one_study.texts["Summary"]
             assert "Estimate: 0.8" in one_text, one_text
             assert "Lower bound: 0.7" in one_text, one_text
             assert "Upper bound: 0.9" in one_text, one_text
@@ -162,7 +162,7 @@ _REAL_REITSMA_DRIVER = textwrap.dedent(
     case.method = ["diagnostic.reitsma"]
     case.parameters = [dict(case.parameters[0], measure="DOR")]
     parsed = headless_analysis.run_headless_analysis(case)
-    texts = parsed["texts"]
+    texts = parsed.texts
 
     # Reitsma emits both data.frames and named character vectors.  Exercise
     # the actual package/bridge boundary so data.frame iteration cannot regress

@@ -278,8 +278,8 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
         ],
     )
     regression = headless_analysis.run_headless_analysis(regression_case)
-    sens_text = regression["texts"]["Sensitivity coefficients"]
-    spec_text = regression["texts"]["Specificity coefficients"]
+    sens_text = regression.texts["Sensitivity coefficients"]
+    spec_text = regression.texts["Specificity coefficients"]
     assert "quality = A (reference)" in sens_text and "quality = A (reference)" in spec_text
     assert "Odds Ratio" in sens_text and "Odds Ratio" in spec_text
 
