@@ -197,7 +197,7 @@ NULL
 #' around model fitting and resampling.
 #'
 #' @section Covariate design:
-#' \code{make.mods.str()}, \code{make.design.matrix()},
+#' \code{make.mods.formula()}, \code{make.design.matrix()},
 #' \code{get.row.vector.cat.cat()}, \code{get.row.vector.cat.cont()},
 #' \code{coded.cat.mod.level()}, \code{is.single.numeric.covariate()},
 #' \code{extract.cov.data()}, and \code{cond.means.info()} prepare covariate
@@ -214,7 +214,7 @@ NULL
 #' See \code{rcmetar.method.references("meta.regression")} for the
 #' meta-regression method citations used in result payloads.
 #'
-#' @aliases adjusted_means_display categorical.meta.regression coded.cat.mod.level cond.means.info create.regression.display extract.cov.data g.bootstrap.meta.regression g.bootstrap.meta.regression.cond.means g.create.plot.data.reg g.get.scale g.meta.regression g.meta.regression.cond.means g.round.display.zval get.row.vector.cat.cat get.row.vector.cat.cont is.single.numeric.covariate make.design.matrix make.mods.str meta.regression meta.regression.plot random.meta.regression regression.wrapper
+#' @aliases adjusted_means_display categorical.meta.regression coded.cat.mod.level cond.means.info create.regression.display extract.cov.data g.bootstrap.meta.regression g.bootstrap.meta.regression.cond.means g.create.plot.data.reg g.get.scale g.meta.regression g.meta.regression.cond.means g.round.display.zval get.row.vector.cat.cat get.row.vector.cat.cont is.single.numeric.covariate make.design.matrix make.mods.formula meta.regression meta.regression.plot random.meta.regression regression.wrapper
 #' @name RCMetaR-meta-regression
 NULL
 

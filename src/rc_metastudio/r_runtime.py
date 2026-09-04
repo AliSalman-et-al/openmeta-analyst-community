@@ -45,11 +45,7 @@ def _frozen_kit_identity(root):
         raise RuntimeError(
             "Frozen R integration-kit identity is missing or unreadable."
         ) from exc
-    target = (
-        "macos-arm64"
-        if sys.platform == "darwin" and __import__("platform").machine() == "arm64"
-        else ("macos-x64" if sys.platform == "darwin" else "windows-x64")
-    )
+    target = "macos-arm64" if sys.platform == "darwin" else "windows-x64"
     if not (
         manifest.get("kind") == "rc-metastudio-r-integration-kit"
         and manifest.get("target") == target

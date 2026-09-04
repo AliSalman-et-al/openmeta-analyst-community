@@ -30,7 +30,7 @@ from rc_metastudio import calculator_routines as calc_fncs
 
 from rc_metastudio import app_error_handler
 from rc_metastudio import adaptive_window
-from rc_metastudio import r_bridge
+from rc_metastudio.calculator_service import CalculatorService
 from rc_metastudio import tabular_data
 from rc_metastudio.meta_globals import (
     CONTINUOUS_METRIC_NAMES,
@@ -105,6 +105,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         group_comparison,
         current_effect,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(ContinuousDataDialog, self).__init__(parent)
@@ -123,7 +124,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             )
             raise ValueError("Confidence interval must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
 
@@ -512,7 +514,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             current_effect=self.current_effect,
             group_comparison=self.group_comparison,
             conv_to_disp_scale=partial(
-                r_bridge.continuous_convert_scale,
+                self.calculator.continuous_convert_scale,
                 metric_name=self.current_effect,
                 convert_to="display.scale",
             ),
@@ -592,7 +594,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.continuous_convert_scale(
+        calculation_scale_value = self.calculator.continuous_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -907,7 +909,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     current_values[self._imputation_field_name(var_name)] = var_value
 
             alpha = self.confidence_level_to_alpha()
-            results_from_r = r_bridge.impute_continuous_data(current_values, alpha)
+            results_from_r = self.calculator.impute_continuous_data(current_values, alpha)
 
             if results_from_r["succeeded"]:
                 computed_vals = results_from_r["output"]
@@ -972,7 +974,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     ] = var_value
         params_dict["metric"] = "'%s'" % self.current_effect
 
-        results_from_r = r_bridge.impute_pre_post_continuous_data(
+        results_from_r = self.calculator.impute_pre_post_continuous_data(
             params_dict,
             calc_fncs.numeric_value(self.correlation_pre_post.text()),
             self.confidence_level_to_alpha(),
@@ -1131,7 +1133,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         ):
             est_and_ci_d = None
             if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
-                est_and_ci_d = r_bridge.continuous_effect_for_study(
+                est_and_ci_d = self.calculator.continuous_effect_for_study(
                     n1,
                     m1,
                     sd1,
@@ -1145,7 +1147,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 )
             else:
                 # continuous, one-arm metric
-                est_and_ci_d = r_bridge.continuous_effect_for_study(
+                est_and_ci_d = self.calculator.continuous_effect_for_study(
                     n1,
                     m1,
                     sd1,
@@ -1154,7 +1156,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     confidence_level=self.confidence_level,
                 )
 
-            est, low, high = r_bridge.effect_triplet(
+            est, low, high = self.calculator.effect_triplet(
                 est_and_ci_d,
                 "calc_scale",
                 metric=self.current_effect,
@@ -1356,7 +1358,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             for candidate in (True, False):
                 candidate_effect_data = dict(effect_data)
                 candidate_effect_data["met.param"] = candidate
-                candidate_imputed = r_bridge.back_calculate_continuous_data(
+                candidate_imputed = self.calculator.back_calculate_continuous_data(
                     group1_data,
                     group2_data,
                     candidate_effect_data,
@@ -1372,7 +1374,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             self.update_clear_button_color()
             return None
 
-        imputed = r_bridge.back_calculate_continuous_data(
+        imputed = self.calculator.back_calculate_continuous_data(
             group1_data, group2_data, effect_data, self.confidence_level
         )
 

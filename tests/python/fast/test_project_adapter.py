@@ -90,7 +90,20 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
     rebuilt_units = _objects(
         _object(_objects(_object(rebuilt["dataset"])["studies"])[0])["analysis_units"]
     )
-    assert rebuilt_units == expected_units
+    assert [
+        {
+            key: value
+            for key, value in unit.items()
+            if key != "stable_id"
+        }
+        | {
+            "groups": [
+                {key: value for key, value in group.items() if key != "stable_id"}
+                for group in unit["groups"]
+            ]
+        }
+        for unit in rebuilt_units
+    ] == expected_units
     assert list(
         dataset.studies[0].analysis_units_by_outcome["Outcome"]["first"].groups
     ) == [
@@ -98,6 +111,23 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
         "Tx 2",
         "Tx 3",
     ]
+
+
+def test_adapter_persists_internal_identities_across_reopen() -> None:
+    dataset = project_adapter.project_to_dataset(_multi_arm_project("binary"))
+    original = (
+        dataset.studies[0].stable_id,
+        dataset.get_outcome_obj("Outcome").stable_id,
+        dataset.studies[0].analysis_units_by_outcome["Outcome"]["first"].stable_id,
+        dataset.studies[0].analysis_units_by_outcome["Outcome"]["first"].groups["Tx 1"].stable_id,
+    )
+    reopened = project_adapter.project_to_dataset(project_adapter.dataset_to_project(dataset))
+    assert original == (
+        reopened.studies[0].stable_id,
+        reopened.get_outcome_obj("Outcome").stable_id,
+        reopened.studies[0].analysis_units_by_outcome["Outcome"]["first"].stable_id,
+        reopened.studies[0].analysis_units_by_outcome["Outcome"]["first"].groups["Tx 1"].stable_id,
+    )
 
 
 def test_document_to_runtime_project_reconstructs_state_and_selection() -> None:

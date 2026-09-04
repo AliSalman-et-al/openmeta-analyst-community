@@ -1,39 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-regression.wrapper <- function(data, mods.str, method, level, digits, btt=NULL) {
-	mods.formula <- stats::as.formula(mods.str)
+regression.wrapper <- function(data, mods.formula, method, level, digits, btt=NULL) {
 	rma.args <- list(yi=data$yi, vi=data$vi, mods=mods.formula, data=data,
 	                 method=method, level=level, digits=digits)
 	if (!is.null(btt)) rma.args$btt <- btt
 	do.call(metafor::rma.uni, rma.args)
 }
 
-make.mods.str <-function(mods) {
-
-	str.els <- c()
-
-	for (mod in mods[["numeric"]]) {
-		str.els <- c(str.els, mod)
-	}
-
-	for (mod in mods[["categorical"]]) {
-		str.els <- c(str.els, mod)
-	}
-
-	for (interaction in names(mods[['interactions']])) {
-		str.els <- c(str.els, interaction)
-	}
-
-
-
-	if (length(str.els)!=0) {
-		mods.str <- paste("~", paste(str.els,collapse=" + "), sep=" ")
-	} else {
-		mods.str <- "~ 1"
-	}
-
-	mods.str
+make.mods.formula <- function(mods, response=NULL) {
+    terms <- c(mods[["numeric"]], mods[["categorical"]], names(mods[["interactions"]]))
+    stats::reformulate(terms, response=response)
 }
 
 make.design.matrix <- function(strat.cov, mods, cond.means.data, data) {
@@ -267,9 +244,9 @@ g.meta.regression <- function(
   disable.plots = FALSE)
 {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
-	res <- regression.wrapper(data, mods.str, method, level, digits,btt)
+	res <- regression.wrapper(data, mods.formula, method, level, digits,btt)
 
 	residuals <- rstandard(res, digits=digits)
 	residuals$slab <- data$slab
@@ -279,7 +256,7 @@ g.meta.regression <- function(
 			                    list(residuals=list(type="blob", description="Standardized residuals for fitted models")))
 
 	Summary <- paste(capture.output(res), collapse="\n")
-	regression.model.formula.str <- sprintf("Regression model formula: yi %s", mods.str)
+	regression.model.formula.str <- sprintf("Regression model formula: %s", paste(deparse(stats::reformulate(attr(terms(mods.formula), "term.labels"), response="yi")), collapse=" "))
 	Summary <- paste(Summary, regression.model.formula.str, sep="\n\n")
 	est.coeffs <- round(res$b[,1], digits=digits)
 	tmp <- est.coeffs[2:length(est.coeffs)]
@@ -289,7 +266,7 @@ g.meta.regression <- function(
 	reg.equation.str <- sprintf("Regression model equation: %s", reg.equation)
 	Summary <- paste(Summary, reg.equation.str, sep="\n")
 
-	model.formula <- stats::as.formula(paste("yi", mods.str))
+	model.formula <- stats::reformulate(attr(terms(mods.formula), "term.labels"), response="yi")
 	more.output <- reg.output.helper(theData=data, rma.results=res, model.formula=model.formula, digits=digits)
 	pre.summary <- ""
 	for (name in names(more.output)) {
@@ -413,9 +390,9 @@ g.get.scale <- function (measure)
 
 g.meta.regression.cond.means <- function(data, mods, method, level, digits, strat.cov, cond.means.data, btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
-	res <- regression.wrapper(data, mods.str, method, level, digits,btt)
+	res <- regression.wrapper(data, mods.formula, method, level, digits,btt)
 
 	A <- make.design.matrix(strat.cov, mods, cond.means.data, data)
 	new_betas <- A %*% res$b
@@ -452,7 +429,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 		n.replicates, histogram.title="", bootstrap.plot.path="./r_tmp/bootstrap.png",
 		btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
 
 	max.failures <- 5*n.replicates
@@ -475,7 +452,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 			}
 
 			analysis_result <- tryCatch({
-						regression.wrapper(data[indices,], mods.str, method, level, digits,btt)
+						regression.wrapper(data[indices,], mods.formula, method, level, digits,btt)
 					  }, error = function(e) {
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)
@@ -543,7 +520,7 @@ g.bootstrap.meta.regression.cond.means <- function(
     n.replicates, histogram.title="", bootstrap.plot.path="./r_tmp/bootstrap.png",
 	btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
 	A <- make.design.matrix(strat.cov, mods, cond.means.data, data)
 
@@ -567,7 +544,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 			}
 
 			analysis_result <- tryCatch({
-						regression.wrapper(data[indices,], mods.str, method, level, digits,btt)
+						regression.wrapper(data[indices,], mods.formula, method, level, digits,btt)
 					}, error = function(e) {
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)

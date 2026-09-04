@@ -38,7 +38,7 @@ def _architectures(path: Path) -> tuple[str, ...]:
     return architectures
 
 
-def normalize_macho(path: Path, *, architecture: str = "x86_64") -> None:
+def normalize_macho(path: Path, *, architecture: str = "arm64") -> None:
     """Atomically thin one universal Mach-O and verify its exact final slice."""
     path = Path(path)
     architectures = _architectures(path)
@@ -74,7 +74,7 @@ def normalize_macho(path: Path, *, architecture: str = "x86_64") -> None:
         )
 
 
-def normalize_manifest(manifest: Path, *, architecture: str = "x86_64") -> int:
+def normalize_manifest(manifest: Path, *, architecture: str = "arm64") -> int:
     """Normalize and verify every path in a NUL-delimited manifest."""
     payload = Path(manifest).read_bytes()
     raw_paths = [item for item in payload.split(b"\0") if item]
@@ -88,7 +88,7 @@ def normalize_manifest(manifest: Path, *, architecture: str = "x86_64") -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--architecture", default="x86_64")
+    parser.add_argument("--architecture", choices=("arm64",), default="arm64")
     args = parser.parse_args()
     try:
         count = normalize_manifest(args.manifest, architecture=args.architecture)

@@ -799,24 +799,6 @@ def covariate_to_r_expression(
 
 
 @serialized_r_call
-def run_continuous_analysis(
-    function_name, params, res_name="result", continuous_data_name="tmp_obj"
-):
-    return _run_rcmetar_core_analysis(
-        continuous_data_name, function_name, params, res_name=res_name
-    )
-
-
-@serialized_r_call
-def run_binary_analysis(
-    function_name, params, res_name="result", binary_data_name="tmp_obj"
-):
-    return _run_rcmetar_core_analysis(
-        binary_data_name, function_name, params, res_name=res_name
-    )
-
-
-@serialized_r_call
 def run_small_study_effects(
     table_model,
     request,
@@ -994,9 +976,6 @@ def run_versioned_analysis_request(
 ):
     """Execute one complete immutable request through the public RCMetaR API."""
     method, workflow, params = _validated_versioned_request(request)
-    injected = _run_injected_analysis(request, method, workflow, params)
-    if injected is not None:
-        return injected
     return _execute_versioned_request(method, workflow, params, res_name, data_name)
 
 
@@ -1014,20 +993,6 @@ def _validated_versioned_request(
     if not isinstance(params, Mapping):
         raise TypeError("analysis request params must be a mapping")
     return method, workflow, {str(key): value for key, value in params.items()}
-
-
-def _run_injected_analysis(
-    request: Mapping[str, object],
-    method: str,
-    workflow: object,
-    params: Mapping[str, object],
-) -> object | None:
-    legacy = run_binary_analysis if request.get("data.type") == "binary" else run_continuous_analysis
-    if getattr(legacy, "__module__", __name__) == __name__:
-        return None
-    if workflow == "standard":
-        return legacy(method, dict(params))
-    return run_workflow_analysis(workflow, method, dict(params))
 
 
 def _execute_versioned_request(
@@ -1060,9 +1025,6 @@ def run_versioned_analysis_requests(
     """Execute a validated diagnostic request set through one R operation."""
     methods, param_values, workflow = _validated_versioned_requests(requests)
     normalized_workflow = _normalize_rcmetar_workflow(workflow)
-    injected = _run_injected_diagnostic(methods, param_values, normalized_workflow)
-    if injected is not None:
-        return injected
     return _execute_versioned_requests(
         methods, param_values, normalized_workflow, res_name, diagnostic_data_name
     )
@@ -1097,18 +1059,6 @@ def _validated_versioned_request_item(
     if not isinstance(values, Mapping):
         raise TypeError("analysis request params must be a mapping")
     return method, {str(key): item for key, item in values.items()}
-
-
-def _run_injected_diagnostic(
-    methods: list[str],
-    param_values: list[dict[str, object]],
-    workflow: str,
-) -> object | None:
-    if getattr(run_diagnostic_multi, "__module__", __name__) == __name__:
-        return None
-    if workflow == "standard":
-        return run_diagnostic_multi(methods, param_values)
-    return run_diagnostic_workflow(workflow, methods, param_values)
 
 
 def _execute_versioned_requests(
@@ -2099,36 +2049,6 @@ def make_weights_str(results):
 
 
 @serialized_r_call
-def run_meta_regression(
-    dataset,
-    study_names,
-    covariates,
-    metric_name,
-    data_name="tmp_obj",
-    results_name="results_obj",
-    fixed_effects=False,
-    confidence_level=None,
-    params=None,
-    method="meta.regression",
-):
-
-    confidence_level = validate_confidence_level(confidence_level)
-
-    params = dict(params or {})
-    params["conf.level"] = confidence_level
-    params.setdefault("digits", 2)
-    params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
-    params["measure"] = metric_name
-    return _run_rcmetar_core_analysis(
-        data_name,
-        method,
-        params,
-        workflow="meta-regression",
-        res_name=results_name,
-    )
-
-
-@serialized_r_call
 def run_diagnostic_workflow(
     workflow,
     function_names,
@@ -2153,20 +2073,6 @@ def run_diagnostic_workflow(
     ro.globalenv[_r_symbol(res_name)] = result
 
     return parse_out_results(result)
-
-
-@serialized_r_call
-def run_workflow_analysis(
-    workflow, function_name, params, res_name="result", data_name="tmp_obj"
-):
-    """Runs a non-standard RCMetaR workflow through the core analysis facade."""
-    return _run_rcmetar_core_analysis(
-        data_name,
-        function_name,
-        params,
-        workflow=workflow,
-        res_name=res_name,
-    )
 
 
 def _get_col(m, i):

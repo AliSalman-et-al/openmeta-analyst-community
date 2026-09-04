@@ -211,7 +211,7 @@ def validate_macos_rcc(
         capture_output=True,
         text=True,
     ).stdout.split()
-    supported = {"x86_64", "arm64"}
+    supported = {"arm64"}
     if (
         not architectures
         or len(architectures) != len(set(architectures))
@@ -629,7 +629,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
 
     generated = build_root / "source/generated/rc_metastudio/forms/ui_about_legal.py"
     resource = build_root / "source/resources/icons.rcc"
-    target_arch = "x86_64" if target == "macos-x64" else "arm64"
+    target_arch = "arm64"
     staged_r_framework, r_toc = _prepare_private_r_framework(
         build_root, evidence_dir, target_arch
     )

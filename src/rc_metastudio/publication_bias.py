@@ -224,6 +224,12 @@ def _text(value: object, field_name: str) -> str:
     return value.strip()
 
 
+def _analysis_family(value: str) -> AnalysisFamily:
+    if value in ("binary", "continuous", "diagnostic"):
+        return value
+    raise ValueError(f"unsupported small-study effects data family: {value!r}")
+
+
 def _string_key_mapping(
     value: Mapping[_MappingKey, object], field_name: str
 ) -> dict[str, object]:
@@ -408,7 +414,7 @@ class SmallStudyEffectsRequest:
             ),
         )
         return cls(
-            data_type=data_type,  # type: ignore[arg-type]
+            data_type=_analysis_family(data_type),
             metric=_text(metric, "metric"),
             confidence_level=float(confidence_level),
             correction_policy=policy,

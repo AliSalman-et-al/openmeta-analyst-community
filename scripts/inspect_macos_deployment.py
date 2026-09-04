@@ -50,28 +50,16 @@ MAX_ARCHIVE_MEMBERS = 30_000
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 3_000_000_000
 PORTABLE_FORBIDDEN = set('<>:"/\\|?*')
 TARGET_CONTRACTS = {
-    "macos-x64": {"architecture": "x86_64", "minimum_macos": "14.0"},
     "macos-arm64": {"architecture": "arm64", "minimum_macos": "14.0"},
 }
 TARGET_RUNNERS = {
-    "macos-x64": {"architecture": "X64", "label": "macos-15-intel"},
     "macos-arm64": {"architecture": "ARM64", "label": "macos-15"},
 }
 DIRECT_R_MARKER_RELATIVE = Path("Contents/Resources/direct-r-spike.marker")
 DIRECT_R_MARKER_SHA256 = (
     "bff2ab12435dd85693745bfd390e12b97ad7fecf284a05b1b339425d40ca720f"
 )
-DIRECT_R_OFFICIAL_URL = (
-    "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg"
-)
-DIRECT_R_OFFICIAL_SHA256 = (
-    "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
-)
 DIRECT_R_OFFICIAL_INPUTS = {
-    "macos-x64": {
-        "url": DIRECT_R_OFFICIAL_URL,
-        "sha256": DIRECT_R_OFFICIAL_SHA256,
-    },
     "macos-arm64": {
         "url": "https://cloud.r-project.org/bin/macosx/sonoma-arm64/base/R-4.6.1-arm64.pkg",
         "sha256": "67f6eea4ced4ce48f0a0d4fa3a1cac43d1859a05a88993ee3dff7c52e7edbc4b",
@@ -292,11 +280,6 @@ def require_macho_architecture(path: Path, architecture: str) -> list[str]:
     return architectures
 
 
-def require_x64_macho(path: Path) -> list[str]:
-    """Retain the named Intel helper for existing callers and focused tests."""
-    return require_macho_architecture(path, "x86_64")
-
-
 def _is_macho(path: Path) -> bool:
     try:
         return is_macho_candidate(path)
@@ -468,7 +451,7 @@ def validate_dependency_graph(
     *,
     app_root: Path,
     executable_relative: str = "Contents/MacOS/RCMetaStudio",
-    architecture: str = "x86_64",
+    architecture: str = "arm64",
 ) -> None:
     root = app_root.resolve()
     executable_dir = (root / executable_relative).parent
@@ -543,7 +526,7 @@ def validate_dependency_graph(
                 )
 
 
-def inspect_unsigned_native_graph(app_root: Path, *, target: str = "macos-x64") -> dict:
+def inspect_unsigned_native_graph(app_root: Path, *, target: str = "macos-arm64") -> dict:
     app_root = app_root.resolve(strict=True)
     architecture = TARGET_CONTRACTS[target]["architecture"]
     native_records = []
@@ -582,7 +565,7 @@ def validate_locked_qt_inventory(
     deployed_qt_records: list[dict],
     *,
     locked_qt_root: Path,
-    architecture: str = "x86_64",
+    architecture: str = "arm64",
 ) -> list[dict]:
     expected: list[dict] = []
     for deployed in deployed_qt_records:
@@ -678,7 +661,7 @@ def _normalize_runtime_path(value: object) -> Path:
 
 
 def _validate_runtime_probe(
-    probe: dict, app_root: Path, *, architecture: str = "x86_64"
+    probe: dict, app_root: Path, *, architecture: str = "arm64"
 ) -> None:
     executable = app_root / "Contents/MacOS/RCMetaStudio"
     frameworks = app_root / "Contents/Frameworks"
@@ -1002,7 +985,7 @@ def inspect_deployment(
     runtime_probe: dict,
     locked_qt_root: Path,
     signing_inventory_path: Path,
-    target: str = "macos-x64",
+    target: str = "macos-arm64",
 ) -> dict:
     app_root = app_root.resolve()
     contract = TARGET_CONTRACTS[target]
@@ -1612,11 +1595,11 @@ def validate_direct_build_archive_inputs(
         "system": "Darwin",
         "machine": TARGET_CONTRACTS[target]["architecture"],
         "aliases": {
-            "Versions/Current": "4.6-x86_64",
+            "Versions/Current": "4.6-arm64",
             "Resources": "Versions/Current/Resources",
             "R": "Versions/Current/R",
-            "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-            "Versions/4.6-x86_64/Resources/R": "bin/R",
+            "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+            "Versions/4.6-arm64/Resources/R": "bin/R",
         },
         "passed": True,
     }:
@@ -1653,7 +1636,7 @@ def inspect_archive(
     *,
     archive_root_name: str,
     embedded_files: dict[str, Path],
-    target: str = "macos-x64",
+    target: str = "macos-arm64",
 ) -> dict:
     validate_archive_root_name(archive_root_name)
     prefix = archive_root_name + "/"
@@ -2004,7 +1987,7 @@ def write_qualification_evidence(
     archive_inspection: Path,
     signing_inventory: Path,
     output: Path,
-    target: str = "macos-x64",
+    target: str = "macos-arm64",
 ) -> dict:
     deployment = json.loads(deployment_manifest.read_text(encoding="utf-8"))
     extracted_probe = json.loads(extracted_runtime_probe.read_text(encoding="utf-8"))
@@ -2211,7 +2194,7 @@ def main() -> int:
     inspect.add_argument("--signing-inventory", type=Path, required=True)
     inspect.add_argument("--locked-qt-root", type=Path, required=True)
     inspect.add_argument(
-        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-arm64"
     )
     for name in EXPECTED_VERSIONS:
         inspect.add_argument(
@@ -2226,7 +2209,7 @@ def main() -> int:
     archive.add_argument("--archive", type=Path, required=True)
     archive.add_argument("--archive-root-name", required=True)
     archive.add_argument(
-        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-arm64"
     )
     for name in (
         "deployment_manifest",
@@ -2250,12 +2233,12 @@ def main() -> int:
     native_graph = commands.add_parser("native-graph")
     native_graph.add_argument("--app", type=Path, required=True)
     native_graph.add_argument(
-        "--target", choices=tuple(TARGET_CONTRACTS), default="macos-x64"
+        "--target", choices=tuple(TARGET_CONTRACTS), default="macos-arm64"
     )
     native_graph.add_argument("--output", type=Path, required=True)
     evidence = commands.add_parser("evidence")
     evidence.add_argument(
-        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-x64"
+        "--target", choices=sorted(TARGET_CONTRACTS), default="macos-arm64"
     )
     for name in (
         "archive",

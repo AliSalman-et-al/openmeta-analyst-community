@@ -32,7 +32,7 @@ EXPECTED_VERSIONS = {
     "rpy2": "3.6.7",
     "pyinstaller": "6.21.0",
 }
-TARGET_MACHINES = {"macos-x64": "x86_64", "macos-arm64": "arm64"}
+TARGET_MACHINES = {"macos-arm64": "arm64"}
 RUNNER_KEYS = {
     "system",
     "release",
@@ -349,7 +349,7 @@ def _validate_deployment_inventory(
             ):
                 _fail(f"deployment inventory has an invalid digest for {path}")
             if not isinstance(architectures, list) or not all(
-                architecture in {"x86_64", "arm64"} for architecture in architectures
+                architecture == "arm64" for architecture in architectures
             ):
                 _fail(f"deployment inventory has invalid architectures for {path}")
         elif kind == "symlink":
@@ -709,14 +709,14 @@ def validate_evidence(
         _fail(f"Python architecture must be {expected_machine}")
     if runner.get("rosetta_translated") is not False:
         _fail("Rosetta translation is forbidden")
-    expected_github_arch = "ARM64" if target == "macos-arm64" else "X64"
+    expected_github_arch = "ARM64"
     if (
         runner.get("github_runner_os") != "macOS"
         or runner.get("github_runner_arch") != expected_github_arch
     ):
         _fail("GitHub runner OS or architecture identity is inconsistent")
     if not isinstance(runner.get("runner_image"), str) or not re.fullmatch(
-        r"macos-[0-9]+(?:-intel)?", runner["runner_image"]
+        r"macos-[0-9]+", runner["runner_image"]
     ):
         _fail("runner image identity is missing or malformed")
 

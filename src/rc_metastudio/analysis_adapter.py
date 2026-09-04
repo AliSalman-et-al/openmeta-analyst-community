@@ -342,18 +342,12 @@ def execute_meta_regression_request(
             "Unsupported meta-regression data family: %s" % request.data_type
         )
     parameters = request.parameter_values()
-    return _typed_result(
-        r_bridge.run_meta_regression(
-            model.dataset,
-            list(studies),
-            list(selected_covariates),
-            request.metric,
-            fixed_effects=fixed_effects,
-            confidence_level=parameters.get("conf.level", default_confidence_level),
-            params=parameters,
-            method=request.method,
-        )
-    )
+    parameters.setdefault("conf.level", default_confidence_level)
+    parameters["rm.method"] = "FE" if fixed_effects else parameters.get("rm.method", "DL")
+    versioned = dict(request.to_mapping())
+    versioned["workflow"] = "meta-regression"
+    versioned["params"] = parameters
+    return _typed_result(r_bridge.run_versioned_analysis_request(versioned))
 
 
 def _run_diagnostic_backend(workflow, method_names, parameter_values):

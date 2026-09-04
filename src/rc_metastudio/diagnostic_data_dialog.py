@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
 )
 
-from rc_metastudio import r_bridge
+from rc_metastudio.calculator_service import CalculatorService
 from rc_metastudio import app_error_handler
 from rc_metastudio import adaptive_window
 from rc_metastudio import tabular_data
@@ -54,6 +54,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         current_groups,
         group_comparison,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(DiagnosticDataDialog, self).__init__(parent)
@@ -68,7 +69,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
         self.current_item_data: int | None = None
@@ -533,7 +535,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             can_calculate_spec = False
             tn, fp = 0, 0
 
-        ests_and_cis = r_bridge.diagnostic_effects_for_study(
+        ests_and_cis = self.calculator.diagnostic_effects_for_study(
             tp,
             fn,
             fp,
@@ -548,7 +550,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             elif metric.lower() == "spec" and not can_calculate_spec:
                 continue
 
-            est, lower, upper = r_bridge.effect_triplet(
+            est, lower, upper = self.calculator.effect_triplet(
                 ests_and_cis[metric],
                 "calc_scale",
                 metric=metric,
@@ -630,7 +632,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             current_effect=self.current_effect,
             group_comparison=self.group_comparison,
             conv_to_disp_scale=partial(
-                r_bridge.diagnostic_convert_scale,
+                self.calculator.diagnostic_convert_scale,
                 metric_name=self.current_effect,
                 convert_to="display.scale",
             ),
@@ -712,7 +714,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.diagnostic_convert_scale(
+        calculation_scale_value = self.calculator.diagnostic_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -919,7 +921,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
                 )
 
                 def conv_to_disp_scale(x):
-                    return r_bridge.diagnostic_convert_scale(
+                    return self.calculator.diagnostic_convert_scale(
                         x, effect, convert_to="display.scale"
                     )
 
@@ -977,7 +979,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
 
         diagnostic_data = build_dict()
 
-        imputed = r_bridge.impute_diagnostic_data(diagnostic_data)
+        imputed = self.calculator.impute_diagnostic_data(diagnostic_data)
 
         # Leave if nothing was imputed
         if not (imputed["TP"] or imputed["TN"] or imputed["FP"] or imputed["FN"]):

@@ -29,9 +29,9 @@ permuted.meta.reg <- function (
 	include.meta.reg.summary=TRUE
 	) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
-	reg.res <- regression.wrapper(data, mods.str, method, level, digits, btt)
+	reg.res <- regression.wrapper(data, mods.formula, method, level, digits, btt)
 
 	perm.res <- permutest(reg.res, exact=exact, iter=iter,
               retpermdist=retpermdist, digits=digits)

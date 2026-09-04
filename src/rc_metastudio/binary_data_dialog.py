@@ -21,8 +21,8 @@ from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
 )
 
-from rc_metastudio import r_bridge
 from rc_metastudio import tabular_data
+from rc_metastudio.calculator_service import CalculatorService
 from rc_metastudio.meta_globals import (
     BINARY_METRIC_NAMES,
     BINARY_ONE_ARM_METRICS,
@@ -61,6 +61,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         group_comparison,
         current_effect,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(BinaryDataDialog, self).__init__(parent)
@@ -74,7 +75,8 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
         self.current_item_data: int | None = None
@@ -223,7 +225,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             )
 
             def conv_to_disp_scale(x):
-                return r_bridge.binary_convert_scale(
+                return self.calculator.binary_convert_scale(
                     x, self.current_effect, convert_to="display.scale"
                 )
 
@@ -314,7 +316,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
         bin_data = build_back_calc_args_dict()
 
-        imputed = r_bridge.impute_binary_data(bin_data.copy())
+        imputed = self.calculator.impute_binary_data(bin_data.copy())
 
         # Leave if nothing was imputed
         if "FAIL" in imputed:
@@ -600,7 +602,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             current_effect=self.current_effect,
             group_comparison=self.group_comparison,
             conv_to_disp_scale=partial(
-                r_bridge.binary_convert_scale,
+                self.calculator.binary_convert_scale,
                 metric_name=self.current_effect,
                 convert_to="display.scale",
             ),
@@ -667,7 +669,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.binary_convert_scale(
+        calculation_scale_value = self.calculator.binary_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -954,7 +956,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         # Leave current effects untouched when raw data are incomplete.
         if two_arm_raw_data_ok or (current_effect_is_one_arm and one_arm_raw_data_ok):
             if current_effect_is_two_arm:
-                est_and_ci_d = r_bridge.effect_for_study(
+                est_and_ci_d = self.calculator.effect_for_study(
                     e1,
                     n1,
                     e2,
@@ -964,7 +966,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                 )
             else:
                 # binary, one-arm
-                est_and_ci_d = r_bridge.effect_for_study(
+                est_and_ci_d = self.calculator.effect_for_study(
                     e1,
                     n1,
                     two_arm=False,
@@ -972,7 +974,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                     confidence_level=self.confidence_level,
                 )
 
-            est, low, high = r_bridge.effect_triplet(
+            est, low, high = self.calculator.effect_triplet(
                 est_and_ci_d,
                 "calc_scale",
                 metric=self.current_effect,

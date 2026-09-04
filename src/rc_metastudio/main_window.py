@@ -74,9 +74,6 @@ from rc_metastudio import about_legal_dialog
 from rc_metastudio.analysis_results import AnalysisResult
 from rc_metastudio.workspace_session import WorkspaceSession
 
-_WORKSPACE_DIRTY_TEST_NAME = "current_" + "data_unsaved"
-
-
 def _qt_item_text(value):
     return qt_text.to_native_text(value)
 
@@ -248,38 +245,6 @@ class ImportProgressDialog(progress_dialog.AnalysisProgressDialog):
 
 
 class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
-    def __getattr__(self, name):
-        if name == _WORKSPACE_DIRTY_TEST_NAME:
-            workspace = self.__dict__.get("workspace")
-            if workspace is not None:
-                return workspace.is_dirty or bool(
-                    self.__dict__.get("workspace_is_dirty", False)
-                )
-        raise AttributeError(name)
-
-    def __setattr__(self, name, value):
-        if name == _WORKSPACE_DIRTY_TEST_NAME and "workspace" in self.__dict__:
-            if value:
-                self.workspace.mark_dirty()
-                self.workspace_is_dirty = True
-            elif self.workspace.document is not None:
-                try:
-                    document = _document_from_model(self.model)
-                except project_adapter.ProjectAdapterError:
-                    document = None
-                if document is not None and document != self.workspace.document:
-                    try:
-                        self.workspace.replace(document, record_history=False)
-                    except project_format.ProjectFormatError:
-                        # A transient editor may still hold an invalid duplicate
-                        # label; keep the last validated workspace document.
-                        pass
-                self.workspace.mark_saved()
-                self.workspace_is_dirty = False
-            else:
-                self.workspace_is_dirty = False
-            return
-        super().__setattr__(name, value)
     model: dataset_table_model.DatasetTableModel
     tableView: dataset_table_view.DatasetTableView
 
@@ -426,157 +391,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if choice == QMessageBox.StandardButton.Yes:
             return self.save() is True
         return choice == QMessageBox.StandardButton.No
-
-    def _project_install_snapshot(self):
-        action_states = {
-            action: action.isEnabled()
-            for action in (
-                self.action_go,
-                self.action_cum_ma,
-                self.action_loo_ma,
-                self.action_meta_regression,
-                self.action_publication_bias,
-                self.action_subgroup_ma,
-            )
-        }
-        current = self.tableView.currentIndex()
-        return {
-            "model": self.model,
-            "table_model": self.tableView.model(),
-            "out_path": self.out_path,
-            "dataset_label": self.dataset_file_lbl.text(),
-            "outcome_label": self.current_outcome_label.text(),
-            "follow_up_label": self.current_follow_up_label.text(),
-            "confidence_label": self.cl_label.text(),
-            "metric_menu_type": self.metric_menu_is_set_for,
-            "metric_menu": self._capture_metric_menu_state(),
-            "action_states": action_states,
-            "current_index": (current.row(), current.column()),
-            "selection": [
-                (index.row(), index.column())
-                for index in required(
-                    self.tableView.selectionModel(), "workspace selection model"
-                ).selectedIndexes()
-            ],
-        }
-
-    def _capture_metric_menu_state(self):
-        submenus = []
-        for menu_action in self.menuMetric.actions():
-            submenu = menu_action.menu()
-            if submenu is None:
-                continue
-            submenus.append(
-                {
-                    "title": submenu.title(),
-                    "actions": [
-                        {
-                            "metric": _qt_item_text(action.data()),
-                            "checked": action.isChecked(),
-                            "enabled": action.isEnabled(),
-                        }
-                        for action in submenu.actions()
-                    ],
-                }
-            )
-        return {"enabled": self.menuMetric.isEnabled(), "submenus": submenus}
-
-    def _restore_metric_menu_state(self, snapshot):
-        self.menuMetric.clear()
-        self.menuMetric.setEnabled(snapshot["enabled"])
-        for submenu_state in snapshot["submenus"]:
-            submenu = self.add_sub_metric_menu(submenu_state["title"])
-            if submenu_state["title"] == "two-arm":
-                self.twoArmMetricMenu = submenu
-            elif submenu_state["title"] == "one-arm":
-                self.oneArmMetricMenu = submenu
-            for action_state in submenu_state["actions"]:
-                action = self.add_metric_action(action_state["metric"], submenu)
-                action.blockSignals(True)
-                action.setChecked(action_state["checked"])
-                action.setEnabled(action_state["enabled"])
-                action.blockSignals(False)
-
-    def _restore_failed_project_install(self, previous, primary_error):
-        rollback_errors = []
-
-        def guarded(phase, operation):
-            try:
-                operation()
-            except Exception as exc:
-                rollback_errors.append((phase, exc))
-
-        old_model = previous["model"]
-        if self.model is not old_model:
-
-            def disconnect_candidate():
-                for connection in self._model_signal_connections:
-                    try:
-                        connection.disconnect()
-                    except Exception as exc:
-                        rollback_errors.append(("disconnect candidate signal", exc))
-                self._model_signal_connections = []
-
-            guarded("disconnect candidate model", disconnect_candidate)
-            guarded(
-                "restore table model",
-                lambda: QTableView.setModel(self.tableView, previous["table_model"]),
-            )
-            self.model = old_model
-            guarded(
-                "restore model signal connections",
-                lambda: self._setup_connections(menu_actions=False),
-            )
-        self.out_path = previous["out_path"]
-        guarded(
-            "restore project label",
-            lambda: self.dataset_file_lbl.setText(previous["dataset_label"]),
-        )
-        guarded(
-            "restore outcome label",
-            lambda: self.current_outcome_label.setText(previous["outcome_label"]),
-        )
-        guarded(
-            "restore follow-up label",
-            lambda: self.current_follow_up_label.setText(previous["follow_up_label"]),
-        )
-        guarded(
-            "restore Confidence Level label",
-            lambda: self.cl_label.setText(previous["confidence_label"]),
-        )
-        self.metric_menu_is_set_for = previous["metric_menu_type"]
-        guarded(
-            "restore metric menu",
-            lambda: self._restore_metric_menu_state(previous["metric_menu"]),
-        )
-        for action, enabled in previous["action_states"].items():
-            guarded(
-                "restore action availability",
-                lambda action=action, enabled=enabled: action.setEnabled(enabled),
-            )
-
-        def restore_selection():
-            selection_model = required(
-                self.tableView.selectionModel(), "workspace selection model"
-            )
-            selection_model.clearSelection()
-            for row, column in previous["selection"]:
-                selection_model.select(
-                    old_model.index(row, column),
-                    QtCore.QItemSelectionModel.SelectionFlag.Select,
-                )
-            row, column = previous["current_index"]
-            if row >= 0 and column >= 0:
-                self.tableView.setCurrentIndex(old_model.index(row, column))
-
-        guarded("restore table selection", restore_selection)
-        for phase, exc in rollback_errors:
-            primary_error.add_note(f"rollback {phase} also failed: {exc}")
-            try:
-                app_error_handler.log_exception(type(exc), exc, exc.__traceback__)
-            except Exception:
-                pass
-
     def _update_recent_project_nonfatal(self, path, operation):
         try:
             add_file_to_recent_files(path)
@@ -1099,20 +913,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.workspace_is_dirty = self.workspace.is_dirty
         if position is not None:
             self.tableView.setCurrentIndex(self.model.index(*position))
-
-    def restore_workspace_after_failed_edit(self, was_dirty):
-        """Reconcile the session after an adapter rejected a partial paste."""
-        if self.model.dataset.get_outcome_names():
-            self.workspace.new(_document_from_model(self.model))
-            if was_dirty:
-                self.workspace.mark_dirty()
-            self.workspace_is_dirty = self.workspace.is_dirty
-
-    def reset_workspace_after_failed_paste(self, dataset, state_dict):
-        """Install the pre-paste snapshot as a clean atomic workspace state."""
-        self.set_model(dataset, state_dict=state_dict)
-        self.workspace.new(_document_from_model(self.model))
-        self.current_data_unsaved = False
 
     def edit_dataset(self):
         current_dataset = copy.deepcopy(self.model.dataset)
@@ -1705,7 +1505,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
-        previous = self._project_install_snapshot()
         try:
             self.set_model(
                 data_model,
@@ -1717,7 +1516,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.model.analysis_source_path = file_path
             self.dataset_file_lbl.setText("Open Project: %s" % file_path)
         except Exception as e:
-            self._restore_failed_project_install(previous, e)
             msg = _format_open_project_error(file_path, e)
             try:
                 app_error_handler.log_exception(type(e), e, e.__traceback__)
