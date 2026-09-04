@@ -590,7 +590,7 @@ def _prepare_private_r_framework(
     return staged_framework, toc
 
 
-def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
+def _native_target(target: str) -> tuple[str, str]:
     if sys.platform != "darwin":
         raise RuntimeError("native macOS feasibility can run only on macOS")
     expected_machine = TARGET_MACHINES[target]
@@ -600,12 +600,47 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
             f"native target mismatch: expected {expected_machine}, got {machine}, "
             f"Rosetta={_rosetta_translated()}"
         )
+    return expected_machine, machine
 
+
+def _feasibility_build_root(target: str, evidence_dir: Path) -> Path:
     evidence_dir.mkdir(parents=True, exist_ok=True)
     build_root = ROOT / "build" / "qt6-macos-feasibility" / target
     if build_root.exists():
         shutil.rmtree(build_root)
     build_root.mkdir(parents=True)
+    return build_root
+
+
+def _packaged_bridge(app_root: Path) -> Path:
+    packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))
+    if len(packaged_bridges) != 1:
+        raise RuntimeError(
+            f"packaged feasibility app must contain one rpy2 API bridge: {packaged_bridges}"
+        )
+    return packaged_bridges[0]
+
+
+def _validate_packaged_smoke(
+    package: dict[str, Any], app_root: Path
+) -> Path:
+    plugin = Path(package["cocoa_plugin"])
+    private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
+    if Path(package.get("r_home", "")) != private_r_home:
+        raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
+    if package.get("rpy2_mode") != "API":
+        raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
+    if not plugin.is_file() or app_root not in plugin.parents:
+        raise RuntimeError(f"Cocoa plugin was not collected inside the app: {plugin}")
+    package["r_home"] = private_r_home.relative_to(app_root).as_posix()
+    package["cocoa_plugin"] = plugin.relative_to(app_root).as_posix()
+    return plugin
+
+
+def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
+    expected_machine, machine = _native_target(target)
+
+    build_root = _feasibility_build_root(target, evidence_dir)
 
     versions, r_result = _dependency_versions()
     components = _retain_native_components(evidence_dir)
@@ -678,11 +713,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         build_root / "dist/Qt6MacFeasibility.app/Contents/MacOS/Qt6MacFeasibility"
     )
     app_root = build_root / "dist/Qt6MacFeasibility.app"
-    packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))
-    if len(packaged_bridges) != 1:
-        raise RuntimeError(
-            f"packaged feasibility app must contain one rpy2 API bridge: {packaged_bridges}"
-        )
+    packaged_bridge = _packaged_bridge(app_root)
     _run(
         [
             sys.executable,
@@ -691,7 +722,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
             "--framework",
             str(app_root / "Contents/Frameworks/R.framework"),
             "--bridge",
-            str(packaged_bridges[0]),
+            str(packaged_bridge),
             "--architecture",
             target_arch,
             "--output",
@@ -719,16 +750,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
     package_environment["RCMS_FEASIBILITY_PHASES"] = str(packaged_phases)
     _run([str(executable)], environment=package_environment)
     package = json.loads(packaged_report.read_text(encoding="utf-8"))
-    plugin = Path(package["cocoa_plugin"])
-    private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
-    if Path(package.get("r_home", "")) != private_r_home:
-        raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
-    if package.get("rpy2_mode") != "API":
-        raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
-    package["r_home"] = private_r_home.relative_to(app_root).as_posix()
-    if not plugin.is_file() or app_root not in plugin.parents:
-        raise RuntimeError(f"Cocoa plugin was not collected inside the app: {plugin}")
-    package["cocoa_plugin"] = plugin.relative_to(app_root).as_posix()
+    plugin = _validate_packaged_smoke(package, app_root)
     probe_root = evidence_dir / "package-probe"
     probe_root.mkdir()
     retained_executable = probe_root / "Qt6MacFeasibility"
