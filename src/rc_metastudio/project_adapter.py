@@ -84,8 +84,7 @@ def _entered_effects(
     return result
 
 
-def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
-    """Return latest-version project data for an application dataset."""
+def _project_outcomes(dataset: analysis_dataset.Dataset) -> tuple[list[JsonValue], set[str]]:
     outcomes: list[JsonValue] = []
     families = set()
     for name in dataset.get_outcome_names():
@@ -113,7 +112,10 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
         raise ProjectAdapterError(
             "a project must contain outcomes from exactly one supported analysis family"
         )
+    return outcomes, families
 
+
+def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
     studies: list[JsonValue] = []
     for study in dataset.studies:
         units: list[JsonValue] = []
@@ -150,7 +152,13 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                 "analysis_units": units,
             }
         )
+    return studies
 
+
+def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
+    """Return latest-version project data for an application dataset."""
+    outcomes, families = _project_outcomes(dataset)
+    studies = _project_studies(dataset)
     family = _FAMILY_NAMES[next(iter(families), 2 if dataset.is_diagnostic else 0)]
     return {
         "schema_version": 1,
