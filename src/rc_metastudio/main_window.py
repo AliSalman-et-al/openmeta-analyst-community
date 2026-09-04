@@ -245,7 +245,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if name == _WORKSPACE_DIRTY_TEST_NAME:
             workspace = self.__dict__.get("workspace")
             if workspace is not None:
-                return workspace.is_dirty
+                return workspace.is_dirty or bool(
+                    self.__dict__.get("workspace_is_dirty", False)
+                )
         raise AttributeError(name)
 
     def __setattr__(self, name, value):

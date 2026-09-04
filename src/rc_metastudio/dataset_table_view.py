@@ -539,6 +539,8 @@ class DatasetTableView(QtWidgets.QTableView):
                         (before_project, before_state), (after_project, after_state)
                     )
             elif data_type == "continuous":
+                before_project = project_adapter.dataset_to_project(self.model().dataset)
+                before_state = project_adapter.model_to_state(self.model())
                 cur_raw_data_dict = {}
                 for group_name in current_groups:
                     cur_raw_data_dict[group_name] = list(
@@ -554,13 +556,22 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    # update the model; push this event onto the stack
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
+                    after_project = project_adapter.dataset_to_project(self.model().dataset)
+                    after_state = project_adapter.model_to_state(self.model())
+                    self._main_gui().record_workspace_change(
+                        (before_project, before_state), (after_project, after_state)
+                    )
             else:
                 # then this is diagnostic data
+                before_project = project_adapter.dataset_to_project(self.model().dataset)
+                before_state = project_adapter.model_to_state(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -575,10 +586,18 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
+                    after_project = project_adapter.dataset_to_project(self.model().dataset)
+                    after_state = project_adapter.model_to_state(self.model())
+                    self._main_gui().record_workspace_change(
+                        (before_project, before_state), (after_project, after_state)
+                    )
         finally:
             del signal_blocker
 

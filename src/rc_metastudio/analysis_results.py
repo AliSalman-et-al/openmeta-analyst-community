@@ -208,21 +208,7 @@ def _sections(
     capabilities: Mapping[str, PlotCapability],
 ) -> tuple[ResultSection, ...]:
     result: list[ResultSection] = []
-    text_items = list(texts.items())
-    image_items = list(images.items())
-    summary = next((item for item in text_items if item[0] == "Summary"), None)
-    standard_layout = summary is not None and "Weights" in texts
-    if standard_layout and summary is not None:
-        text_items.remove(summary)
-        text_items.insert(0, summary)
-    ordered_items = (
-        [("text", item) for item in text_items[:1]]
-        + [("image", item) for item in image_items]
-        + [("text", item) for item in text_items[1:]]
-        if standard_layout
-        else [("text", item) for item in text_items]
-        + [("image", item) for item in image_items]
-    )
+    ordered_items = _ordered_section_items(texts, images)
     for order, (kind, (title, value)) in enumerate(ordered_items):
         if kind == "text":
             result.append(ResultSection(_section_id("text", title), "text", order, title, value))
@@ -230,6 +216,33 @@ def _sections(
         capability = capabilities[title]
         result.append(ResultSection(_section_id("image", title), "image", order, title, value, capability.plot_kind, image_params_paths.get(title), capability))
     return tuple(result)
+
+
+def _ordered_section_items(
+    texts: Mapping[str, str], images: Mapping[str, str]
+) -> list[tuple[str, tuple[str, str]]]:
+    text_items = list(texts.items())
+    image_items = list(images.items())
+    summary = next((item for item in text_items if item[0] == "Summary"), None)
+    if summary is None or "Weights" not in texts:
+        return _text_sections(text_items) + _image_sections(image_items)
+    text_items.remove(summary)
+    text_items.insert(0, summary)
+    return _standard_sections(text_items, image_items)
+
+
+def _text_sections(items: list[tuple[str, str]]) -> list[tuple[str, tuple[str, str]]]:
+    return [("text", item) for item in items]
+
+
+def _image_sections(items: list[tuple[str, str]]) -> list[tuple[str, tuple[str, str]]]:
+    return [("image", item) for item in items]
+
+
+def _standard_sections(
+    texts: list[tuple[str, str]], images: list[tuple[str, str]]
+) -> list[tuple[str, tuple[str, str]]]:
+    return _text_sections(texts[:1]) + _image_sections(images) + _text_sections(texts[1:])
 
 
 class _FrozenList(list[str]):

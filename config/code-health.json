@@ -67,15 +67,16 @@
     "src/rc_metastudio/dataset_table_model.py": {
       "_edit_raw_data": "one visible edit validates, computes, and publishes a family-specific domain change"
     },
-    "src/rc_metastudio/dataset_table_view.py": {
-      "paste_contents": "Qt clipboard parsing coordinates a rectangular edit across visible adapter cells"
-    },
     "src/rc_metastudio/main_window.py": {
       "open": "interface boundary coordinates prompt, decode, replacement, and recent-project updates",
       "save": "interface boundary coordinates save-as prompts, serialization, and recent-project updates"
     },
     "src/rc_metastudio/plot_capabilities.py": {
       "_validate_descriptor": "boundary validation checks independent capability fields before immutable construction"
+    },
+    "src/rc_metastudio/dataset_table_view.py": {
+      "paste_contents": "Qt clipboard parsing coordinates a rectangular edit across visible adapter cells",
+      "row_header_clicked": "the Qt adapter selects one isolated family editor and publishes its accepted snapshot"
     },
     "r/RCMetaR/R/meta_methods.R": {
       "bootstrap": "statistical resampling has independent method, seed, and result-shape branches"
