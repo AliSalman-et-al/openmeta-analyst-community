@@ -229,6 +229,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             plot.names <- c(plot.names, biv.results$plot_names)
             plot.params.paths <- c(plot.params.paths, biv.results$plot_params_paths)
             plot.capabilities <- c(plot.capabilities, biv.results$plot_capabilities)
+            sections <- c(sections, biv.results$sections %||% list())
             image.order <- append.image.order(image.order, biv.results)
             remove.indices <- joint.index
 			references <- c(references, biv.results$References)

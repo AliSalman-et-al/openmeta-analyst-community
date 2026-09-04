@@ -647,7 +647,8 @@ rcmetar.reitsma.fit <- function(prepared) {
 }
 
 rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, params) {
-    empty <- list(images=character(), paths=character(), capabilities=list(), warnings=character())
+    empty <- list(images=character(), paths=character(), capabilities=list(),
+                  sections=list(), warnings=character())
     if (!isTRUE(params$create.plot %||% TRUE) || is.null(plot.data)) return(empty)
     path <- as.character(params$fp_outpath %||% params$roc_outpath %||% params$sroc_outpath %||% "./r_tmp/reitsma_sroc.svg")
     capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.draw(plot.data, path))
@@ -661,6 +662,10 @@ rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, par
     saved <- save.data(diagnostic.data, fit, params, plot.data)
     list(images=c(SROC=path), paths=c(SROC=saved),
          capabilities=list(SROC=.rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)),
+         sections=list(list(
+             id="diagnostic.reitsma.sroc", kind="image", order=1L,
+             title="SROC", source_key="SROC"
+         )),
          warnings=warnings)
 }
 
@@ -832,8 +837,14 @@ rcmetar.reitsma.report.standard <- function(prepared, fitted, extracted, rendere
         summary <- summary[intersect(desired.order, names(summary))]
     }
     plot.names <- if (length(rendered$images)) setNames("sroc", names(rendered$images)) else character()
+    sections <- list(list(
+        id="diagnostic.reitsma.summary", kind="text", order=0L,
+        title="Summary", source_key="Summary"
+    ))
+    if (length(rendered$sections)) sections <- c(sections, rendered$sections)
     list(images=rendered$images, image_order=names(rendered$images), plot_names=plot.names,
          plot_params_paths=rendered$paths, plot_capabilities=rendered$capabilities,
+         sections=sections,
          Summary=summary,
          References=rcmetar.unique.references(c(rcmetar.method.references("reitsma"), rcmetar.method.references("rutter.gatsonis"))))
 }
@@ -1034,7 +1045,7 @@ diagnostic.reitsma.is.feasible <- function(diagnostic.data, metric) {
                                                    sensitivity, specificity) {
     if (identical(params$create.plot, FALSE)) return(list(
         images=character(), image.order=character(), plot_names=character(),
-        plot_params_paths=character(), plot_capabilities=list()))
+        plot_params_paths=character(), plot_capabilities=list(), sections=list()))
     output <- as.character(
         params$fp_outpath %||% rcmetar.scratch.path("reitsma_coefficients.svg"))
     specifications <- list(
@@ -1051,8 +1062,17 @@ diagnostic.reitsma.is.feasible <- function(diagnostic.data, metric) {
     plot.names <- stats::setNames(rep("forest", length(titles)), titles)
     capabilities <- stats::setNames(lapply(titles, function(title)
         .rcmetar.plot.descriptor.for.kind("forest", has.params=TRUE)), titles)
+    section.ids <- c(
+        "diagnostic.reitsma.sensitivity.coefficients",
+        "diagnostic.reitsma.specificity.coefficients"
+    )
+    sections <- lapply(seq_along(titles), function(index) list(
+        id=section.ids[[index]], kind="image", order=index,
+        title=titles[[index]], source_key=titles[[index]]
+    ))
     list(images=paths, image.order=titles, plot_names=plot.names,
-         plot_params_paths=params.paths, plot_capabilities=capabilities)
+         plot_params_paths=params.paths, plot_capabilities=capabilities,
+         sections=sections)
 }
 
 diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FALSE) {
@@ -1126,6 +1146,12 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
                        BIC=if (is.null(full.bic.capture$value)) NULL else as.numeric(full.bic.capture$value),
                        warnings=all.warnings,
                        package.version=as.character(packageVersion("mada")))
+    sections <- list(list(
+        id="diagnostic.reitsma.meta.regression.summary", kind="text", order=0L,
+        title="Summary", source_key="Summary"
+    ))
+    if (length(plots$sections)) sections <- c(sections, plots$sections)
+    plots$sections <- sections
     c(plots, list(input_data=reg.data, input_params=params, res=fit,
          Summary=list("Clinical interpretation"=clinical.interpretation,
                       "Overall ML likelihood-ratio test"=likelihood$overall,

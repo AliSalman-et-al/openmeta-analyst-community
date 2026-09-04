@@ -72,9 +72,35 @@ testthat::test_that("Reitsma validates and represents diagnostic counts", {
   testthat::expect_length(result$plot_names, 0)
   testthat::expect_length(result$plot_params_paths, 0)
   testthat::expect_length(result$plot_capabilities, 0)
+  testthat::expect_identical(result$sections, list(list(
+    id="diagnostic.reitsma.summary", kind="text", order=0L,
+    title="Summary", source_key="Summary"
+  )))
   testthat::expect_equal(RCMetaR:::rcmetar.reitsma.correction.control("Studies with any zero cell"), "single")
   testthat::expect_equal(RCMetaR:::rcmetar.reitsma.correction.control("All studies if any zero exists"), "all")
   testthat::expect_equal(RCMetaR:::rcmetar.reitsma.correction.control("None"), "none")
+})
+
+testthat::test_that("Reitsma SROC reports a semantic image section", {
+  library(RCMetaR)
+  testthat::skip_if_not_installed("mada")
+  testthat::skip_if_not(as.character(utils::packageVersion("mada")) == "0.5.12")
+  data <- methods::new("DiagnosticData",
+    TP=c(19, 8, 41, 5, 45), FN=c(10, 2, 12, 2, 32),
+    TN=c(81, 13, 49, 18, 165), FP=c(1, 9, 1, 1, 58),
+    study.names=letters[1:5]
+  )
+  output <- tempfile(fileext=".svg")
+  result <- RCMetaR:::diagnostic.reitsma(data, list(
+    create.plot=TRUE, fp_outpath=output, conf.level=95, digits=2
+  ))
+  testthat::expect_true(file.exists(output))
+  testthat::expect_identical(result$image_order, "SROC")
+  testthat::expect_identical(result$sections[[1]]$id, "diagnostic.reitsma.summary")
+  testthat::expect_identical(result$sections[[2]], list(
+    id="diagnostic.reitsma.sroc", kind="image", order=1L,
+    title="SROC", source_key="SROC"
+  ))
 })
 
 testthat::test_that("multiple diagnostic results retain editable Reitsma plot data", {
@@ -85,7 +111,11 @@ testthat::test_that("multiple diagnostic results retain editable Reitsma plot da
     Summary=list(), References=character(), images=c(SROC="sroc.svg"),
     image_order="SROC", plot_names=c(SROC="sroc"),
     plot_params_paths=c(SROC="sroc-data"),
-    plot_capabilities=list(SROC=RCMetaR:::.rcmetar.plot.descriptor.for.kind("sroc", TRUE))
+    plot_capabilities=list(SROC=RCMetaR:::.rcmetar.plot.descriptor.for.kind("sroc", TRUE)),
+    sections=list(list(
+      id="diagnostic.reitsma.sroc", kind="image", order=1L,
+      title="SROC", source_key="SROC"
+    ))
   )
   unlockBinding("diagnostic.reitsma", namespace)
   assign("diagnostic.reitsma", replacement, envir=namespace)
@@ -101,6 +131,7 @@ testthat::test_that("multiple diagnostic results retain editable Reitsma plot da
   testthat::expect_identical(names(result$plot_names), "SROC")
   testthat::expect_identical(names(result$plot_params_paths), "SROC")
   testthat::expect_identical(result$plot_params_paths[["SROC"]], "sroc-data")
+  testthat::expect_identical(result$sections[[1]]$id, "diagnostic.reitsma.sroc")
 })
 
 testthat::test_that("plot capability attachment rejects editable plots without regeneration data", {
@@ -253,6 +284,27 @@ testthat::test_that("Reitsma meta-regression reports coding, odds ratios, and se
   testthat::expect_identical(names(result$Summary)[length(result$Summary)], "Model information")
   testthat::expect_equal(result$Summary[["Model information"]]$studies.used, 6L)
   testthat::expect_identical(result$Summary[["Model information"]]$package.version, "0.5.12")
+  testthat::expect_identical(result$sections, list(list(
+    id="diagnostic.reitsma.meta.regression.summary", kind="text", order=0L,
+    title="Summary", source_key="Summary"
+  )))
+  prepared <- RCMetaR:::.rcmetar.reitsma.prepare.meta.regression(data)
+  plots <- RCMetaR:::.rcmetar.reitsma.meta.regression.plots(
+    data, result$res,
+    list(create.plot=TRUE, fp_outpath=tempfile(fileext=".svg")),
+    prepared$coding,
+    result$Summary[["Sensitivity coefficients"]],
+    result$Summary[["Specificity coefficients"]]
+  )
+  testthat::expect_identical(
+    vapply(plots$sections, function(section) section$id, character(1)),
+    c("diagnostic.reitsma.sensitivity.coefficients",
+      "diagnostic.reitsma.specificity.coefficients")
+  )
+  testthat::expect_identical(
+    vapply(plots$sections, function(section) section$title, character(1)),
+    c("Sensitivity Moderator Coefficients", "Specificity Moderator Coefficients")
+  )
   testthat::expect_true(all(c("Odds Ratio", "Odds Ratio lower", "Odds Ratio upper") %in% colnames(result$Summary[["Specificity coefficients"]])))
   testthat::expect_false(any(grepl("Intercept", rownames(result$Summary[["Sensitivity coefficients"]]), fixed=TRUE)))
   reference <- result$Summary[["Sensitivity coefficients"]][grep("reference", rownames(result$Summary[["Sensitivity coefficients"]]), fixed=TRUE), "Odds Ratio"]
