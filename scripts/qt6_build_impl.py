@@ -381,22 +381,15 @@ def _smoke_inputs(build_root: Path) -> tuple[Path, Path]:
     return generate(build_root)
 
 
-def smoke(
-    build_root: Path,
-    exit_after_ms: int,
-    *,
-    expected_qpa: str | None = None,
-) -> dict[str, str | bool]:
-    """Launch a visible native Qt6 form and return user-observable evidence."""
-    module_path, resource_path = _smoke_inputs(build_root)
-    if not QtCore.QResource.registerResource(str(resource_path)):
-        raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
-
+def _smoke_application() -> tuple[QtWidgets.QApplication, bool]:
     application = cast(QtWidgets.QApplication | None, QtWidgets.QApplication.instance())
     owns_application = application is None
     if application is None:
         application = QtWidgets.QApplication(["rc-metastudio-qt6-smoke"])
-    qpa = application.platformName()
+    return application, owns_application
+
+
+def _validate_smoke_platform(qpa: str, expected_qpa: str | None) -> None:
     if expected_qpa is not None and qpa != expected_qpa:
         raise RuntimeError(f"Qt QPA mismatch: expected {expected_qpa!r}, got {qpa!r}")
     architecture = platform.machine().lower()
@@ -409,20 +402,32 @@ def smoke(
             f"Native macOS smoke requires Apple silicon Python, got {platform.machine()!r}"
         )
 
+
+def _smoke_dialog(
+    module_path: Path,
+) -> tuple[QtWidgets.QDialog, QtGui.QIcon, QtGui.QPixmap, QtGui.QPixmap]:
     dialog = QtWidgets.QDialog()
-    form_type = _load_generated_form(module_path)
-    form = form_type()
+    form = _load_generated_form(module_path)()
     form.setupUi(dialog)
     app_icon = QtGui.QIcon(":/misc/meta.png")
-    svg_icon = QtGui.QIcon(":/icons/actions/about-legal.svg")
     app_icon_pixmap = app_icon.pixmap(QtCore.QSize(32, 32))
-    svg_icon_pixmap = svg_icon.pixmap(QtCore.QSize(24, 24))
+    svg_icon_pixmap = QtGui.QIcon(":/icons/actions/about-legal.svg").pixmap(
+        QtCore.QSize(24, 24)
+    )
     if app_icon_pixmap.isNull() or svg_icon_pixmap.isNull():
         raise RuntimeError(
             "The registered binary resource did not expose required icons"
         )
-    application.setWindowIcon(app_icon)
     dialog.setWindowIcon(app_icon)
+    return dialog, app_icon, app_icon_pixmap, svg_icon_pixmap
+
+
+def _run_smoke_dialog(
+    application: QtWidgets.QApplication,
+    dialog: QtWidgets.QDialog,
+    resource_path: Path,
+    exit_after_ms: int,
+) -> bool:
     dialog.show()
     application.processEvents()
     visible = dialog.isVisible()
@@ -437,9 +442,27 @@ def smoke(
             f"Qt6 smoke did not shut down cleanly: exit={exit_code}, "
             f"resource_unregistered={unregistered}"
         )
+    return visible
 
-    # QApplication cannot be recreated in a process; this flag documents why
-    # the smoke command is intentionally a standalone process.
+
+def smoke(
+    build_root: Path,
+    exit_after_ms: int,
+    *,
+    expected_qpa: str | None = None,
+) -> dict[str, str | bool]:
+    """Launch a visible native Qt6 form and return user-observable evidence."""
+    module_path, resource_path = _smoke_inputs(build_root)
+    if not QtCore.QResource.registerResource(str(resource_path)):
+        raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
+
+    application, owns_application = _smoke_application()
+    qpa = application.platformName()
+    _validate_smoke_platform(qpa, expected_qpa)
+    dialog, app_icon, app_icon_pixmap, svg_icon_pixmap = _smoke_dialog(module_path)
+    application.setWindowIcon(app_icon)
+    visible = _run_smoke_dialog(application, dialog, resource_path, exit_after_ms)
+
     if not owns_application:
         raise RuntimeError("Qt6 smoke requires ownership of its QApplication")
     return {
