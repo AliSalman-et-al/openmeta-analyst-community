@@ -134,11 +134,15 @@ def _retained_file_metadata(record: dict[str, object], label: str) -> tuple[int,
         _fail(f"{label} has no retained path or digest")
     if not isinstance(size, int) or isinstance(size, bool) or size < 0:
         _fail(f"{label} has an invalid retained size")
-    if len(digest) != 64 or any(
-        character not in "0123456789abcdef" for character in digest
-    ):
+    if not _valid_sha256_text(digest):
         _fail(f"{label} has an invalid SHA-256 digest")
     return size, digest
+
+
+def _valid_sha256_text(value: str) -> bool:
+    return len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
 
 
 def _validate_retained_bytes(
@@ -870,6 +874,11 @@ def _validate_build_plan_collection_options(arguments: list[str]) -> None:
 
 
 def _validate_build_plan_allowlist(arguments: list[str]) -> None:
+    _validate_build_plan_option_order(arguments)
+    _validate_build_plan_paths(arguments)
+
+
+def _validate_build_plan_option_order(arguments: list[str]) -> None:
     expected_options = ["--noconfirm", "--clean", "--distpath", "--workpath"]
     if [
         argument for argument in arguments if argument.startswith("--")
@@ -885,6 +894,9 @@ def _validate_build_plan_allowlist(arguments: list[str]) -> None:
         .endswith("packaging/pyinstaller/qt6-macos-feasibility.spec")
     ):
         _fail("PyInstaller build plan contains unexpected manual inputs")
+
+
+def _validate_build_plan_paths(arguments: list[str]) -> None:
     for path_argument in (arguments[3], arguments[5], arguments[6]):
         if not (
             PurePosixPath(path_argument).is_absolute()

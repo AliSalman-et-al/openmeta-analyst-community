@@ -340,19 +340,33 @@ def _valid_r_kit_identity(
     probe_r: dict[str, object],
     probe_rpy2: dict[str, object],
 ) -> bool:
-    if manifest.get("kind") != "rc-metastudio-r-integration-kit":
-        return False
-    if manifest.get("target") != target or manifest.get("architecture") != architecture:
-        return False
-    if (
-        manifest.get("cffi_mode") != "API"
-        or len(str(manifest.get("kit_sha256", ""))) != 64
-    ):
+    if not _valid_r_kit_manifest_header(manifest, target, architecture):
         return False
     if derivation.get("kit_sha256") != manifest.get("kit_sha256"):
         return False
     if not _valid_r_kit_derivation(manifest, derivation, target):
         return False
+    return _valid_r_kit_probe_digests(derivation, probe_r, probe_rpy2)
+
+
+def _valid_r_kit_manifest_header(
+    manifest: dict[str, object], target: str, architecture: str
+) -> bool:
+    if manifest.get("kind") != "rc-metastudio-r-integration-kit":
+        return False
+    if manifest.get("target") != target or manifest.get("architecture") != architecture:
+        return False
+    return bool(
+        manifest.get("cffi_mode") == "API"
+        and len(str(manifest.get("kit_sha256", ""))) == 64
+    )
+
+
+def _valid_r_kit_probe_digests(
+    derivation: dict[str, object],
+    probe_r: dict[str, object],
+    probe_rpy2: dict[str, object],
+) -> bool:
     final = _mapping_or_empty(derivation.get("final"))
     api_bridge = _mapping_or_empty(final.get("api_bridge"))
     shared_library = _mapping_or_empty(final.get("r_shared_library"))
@@ -1022,26 +1036,47 @@ def _validate_signing_inventory_shape(
         "nested_bundles",
         "verification",
     }
-    native_files = inventory.get("native_files")
-    nested_bundles = inventory.get("nested_bundles")
-    verification = inventory.get("verification")
-    if (
-        set(inventory) != expected_keys
-        or inventory.get("schema_version") != 1
-        or inventory.get("app") != "RCMetaStudio.app"
-        or inventory.get("identity") != "ad-hoc"
-        or not isinstance(native_files, list)
-        or not all(isinstance(item, str) for item in native_files)
-        or len(native_files) != len(set(native_files))
-        or set(native_files) != native_paths
-        or not isinstance(nested_bundles, list)
-        or not all(isinstance(item, str) for item in nested_bundles)
-        or len(nested_bundles) != len(set(nested_bundles))
-        or verification != {"individual_strict": True, "outer_deep_strict": True}
-    ):
+    if set(inventory) != expected_keys:
         raise MacOSDeploymentInspectionError(
             "signing inventory differs from the authoritative native deployment"
         )
+    if inventory.get("schema_version") != 1 or inventory.get("app") != "RCMetaStudio.app":
+        raise MacOSDeploymentInspectionError(
+            "signing inventory differs from the authoritative native deployment"
+        )
+    if inventory.get("identity") != "ad-hoc":
+        raise MacOSDeploymentInspectionError(
+            "signing inventory differs from the authoritative native deployment"
+        )
+    if not _valid_signing_native_files(inventory.get("native_files"), native_paths):
+        raise MacOSDeploymentInspectionError(
+            "signing inventory differs from the authoritative native deployment"
+        )
+    if not _valid_signing_nested_bundles(inventory.get("nested_bundles")):
+        raise MacOSDeploymentInspectionError(
+            "signing inventory differs from the authoritative native deployment"
+        )
+    if inventory.get("verification") != {"individual_strict": True, "outer_deep_strict": True}:
+        raise MacOSDeploymentInspectionError(
+            "signing inventory differs from the authoritative native deployment"
+        )
+
+
+def _valid_signing_native_files(value: object, native_paths: set[str]) -> bool:
+    return (
+        isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
+        and len(value) == len(set(value))
+        and set(value) == native_paths
+    )
+
+
+def _valid_signing_nested_bundles(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
+        and len(value) == len(set(value))
+    )
 
 
 def _validate_nested_bundle_paths(
@@ -1125,27 +1160,47 @@ def _validate_r_framework_members(
     delivery_kind: str,
 ) -> None:
     if delivery_kind == "direct-spike":
-        launcher = by_path.get(f"{resources}/bin/R", {})
-        if (
-            launcher.get("kind") != "file"
-            or "architectures" in launcher
-            or not _int_or_default(launcher.get("mode"), 0) & 0o111
-            or launcher.get("shebang") != "#!/bin/sh"
-        ):
-            raise MacOSDeploymentInspectionError(
-                "official R framework bin/R is not its executable shell front-end"
-            )
+        _validate_r_framework_launcher(by_path, resources)
     required_files = {
         f"{resources}/bin/Rscript",
         f"{resources}/library/RCMetaR/DESCRIPTION",
         f"{resources}/Info.plist",
         *native_paths,
     }
+    _validate_required_r_framework_files(by_path, required_files)
+    _validate_r_framework_executables(by_path, native_paths, architecture)
+
+
+def _validate_r_framework_launcher(
+    by_path: dict[object, dict[str, object]], resources: str
+) -> None:
+    launcher = by_path.get(f"{resources}/bin/R", {})
+    if (
+        launcher.get("kind") != "file"
+        or "architectures" in launcher
+        or not _int_or_default(launcher.get("mode"), 0) & 0o111
+        or launcher.get("shebang") != "#!/bin/sh"
+    ):
+        raise MacOSDeploymentInspectionError(
+            "official R framework bin/R is not its executable shell front-end"
+        )
+
+
+def _validate_required_r_framework_files(
+    by_path: dict[object, dict[str, object]], required_files: set[str]
+) -> None:
     for path in required_files:
         if by_path.get(path, {}).get("kind") != "file":
             raise MacOSDeploymentInspectionError(
                 f"R framework is missing its concrete versioned member: {path}"
             )
+
+
+def _validate_r_framework_executables(
+    by_path: dict[object, dict[str, object]],
+    native_paths: list[str],
+    architecture: str,
+) -> None:
     for native_path in native_paths:
         r_executable = by_path[native_path]
         if (
