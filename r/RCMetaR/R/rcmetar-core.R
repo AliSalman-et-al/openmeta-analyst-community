@@ -605,6 +605,29 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
     )
 }
 
+.rcmetar.finish.diagnostic.analysis <- function(result, methods, params.list,
+                                                workflow, validated.requests) {
+    inference.labels <- unique(unlist(Map(function(method, params) {
+        if (!.rcmetar.method.supports.inference(method)) return(character())
+        rcmetar.inference.method.names()[[rcmetar.inference.method(params)]]
+    }, methods, params.list), use.names=FALSE))
+    if (is.list(result) && length(inference.labels) > 0) {
+        result[["Inference Method"]] <- paste(inference.labels, collapse=", ")
+    }
+    artifact.request <- list(
+        version=1L,
+        data_type="diagnostic",
+        methods=as.character(methods),
+        params.list=params.list,
+        workflow=workflow
+    )
+    result.request <- if (is.null(validated.requests)) artifact.request else validated.requests
+    result <- .rcmetar.attach.plot.display.artifacts(result, artifact.request)
+    result <- .rcmetar.attach.plot.capabilities(result, artifact.request)
+    attr(result, "rcmetar.request") <- result.request
+    result
+}
+
 rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, params.list=NULL, workflow="standard", selected.cov=NULL, version=1, request.list=NULL) {
     if (length(version) != 1 || !identical(as.integer(version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
@@ -657,26 +680,9 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods=NULL, param
         subgroup=multiple.subgroup.diagnostic(methods, params.list, diagnostic.data)
     )
 
-    inference.labels <- unique(unlist(Map(function(method, params) {
-        if (!.rcmetar.method.supports.inference(method)) return(character())
-        rcmetar.inference.method.names()[[rcmetar.inference.method(params)]]
-    }, methods, params.list), use.names=FALSE))
-    if (is.list(result) && length(inference.labels) > 0) {
-        result[["Inference Method"]] <- paste(inference.labels, collapse=", ")
-    }
-
-    artifact.request <- list(
-        version=1L,
-        data_type="diagnostic",
-        methods=as.character(methods),
-        params.list=params.list,
-        workflow=workflow
+    .rcmetar.finish.diagnostic.analysis(
+        result, methods, params.list, workflow, validated.requests
     )
-    result.request <- if (!is.null(request.list)) validated.requests else artifact.request
-    result <- .rcmetar.attach.plot.display.artifacts(result, artifact.request)
-    result <- .rcmetar.attach.plot.capabilities(result, artifact.request)
-    attr(result, "rcmetar.request") <- result.request
-    result
 }
 
 rcmetar.run.permutation <- function(data, method="DL", mods=NULL, level=95, digits=RCMETAR_DEFAULT_DISPLAY_DIGITS, iter=1000,
