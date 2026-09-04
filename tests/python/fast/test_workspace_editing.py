@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 
-import pytest
-
 from rc_metastudio.workspace_editing import WorkspaceEditingService
 from rc_metastudio.meta_globals import BINARY
 
 
 class FakeBridge:
+    def get_confidence_multiplier_from_r(self, confidence_level):
+        return 1.96
+
+    def set_confidence_level(self, confidence_level):
+        return None
+
     def effect_for_study(self, *args, **kwargs):
         return {"calc_scale": 0.5}
 
@@ -53,19 +57,3 @@ def test_inclusion_policy_is_owned_by_the_qt_free_service():
     )
 
     assert study.include is True
-
-
-def test_transaction_rolls_back_a_failed_dataset_mutation():
-    @dataclass
-    class Dataset:
-        value: int = 1
-
-    dataset = Dataset()
-    service = WorkspaceEditingService(FakeBridge())
-
-    with pytest.raises(RuntimeError, match="preview failed"):
-        with service.transaction(dataset):
-            dataset.value = 2
-            raise RuntimeError("preview failed")
-
-    assert dataset.value == 1

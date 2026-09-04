@@ -1114,8 +1114,6 @@ class DatasetTableModel(QAbstractTableModel):
         changed_top_left = self.index(index.row(), changed_first_column)
         changed_bottom_right = self.index(index.row(), changed_last_column)
         role_values = [int(item) for item in roles]
-        self.dataChanged.emit(changed_top_left, changed_bottom_right, role_values)
-
         new_value = (
             StudyInclusionState(
                 include=bool(target.study.include),
@@ -1124,18 +1122,20 @@ class DatasetTableModel(QAbstractTableModel):
             if target.column == self.INCLUDE_STUDY
             else self.data(index, Qt.ItemDataRole.EditRole)
         )
-        self.workspaceEditCommitted.emit(
-            WorkspaceEdit(
-                index=QModelIndex(index),
-                old_value=target.old_value,
-                new_value=new_value,
-                added_study_id=added_study_id,
-                changed_top_left=QModelIndex(changed_top_left),
-                changed_bottom_right=QModelIndex(changed_bottom_right),
-                roles=tuple(role_values),
-                before_workspace_snapshot=before_workspace_snapshot,
-            )
+        edit = WorkspaceEdit(
+            index=QModelIndex(index),
+            old_value=target.old_value,
+            new_value=new_value,
+            added_study_id=added_study_id,
+            changed_top_left=QModelIndex(changed_top_left),
+            changed_bottom_right=QModelIndex(changed_bottom_right),
+            roles=tuple(role_values),
+            before_workspace_snapshot=before_workspace_snapshot,
         )
+        # Record the durable workspace change before publishing the visual
+        # update. The session is then authoritative if a UI observer fails.
+        self.workspaceEditCommitted.emit(edit)
+        self.dataChanged.emit(changed_top_left, changed_bottom_right, role_values)
 
     def setData(
         self,
@@ -1157,20 +1157,17 @@ class DatasetTableModel(QAbstractTableModel):
             project_adapter.dataset_to_project(copy.deepcopy(self.dataset)),
             project_adapter.model_to_state(self),
         )
-        with self.editing_service.transaction(self.dataset) as transaction:
-            applied, added_study_id = self._apply_edit(
-                index,
-                value,
-                target,
-                inclusion_value,
-                import_csv,
-                allow_empty_names,
-            )
-            if not applied:
-                transaction.rollback()
-                return False
-            self._update_inclusion_after_edit(index, target)
-            transaction.commit()
+        applied, added_study_id = self._apply_edit(
+            index,
+            value,
+            target,
+            inclusion_value,
+            import_csv,
+            allow_empty_names,
+        )
+        if not applied:
+            return False
+        self._update_inclusion_after_edit(index, target)
         self._publish_workspace_edit(
             index, target, added_study_id, before_workspace_snapshot
         )

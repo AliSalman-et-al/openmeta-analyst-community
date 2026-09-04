@@ -10,14 +10,14 @@ calculate the same raw-data preview as the table.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import copy
 from collections.abc import Mapping
+from dataclasses import dataclass
 from statistics import NormalDist
-from typing import Any, Protocol
+from typing import Protocol
 
 from rc_metastudio import r_backend, r_bridge
 from rc_metastudio.dataset_analysis_domain import (
+    ScaleBridge,
     calculate_raw_effects,
     make_display_scale_converter,
     to_calculation_scale,
@@ -38,32 +38,6 @@ class _InclusionTarget(Protocol):
     manually_excluded: bool
 
 
-class WorkspaceEditTransaction:
-    """Provide rollback for a mutation of a live dataset graph."""
-
-    def __init__(self, dataset: object) -> None:
-        self._dataset = dataset
-        self._before = copy.deepcopy(dataset)
-        self._committed = False
-
-    def commit(self) -> None:
-        self._committed = True
-
-    def rollback(self) -> None:
-        if self._committed:
-            return
-        self._dataset.__dict__.clear()
-        self._dataset.__dict__.update(copy.deepcopy(self._before.__dict__))
-
-    def __enter__(self) -> "WorkspaceEditTransaction":
-        return self
-
-    def __exit__(self, exception_type, exception, traceback) -> bool:
-        if exception_type is not None:
-            self.rollback()
-        return False
-
-
 class WorkspaceEditingService:
     """Perform backend-facing edit work without importing Qt.
 
@@ -72,11 +46,8 @@ class WorkspaceEditingService:
     RCMetaR bridge, preserving the existing statistical contract.
     """
 
-    def __init__(self, bridge: Any = None) -> None:
+    def __init__(self, bridge: ScaleBridge | None = None) -> None:
         self.bridge = r_bridge if bridge is None else bridge
-
-    def transaction(self, dataset: object) -> WorkspaceEditTransaction:
-        return WorkspaceEditTransaction(dataset)
 
     @staticmethod
     def update_inclusion_after_edit(
