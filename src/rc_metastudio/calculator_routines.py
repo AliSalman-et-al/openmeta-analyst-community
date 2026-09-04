@@ -400,8 +400,8 @@ def set_current_effect_from_value(
         txt_boxes[box_name] for box_name in ("effect", "lower", "upper")
     ]
 
-    (est, lower, upper) = analysis_unit.get_effect_and_ci(
-        current_effect, group_comparison, confidence_multiplier
+    (est, lower, upper) = analysis_unit.get_effect_and_ci_for_source(
+        "entered", current_effect, group_comparison, confidence_multiplier
     )
     (display_estimate, display_lower, display_upper) = [
         conv_to_disp_scale(x) for x in (est, lower, upper)
@@ -616,8 +616,8 @@ def evaluate(
     if confidence_multiplier is None:
         raise ValueError("confidence multiplier must be specified")
 
-    est, lower, upper = analysis_unit.get_effect_and_ci(
-        current_effect, group_comparison, confidence_multiplier
+    est, lower, upper = analysis_unit.get_effect_and_ci_for_source(
+        "entered", current_effect, group_comparison, confidence_multiplier
     )  # calc scale
     display_estimate, display_lower, display_upper = [
         conv_to_disp_scale(x) for x in (est, lower, upper)

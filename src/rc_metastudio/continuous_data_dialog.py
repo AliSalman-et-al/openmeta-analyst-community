@@ -680,6 +680,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 # Insert standard errors when available.
                 se_col = 3
                 se = self.analysis_unit.get_se(
+                    "entered",
                     self.current_effect,
                     self.group_comparison,
                     self.confidence_multiplier,
@@ -1281,8 +1282,11 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             group1_data = dict(tmp[0])
             group2_data = dict(tmp[1])
 
-            tmp = self.analysis_unit.get_effect_and_ci(
-                self.current_effect, self.group_comparison, self.confidence_multiplier
+            tmp = self.analysis_unit.get_effect_and_ci_for_source(
+                "entered",
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
             )
             effect_data = {
                 "est": tmp[0],

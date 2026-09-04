@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 
 from rc_metastudio import two_way_dict
-from rc_metastudio.analysis_unit import AnalysisUnit
+from rc_metastudio.analysis_unit import AnalysisUnit, EffectSource
 from rc_metastudio import meta_globals
 
 BINARY = meta_globals.BINARY
@@ -445,7 +445,9 @@ class Dataset:
             comp_str_present = comp_str in analysis_unit.get_group_strings(effect)
             try:
                 estimate_is_present = (
-                    analysis_unit.get_estimate(effect, comp_str) is not None
+                    analysis_unit.get_estimate_for_source(
+                        "entered", effect, comp_str
+                    ) is not None
                 )
             except KeyError:
                 estimate_is_present = False
@@ -465,6 +467,7 @@ class Dataset:
         directions_to_analysis_unit=None,
         confidence_multiplier=None,
         convert_to_display_scale: Callable[[object, str, object], object] | None = None,
+        effect_source: EffectSource = "entered",
     ):
         """Compare studies in various ways -- pass the returned function
         to the (built-in) sort function.
@@ -546,11 +549,17 @@ class Dataset:
                     raise ValueError(f"Unsupported outcome type: {outcome_type!r}")
 
                 if outcome_type in (BINARY, CONTINUOUS):
-                    outcome_data_a = analysis_unit_a.get_effect_and_ci(
-                        current_effect, group_comparison, confidence_multiplier
+                    outcome_data_a = analysis_unit_a.get_effect_and_ci_for_source(
+                        effect_source,
+                        current_effect,
+                        group_comparison,
+                        confidence_multiplier,
                     )
-                    outcome_data_b = analysis_unit_b.get_effect_and_ci(
-                        current_effect, group_comparison, confidence_multiplier
+                    outcome_data_b = analysis_unit_b.get_effect_and_ci_for_source(
+                        effect_source,
+                        current_effect,
+                        group_comparison,
+                        confidence_multiplier,
                     )
                     outcome_data_a = [
                         to_display_scale(c_val) for c_val in outcome_data_a
@@ -560,11 +569,17 @@ class Dataset:
                     ]
                 elif outcome_type == DIAGNOSTIC:
                     for diagnostic_metric in ("Sens", "Spec"):
-                        estimate_and_ci_a = analysis_unit_a.get_effect_and_ci(
-                            diagnostic_metric, group_comparison, confidence_multiplier
+                        estimate_and_ci_a = analysis_unit_a.get_effect_and_ci_for_source(
+                            effect_source,
+                            diagnostic_metric,
+                            group_comparison,
+                            confidence_multiplier,
                         )
-                        estimate_and_ci_b = analysis_unit_b.get_effect_and_ci(
-                            diagnostic_metric, group_comparison, confidence_multiplier
+                        estimate_and_ci_b = analysis_unit_b.get_effect_and_ci_for_source(
+                            effect_source,
+                            diagnostic_metric,
+                            group_comparison,
+                            confidence_multiplier,
                         )
                         estimate_and_ci_a = [
                             to_display_scale(c_val) for c_val in estimate_and_ci_a

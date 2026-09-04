@@ -660,8 +660,8 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[group_comparison].raw_data[0] == 20.0
-    assert analysis_unit.get_effect_and_ci(
-        "Sens", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "Sens", group_comparison, model.get_confidence_multiplier()
     ) == (
         0.75,
         None,
@@ -742,6 +742,7 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
             lambda value: value,
             confidence_level=model.get_confidence_level(),
             confidence_multiplier=model.get_confidence_multiplier(),
+            source="derived_preview",
         )
     model.dataset.studies[0].include = True
 
@@ -761,7 +762,9 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
             None,
             None,
         )
-        assert analysis_unit.get_display_effect_and_ci(metric, group_comparison) == (
+        assert analysis_unit.get_display_effect_and_ci_for_source(
+            "derived_preview", metric, group_comparison
+        ) == (
             None,
             None,
             None,
@@ -793,8 +796,8 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[model.current_groups[0]].raw_data[0] == 4.0
-    assert analysis_unit.get_effect_and_ci(
-        "OR", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "OR", group_comparison, model.get_confidence_multiplier()
     ) == (
         0.5,
         None,
@@ -826,8 +829,8 @@ def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[model.current_groups[0]].raw_data[1] == 5.5
-    assert analysis_unit.get_effect_and_ci(
-        "MD", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "MD", group_comparison, model.get_confidence_multiplier()
     ) == (
         1.25,
         None,

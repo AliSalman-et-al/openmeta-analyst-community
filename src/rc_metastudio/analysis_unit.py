@@ -193,27 +193,22 @@ class AnalysisUnit:
             }
         )
 
-    def _store_for_read(self, effect, group_comparison):
-        """Return the highest-authority value available for this cell."""
-        for store in (
-            self.analysis_effects,
-            self.derived_effect_previews,
-            self.entered_effects,
-        ):
-            entry = store.get(effect, {}).get(group_comparison)
-            if entry and any(value is not None for value in entry.values()):
-                return store
-        return self.entered_effects
+    def _store(self, source: EffectSource):
+        return {
+            "entered": self.entered_effects,
+            "derived_preview": self.derived_effect_previews,
+            "analysis": self.analysis_effects,
+        }[source]
+
+    def _entry(self, source: EffectSource, effect: str, group_comparison: str):
+        return self._store(source).setdefault(effect, {}).setdefault(
+            group_comparison, self._new_effect_entry()
+        )
 
     def get_effect_for_source(
         self, source: EffectSource, effect: str, group_comparison: str
     ) -> EffectEstimate:
-        stores = {
-            "entered": self.entered_effects,
-            "derived_preview": self.derived_effect_previews,
-            "analysis": self.analysis_effects,
-        }
-        entry = stores[source].get(effect, {}).get(group_comparison, {})
+        entry = self._store(source).get(effect, {}).get(group_comparison, {})
         return EffectEstimate(
             entry.get("est"),
             entry.get("lower"),
@@ -254,11 +249,13 @@ class AnalysisUnit:
         lower=None,
         upper=None,
         confidence_multiplier=None,
+        *,
+        source: EffectSource = "entered",
     ):
         if confidence_multiplier is None:
             raise ValueError("Mult must be specified")
 
-        entry = self._store_for_read(effect, group_comparison)[effect][group_comparison]
+        entry = self._entry(source, effect, group_comparison)
         if est is None:
             est = entry["est"]
         if lower is None:
@@ -286,25 +283,25 @@ class AnalysisUnit:
     def set_standard_error(self, effect, group_comparison, se):
         self.entered_effects[effect][group_comparison]["SE"] = se
 
-    def set_display_effect(self, effect, group_comparison, value):
-        self._store_for_read(effect, group_comparison)[effect][group_comparison][
-            "display_est"
-        ] = value
+    def set_display_effect_for_source(
+        self, source: EffectSource, effect, group_comparison, value
+    ):
+        self._entry(source, effect, group_comparison)["display_est"] = value
 
-    def set_display_lower(self, effect, group_comparison, lower):
-        self._store_for_read(effect, group_comparison)[effect][group_comparison][
-            "display_lower"
-        ] = lower
+    def set_display_lower_for_source(
+        self, source: EffectSource, effect, group_comparison, lower
+    ):
+        self._entry(source, effect, group_comparison)["display_lower"] = lower
 
-    def set_display_upper(self, effect, group_comparison, upper):
-        self._store_for_read(effect, group_comparison)[effect][group_comparison][
-            "display_upper"
-        ] = upper
+    def set_display_upper_for_source(
+        self, source: EffectSource, effect, group_comparison, upper
+    ):
+        self._entry(source, effect, group_comparison)["display_upper"] = upper
 
-    def set_display_se(self, effect, group_comparison, se):
-        self._store_for_read(effect, group_comparison)[effect][group_comparison][
-            "display_se"
-        ] = se
+    def set_display_se_for_source(
+        self, source: EffectSource, effect, group_comparison, se
+    ):
+        self._entry(source, effect, group_comparison)["display_se"] = se
 
     def calculate_display_effect_and_ci(
         self,
@@ -314,6 +311,8 @@ class AnalysisUnit:
         confidence_level=None,
         confidence_multiplier=None,
         check_if_necessary=False,
+        *,
+        source: EffectSource,
     ):
         if None in [confidence_level, confidence_multiplier]:
             raise ValueError("confidence level and multiplier must be specified")
@@ -321,7 +320,10 @@ class AnalysisUnit:
         if (
             check_if_necessary
             and not self._should_calculate_display_effect_and_ci_and_se(
-                effect, group_comparison, confidence_level
+                effect,
+                group_comparison,
+                confidence_level,
+                source=source,
             )
         ):
             return
@@ -329,88 +331,102 @@ class AnalysisUnit:
         if convert_to_display_scale is None:
             raise ValueError("Display-scale conversion is unavailable")
 
-        est, lower, upper = self.get_effect_and_ci(
-            effect, group_comparison, confidence_multiplier
+        est, lower, upper = self.get_effect_and_ci_for_source(
+            source, effect, group_comparison, confidence_multiplier
         )
         display_estimate, display_lower, display_upper = [
             convert_to_display_scale(x) for x in [est, lower, upper]
         ]
-        se = self.get_se(effect, group_comparison, confidence_multiplier)
+        se = self.get_se(source, effect, group_comparison, confidence_multiplier)
         display_standard_error = se
 
-        self.set_display_effect(effect, group_comparison, display_estimate)
-        self.set_display_lower(effect, group_comparison, display_lower)
-        self.set_display_upper(effect, group_comparison, display_upper)
-        self.set_display_se(effect, group_comparison, display_standard_error)
-        self._store_for_read(effect, group_comparison)[effect][group_comparison][
+        self.set_display_effect_for_source(
+            source, effect, group_comparison, display_estimate
+        )
+        self.set_display_lower_for_source(
+            source, effect, group_comparison, display_lower
+        )
+        self.set_display_upper_for_source(
+            source, effect, group_comparison, display_upper
+        )
+        self.set_display_se_for_source(
+            source, effect, group_comparison, display_standard_error
+        )
+        self._entry(source, effect, group_comparison)[
             "display_conf_level"
         ] = confidence_level
 
-    def get_display_effect(self, effect, group_comparison):
-        return self._store_for_read(effect, group_comparison)[effect][
-            group_comparison
-        ].get("display_est")
+    def get_display_effect_for_source(self, source: EffectSource, effect, group_comparison):
+        return self._entry(source, effect, group_comparison).get("display_est")
 
-    def get_display_lower(self, effect, group_comparison):
-        return self._store_for_read(effect, group_comparison)[effect][
-            group_comparison
-        ].get("display_lower")
+    def get_display_lower_for_source(self, source: EffectSource, effect, group_comparison):
+        return self._entry(source, effect, group_comparison).get("display_lower")
 
-    def get_display_upper(self, effect, group_comparison):
-        return self._store_for_read(effect, group_comparison)[effect][
-            group_comparison
-        ].get("display_upper")
+    def get_display_upper_for_source(self, source: EffectSource, effect, group_comparison):
+        return self._entry(source, effect, group_comparison).get("display_upper")
 
-    def get_display_se(self, effect, group_comparison):
-        return self._store_for_read(effect, group_comparison)[effect][
-            group_comparison
-        ].get("display_se")
+    def get_display_se_for_source(self, source: EffectSource, effect, group_comparison):
+        return self._entry(source, effect, group_comparison).get("display_se")
 
-    def get_display_effect_and_ci(self, effect, group_comparison):
+    def get_display_effect_and_ci_for_source(
+        self, source: EffectSource, effect, group_comparison
+    ):
         return (
-            self.get_display_effect(effect, group_comparison),
-            self.get_display_lower(effect, group_comparison),
-            self.get_display_upper(effect, group_comparison),
+            self.get_display_effect_for_source(source, effect, group_comparison),
+            self.get_display_lower_for_source(source, effect, group_comparison),
+            self.get_display_upper_for_source(source, effect, group_comparison),
         )
 
-    def get_display_effect_and_se(self, effect, group_comparison):
+    def get_display_effect_and_se_for_source(
+        self, source: EffectSource, effect, group_comparison
+    ):
         return (
-            self.get_display_effect(effect, group_comparison),
-            self.get_display_se(effect, group_comparison),
+            self.get_display_effect_for_source(source, effect, group_comparison),
+            self.get_display_se_for_source(source, effect, group_comparison),
         )
 
     def _should_calculate_display_effect_and_ci_and_se(
-        self, effect, group_comparison, confidence_level=None
+        self,
+        effect,
+        group_comparison,
+        confidence_level=None,
+        *,
+        source: EffectSource,
     ):
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
 
-        display_confidence_level = self._store_for_read(effect, group_comparison)[
-            effect
-        ][group_comparison].get(
-            "display_conf_level"
-        )
+        display_confidence_level = self._entry(
+            source, effect, group_comparison
+        ).get("display_conf_level")
         return display_confidence_level is None or not meta_globals.equal_close_enough(
             display_confidence_level, confidence_level
         )
 
-    def get_estimate(self, effect, group_comparison):
-        return self._store_for_read(effect, group_comparison)[effect][
-            group_comparison
-        ].get("est")
+    def get_estimate_for_source(self, source: EffectSource, effect, group_comparison):
+        return self._entry(source, effect, group_comparison).get("est")
 
-    def get_lower(self, effect, group_comparison, confidence_multiplier):
+    def get_lower_for_source(
+        self, source: EffectSource, effect, group_comparison, confidence_multiplier
+    ):
         return self._helper_get_upper_lower(
-            "lower", effect, group_comparison, confidence_multiplier
+            "lower", source, effect, group_comparison, confidence_multiplier
         )
 
-    def get_upper(self, effect, group_comparison, confidence_multiplier):
+    def get_upper_for_source(
+        self, source: EffectSource, effect, group_comparison, confidence_multiplier
+    ):
         return self._helper_get_upper_lower(
-            "upper", effect, group_comparison, confidence_multiplier
+            "upper", source, effect, group_comparison, confidence_multiplier
         )
 
     def _helper_get_upper_lower(
-        self, boundary, effect, group_comparison, confidence_multiplier=None
+        self,
+        boundary,
+        source: EffectSource,
+        effect,
+        group_comparison,
+        confidence_multiplier=None,
     ):
         if confidence_multiplier is None:
             raise ValueError("Mult must be specified")
@@ -418,12 +434,10 @@ class AnalysisUnit:
         if boundary not in ["upper", "lower"]:
             raise Exception("Boundary must be one of 'upper' or 'lower'")
 
-        if self.get_se(effect, group_comparison, confidence_multiplier) is None:
-            return self._store_for_read(effect, group_comparison)[effect][
-                group_comparison
-            ][boundary]
-        est = self.get_estimate(effect, group_comparison)
-        se = self.get_se(effect, group_comparison, confidence_multiplier)
+        if self.get_se(source, effect, group_comparison, confidence_multiplier) is None:
+            return self._entry(source, effect, group_comparison)[boundary]
+        est = self.get_estimate_for_source(source, effect, group_comparison)
+        se = self.get_se(source, effect, group_comparison, confidence_multiplier)
         if est is None or se is None:
             return None
         return (
@@ -432,13 +446,18 @@ class AnalysisUnit:
             else est + confidence_multiplier * se
         )
 
-    def get_se(self, effect, group_comparison, confidence_multiplier):
-        entry = self._store_for_read(effect, group_comparison)[effect][group_comparison]
+    def get_se(
+        self, source: EffectSource, effect, group_comparison, confidence_multiplier
+    ):
+        entry = self._entry(source, effect, group_comparison)
         standard_error = entry.get("SE")
         if standard_error is not None:
             return standard_error
         return self.calculate_se_if_possible(
-            effect, group_comparison, confidence_multiplier=confidence_multiplier
+            effect,
+            group_comparison,
+            confidence_multiplier=confidence_multiplier,
+            source=source,
         )
 
     def set_effect_and_ci(
@@ -473,17 +492,33 @@ class AnalysisUnit:
             standard_error=se,
         )
 
-    def get_effect_and_ci(self, effect, group_comparison, confidence_multiplier):
+    def get_effect_and_ci_for_source(
+        self,
+        source: EffectSource,
+        effect,
+        group_comparison,
+        confidence_multiplier,
+    ):
         return (
-            self.get_estimate(effect, group_comparison),
-            self.get_lower(effect, group_comparison, confidence_multiplier),
-            self.get_upper(effect, group_comparison, confidence_multiplier),
+            self.get_estimate_for_source(source, effect, group_comparison),
+            self.get_lower_for_source(
+                source, effect, group_comparison, confidence_multiplier
+            ),
+            self.get_upper_for_source(
+                source, effect, group_comparison, confidence_multiplier
+            ),
         )
 
-    def get_effect_and_se(self, effect, group_comparison, confidence_multiplier):
+    def get_effect_and_se_for_source(
+        self,
+        source: EffectSource,
+        effect,
+        group_comparison,
+        confidence_multiplier,
+    ):
         return (
-            self.get_estimate(effect, group_comparison),
-            self.get_se(effect, group_comparison, confidence_multiplier),
+            self.get_estimate_for_source(source, effect, group_comparison),
+            self.get_se(source, effect, group_comparison, confidence_multiplier),
         )
 
     def get_entered_effect_and_ci(self, effect, group_comparison):

@@ -224,8 +224,11 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             d = {}
             d["metric"] = str(self.current_effect)
 
-            est, lower, upper = self.analysis_unit.get_effect_and_ci(
-                self.current_effect, self.group_comparison, self.confidence_multiplier
+            est, lower, upper = self.analysis_unit.get_effect_and_ci_for_source(
+                "entered",
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
             )
 
             def conv_to_disp_scale(x):

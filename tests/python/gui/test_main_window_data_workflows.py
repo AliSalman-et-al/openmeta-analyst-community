@@ -1103,6 +1103,7 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
                 lambda value: value,
                 confidence_level=model.get_confidence_level(),
                 confidence_multiplier=model.get_confidence_multiplier(),
+                source="derived_preview",
             )
         model.dataset.studies[1].include = True
         window.data_dirtied()

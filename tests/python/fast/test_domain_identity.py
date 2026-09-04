@@ -98,4 +98,16 @@ def test_legacy_calculated_effects_are_published_as_previews():
     assert unit.get_effect_for_source(
         "derived_preview", "TX Mean", "group 1"
     ).estimate == 2.0
-    assert unit.get_estimate("TX Mean", "group 1") == 2.0
+    assert unit.get_estimate_for_source("derived_preview", "TX Mean", "group 1") == 2.0
+
+
+def test_entered_edit_does_not_hide_which_source_a_preview_belongs_to():
+    outcome = analysis_dataset.Outcome("Outcome", meta_globals.CONTINUOUS)
+    unit = analysis_dataset.AnalysisUnit(outcome, group_names=["group 1"])
+    unit.set_effect_and_ci("TX Mean", "group 1", 2.0, 1.5, 2.5, 1.96)
+    unit.set_effect("TX Mean", "group 1", 3.0)
+
+    assert unit.get_effect_for_source("entered", "TX Mean", "group 1").estimate == 3.0
+    assert unit.get_effect_for_source(
+        "derived_preview", "TX Mean", "group 1"
+    ).estimate == 2.0

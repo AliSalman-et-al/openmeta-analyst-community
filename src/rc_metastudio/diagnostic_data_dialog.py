@@ -913,8 +913,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             d = {}
 
             for effect in BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS:
-                est, lower, upper = self.analysis_unit.get_effect_and_ci(
-                    effect, self.group_comparison, self.confidence_multiplier
+                est, lower, upper = self.analysis_unit.get_effect_and_ci_for_source(
+                    "entered", effect, self.group_comparison, self.confidence_multiplier
                 )
 
                 def conv_to_disp_scale(x):
