@@ -449,6 +449,21 @@ test_that("core method discovery and metadata avoid direct implementation export
   expect_true(nzchar(description))
 })
 
+test_that("meta-regression supplies metafor digits when the request omits them", {
+  fixture <- binary_fixture()
+  fixture$params$digits <- NULL
+  fixture$params$create.plot <- FALSE
+
+  result <- rcmetar.run.analysis(
+    fixture$data,
+    list(method = "meta.regression", params = fixture$params,
+         workflow = "meta-regression", stop.at.rma = TRUE)
+  )
+
+  expect_s4_class(result, "rma")
+  expect_length(result$b, 2)
+})
+
 test_that("inference method reaches metafor results and is reported", {
   fixture <- binary_fixture()
   fixture$params$inference.method <- "knha"
