@@ -371,7 +371,7 @@ def _observe_surface_focus(app, window, control):
     control.setFocus()
     app.processEvents()
     focus_before = app.focusWidget()
-    app.focusNextPrevChild(True)
+    window.focusNextPrevChild(True)
     return focus_before, app.focusWidget()
 
 

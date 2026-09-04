@@ -60,6 +60,51 @@ def test_packaged_qualification_commands_validate_their_arguments():
         automation.dispatch(["RCMetaStudio", "--automation-package-operation"])
 
 
+def test_surface_focus_observation_traverses_from_window_not_application():
+    from rc_metastudio import automation
+
+    class App:
+        def __init__(self):
+            self.current = None
+
+        def processEvents(self):
+            pass
+
+        def focusWidget(self):
+            return self.current
+
+    class Control:
+        def __init__(self, app):
+            self.app = app
+
+        def setFocus(self):
+            self.app.current = self
+
+    class Window:
+        def __init__(self, app, target):
+            self.app = app
+            self.target = target
+            self.calls = []
+
+        def focusNextPrevChild(self, forward):
+            self.calls.append(forward)
+            self.app.current = self.target
+            return True
+
+    app = App()
+    target = object()
+    control = Control(app)
+    window = Window(app, target)
+
+    focus_before, focus_after = automation._observe_surface_focus(
+        app, window, control
+    )
+
+    assert focus_before is control
+    assert focus_after is target
+    assert window.calls == [True]
+
+
 def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
     monkeypatch, tmp_path
 ):
