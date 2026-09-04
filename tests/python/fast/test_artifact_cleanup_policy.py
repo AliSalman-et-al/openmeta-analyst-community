@@ -183,9 +183,9 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
         lambda _model, **_kwargs: None,
     )
 
-        def fake_versioned_request(request):
-            captured_params.append(request["params"])
-            return {"version": 1, "texts": {}, "images": {}, "sections": []}
+    def fake_versioned_request(request):
+        captured_params.append(request["params"])
+        return {"version": 1, "texts": {}, "images": {}, "sections": []}
 
     monkeypatch.setattr(
         analysis_adapter.r_bridge,
