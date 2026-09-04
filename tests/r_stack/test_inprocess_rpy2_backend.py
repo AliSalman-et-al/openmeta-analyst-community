@@ -57,10 +57,15 @@ _DRIVER = textwrap.dedent(
 
     r_bridge.execute_r_function = raise_workflow_r_error
     try:
-        r_bridge.run_diagnostic_workflow(
-            "subgroup",
-            ["diagnostic.random"],
-            [{"measure": "Sens"}],
+        r_bridge.run_versioned_analysis_requests(
+            [{
+                "version": 1,
+                "data_type": "diagnostic",
+                "workflow": "subgroup",
+                "method": "diagnostic.random",
+                "metric": "Sens",
+                "params": {"measure": "Sens"},
+            }],
             diagnostic_data_name="workflow_data",
         )
     except r_bridge.DiagnosticExecutionError as exc:
@@ -215,8 +220,9 @@ _DRIVER = textwrap.dedent(
     continuous_result = r_bridge.run_versioned_analysis_request(
         {
             "version": 1,
-            "request.version": 1,
+            "data_type": "continuous",
             "method": "continuous.random",
+            "metric": "MD",
             "workflow": "standard",
             "params": {
                 "conf.level": 95.0,
@@ -716,7 +722,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             rcmetar.run.analysis(
               advanced_data,
-              list(method="meta.regression", params=params, workflow="meta-regression")
+              list(version=1, method="meta.regression", params=params, workflow="meta-regression")
             )
             '''
         )
@@ -836,7 +842,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             )
             boot.result <- rcmetar.run.analysis(
               advanced_data,
-              list(method="binary.random", params=params, workflow="bootstrap")
+              list(version=1, method="binary.random", params=params, workflow="bootstrap")
             )
             stopifnot("Summary" %in% names(boot.result))
             stopifnot("Histogram" %in% names(boot.result$images))
@@ -846,7 +852,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             params$bootstrap.plot.path <- "./r_tmp/issue113_bootstrap_meta_reg.png"
             boot.reg.result <- rcmetar.run.analysis(
               advanced_data,
-              list(method="binary.random", params=params, workflow="bootstrap")
+              list(version=1, method="binary.random", params=params, workflow="bootstrap")
             )
             stopifnot("Summary" %in% names(boot.reg.result))
             stopifnot("Histograms" %in% names(boot.reg.result$images))

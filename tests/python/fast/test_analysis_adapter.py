@@ -86,7 +86,14 @@ def test_analysis_request_is_versioned_and_semantically_identified() -> None:
 
     assert first.version == 1
     assert first.semantic_id == second.semantic_id
-    assert first.to_mapping()["parameters"] == {}
+    assert first.to_mapping() == {
+        "version": 1,
+        "data_type": "binary",
+        "workflow": "standard",
+        "method": "random",
+        "metric": "OR",
+        "params": {"measure": "OR"},
+    }
     with pytest.raises(ValueError, match="unsupported analysis request version"):
         type(first)(first.data_type, first.workflow, first.method, first.metric, (), 2)
 

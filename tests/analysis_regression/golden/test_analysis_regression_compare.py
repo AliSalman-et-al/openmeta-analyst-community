@@ -1309,7 +1309,6 @@ def _import_legacy_golden_modules():
         sys.modules["meta_globals"] = globals_module
         r_boundary = ModuleType("r_bridge")
         setattr(r_boundary, "RLibraryLoader", lambda: None)
-        setattr(r_boundary, "run_diagnostic_multi", lambda *args, **kwargs: {})
         setattr(r_boundary, "run_workflow_analysis", lambda *args, **kwargs: {})
         def run_versioned(request):
             params = request.get("params", {})
@@ -1326,10 +1325,7 @@ def _import_legacy_golden_modules():
         setattr(
             r_boundary,
             "run_versioned_analysis_requests",
-            lambda requests: r_boundary.run_diagnostic_multi(
-                [request["method"] for request in requests],
-                [request.get("params", {}) for request in requests],
-            ),
+            lambda requests: {},
         )
         sys.modules["rc_metastudio.r_bridge"] = r_boundary
         from tests.analysis_regression.golden.support import golden_analysis

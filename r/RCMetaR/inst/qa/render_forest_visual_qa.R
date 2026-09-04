@@ -306,8 +306,7 @@ qa_render_case <- function(kind, workflow, style, scenario.name, scenarios, outp
   }
   result <- rcmetar.run.analysis(
     data,
-    list(
-      method = qa_method_for(kind),
+    list(version=1, method= qa_method_for(kind),
       params = params,
       workflow = workflow,
       selected.cov = selected.cov

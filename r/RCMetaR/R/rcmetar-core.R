@@ -534,17 +534,10 @@ rcmetar.graphics.off <- function() {
     grDevices::graphics.off()
 }
 
-rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list(), workflow="standard",
-                                   selected.cov=NULL, cond.means.data=NULL, stop.at.rma=FALSE) {
+rcmetar.run.analysis <- function(om.data, request) {
     request <- rcmetar.validate.analysis.request(
         om.data=om.data,
-        request=request,
-        method=method,
-        params=params,
-        workflow=workflow,
-        selected.cov=selected.cov,
-        cond.means.data=cond.means.data,
-        stop.at.rma=stop.at.rma
+        request=request
     )
 
     # Reitsma owns the count transformation.  Keep raw TP/FN/FP/TN all the
@@ -575,8 +568,8 @@ rcmetar.run.analysis <- function(om.data, request=NULL, method=NULL, params=list
     .rcmetar.attach.request(result, request)
 }
 
-rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL, request.version=1) {
-    if (length(request.version) != 1 || !identical(as.integer(request.version), 1L)) {
+rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.list, workflow="standard", selected.cov=NULL, version) {
+    if (length(version) != 1 || !identical(as.integer(version), 1L)) {
         stop("Unsupported analysis request version.", call.=FALSE)
     }
     if (!("DiagnosticData" %in% class(diagnostic.data))) {
@@ -623,7 +616,8 @@ rcmetar.run.diagnostic.analyses <- function(diagnostic.data, methods, params.lis
     }
 
     result.request <- list(
-        data.type="diagnostic",
+        version=1L,
+        data_type="diagnostic",
         methods=as.character(methods),
         params.list=params.list,
         workflow=workflow
@@ -652,29 +646,30 @@ rcmetar.run.permutation <- function(data, method="DL", mods=NULL, level=95, digi
                       exact=exact, retpermdist=retpermdist, ...)
 }
 
-rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL, params=list(), workflow="standard",
-                                                selected.cov=NULL, cond.means.data=NULL, stop.at.rma=FALSE) {
-    if (!is.null(request)) {
-        if (!is.list(request)) {
-            stop("Analysis request must be a named list.", call.=FALSE)
-        }
-        request.version <- .rcmetar.request.value(request, "request.version", NULL)
-        if (!is.null(request.version) &&
-                (length(request.version) != 1 || !identical(as.integer(request.version), 1L))) {
-            stop("Unsupported analysis request version.", call.=FALSE)
-        }
-        method <- .rcmetar.request.value(request, "method", method)
-        params <- .rcmetar.request.value(request, "params", params)
-        workflow <- .rcmetar.request.value(request, "workflow", workflow)
-        selected.cov <- .rcmetar.request.value(request, "selected.cov", selected.cov)
-        cond.means.data <- .rcmetar.request.value(request, "cond.means.data", cond.means.data)
-        stop.at.rma <- .rcmetar.request.value(request, "stop.at.rma", stop.at.rma)
+rcmetar.validate.analysis.request <- function(om.data, request) {
+    if (!is.list(request) || is.null(names(request))) {
+        stop("Analysis request must be a named list.", call.=FALSE)
+    }
+    if (length(request$version) != 1 || !identical(as.integer(request$version), 1L)) {
+        stop("Unsupported analysis request version.", call.=FALSE)
     }
 
     data.type <- .rcmetar.data.type(om.data)
-    workflow <- .rcmetar.normalize.workflow(workflow)
-    params <- .rcmetar.as.params.list(params)
-    method <- as.character(method)
+    request.data.type <- request$data_type %||% data.type
+    if (!is.character(request.data.type) || length(request.data.type) != 1L ||
+            !identical(request.data.type, data.type)) {
+        stop("Analysis request data_type does not match the input data.", call.=FALSE)
+    }
+    if (is.null(request$method) || is.null(request$params) || is.null(request$workflow)) {
+        stop("Analysis request must include method, metric, params, and workflow.", call.=FALSE)
+    }
+    workflow <- .rcmetar.normalize.workflow(request$workflow)
+    params <- .rcmetar.as.params.list(request$params)
+    method <- as.character(request$method)
+    metric <- as.character(request$metric %||% params$measure %||% "")
+    if (length(metric) != 1L || !nzchar(metric)) {
+        stop("Analysis request must include one metric.", call.=FALSE)
+    }
     if (length(method) != 1 || is.na(method) || !nzchar(method)) {
         stop("Analysis request must include one method name.", call.=FALSE)
     }
@@ -712,7 +707,13 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     }
 
     if (workflow == "subgroup") {
-        selected.cov <- .rcmetar.resolve.selected.cov(om.data, selected.cov, params)
+        selected.cov <- .rcmetar.resolve.selected.cov(
+            om.data, request$selected.cov, params
+        )
+    }
+
+    if (!is.null(params$measure) && !identical(as.character(params$measure), metric)) {
+        stop("Analysis request metric does not match params$measure.", call.=FALSE)
     }
 
     list(
@@ -720,9 +721,9 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
         method=method,
         params=params,
         workflow=workflow,
-        selected.cov=selected.cov,
-        cond.means.data=cond.means.data,
-        stop.at.rma=isTRUE(stop.at.rma)
+        selected.cov=request$selected.cov,
+        cond.means.data=request$cond.means.data,
+        stop.at.rma=isTRUE(request$stop.at.rma)
     )
 }
 
@@ -890,13 +891,6 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     lapply(args, function(value) value[[1]])
 }
 
-.rcmetar.request.value <- function(request, name, default) {
-    if (name %in% names(request)) {
-        return(request[[name]])
-    }
-    default
-}
-
 .rcmetar.match.arg <- function(value, choices, argument.name) {
     if (length(value) != 1 || !(value %in% choices)) {
         stop(sprintf("Unknown %s '%s'. Expected one of: %s.", argument.name, paste(value, collapse=", "), paste(choices, collapse=", ")), call.=FALSE)
@@ -1016,13 +1010,14 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (!is.list(result) || is.null(result$images) || length(result$images) == 0) {
         return(result)
     }
+    result <- .rcmetar.normalize.plot.artifact.keys(result, request)
     pairs <- .rcmetar.request.plot.path.pairs(request)
     display.images <- character(0)
-    for (title in names(result$images)) {
-        image.path <- result$images[[title]]
+    for (key in names(result$images)) {
+        image.path <- result$images[[key]]
         for (pair in pairs) {
             if (rcmetar.plot.paths.equal(image.path, pair$output) && file.exists(pair$display)) {
-                display.images[[title]] <- pair$display
+                display.images[[key]] <- pair$display
                 break
             }
         }
@@ -1030,6 +1025,26 @@ rcmetar.validate.analysis.request <- function(om.data, request=NULL, method=NULL
     if (length(display.images) > 0) {
         result$display_images <- display.images
     }
+    result
+}
+
+.rcmetar.normalize.plot.artifact.keys <- function(result, request) {
+    if (!is.null(result$sections) || is.null(names(result$images))) return(result)
+    titles <- names(result$images)
+    workflow <- as.character(request$workflow[[1L]])
+    kind <- if (length(result$plot_names)) as.character(result$plot_names[[1L]]) else "plot"
+    keys <- paste0("analysis.", workflow, ".", kind, ".", seq_along(titles))
+    names(result$images) <- keys
+    if (!is.null(result$display_images)) names(result$display_images) <- keys
+    if (!is.null(result$plot_names)) names(result$plot_names) <- keys
+    if (!is.null(result$plot_params_paths)) names(result$plot_params_paths) <- keys
+    if (!is.null(result$plot_capabilities)) names(result$plot_capabilities) <- keys
+    result$image_order <- keys
+    result$plot_titles <- stats::setNames(titles, keys)
+    result$sections <- lapply(seq_along(keys), function(index) list(
+        id=keys[[index]], kind="image", order=as.integer(index - 1L),
+        title=titles[[index]], source_key=keys[[index]]
+    ))
     result
 }
 

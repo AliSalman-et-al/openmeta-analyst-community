@@ -1055,22 +1055,22 @@ diagnostic.reitsma.is.feasible <- function(diagnostic.data, metric) {
         function(scale, spec) .rcmetar.reitsma.coefficient.plot(
             scale, spec, output, reg.data, fit, params, coding),
         names(specifications), specifications)
-    titles <- vapply(plots, `[[`, character(1), "title")
-    paths <- stats::setNames(vapply(plots, `[[`, character(1), "path"), titles)
-    params.paths <- stats::setNames(
-        vapply(plots, `[[`, character(1), "params.path"), titles)
-    plot.names <- stats::setNames(rep("forest", length(titles)), titles)
-    capabilities <- stats::setNames(lapply(titles, function(title)
-        .rcmetar.plot.descriptor.for.kind("forest", has.params=TRUE)), titles)
-    section.ids <- c(
+    keys <- c(
         "diagnostic.reitsma.sensitivity.coefficients",
         "diagnostic.reitsma.specificity.coefficients"
     )
-    sections <- lapply(seq_along(titles), function(index) list(
-        id=section.ids[[index]], kind="image", order=index,
-        title=titles[[index]], source_key=titles[[index]]
+    titles <- vapply(plots, `[[`, character(1), "title")
+    paths <- stats::setNames(vapply(plots, `[[`, character(1), "path"), keys)
+    params.paths <- stats::setNames(
+        vapply(plots, `[[`, character(1), "params.path"), keys)
+    plot.names <- stats::setNames(rep("forest", length(keys)), keys)
+    capabilities <- stats::setNames(lapply(keys, function(key)
+        .rcmetar.plot.descriptor.for.kind("forest", has.params=TRUE)), keys)
+    sections <- lapply(seq_along(keys), function(index) list(
+        id=keys[[index]], kind="image", order=index,
+        title=titles[[index]], source_key=keys[[index]]
     ))
-    list(images=paths, image.order=titles, plot_names=plot.names,
+    list(images=paths, image.order=keys, plot_names=plot.names,
          plot_params_paths=params.paths, plot_capabilities=capabilities,
          sections=sections)
 }

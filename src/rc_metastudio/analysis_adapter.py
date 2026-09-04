@@ -116,14 +116,11 @@ class AnalysisRequest:
         parameters.setdefault("measure", self.metric)
         return {
             "version": self.version,
-            "request.version": self.version,
             "data_type": self.data_type,
-            "data.type": self.data_type,
             "workflow": self.workflow,
             "method": self.method,
             "metric": self.metric,
             "params": parameters,
-            "parameters": self.parameter_values(),
         }
 
     def parameter_values(self) -> dict[str, AnalysisValue]:
@@ -467,12 +464,11 @@ def _run_diagnostic_backend(workflow, method_names, parameter_values):
     requests = [
         {
             "version": 1,
-            "request.version": 1,
-            "data.type": "diagnostic",
+            "data_type": "diagnostic",
             "workflow": workflow,
             "method": method,
+            "metric": params.get("measure", "DOR"),
             "params": params,
-            "parameters": params,
         }
         for method, params in zip(method_names, parameter_values, strict=True)
     ]

@@ -652,14 +652,15 @@
     ), text.names, seq_along(text.names) - 1L))
     image.names <- names(plots$images %||% character())
     if (length(image.names)) {
-        kinds <- vapply(image.names, function(title) {
-            kind <- plots$plot_names[[tolower(title)]] %||% "plot"
+        kinds <- vapply(image.names, function(key) {
+            kind <- plots$plot_names[[key]] %||% "plot"
             as.character(kind)
         }, character(1))
         occurrences <- ave(seq_along(kinds), kinds, FUN=seq_along)
-        image.sections <- unname(Map(function(title, kind, occurrence, order) list(
+        image.sections <- unname(Map(function(key, kind, occurrence, order) list(
             id=paste0("small-study.", kind, ".", occurrence), kind="image",
-            order=as.integer(order), title=title, source_key=title
+            order=as.integer(order), title=plots$plot_titles[[key]] %||% key,
+            source_key=key
         ), image.names, kinds, occurrences,
         length(sections) + seq_along(image.names) - 1L))
         sections <- c(sections, image.sections)
@@ -669,7 +670,7 @@
 
 .small.study.render.plots <- function(om.data, prepared, trimfill) {
     if (prepared$diagnostic && !isTRUE(prepared$derived$raw))
-        return(list(images=character(), plot_capabilities=list(), plot_names=character(),
+        return(list(images=character(), plot_titles=character(), plot_capabilities=list(), plot_names=character(),
                     plot_params_paths=list(), image_order=character(), failures=character()))
     .small.study.plots(
         om.data, prepared$metafor.pooled, prepared$params, prepared$metric,
@@ -1052,7 +1053,7 @@ publication.bias.effects <- function(om.data, params) {
     "trimfill_funnel"
 }
 
-.small.study.plot.artifact <- function(title, kind, path, plot.data, fit, params,
+.small.study.plot.artifact <- function(key, title, kind, path, plot.data, fit, params,
                                        failure.prefix=title) {
     failure <- tryCatch({
         rcmetar.regenerate.small.study.funnel(plot.data, fit, params, path)
@@ -1064,7 +1065,7 @@ publication.bias.effects <- function(om.data, params) {
                        composition="single", regenerator="funnel")
     base <- sub("\\.png$", "", path)
     .small.study.save(plot.data, fit, params, base)
-    list(title=title, path=path, kind=plot.kind, capability=capability,
+    list(key=key, title=title, path=path, kind=plot.kind, capability=capability,
          params.path=base, failure=character())
 }
 
@@ -1107,8 +1108,9 @@ publication.bias.effects <- function(om.data, params) {
     run.params$funnel.ylab <- as.character(ylab)
     if (kind == "deeks") run.params <- .small.study.deeks.params(
         run.params, plot.data, prepared, diagnostic.model)
+    key <- paste0("small-study.", .small.study.plot.kind(kind), ".", index)
     path <- tempfile(pattern=paste0("small-study-", kind, "-"), fileext=".png")
-    .small.study.plot.artifact(title, kind, path, plot.data, pooled, run.params)
+    .small.study.plot.artifact(key, title, kind, path, plot.data, pooled, run.params)
 }
 
 .small.study.trimfill.plot <- function(name, scenario, plot.data, params, metric) {
@@ -1132,24 +1134,25 @@ publication.bias.effects <- function(om.data, params) {
         .small.study.plot.setting(params, "funnel.xlab", 1L, label))
     run.params$funnel.ylab <- as.character(
         .small.study.plot.setting(params, "funnel.ylab", 1L, "Standard error"))
+    key <- paste0("small-study.trim-and-fill.", tolower(name))
     path <- tempfile(pattern="small-study-trimfill-", fileext=".png")
     .small.study.plot.artifact(
-        name, "trimfill", path, augmented, scenario$fit, run.params,
+        key, name, "trimfill", path, augmented, scenario$fit, run.params,
         paste0(name, " plot"))
 }
 
 .small.study.collect.plots <- function(artifacts) {
     valid <- artifacts[vapply(artifacts, function(item) !is.null(item$title), logical(1))]
     failures <- as.character(unlist(lapply(artifacts, `[[`, "failure"), use.names=FALSE))
-    paths <- stats::setNames(vapply(valid, `[[`, character(1), "path"),
-                             vapply(valid, `[[`, character(1), "title"))
-    kinds <- stats::setNames(vapply(valid, `[[`, character(1), "kind"),
-                             tolower(names(paths)))
+    keys <- vapply(valid, `[[`, character(1), "key")
+    paths <- stats::setNames(vapply(valid, `[[`, character(1), "path"), keys)
+    kinds <- stats::setNames(vapply(valid, `[[`, character(1), "kind"), keys)
+    titles <- stats::setNames(vapply(valid, `[[`, character(1), "title"), keys)
     params.paths <- stats::setNames(vapply(valid, `[[`, character(1), "params.path"),
                                     names(paths))
     capabilities <- stats::setNames(lapply(valid, `[[`, "capability"), names(paths))
-    list(images=paths, plot_capabilities=capabilities, plot_names=kinds,
-         plot_params_paths=params.paths, image_order=names(paths), failures=failures)
+    list(images=paths, plot_titles=titles, plot_capabilities=capabilities, plot_names=kinds,
+         plot_params_paths=params.paths, image_order=keys, failures=failures)
 }
 
 .small.study.plots <- function(om.data, pooled, params, metric, common.center=0,

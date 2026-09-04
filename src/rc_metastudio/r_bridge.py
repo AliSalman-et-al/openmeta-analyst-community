@@ -960,37 +960,6 @@ def _normalize_rcmetar_workflow(workflow):
     return workflow
 
 
-def _run_rcmetar_core_analysis(
-    data_name,
-    method_name,
-    params,
-    workflow="standard",
-    res_name="result",
-    cond_means_data="NULL",
-    stop_at_rma=False,
-):
-    workflow = _normalize_rcmetar_workflow(workflow)
-    params = normalize_confidence_level_params(params)
-    request = ro.ListVector(
-        {
-            "method": ro.StrVector([str(method_name)]),
-            "params": _to_r_params(params),
-            "workflow": ro.StrVector([workflow]),
-            "cond.means.data": (
-                rpy2.rinterface.NULL
-                if cond_means_data in (None, "NULL")
-                else cond_means_data
-            ),
-            "stop.at.rma": ro.BoolVector([bool(stop_at_rma)]),
-        }
-    )
-    result = execute_r_function(
-        "rcmetar.run.analysis", _r_object_from_symbol(data_name), request
-    )
-    ro.globalenv[_r_symbol(res_name)] = result
-    return parse_out_results(result)
-
-
 @serialized_r_call
 def run_versioned_analysis_request(
     request: Mapping[str, object],
@@ -998,28 +967,42 @@ def run_versioned_analysis_request(
     data_name: str = "tmp_obj",
 ):
     """Execute one complete immutable request through the public RCMetaR API."""
-    method, workflow, params = _validated_versioned_request(request)
-    return _execute_versioned_request(method, workflow, params, res_name, data_name)
+    data_type, method, metric, workflow, params = _validated_versioned_request(request)
+    return _execute_versioned_request(
+        data_type, method, metric, workflow, params, res_name, data_name
+    )
 
 
 def _validated_versioned_request(
     request: Mapping[str, object],
-) -> tuple[str, object, Mapping[str, object]]:
+) -> tuple[str, str, str, object, Mapping[str, object]]:
     version = request.get("version")
     if type(version) is not int or version != 1:
         raise ValueError("unsupported analysis request version")
+    data_type = request.get("data_type")
     method = request.get("method")
-    workflow = request.get("workflow", "standard")
-    params = request.get("params", request.get("parameters", {}))
+    metric = request.get("metric")
+    workflow = request.get("workflow")
+    params = request.get("params")
+    if not isinstance(data_type, str) or not data_type:
+        raise ValueError("analysis request data_type must be non-empty text")
     if not isinstance(method, str) or not method:
         raise ValueError("analysis request method must be non-empty text")
+    if not isinstance(metric, str) or not metric:
+        raise ValueError("analysis request metric must be non-empty text")
+    if not isinstance(workflow, str) or not workflow:
+        raise ValueError("analysis request workflow must be non-empty text")
     if not isinstance(params, Mapping):
         raise TypeError("analysis request params must be a mapping")
-    return method, workflow, {str(key): value for key, value in params.items()}
+    return data_type, method, metric, workflow, {
+        str(key): value for key, value in params.items()
+    }
 
 
 def _execute_versioned_request(
+    data_type: str,
     method: str,
+    metric: str,
     workflow: object,
     params: Mapping[str, object],
     res_name: str,
@@ -1027,8 +1010,9 @@ def _execute_versioned_request(
 ) -> object:
     normalized = {
         "version": 1,
-        "request.version": 1,
+        "data_type": data_type,
         "method": method,
+        "metric": metric,
         "params": _to_r_params(params),
         "workflow": _normalize_rcmetar_workflow(workflow),
     }
@@ -1057,33 +1041,22 @@ def run_versioned_analysis_requests(
 
 def _validated_versioned_requests(
     requests: list[Mapping[str, object]],
-) -> tuple[list[str], list[dict[str, object]], object]:
+) -> tuple[list[str], list[dict[str, object]], str]:
     if not requests:
         raise ValueError("at least one analysis request is required")
     methods: list[str] = []
     param_values: list[dict[str, object]] = []
-    workflow = requests[0].get("workflow", "standard")
+    first = _validated_versioned_request(requests[0])
+    data_type, _, _, workflow, _ = first
     for request in requests:
-        if request.get("workflow", workflow) != workflow:
+        current_data_type, method, _, current_workflow, values = (
+            _validated_versioned_request(request)
+        )
+        if current_data_type != data_type or current_workflow != workflow:
             raise ValueError("one execution cannot mix analysis workflows")
-        method, values = _validated_versioned_request_item(request)
         methods.append(method)
-        param_values.append(values)
-    return methods, param_values, workflow
-
-
-def _validated_versioned_request_item(
-    request: Mapping[str, object],
-) -> tuple[str, dict[str, object]]:
-    if type(request.get("version")) is not int or request.get("version") != 1:
-        raise ValueError("unsupported analysis request version")
-    method = request.get("method")
-    values = request.get("params", request.get("parameters", {}))
-    if not isinstance(method, str) or not method:
-        raise ValueError("analysis request method must be non-empty text")
-    if not isinstance(values, Mapping):
-        raise TypeError("analysis request params must be a mapping")
-    return method, {str(key): item for key, item in values.items()}
+        param_values.append(dict(values))
+    return methods, param_values, str(workflow)
 
 
 def _execute_versioned_requests(
@@ -1101,31 +1074,11 @@ def _execute_versioned_requests(
             _r_character_vector(methods),
             execute_r_function("list", *params),
             workflow=normalized_workflow,
-            **{"request.version": 1},
+            version=1,
         )
     except RRuntimeError as error:
         raise DiagnosticExecutionError(str(error)) from error
     ro.globalenv[_r_symbol(res_name)] = result
-    return parse_out_results(result)
-
-
-@serialized_r_call
-def run_diagnostic_multi(
-    function_names, list_of_params, res_name="result", diagnostic_data_name="tmp_obj"
-):
-    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
-    try:
-        result = execute_r_function(
-            "rcmetar.run.diagnostic.analyses",
-            _r_object_from_symbol(diagnostic_data_name),
-            _r_character_vector(function_names),
-            execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
-            workflow="standard",
-        )
-    except RRuntimeError as error:
-        raise DiagnosticExecutionError(str(error)) from error
-    ro.globalenv[_r_symbol(res_name)] = result
-
     return parse_out_results(result)
 
 
@@ -1268,6 +1221,7 @@ def parse_out_results(result):
     sections.extend(
         _image_section_metadata(
             metadata["images"],
+            metadata["image_order"],
             metadata["image_var_names"],
             metadata["plot_capabilities"],
             metadata["sections"],
@@ -1311,6 +1265,7 @@ _RESULT_METADATA_KEYS = frozenset(
         "display_images",
         "image_order",
         "plot_names",
+        "plot_titles",
         "plot_params_paths",
         "plot_capabilities",
         "sections",
@@ -1384,7 +1339,7 @@ def _text_section_metadata(sources, producer_sections):
 
 
 def _image_section_metadata(
-    images, variable_names, capabilities, producer_sections, offset
+    images, image_order, variable_names, capabilities, producer_sections, offset
 ):
     by_source = {
         section["source_key"]: section
@@ -1393,12 +1348,15 @@ def _image_section_metadata(
     }
     sections = []
     used_ids = set()
-    for index, title in enumerate(images):
-        supplied = by_source.get(title)
-        capability = capabilities.get(title, {})
+    ordered_keys = [key for key in (image_order or images) if key in images]
+    for index, image_key in enumerate(ordered_keys):
+        supplied = by_source.get(image_key)
+        capability = capabilities.get(image_key, {})
         semantic_key = variable_names.get(
-            title,
-            variable_names.get(title.lower(), capability.get("plot_kind", "plot")),
+            image_key,
+            variable_names.get(
+                image_key.lower(), capability.get("plot_kind", "plot")
+            ),
         )
         semantic_id = (
             supplied["id"]
@@ -1411,8 +1369,8 @@ def _image_section_metadata(
                 "id": semantic_id,
                 "kind": "image",
                 "order": offset + index,
-                "title": supplied["title"] if supplied is not None else title,
-                "source_key": title,
+                "title": supplied["title"] if supplied is not None else image_key,
+                "source_key": image_key,
             }
         )
     return sections
@@ -2169,33 +2127,6 @@ def _weight_table(study_names, weights):
         "Study names", "Weights", widths=widths
     )
     return "\n".join([header, table]) + "\n"
-
-
-@serialized_r_call
-def run_diagnostic_workflow(
-    workflow,
-    function_names,
-    list_of_params,
-    res_name="result",
-    diagnostic_data_name="tmp_obj",
-):
-    # list of parameter objects
-    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
-
-    workflow = _normalize_rcmetar_workflow(workflow)
-    try:
-        result = execute_r_function(
-            "rcmetar.run.diagnostic.analyses",
-            _r_object_from_symbol(diagnostic_data_name),
-            _r_character_vector(function_names),
-            execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
-            workflow=workflow,
-        )
-    except RRuntimeError as error:
-        raise DiagnosticExecutionError(str(error)) from error
-    ro.globalenv[_r_symbol(res_name)] = result
-
-    return parse_out_results(result)
 
 
 def _get_col(m, i):
