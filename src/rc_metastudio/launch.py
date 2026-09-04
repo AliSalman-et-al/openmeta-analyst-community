@@ -245,6 +245,10 @@ def start():
         settings.setup_directories()
         meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
         if startup_project_path:
+            # The initial blank workspace exists only to compose the shell.  A
+            # startup project replaces it directly, so it must not trigger the
+            # ordinary unsaved-change prompt before the open boundary.
+            meta.workspace.mark_saved()
             handled, result = _open_startup_project(
                 app, meta, startup_project_path, startup_argv
             )

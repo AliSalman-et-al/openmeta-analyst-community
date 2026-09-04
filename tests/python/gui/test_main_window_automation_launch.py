@@ -916,14 +916,26 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     closed = []
     startup_events = []
 
+    class Workspace:
+        document = object()
+
+        def __init__(self):
+            self.saved = False
+
+        def mark_saved(self):
+            self.saved = True
+            startup_events.append("workspace-marked-saved")
+
     class Window:
         def __init__(self):
             self.tableView = self
+            self.workspace = Workspace()
 
         def show(self):
             pass
 
         def open(self, project_path):
+            assert self.workspace.saved
             opened.append(project_path)
             return True
 
@@ -992,7 +1004,12 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert opened == [sample_project]
     assert started == []
     assert closed == [True]
-    assert startup_events == ["r-backend-ready", "main-window-import"]
+    assert startup_events == [
+        "r-backend-ready",
+        "main-window-import",
+        "workspace-marked-saved",
+        "workspace-marked-saved",
+    ]
     marker = json.loads(completion_marker.read_text(encoding="utf-8"))
     assert marker["project"] == "amino.rcms"
     os.chdir(REPO_ROOT)
