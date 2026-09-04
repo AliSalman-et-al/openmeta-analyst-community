@@ -458,7 +458,18 @@ def grimp_evidence() -> dict[str, object] | None:
 
 
 def changed_lines(root: Path, base: str, head: str) -> dict[str, set[int]]:
-    output = run_git(root, "diff", "--unified=0", base, head, "--", "*.py", "*.R", "*.r")
+    output = run_git(
+        root,
+        "diff",
+        "-M20%",
+        "--unified=0",
+        base,
+        head,
+        "--",
+        "*.py",
+        "*.R",
+        "*.r",
+    )
     changed: dict[str, set[int]] = {}
     current: str | None = None
     for line in output.splitlines():
