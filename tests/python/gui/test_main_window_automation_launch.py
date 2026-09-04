@@ -4874,6 +4874,7 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     main_window = launch._import_main_window()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = main_window.MainWindow()
+    _mark_workspace_saved(window)
     sample_project = _sample_project_path("amino.rcms")
 
     class RejectedWizard(QtCore.QObject):
