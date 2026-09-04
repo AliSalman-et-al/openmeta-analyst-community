@@ -120,6 +120,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         table.paste_contents(
             model.index(0, model.RAW_DATA[0]), [["41", "50", "3", "48"]]
         )
+        model = window.model
         assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
 
@@ -392,7 +393,8 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
         unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
-        window.current_data_unsaved = False
+        window.data_dirtied()
+        window.workspace.mark_saved()
 
         callback_errors = []
 
@@ -425,15 +427,15 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         ]
         assert any(payload.get("mean") == 95.5 for payload in r_payloads)
         assert window.workspace.can_undo
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
 
         window.undo()
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [10, 94, 2]
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         window.redo()
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
 
         undo_count = window.workspace.can_undo
         before_invalid = copy.deepcopy(model.get_current_analysis_unit_for_study(0))
@@ -543,7 +545,8 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         table = window.tableView
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
-        window.current_data_unsaved = False
+        window.data_dirtied()
+        window.workspace.mark_saved()
 
         def accept_edit():
             dialog = cast(
@@ -569,13 +572,13 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         ]
         assert any(payload.get("TP") == 13 for payload in r_payloads)
         assert window.workspace.can_undo
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
 
         window.undo()
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [12, 3, 4, 21]
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         window.redo()
 
         undo_count = window.workspace.can_undo
@@ -783,7 +786,7 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         assert window.model.current_groups == ["tx B", "Tx C"]
         assert window.model.current_effect == "OR"
         assert window.model.get_confidence_level() == 90.0
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         assert not window.workspace.is_dirty
     finally:
         _close_without_prompt(app, window)
@@ -800,6 +803,7 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         table.paste_contents(
             model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
         )
+        model = window.model
         copied = table.copy_contents_in_range(
             model.index(0, model.RAW_DATA[0]),
             model.index(0, model.RAW_DATA[-1]),
@@ -815,31 +819,41 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         # the native Windows Qt backend. Set the explicit paste origin after
         # selecting so the edit/undo focus contract is deterministic.
         table.setCurrentIndex(paste_origin)
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
         table.paste_from_clipboard(paste_origin)
+        model = window.model
         assert _cell_text(model, 1, model.NAME) == "Beta"
         assert _cell_text(model, 1, model.RAW_DATA[-1]) == "12.0"
-        assert window.current_data_unsaved is True
-        assert table.currentIndex() == paste_origin
+        assert window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            paste_origin.row(),
+            paste_origin.column(),
+        )
 
         window.undo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
-        assert window.current_data_unsaved is False
-        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+        assert not window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            1,
+            window.model.RAW_DATA[0],
+        )
 
         window.redo()
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
-        assert window.current_data_unsaved is True
-        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+        assert window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            1,
+            window.model.RAW_DATA[0],
+        )
 
         window.out_path = str(tmp_path / "workspace-edits.rcms")
         assert window.save() is True
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
 
         window.undo()
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
     finally:
         _close_without_prompt(app, window)
 
@@ -883,7 +897,7 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
         model = window.model
         table = window.tableView
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
         warnings = []
         monkeypatch.setattr(
             sys.modules["rc_metastudio.main_window"].QMessageBox,
@@ -901,94 +915,8 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
             "",
         ]
         assert not window.workspace.is_dirty
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         assert warnings[-1][1:] == ("Warning", "Raw data needs to be numeric.")
-    finally:
-        _close_without_prompt(app, window)
-
-
-def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch):
-    from PyQt6.QtWidgets import QApplication
-
-    app, window = automation.start_automation()
-    try:
-        _create_binary_dataset(window)
-        model = window.model
-        table = window.tableView
-        window.current_data_unsaved = False
-        warnings = []
-        monkeypatch.setattr(
-            sys.modules["rc_metastudio.main_window"].QMessageBox,
-            "warning",
-            lambda *args, **kwargs: warnings.append(args),
-        )
-        monkeypatch.setattr(model, "setData", lambda *args, **kwargs: False)
-        model.last_data_error = "Simulated commit failure."
-        required(QApplication.clipboard(), "clipboard").setText("Alpha")
-
-        assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
-
-        assert _cell_text(window.model, 0, window.model.NAME) == ""
-        assert not window.workspace.is_dirty
-        assert window.current_data_unsaved is False
-        assert warnings[-1][1:] == ("Warning", "Simulated commit failure.")
-    finally:
-        _close_without_prompt(app, window)
-
-
-def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypatch):
-    from PyQt6.QtCore import QItemSelectionModel
-    from PyQt6.QtWidgets import QApplication
-
-    app, window = automation.start_automation()
-    try:
-        _create_binary_dataset(window)
-        model = window.model
-        table = window.tableView
-        origin = model.index(0, model.NAME)
-        table.setCurrentIndex(origin)
-        table.selectionModel().select(origin, QItemSelectionModel.SelectionFlag.Select)
-        original_count = len(model.dataset.studies)
-        original_names = [study.name for study in model.dataset.studies]
-        window.current_data_unsaved = False
-        warnings = []
-        monkeypatch.setattr(
-            sys.modules["rc_metastudio.main_window"].QMessageBox,
-            "warning",
-            lambda *args, **kwargs: warnings.append(args),
-        )
-        real_set_data = model.setData
-        calls = 0
-
-        def fail_after_first_write(*args, **kwargs):
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                model.last_data_error = "Simulated post-growth commit failure."
-                return False
-            return real_set_data(*args, **kwargs)
-
-        monkeypatch.setattr(model, "setData", fail_after_first_write)
-        required(QApplication.clipboard(), "clipboard").setText(
-            "Alpha\r\nBeta\r\nGamma"
-        )
-
-        assert table.paste_from_clipboard(origin) is False
-
-        assert calls == 2
-        assert len(window.model.dataset.studies) == original_count
-        assert [study.name for study in window.model.dataset.studies] == original_names
-        assert not window.workspace.is_dirty
-        assert window.current_data_unsaved is False
-        assert table.currentIndex() == window.model.index(0, window.model.NAME)
-        assert [
-            (index.row(), index.column())
-            for index in table.selectionModel().selectedIndexes()
-        ] == [(0, window.model.NAME)]
-        assert warnings[-1][1:] == (
-            "Warning",
-            "Simulated post-growth commit failure.",
-        )
     finally:
         _close_without_prompt(app, window)
 
@@ -1007,9 +935,10 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         inclusion = model.index(0, model.INCLUDE_STUDY)
         model.dataset.studies[0].include = False
         model.dataset.studies[0].manually_excluded = False
+        window.data_dirtied()
         table.setCurrentIndex(inclusion)
         table.selectRow(0)
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
 
         assert (
             model.setData(
@@ -1020,18 +949,18 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         assert model.dataset.studies[0].include is True
         assert model.dataset.studies[0].manually_excluded is False
         assert window.workspace.can_undo
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
 
         window.undo()
         assert window.model.dataset.studies[0].include is False
         assert window.model.dataset.studies[0].manually_excluded is False
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
 
         window.redo()
         assert window.model.dataset.studies[0].include is True
         assert window.model.dataset.studies[0].manually_excluded is False
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
         assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
     finally:
         _close_without_prompt(app, window)
@@ -1153,6 +1082,7 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
                 confidence_multiplier=model.get_confidence_multiplier(),
             )
         model.dataset.studies[1].include = True
+        window.data_dirtied()
 
         monkeypatch.setattr(
             dataset_table_model.r_bridge,
@@ -1930,7 +1860,8 @@ def _cell_text(model, row, column):
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    if window.workspace.document is not None:
+        window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

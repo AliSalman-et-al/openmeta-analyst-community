@@ -1255,7 +1255,7 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

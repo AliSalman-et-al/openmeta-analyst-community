@@ -745,11 +745,21 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         )
         if self.workspace.document is None:
             self.workspace.new(before_document)
-        elif self.workspace.document == after_document:
+        if before_document == after_document:
             self.workspace_is_dirty = self.workspace.is_dirty
             return
         self.workspace.replace(after_document)
         self.workspace_is_dirty = self.workspace.is_dirty
+
+    def commit_workspace_change(self, before, after):
+        """Commit a validated document, then rebuild the Qt adapter from it."""
+        after_document = (
+            after
+            if isinstance(after, project_format.ProjectDocument)
+            else project_format.ProjectDocument(1, *after)
+        )
+        self.record_workspace_change(before, after_document)
+        self._install_workspace_document(after_document)
 
     def _commit_model_operation(self, operation):
         """Run one already validated UI operation as one workspace change."""
@@ -898,7 +908,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         if previous_model not in observers:
             observers.append(previous_model)
         runtime = project_adapter.document_to_runtime_project(document)
-        self.set_model(
+        self._set_model_adapter(
             runtime.dataset,
             runtime.model_state,
             preserve_state_selection=runtime.restored_selection,
@@ -1659,6 +1669,23 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         preserve_state_selection=False,
         recalculate_outcomes=True,
     ):
+        self._set_model_adapter(
+            data_model,
+            state_dict=state_dict,
+            check_for_appropriate_metric=check_for_appropriate_metric,
+            preserve_state_selection=preserve_state_selection,
+            recalculate_outcomes=recalculate_outcomes,
+        )
+        self.data_dirtied()
+
+    def _set_model_adapter(
+        self,
+        data_model,
+        state_dict=None,
+        check_for_appropriate_metric=False,
+        preserve_state_selection=False,
+        recalculate_outcomes=True,
+    ):
         # An empty dataset starts with one editable blank row.
         add_blank_study = len(data_model) < 1
         self.model = dataset_table_model.DatasetTableModel(
@@ -1689,7 +1716,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             preserve_selection=preserve_state_selection,
             recalculate_outcomes=recalculate_outcomes,
         )
-        self.data_dirtied()
 
     def model_updated(self, preserve_selection=False, recalculate_outcomes=True):
         """Call me when the model is changed."""

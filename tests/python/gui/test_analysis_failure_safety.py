@@ -807,7 +807,7 @@ def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

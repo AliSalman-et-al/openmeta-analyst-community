@@ -195,7 +195,7 @@ def _run_main() -> int:
     prepare_generated_ui_imports()
     ensure_application_resources()
     repo_root = Path(__file__).resolve().parents[1]
-    install_native_test_backend()
+    backend = install_native_test_backend()
 
     from rc_metastudio import (
         binary_data_dialog,
@@ -206,41 +206,38 @@ def _run_main() -> int:
     )
     for name, implementation in vars(backend).items():
         setattr(r_bridge, name, implementation)
-    for dialog_module in (binary_data_dialog, continuous_data_dialog, diagnostic_data_dialog):
-        setattr(dialog_module, "r_bridge", r_bridge)
-
     _install_backend_test_double(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _level: 1.96,
     )
     setattr(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     _install_backend_test_double(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "impute_binary_data",
         lambda _data: {"FAIL": True},
     )
     _install_backend_test_double(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
     )
     setattr(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     setattr(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     _install_backend_test_double(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "impute_continuous_data",
         lambda _data, _alpha: {
             "succeeded": False,
@@ -248,55 +245,55 @@ def _run_main() -> int:
         },
     )
     _install_backend_test_double(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
     )
     setattr(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     _install_backend_test_double(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "back_calculate_continuous_data",
         lambda *_args, **_kwargs: {"FAIL": True},
     )
     setattr(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     _install_backend_test_double(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "impute_diagnostic_data",
         lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     _install_backend_test_double(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         },
     )
     setattr(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     setattr(diagnostic_data_dialog.QMessageBox, "warning", lambda *args, **kwargs: None)
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
