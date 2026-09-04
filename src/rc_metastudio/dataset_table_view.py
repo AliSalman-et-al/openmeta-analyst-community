@@ -36,6 +36,7 @@ from rc_metastudio import app_error_handler
 from rc_metastudio import qt_layout
 from rc_metastudio import meta_globals
 from rc_metastudio import project_adapter
+from rc_metastudio import analysis_dataset
 from rc_metastudio import qt_text
 from rc_metastudio import tabular_data
 from rc_metastudio.analysis_dataset import Study
@@ -59,6 +60,7 @@ class MainWindowProtocol(Protocol):
     twoArmMetricMenu: QMenu
 
     def data_dirtied(self) -> None: ...
+    def data_error(self, message: str) -> None: ...
     def record_workspace_change(self, before, after) -> None: ...
     def delete_study(self, study, *, study_index: int) -> None: ...
     def edit_group_name(self, group: str) -> None: ...
@@ -70,6 +72,23 @@ class MainWindowProtocol(Protocol):
     def enable_menu_options_that_require_dataset(self) -> None: ...
     def disable_menu_options_that_require_dataset(self) -> None: ...
     def set_model(self, dataset, state_dict=None) -> None: ...
+
+
+def _workspace_snapshot(model):
+    if not isinstance(model.dataset, analysis_dataset.Dataset):
+        return None
+    return (
+        project_adapter.dataset_to_project(model.dataset),
+        project_adapter.model_to_state(model),
+    )
+
+
+def _publish_workspace_snapshot(view, before, main_gui):
+    if before is None:
+        return
+    after = _workspace_snapshot(view.model())
+    if after is not None:
+        main_gui.record_workspace_change(before, after)
     def data_error(self, message: str) -> None: ...
 
 
@@ -509,8 +528,7 @@ class DatasetTableView(QtWidgets.QTableView):
 
             # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
-                before_project = project_adapter.dataset_to_project(self.model().dataset)
-                before_state = project_adapter.model_to_state(self.model())
+                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -533,14 +551,9 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
                     self.dataDirtied.emit()
-                    after_project = project_adapter.dataset_to_project(self.model().dataset)
-                    after_state = project_adapter.model_to_state(self.model())
-                    self._main_gui().record_workspace_change(
-                        (before_project, before_state), (after_project, after_state)
-                    )
+                    _publish_workspace_snapshot(self, before, self._main_gui())
             elif data_type == "continuous":
-                before_project = project_adapter.dataset_to_project(self.model().dataset)
-                before_state = project_adapter.model_to_state(self.model())
+                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group_name in current_groups:
                     cur_raw_data_dict[group_name] = list(
@@ -563,15 +576,10 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
                     self.dataDirtied.emit()
-                    after_project = project_adapter.dataset_to_project(self.model().dataset)
-                    after_state = project_adapter.model_to_state(self.model())
-                    self._main_gui().record_workspace_change(
-                        (before_project, before_state), (after_project, after_state)
-                    )
+                    _publish_workspace_snapshot(self, before, self._main_gui())
             else:
                 # then this is diagnostic data
-                before_project = project_adapter.dataset_to_project(self.model().dataset)
-                before_state = project_adapter.model_to_state(self.model())
+                before = _workspace_snapshot(self.model())
                 cur_raw_data_dict = {}
                 for group in current_groups:
                     cur_raw_data_dict[group] = list(
@@ -593,11 +601,7 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
                     self.dataDirtied.emit()
-                    after_project = project_adapter.dataset_to_project(self.model().dataset)
-                    after_state = project_adapter.model_to_state(self.model())
-                    self._main_gui().record_workspace_change(
-                        (before_project, before_state), (after_project, after_state)
-                    )
+                    _publish_workspace_snapshot(self, before, self._main_gui())
         finally:
             del signal_blocker
 
