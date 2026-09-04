@@ -1333,9 +1333,38 @@ class DatasetTableModel(QAbstractTableModel):
             reverse=reverse,
             directions_to_analysis_unit=directions_to_analysis_unit,
             confidence_multiplier=self.get_confidence_multiplier(),
-            effect_source=self._display_effect_source,
         )
         self.dataset.studies.sort(key=cmp_to_key(comparator), reverse=reverse)
+
+    def _sort_outcomes_with_display_source(self, column, reverse):
+        data_type = self.get_current_outcome_type(get_str=False)
+        follow_up = self.get_current_follow_up_name()
+        group_comparison = self.get_current_group_comparison()
+        data_index = column - min(self.OUTCOMES)
+
+        def outcome_value(study):
+            unit = study.get_analysis_unit(self.current_outcome_name, follow_up)
+            source = self._display_effect_source(unit)
+            effect = self.current_effect
+            index = data_index
+            if data_type == DIAGNOSTIC:
+                effect = "Spec" if index >= 3 else "Sens"
+                index %= 3
+            values = unit.get_effect_and_ci_for_source(
+                source, effect, group_comparison, self.get_confidence_multiplier()
+            )
+            n1 = None
+            if effect == "PFT":
+                n1 = unit.get_raw_data_for_groups(self.current_groups)[1]
+            converter = self._get_conv_to_display_scale(data_type, effect, n1)
+            return converter(values[index])
+
+        def compare(study_a, study_b):
+            return self.dataset._meta_cmp_wrapper(
+                study_a, study_b, outcome_value(study_a), outcome_value(study_b), reverse
+            )
+
+        self.dataset.studies.sort(key=cmp_to_key(compare), reverse=reverse)
 
     def sort_studies(self, col, reverse):
         if col == self.NAME:
@@ -1356,23 +1385,7 @@ class DatasetTableModel(QAbstractTableModel):
                 "raw_data", reverse, analysis_unit_reference_info
             )
         elif col in self.OUTCOMES:
-            # need this to dig down to find right analysis_unit and data we're looking for to compare against
-            analysis_unit_reference_info = {
-                "outcome_type": self.dataset.get_outcome_type(
-                    self.current_outcome_name
-                ),
-                "outcome_name": self.current_outcome_name,
-                "follow_up": self.get_follow_up_name_for_t_point(
-                    self.current_follow_up_index
-                ),
-                "current_groups": self.get_current_groups(),
-                "current_effect": self.current_effect,
-                "group_comparison": self.get_current_group_comparison(),
-                "data_index": col - min(self.OUTCOMES),
-            }
-            self._sort_studies_with_cmp(
-                "outcomes", reverse, analysis_unit_reference_info
-            )
+            self._sort_outcomes_with_display_source(col, reverse)
 
         # Columns to the right of outcomes are covariates.
         elif col > self.OUTCOMES[-1]:

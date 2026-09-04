@@ -467,7 +467,7 @@ class Dataset:
         directions_to_analysis_unit=None,
         confidence_multiplier=None,
         convert_to_display_scale: Callable[[object, str, object], object] | None = None,
-        effect_source: EffectSource | Callable[[AnalysisUnit], EffectSource] = "entered",
+        effect_source: EffectSource = "entered",
     ):
         """Compare studies in various ways -- pass the returned function
         to the (built-in) sort function.
@@ -533,17 +533,6 @@ class Dataset:
                 outcome_data_a = []
                 outcome_data_b = []
 
-                source_a = (
-                    effect_source(analysis_unit_a)
-                    if callable(effect_source)
-                    else effect_source
-                )
-                source_b = (
-                    effect_source(analysis_unit_b)
-                    if callable(effect_source)
-                    else effect_source
-                )
-
                 if outcome_type is BINARY:
 
                     def to_display_scale(x):
@@ -561,13 +550,13 @@ class Dataset:
 
                 if outcome_type in (BINARY, CONTINUOUS):
                     outcome_data_a = analysis_unit_a.get_effect_and_ci_for_source(
-                        source_a,
+                        effect_source,
                         current_effect,
                         group_comparison,
                         confidence_multiplier,
                     )
                     outcome_data_b = analysis_unit_b.get_effect_and_ci_for_source(
-                        source_b,
+                        effect_source,
                         current_effect,
                         group_comparison,
                         confidence_multiplier,
@@ -581,13 +570,13 @@ class Dataset:
                 elif outcome_type == DIAGNOSTIC:
                     for diagnostic_metric in ("Sens", "Spec"):
                         estimate_and_ci_a = analysis_unit_a.get_effect_and_ci_for_source(
-                            source_a,
+                            effect_source,
                             diagnostic_metric,
                             group_comparison,
                             confidence_multiplier,
                         )
                         estimate_and_ci_b = analysis_unit_b.get_effect_and_ci_for_source(
-                            source_b,
+                            effect_source,
                             diagnostic_metric,
                             group_comparison,
                             confidence_multiplier,
