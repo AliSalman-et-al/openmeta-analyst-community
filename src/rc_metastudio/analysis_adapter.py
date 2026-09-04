@@ -237,6 +237,13 @@ def _native_value(value: object) -> AnalysisValue:
     )
 
 
+def _typed_result(value: object) -> AnalysisResult:
+    """Parse raw boundary data once; R bridge results are already typed."""
+    if isinstance(value, AnalysisResult):
+        return value
+    return parse_analysis_result(value)
+
+
 def execute_analysis_requests(
     model: object,
     requests: Sequence[AnalysisRequest],
@@ -254,13 +261,13 @@ def execute_analysis_requests(
             raise ValueError("Binary execution requires exactly one request.")
         conversion_kwargs = _conversion_kwargs(selected_covariates)
         r_bridge.dataset_to_simple_binary_r_object(model, **conversion_kwargs)
-        return parse_analysis_result(_run_binary_request(requests[0]))
+        return _typed_result(_run_binary_request(requests[0]))
     if data_type == "continuous":
         if len(requests) != 1:
             raise ValueError("Continuous execution requires exactly one request.")
         conversion_kwargs = _conversion_kwargs(selected_covariates)
         r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
-        return parse_analysis_result(_run_continuous_request(requests[0]))
+        return _typed_result(_run_continuous_request(requests[0]))
     if data_type == "diagnostic":
         if not isinstance(model, DiagnosticExecutionModel):
             raise TypeError(
@@ -313,7 +320,7 @@ def execute_meta_regression_request(
             "Unsupported meta-regression data family: %s" % request.data_type
         )
     parameters = request.parameter_values()
-    return parse_analysis_result(
+    return _typed_result(
         r_bridge.run_meta_regression(
             model.dataset,
             list(studies),
@@ -387,7 +394,7 @@ def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
         method_names = [request.method for request in requests]
         parameter_values = [request.parameter_values() for request in requests]
         workflow = requests[0].workflow
-        return parse_analysis_result(
+        return _typed_result(
             _run_diagnostic_backend(workflow, method_names, parameter_values)
         )
     except DiagnosticExecutionError:
@@ -419,19 +426,19 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
     for request in requests:
         metric = request.metric
         try:
-            metric_result = parse_analysis_result(run_metric(request))
+            metric_result = _typed_result(run_metric(request))
         except DiagnosticExecutionError as e:
             failures.append((metric, e))
             cast(dict[str, str], merged_result["texts"])["%s Error" % metric] = str(e)
         else:
             _merge_diagnostic_result(merged_result, metric_result)
 
-    if failures and not _diagnostic_result_has_successes(parse_analysis_result(merged_result)):
+    if failures and not _diagnostic_result_has_successes(_typed_result(merged_result)):
         raise RuntimeError(_format_diagnostic_failures(failures))
 
     if not merged_result["image_order"]:
         merged_result["image_order"] = None
-    return parse_analysis_result(merged_result)
+    return _typed_result(merged_result)
 
 
 def _empty_diagnostic_result() -> dict[str, object]:

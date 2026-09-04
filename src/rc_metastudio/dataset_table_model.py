@@ -809,6 +809,10 @@ class DatasetTableModel(QAbstractTableModel):
                 "Could not compute study effects from the edited raw data: %s" % exc
             )
             return False
+        live_analysis_unit.adopt_calculated_state(analysis_unit)
+        study.analysis_units_by_outcome[self.current_outcome_name][follow_up] = (
+            live_analysis_unit
+        )
         return True
 
     def _edit_covariate(self, study, column, value):

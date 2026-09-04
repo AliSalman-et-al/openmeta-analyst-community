@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 from typing import Literal, NewType
 import uuid
 
@@ -92,6 +93,37 @@ class AnalysisUnit:
         for i, group in enumerate(group_names):
             self.add_group(group)
             self.groups[group].raw_data = raw_data[i]
+
+    def adopt_calculated_state(self, candidate: "AnalysisUnit") -> None:
+        """Publish a validated candidate while preserving this unit's identity.
+
+        Table edits calculate against an isolated copy.  Once calculation has
+        succeeded, callers can publish the complete state without mutating the
+        live object during validation or relying on implementation-level
+        ``__dict__`` restoration.
+        """
+        self.is_diagnostic = candidate.is_diagnostic
+        self.outcome = candidate.outcome
+        self.stable_id = candidate.stable_id
+        self.raw_data_length = candidate.raw_data_length
+        existing_groups = self.groups
+        for name, candidate_group in candidate.groups.items():
+            group = existing_groups.get(name)
+            if group is None:
+                group = copy.deepcopy(candidate_group)
+            else:
+                group.id = candidate_group.id
+                group.name = candidate_group.name
+                group.stable_id = candidate_group.stable_id
+                group.raw_data[:] = copy.deepcopy(candidate_group.raw_data)
+            existing_groups[name] = group
+        for name in tuple(existing_groups):
+            if name not in candidate.groups:
+                del existing_groups[name]
+        self.effects = copy.deepcopy(candidate.effects)
+        self.entered_effects = self.effects
+        self.derived_effect_previews = copy.deepcopy(candidate.derived_effect_previews)
+        self.analysis_effects = copy.deepcopy(candidate.analysis_effects)
 
     def _new_effect_entry(self):
         return {
