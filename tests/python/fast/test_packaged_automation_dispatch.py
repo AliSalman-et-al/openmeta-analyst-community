@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -163,6 +164,93 @@ def test_package_pipelines_assemble_atomic_observations_before_validation():
         assert "--sample-root" in script
         assert "--executable" in script
         assert "--output" in script
+
+
+def test_assembler_keeps_surface_directory_records_in_place(monkeypatch, tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    surface_directory = tmp_path / "surface-records"
+    surface_directory.mkdir()
+    record = surface_directory / "surface-1.25.json"
+    record.write_text(json.dumps({"requested": "1.25"}), encoding="utf-8")
+    workflow = tmp_path / "workflow.json"
+    workflow.write_text(
+        json.dumps(
+            {
+                "summary": "summary",
+                "svg_paths": {},
+                "locale_inputs": [
+                    {
+                        "operation": "analysis",
+                        "locale": "en_US",
+                        "decimal_point": ".",
+                        "input": "1.2",
+                        "canonical_value": 1.2,
+                        "summary": "summary",
+                        "svg_paths": {},
+                    },
+                    {
+                        "operation": "locale",
+                        "locale": "de_DE",
+                        "decimal_point": ",",
+                        "input": "1,2",
+                        "canonical_value": 1.2,
+                        "summary": "summary",
+                        "svg_paths": {},
+                    },
+                ],
+                "edit_observed": True,
+                "analysis_observed": True,
+                "reopen_observed": True,
+                "analysis_after_reopen_observed": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    samples = tmp_path / "samples.json"
+    samples.write_text("{}", encoding="utf-8")
+    output = tmp_path / "packaged-smoke.json"
+    monkeypatch.setattr(
+        assembler,
+        "capture_atomic_observations",
+        lambda executable, runtime_probe, surface_directory: [record],
+    )
+    monkeypatch.setattr(
+        assembler,
+        "capture_workflow_observations",
+        lambda executable, sample, output: None,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "assemble_packaged_smoke_evidence.py",
+            "--workflow-observation",
+            str(workflow),
+            "--surface-records",
+            str(surface_directory),
+            "--sample-observations",
+            str(samples),
+            "--sample",
+            "BCG.rcms",
+            "--sample-path",
+            str(tmp_path / "sample.rcms"),
+            "--executable",
+            str(tmp_path / "RCMetaStudio.exe"),
+            "--runtime-probe",
+            str(tmp_path / "runtime-probe.json"),
+            "--surface-directory",
+            str(surface_directory),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert assembler.main() == 0
+    assert surface_directory.is_dir()
+    assert json.loads(output.read_text(encoding="utf-8"))["scales"] == [
+        {"requested": "1.25"}
+    ]
 
 
 def test_assembler_runs_surface_probes_with_requested_scale_and_locale():

@@ -232,7 +232,10 @@ def main() -> int:
         for record in records:
             payload = json.loads(record.read_text(encoding="utf-8"))
             combined.extend(payload.get("scales", [payload]))
-        args.surface_records.write_text(json.dumps(combined, indent=2) + "\n", encoding="utf-8")
+        if not args.surface_records.is_dir():
+            args.surface_records.write_text(
+                json.dumps(combined, indent=2) + "\n", encoding="utf-8"
+            )
         if args.sample_root:
             capture_sample_observations(args.executable, sample_root=args.sample_root, output=args.sample_observations)
         if not args.sample_path:
