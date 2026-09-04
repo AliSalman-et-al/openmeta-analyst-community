@@ -235,260 +235,334 @@
     selected
 }
 
-.small.study.fit.report <- function(om.data, params, prepared) {
-    metric <- prepared$metric
-    confidence.level <- prepared$confidence.level
-    meta.level <- .small.study.meta.level(confidence.level)
-    diagnostic <- prepared$diagnostic
+.small.study.test.interval <- function(fit, confidence.level) {
+    coefficient <- as.numeric(fit$estimate[[1L]] %||% NA_real_)
+    standard.error <- as.numeric(fit$estimate[[2L]] %||% NA_real_)
+    df <- as.numeric(fit$df %||% NA_real_)
+    interval <- if (is.finite(coefficient) && is.finite(standard.error) && is.finite(df))
+        coefficient + c(-1, 1) * stats::qt((1 + confidence.level / 100) / 2, df) * standard.error else c(NA_real_, NA_real_)
+    list(coefficient=coefficient, standard.error=standard.error, df=df,
+         interval=as.numeric(interval))
+}
+
+.small.study.fit.deeks <- function(prepared, entry, k.min) {
     params <- prepared$params
-    derived <- prepared$derived
-    keep <- prepared$keep
-    y <- prepared$y
-    se <- prepared$se
-    native.model <- prepared$native.model
-    pooled <- prepared$pooled
-    metafor.pooled <- prepared$metafor.pooled
-    tau2 <- pooled$tau2 %||% NA_real_
-    eligibility <- prepared$eligibility
-    tests <- list(); failures <- character()
-    asd.keep <- which(keep)
-    selected <- .small.study.select.methods(eligibility, params, metric, diagnostic)
+    confidence.level <- prepared$confidence.level
+    fit.model <- prepared$native.model
+    fit <- meta::metabias(fit.model, method.bias="Deeks", k.min=k.min,
+                         level=.small.study.meta.level(confidence.level))
+    estimate <- .small.study.test.interval(fit, confidence.level)
+    ess <- 4 * fit.model$n.e * fit.model$n.c / (fit.model$n.e + fit.model$n.c)
+    list(
+        method="Deeks test (meta implementation)", role=entry$role, package="meta",
+        package.version=utils::packageDescription("meta")$Version,
+        call=paste0("meta::metabin(event.e=TP, n.e=TP+FN, event.c=FP, n.c=FP+TN, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML', level=", .small.study.meta.level(confidence.level), "); meta::metabias(x=prepared.DOR.model, method.bias='Deeks', k.min=", k.min, ", level=", .small.study.meta.level(confidence.level), ")"),
+        predictor="1/sqrt(ESS), ESS=4*n.e*n.c/(n.e+n.c)", weighting="native ESS weights",
+        inference="t-based Deeks regression test", model="Deeks effective-sample-size weighted regression",
+        usable.studies=as.numeric(fit.model$k), df=estimate$df,
+        p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
+        coefficient=estimate$coefficient, standard.error=estimate$standard.error,
+        confidence.interval=estimate$interval,
+        intercept=as.numeric(fit$intercept %||% NA_real_), se.intercept=as.numeric(fit$se.intercept %||% NA_real_),
+        prepared.effects=as.numeric(prepared$y), prepared.standard.errors=as.numeric(prepared$se),
+        effective.sample.size=as.numeric(ess), deeks.predictor=as.numeric(1 / sqrt(ess)),
+        deeks.weights=as.numeric(ess)
+    )
+}
+
+.small.study.fit.mixed.egger <- function(prepared, entry) {
+    confidence.level <- prepared$confidence.level
+    fit <- metafor::regtest(prepared$y, sei=prepared$se, model="rma", predictor="sei",
+                           ret.fit=TRUE, level=confidence.level)
+    model <- fit$fit
+    list(
+        method="mixed-effects-egger", role=entry$role, package="metafor",
+        package.version=utils::packageDescription("metafor")$Version,
+        call=paste0("metafor::regtest(x=prepared.effects, sei=prepared.standard.errors, model='rma', predictor='sei', ret.fit=TRUE, level=", confidence.level, ")"),
+        predictor="SE", weighting="inverse-variance weights with REML heterogeneity",
+        inference="z test from metafor::regtest", model="REML mixed-effects meta-regression",
+        usable.studies=length(prepared$y), df=as.numeric(fit$dfs %||% NA_real_),
+        p.value=as.numeric(fit$pval), statistic=as.numeric(fit$zval),
+        coefficient=as.numeric(model$b[2]), standard.error=as.numeric(model$se[2]),
+        intercept=as.numeric(model$b[1]), se.intercept=as.numeric(model$se[1]),
+        confidence.interval=as.numeric(c(model$ci.lb[2], model$ci.ub[2])),
+        confidence.interval.intercept=as.numeric(c(model$ci.lb[1], model$ci.ub[1]))
+    )
+}
+
+.small.study.fit.pustejovsky <- function(prepared, entry, k.min) {
+    confidence.level <- prepared$confidence.level
+    fit <- meta::metabias(prepared$native.model, method.bias="Pustejovsky", k.min=k.min,
+                         level=.small.study.meta.level(confidence.level))
+    estimate <- .small.study.test.interval(fit, confidence.level)
+    list(
+        method="pustejovsky-rodgers", role=entry$role, package="meta",
+        package.version=utils::packageDescription("meta")$Version,
+        call=paste0("meta::metacont(n.e, mean.e, sd.e, n.c, mean.c, sd.c, sm='SMD', common=TRUE, random=TRUE, method.tau='REML', level=", .small.study.meta.level(confidence.level), "); meta::metabias(x=prepared.SMD.model, method.bias='Pustejovsky', k.min=", k.min, ", level=", .small.study.meta.level(confidence.level), ")"),
+        predictor="sqrt(1/n.e + 1/n.c)", weighting="inverse variance from native Pustejovsky standard errors",
+        inference="t-based Pustejovsky regression test",
+        model="Pustejovsky-Rodgers independent two-group regression",
+        usable.studies=length(prepared$y), df=estimate$df,
+        p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
+        coefficient=estimate$coefficient, standard.error=estimate$standard.error,
+        confidence.interval=estimate$interval,
+        intercept=as.numeric(fit$intercept %||% NA_real_), se.intercept=as.numeric(fit$se.intercept %||% NA_real_),
+        prepared.effects=as.numeric(prepared$y), prepared.standard.errors=as.numeric(prepared$se)
+    )
+}
+
+.small.study.fit.classical <- function(prepared, entry, method, k.min) {
+    confidence.level <- prepared$confidence.level
+    bias.method <- if (method == "classical-egger") "Egger" else "Begg"
+    fit <- meta::metabias(prepared$pooled, method.bias=bias.method, k.min=k.min,
+                         level=.small.study.meta.level(confidence.level))
+    estimate <- .small.study.test.interval(fit, confidence.level)
+    list(
+        method=method, role=entry$role, package="meta",
+        package.version=utils::packageDescription("meta")$Version,
+        call=paste0("meta::metabias(x=prepared.meta.model, method.bias='", bias.method, "', k.min=", k.min, ", level=", .small.study.meta.level(confidence.level), ")"),
+        predictor=if (method == "begg-mazumdar") "rank correlation of standardized effects and variance" else "SE",
+        weighting=if (method == "begg-mazumdar") "not applicable (Kendall rank-based test)" else "inverse variance",
+        inference=if (method == "begg-mazumdar") "z test from Kendall rank correlation" else "t-based meta::metabias test",
+        model=if (method == "begg-mazumdar") "Begg-Mazumdar rank correlation" else "multiplicative Egger regression",
+        usable.studies=length(prepared$y), df=estimate$df,
+        p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
+        coefficient=estimate$coefficient, standard.error=estimate$standard.error,
+        confidence.interval=estimate$interval,
+        intercept=if (method == "classical-egger") as.numeric(fit$intercept %||% NA_real_) else NA_real_,
+        se.intercept=if (method == "classical-egger") as.numeric(fit$se.intercept %||% NA_real_) else NA_real_
+    )
+}
+
+.small.study.prepare.or.test <- function(om.data, prepared, method, k.min) {
+    params <- prepared$params
+    meta.level <- .small.study.meta.level(prepared$confidence.level)
+    if (method == "rucker-as-re") {
+        fit.model <- .small.study.asd.model(om.data, params, which(prepared$keep))
+        bias.method <- "Thompson"
+        fit.call <- paste0("meta::metabin(event.e, n.e, event.c, n.c, sm='ASD', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, ")")
+        test.call <- paste0("meta::metabias(x=prepared.ASD.model, method.bias='Thompson', k.min=", k.min, ", level=", meta.level, ")")
+    } else {
+        fit.model <- prepared$native.model
+        bias.method <- if (method == "harbord") "Harbord" else "Peters"
+        fit.call <- paste0("meta::metabin(event.e, n.e, event.c, n.c, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, ")")
+        if (method == "peters") {
+            fit.model$TE <- prepared$y
+            fit.model$seTE <- prepared$se
+        }
+        test.call <- paste0(if (method == "peters") "prepared.OR.model$TE <- prepared.effects; prepared.OR.model$seTE <- prepared.standard.errors; " else "",
+                            "meta::metabias(x=prepared.OR.model, method.bias='", bias.method,
+                            "', k.min=", k.min, ", level=", meta.level, ")")
+    }
+    list(model=fit.model, bias.method=bias.method,
+         call=paste0(fit.call, "; ", test.call), level=meta.level)
+}
+
+.small.study.fit.or.method <- function(om.data, prepared, entry, method, k.min) {
+    input <- .small.study.prepare.or.test(om.data, prepared, method, k.min)
+    fit <- meta::metabias(input$model, method.bias=input$bias.method,
+                         k.min=k.min, level=input$level)
+    estimate <- .small.study.test.interval(fit, prepared$confidence.level)
+    list(
+        method=method, role=entry$role, package="meta",
+        package.version=utils::packageDescription("meta")$Version,
+        call=input$call,
+        predictor=if (method == "harbord") "Harbord Z/V on 1/sqrt(V), where V is the native score variance" else if (method == "peters") "1/(n.e+n.c), with native Peters seTE=sqrt(1/(event.e+event.c)+1/(non-events.e+non-events.c))" else "ASD effect on native ASD standard error",
+        weighting=if (method == "harbord") "native Harbord score variance V" else if (method == "peters") "1/Peters seTE^2" else "native AS+RE additive REML weights",
+        inference="t-based meta::metabias test",
+        model=if (method == "rucker-as-re") "R\u00fccker AS+RE (ASD + Thompson)" else paste0(input$bias.method, " native metabin model"),
+        usable.studies=if (method == "rucker-as-re") as.numeric(input$model$k) else length(prepared$y),
+        df=estimate$df, p.value=as.numeric(fit$p.value %||% NA_real_),
+        statistic=as.numeric(fit$statistic %||% NA_real_), coefficient=estimate$coefficient,
+        standard.error=estimate$standard.error, confidence.interval=estimate$interval,
+        intercept=if (method == "peters") as.numeric(fit$intercept %||% NA_real_) else NA_real_,
+        se.intercept=if (method == "peters") as.numeric(fit$se.intercept %||% NA_real_) else NA_real_,
+        prepared.effects=as.numeric(prepared$y), prepared.standard.errors=as.numeric(prepared$se),
+        routing.effects=as.numeric(prepared$y), routing.standard.errors=as.numeric(prepared$se)
+    )
+}
+
+.small.study.fit.one <- function(om.data, prepared, method, entry, k.min=10L) {
+    switch(method,
+        "deeks"=.small.study.fit.deeks(prepared, entry, k.min),
+        "mixed-effects-egger"=.small.study.fit.mixed.egger(prepared, entry),
+        "pustejovsky-rodgers"=.small.study.fit.pustejovsky(prepared, entry, k.min),
+        "classical-egger"=.small.study.fit.classical(prepared, entry, method, k.min),
+        "begg-mazumdar"=.small.study.fit.classical(prepared, entry, method, k.min),
+        "harbord"=.small.study.fit.or.method(om.data, prepared, entry, method, k.min),
+        "peters"=.small.study.fit.or.method(om.data, prepared, entry, method, k.min),
+        "rucker-as-re"=.small.study.fit.or.method(om.data, prepared, entry, method, k.min),
+        stop("unsupported selected asymmetry method: ", method)
+    )
+}
+
+.small.study.fit.tests <- function(om.data, prepared, selected) {
+    tests <- list()
+    failures <- character()
     for (method in selected) {
         tryCatch({
-            entry <- eligibility$methods[vapply(eligibility$methods, function(x) identical(x$method, method), logical(1))][[1L]]
-            if (is.null(entry) || !isTRUE(entry$available)) stop(entry$reason %||% "method is unavailable")
-            k.min <- 10
-            if (metric == "DOR" && method == "deeks") {
-                fit.model <- native.model
-                fit <- meta::metabias(fit.model, method.bias="Deeks", k.min=k.min, level=.small.study.meta.level(confidence.level))
-                coefficient <- as.numeric(fit$estimate[[1L]] %||% NA_real_)
-                standard.error <- as.numeric(fit$estimate[[2L]] %||% NA_real_)
-                df <- as.numeric(fit$df %||% NA_real_)
-                interval <- if (is.finite(coefficient) && is.finite(standard.error) && is.finite(df))
-                    coefficient + c(-1, 1) * stats::qt((1 + confidence.level / 100) / 2, df) * standard.error else c(NA_real_, NA_real_)
-                tests[[method]] <- list(
-                    method="Deeks test (meta implementation)", role=entry$role, package="meta",
-                    package.version=utils::packageDescription("meta")$Version,
-                    call=paste0("meta::metabin(event.e=TP, n.e=TP+FN, event.c=FP, n.c=FP+TN, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, "); meta::metabias(x=prepared.DOR.model, method.bias='Deeks', k.min=", k.min, ", level=", meta.level, ")"),
-                    predictor="1/sqrt(ESS), ESS=4*n.e*n.c/(n.e+n.c)", weighting="native ESS weights", inference="t-based Deeks regression test",
-                    model="Deeks effective-sample-size weighted regression", usable.studies=as.numeric(fit.model$k),
-                    df=df, p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
-                    coefficient=coefficient, standard.error=standard.error, confidence.interval=as.numeric(interval),
-                    intercept=as.numeric(fit$intercept %||% NA_real_), se.intercept=as.numeric(fit$se.intercept %||% NA_real_),
-                    prepared.effects=as.numeric(y), prepared.standard.errors=as.numeric(se),
-                    effective.sample.size=as.numeric(4 * fit.model$n.e * fit.model$n.c / (fit.model$n.e + fit.model$n.c)),
-                    deeks.predictor=as.numeric(1 / sqrt(4 * fit.model$n.e * fit.model$n.c / (fit.model$n.e + fit.model$n.c))),
-                    deeks.weights=as.numeric(4 * fit.model$n.e * fit.model$n.c / (fit.model$n.e + fit.model$n.c))
-                )
-            } else if (method == "mixed-effects-egger") {
-                fit <- metafor::regtest(y, sei=se, model="rma", predictor="sei", ret.fit=TRUE, level=confidence.level)
-                model <- fit$fit
-                tests[[method]] <- list(
-                    method=method, role=entry$role, package="metafor",
-                    package.version=utils::packageDescription("metafor")$Version,
-                    call=paste0("metafor::regtest(x=prepared.effects, sei=prepared.standard.errors, model='rma', predictor='sei', ret.fit=TRUE, level=", confidence.level, ")"),
-                    predictor="SE", weighting="inverse-variance weights with REML heterogeneity", inference="z test from metafor::regtest", model="REML mixed-effects meta-regression",
-                    usable.studies=length(y), df=as.numeric(fit$dfs %||% NA_real_),
-                    p.value=as.numeric(fit$pval), statistic=as.numeric(fit$zval),
-                    coefficient=as.numeric(model$b[2]), standard.error=as.numeric(model$se[2]),
-                    intercept=as.numeric(model$b[1]), se.intercept=as.numeric(model$se[1]),
-                    confidence.interval=as.numeric(c(model$ci.lb[2], model$ci.ub[2])),
-                    confidence.interval.intercept=as.numeric(c(model$ci.lb[1], model$ci.ub[1]))
-                )
-            } else if (metric == "SMD" && method == "pustejovsky-rodgers") {
-                fit.model <- native.model
-                fit <- meta::metabias(fit.model, method.bias="Pustejovsky", k.min=k.min, level=.small.study.meta.level(confidence.level))
-                coefficient <- as.numeric(fit$estimate[[1L]] %||% NA_real_)
-                standard.error <- as.numeric(fit$estimate[[2L]] %||% NA_real_)
-                df <- as.numeric(fit$df %||% NA_real_)
-                interval <- if (is.finite(coefficient) && is.finite(standard.error) && is.finite(df))
-                    coefficient + c(-1, 1) * stats::qt((1 + confidence.level / 100) / 2, df) * standard.error else c(NA_real_, NA_real_)
-                tests[[method]] <- list(
-                    method=method, role=entry$role, package="meta", package.version=utils::packageDescription("meta")$Version,
-                    call=paste0("meta::metacont(n.e, mean.e, sd.e, n.c, mean.c, sd.c, sm='SMD', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, "); meta::metabias(x=prepared.SMD.model, method.bias='Pustejovsky', k.min=", k.min, ", level=", meta.level, ")"),
-                    predictor="sqrt(1/n.e + 1/n.c)", weighting="inverse variance from native Pustejovsky standard errors", inference="t-based Pustejovsky regression test",
-                    model="Pustejovsky-Rodgers independent two-group regression", usable.studies=length(y), df=df,
-                    p.value=as.numeric(fit$p.value %||% NA_real_), statistic=as.numeric(fit$statistic %||% NA_real_),
-                    coefficient=coefficient, standard.error=standard.error, confidence.interval=as.numeric(interval),
-                    intercept=as.numeric(fit$intercept %||% NA_real_), se.intercept=as.numeric(fit$se.intercept %||% NA_real_),
-                    prepared.effects=as.numeric(y), prepared.standard.errors=as.numeric(se)
-                )
-            } else if (method %in% c("classical-egger", "begg-mazumdar")) {
-                bias.method <- if (method == "classical-egger") "Egger" else "Begg"
-                fit <- meta::metabias(pooled, method.bias=bias.method, k.min=k.min, level=.small.study.meta.level(confidence.level))
-                coefficient <- as.numeric(fit$estimate[[1L]] %||% NA_real_)
-                standard.error <- as.numeric(fit$estimate[[2L]] %||% NA_real_)
-                df <- as.numeric(fit$df %||% NA_real_)
-                interval <- if (is.finite(coefficient) && is.finite(standard.error) && is.finite(df))
-                    coefficient + c(-1, 1) * stats::qt((1 + confidence.level / 100) / 2, df) * standard.error else c(NA_real_, NA_real_)
-                tests[[method]] <- list(
-                    method=method, role=entry$role, package="meta", package.version=utils::packageDescription("meta")$Version,
-                    call=paste0("meta::metabias(x=prepared.meta.model, method.bias='", bias.method, "', k.min=", k.min, ", level=", meta.level, ")"),
-                    predictor=if (method == "begg-mazumdar") "rank correlation of standardized effects and variance" else "SE",
-                    weighting=if (method == "begg-mazumdar") "not applicable (Kendall rank-based test)" else "inverse variance",
-                    inference=if (method == "begg-mazumdar") "z test from Kendall rank correlation" else "t-based meta::metabias test",
-                    model=if (method == "begg-mazumdar") "Begg-Mazumdar rank correlation" else "multiplicative Egger regression",
-                    usable.studies=length(y), df=df, p.value=as.numeric(fit$p.value %||% NA_real_),
-                    statistic=as.numeric(fit$statistic %||% NA_real_), coefficient=coefficient,
-                    standard.error=standard.error, confidence.interval=as.numeric(interval),
-                    intercept=if (method == "classical-egger") as.numeric(fit$intercept %||% NA_real_) else NA_real_,
-                    se.intercept=if (method == "classical-egger") as.numeric(fit$se.intercept %||% NA_real_) else NA_real_
-                )
-            } else if (metric == "OR" && method %in% c("harbord", "peters", "rucker-as-re")) {
-                if (method == "rucker-as-re") {
-                    fit.model <- .small.study.asd.model(om.data, params, asd.keep)
-                    bias.method <- "Thompson"
-                    fit.call <- paste0("meta::metabin(event.e, n.e, event.c, n.c, sm='ASD', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, ")")
-                    test.call <- paste0("meta::metabias(x=prepared.ASD.model, method.bias='Thompson', k.min=", k.min, ", level=", meta.level, ")")
-                } else if (method == "harbord") {
-                    fit.model <- native.model
-                    bias.method <- "Harbord"
-                    fit.call <- paste0("meta::metabin(event.e, n.e, event.c, n.c, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, ")")
-                    test.call <- paste0("meta::metabias(x=prepared.OR.model, method.bias='Harbord', k.min=", k.min, ", level=", meta.level, ")")
-                } else {
-                    fit.model <- native.model
-                    fit.model$TE <- y
-                    fit.model$seTE <- se
-                    bias.method <- "Peters"
-                    fit.call <- paste0("meta::metabin(event.e, n.e, event.c, n.c, sm='OR', incr=0.5, method.incr='", .small.study.correction.method(params), "', common=TRUE, random=TRUE, method.tau='REML', level=", meta.level, ")")
-                    test.call <- paste0("prepared.OR.model$TE <- prepared.effects; prepared.OR.model$seTE <- prepared.standard.errors; meta::metabias(x=prepared.OR.model, method.bias='Peters', k.min=", k.min, ", level=", meta.level, ")")
-                }
-                fit <- meta::metabias(fit.model, method.bias=bias.method, k.min=k.min, level=.small.study.meta.level(confidence.level))
-                coefficient <- as.numeric(fit$estimate[[1L]] %||% NA_real_)
-                standard.error <- as.numeric(fit$estimate[[2L]] %||% NA_real_)
-                df <- as.numeric(fit$df %||% NA_real_)
-                interval <- if (is.finite(coefficient) && is.finite(standard.error) && is.finite(df))
-                    coefficient + c(-1, 1) * stats::qt((1 + confidence.level / 100) / 2, df) * standard.error else c(NA_real_, NA_real_)
-                tests[[method]] <- list(
-                    method=method, role=entry$role, package="meta", package.version=utils::packageDescription("meta")$Version,
-                    call=paste0(fit.call, "; ", test.call),
-                    predictor=if (method == "harbord") "Harbord Z/V on 1/sqrt(V), where V is the native score variance" else if (method == "peters") "1/(n.e+n.c), with native Peters seTE=sqrt(1/(event.e+event.c)+1/(non-events.e+non-events.c))" else "ASD effect on native ASD standard error",
-                    weighting=if (method == "harbord") "native Harbord score variance V" else if (method == "peters") "1/Peters seTE^2" else "native AS+RE additive REML weights",
-                    inference="t-based meta::metabias test",
-                    model=if (method == "rucker-as-re") "R\u00fccker AS+RE (ASD + Thompson)" else paste0(bias.method, " native metabin model"),
-                    usable.studies=if (method == "rucker-as-re") as.numeric(fit.model$k) else length(y), df=df, p.value=as.numeric(fit$p.value %||% NA_real_),
-                    statistic=as.numeric(fit$statistic %||% NA_real_), coefficient=coefficient,
-                    standard.error=standard.error, confidence.interval=as.numeric(interval),
-                    intercept=if (method == "peters") as.numeric(fit$intercept %||% NA_real_) else NA_real_,
-                    se.intercept=if (method == "peters") as.numeric(fit$se.intercept %||% NA_real_) else NA_real_,
-                    prepared.effects=as.numeric(y), prepared.standard.errors=as.numeric(se),
-                    routing.effects=as.numeric(y), routing.standard.errors=as.numeric(se)
-                )
-            } else {
-                stop("unsupported selected asymmetry method: ", method)
-            }
-        }, error=function(e) failures <<- c(failures, paste(.small.study.method.label(method), conditionMessage(e), sep=": ")))
+            matches <- vapply(prepared$eligibility$methods,
+                              function(x) identical(x$method, method), logical(1))
+            entry <- prepared$eligibility$methods[matches][[1L]]
+            if (is.null(entry) || !isTRUE(entry$available))
+                stop(entry$reason %||% "method is unavailable")
+            tests[[method]] <- .small.study.fit.one(om.data, prepared, method, entry)
+        }, error=function(e) failures <<- c(
+            failures, paste(.small.study.method.label(method), conditionMessage(e), sep=": ")
+        ))
     }
-    primary.methods <- vapply(eligibility$methods, function(x) identical(x$role, "primary") && isTRUE(x$available), logical(1))
-    primary.name <- if (any(primary.methods)) vapply(eligibility$methods[primary.methods], `[[`, character(1), "method")[[1L]] else "None"
-    primary.test <- if (primary.name != "None") tests[[primary.name]] else NULL
-    primary.summary <- if (is.null(primary.test)) {
-        if (primary.name == "None") .small.study.no.test.summary(eligibility, selected)
-        else paste0("Primary asymmetry test: ", .small.study.method.label(primary.name), "; result unavailable.")
-    } else {
-        primary.p <- as.numeric(primary.test$p.value %||% NA_real_)
-        primary.coefficient <- as.numeric(primary.test$coefficient %||% NA_real_)
-        primary.interval <- as.numeric(primary.test$confidence.interval %||% c(NA_real_, NA_real_))
-        if (length(primary.interval) < 2L) primary.interval <- c(primary.interval, NA_real_)[1:2]
-        primary.result <- if (!is.finite(primary.p)) "p-value not available" else if (primary.p < .05)
-            paste0("evidence of small-study effects (p = ", .small.study.p.value(primary.p), ")")
-        else paste0("no clear evidence of small-study effects (p = ", .small.study.p.value(primary.p), ")")
-        paste(c(
-            paste0("Primary asymmetry test: ", .small.study.method.label(primary.name)),
-            paste0("Result: ", primary.result),
-            paste0("Usable studies: ", .small.study.integer(primary.test$usable.studies)),
-            paste0("Estimate: ", .small.study.number(primary.coefficient),
-                   " (", .small.study.confidence.label(confidence.level, short=TRUE), " ", .small.study.number(primary.interval[[1L]]),
-                   " to ", .small.study.number(primary.interval[[2L]]), ")")
-        ), collapse="\n")
+    list(tests=tests, failures=failures)
+}
+
+.small.study.primary.summary <- function(eligibility, selected, tests, confidence.level) {
+    primary.methods <- vapply(
+        eligibility$methods,
+        function(x) identical(x$role, "primary") && isTRUE(x$available),
+        logical(1)
+    )
+    name <- if (any(primary.methods))
+        vapply(eligibility$methods[primary.methods], `[[`, character(1), "method")[[1L]] else "None"
+    test <- if (name != "None") tests[[name]] else NULL
+    if (is.null(test)) {
+        text <- if (name == "None") .small.study.no.test.summary(eligibility, selected) else
+            paste0("Primary asymmetry test: ", .small.study.method.label(name), "; result unavailable.")
+        return(list(name=name, text=text))
     }
-    warning.text <- paste(c(
+    p.value <- as.numeric(test$p.value %||% NA_real_)
+    coefficient <- as.numeric(test$coefficient %||% NA_real_)
+    interval <- as.numeric(test$confidence.interval %||% c(NA_real_, NA_real_))
+    if (length(interval) < 2L) interval <- c(interval, NA_real_)[1:2]
+    result <- if (!is.finite(p.value)) "p-value not available" else if (p.value < .05)
+        paste0("evidence of small-study effects (p = ", .small.study.p.value(p.value), ")") else
+        paste0("no clear evidence of small-study effects (p = ", .small.study.p.value(p.value), ")")
+    text <- paste(c(
+        paste0("Primary asymmetry test: ", .small.study.method.label(name)),
+        paste0("Result: ", result),
+        paste0("Usable studies: ", .small.study.integer(test$usable.studies)),
+        paste0("Estimate: ", .small.study.number(coefficient), " (",
+               .small.study.confidence.label(confidence.level, short=TRUE), " ",
+               .small.study.number(interval[[1L]]), " to ",
+               .small.study.number(interval[[2L]]), ")")
+    ), collapse="\n")
+    list(name=name, text=text)
+}
+
+.small.study.warning.text <- function(metric, eligibility, primary.summary) {
+    text <- paste(c(
         primary.summary,
         "Funnel plot asymmetry can reflect publication bias, heterogeneity, study design, or chance.",
         "Interpret the plots and tests together. No single result proves or rules out publication bias."
     ), collapse="\n\n")
-    if (metric %in% c("PR", "PLN", "PLO", "PAS", "PFT")) warning.text <- paste(
-        warning.text,
-        "For one-arm proportions, the funnel plot is descriptive because the effect and its standard error are mathematically related.",
-        sep="\n\n"
+    cautions <- c(
+        if (metric %in% c("PR", "PLN", "PLO", "PAS", "PFT"))
+            "For one-arm proportions, the funnel plot is descriptive because the effect and its standard error are mathematically related.",
+        if (metric %in% c("RR", "RD"))
+            "No automatic primary asymmetry test is available for this effect measure.",
+        if (metric == "SMD")
+            "The ordinary Egger test is not selected for standardized mean differences because it can create effect-standard-error artifacts."
     )
-    if (metric %in% c("RR", "RD")) warning.text <- paste(
-        warning.text,
-        "No automatic primary asymmetry test is available for this effect measure.",
-        sep="\n\n"
+    warnings <- unique(as.character(eligibility$warnings %||% character()))
+    warnings <- warnings[!is.na(warnings) & nzchar(trimws(warnings))]
+    if (length(warnings)) cautions <- c(
+        cautions, paste(c("Analysis warnings:", paste0("- ", warnings)), collapse="\n")
     )
-    if (metric == "SMD") warning.text <- paste(
-        warning.text,
-        "The ordinary Egger test is not selected for standardized mean differences because it can create effect-standard-error artifacts.",
-        sep="\n\n"
-    )
-    eligibility.warnings <- unique(as.character(eligibility$warnings %||% character()))
-    eligibility.warnings <- eligibility.warnings[!is.na(eligibility.warnings) & nzchar(trimws(eligibility.warnings))]
-    if (length(eligibility.warnings)) warning.text <- paste(
-        warning.text,
-        paste(c("Analysis warnings:", paste0("- ", eligibility.warnings)), collapse="\n"),
-        sep="\n\n"
-    )
-    trimfill <- if (isTRUE(params$trim.and.fill) && metric != "DOR" && !metric %in% c("PR", "PLN", "PLO", "PAS", "PFT"))
-        .small.study.trimfill(pooled, params, metric, prepared=derived) else NULL
-    extrapolation <- if (diagnostic) NULL else .small.study.extrapolation(tests, params, metric, eligibility=eligibility)
-    analysis.summary <- c(
+    paste(c(text, cautions), collapse="\n\n")
+}
+
+.small.study.analysis.summary <- function(prepared, primary.name) {
+    metric <- prepared$metric
+    params <- prepared$params
+    summary <- c(
         paste0("Effect measure: ", .small.study.metric.label(metric), " (", metric, ")"),
-        paste0("Studies analyzed: ", length(y)),
-        paste0("Confidence level: ", .small.study.confidence.label(confidence.level)),
+        paste0("Studies analyzed: ", length(prepared$y)),
+        paste0("Confidence level: ", .small.study.confidence.label(prepared$confidence.level)),
         paste0("Primary test: ", if (primary.name == "None") "None available" else .small.study.method.label(primary.name))
     )
-    if (length(se)) analysis.summary <- c(
-        analysis.summary,
-        paste0(
-            "Observed standard-error range: [",
-            .small.study.exact.number(min(se)), ", ",
-            .small.study.exact.number(max(se)), "]"
-        )
+    if (length(prepared$se)) summary <- c(
+        summary, paste0("Observed standard-error range: [",
+                        .small.study.exact.number(min(prepared$se)), ", ",
+                        .small.study.exact.number(max(prepared$se)), "]")
     )
-    if (metric == "OR") analysis.summary <- c(
-        analysis.summary,
-        paste0("Heterogeneity (REML tau-squared): ", .small.study.number(tau2)),
+    if (metric == "OR") summary <- c(
+        summary,
+        paste0("Heterogeneity (REML tau-squared): ", .small.study.number(prepared$pooled$tau2 %||% NA_real_)),
         paste0("Continuity correction: ", as.character(params$correction.policy %||% "Studies with any zero cell"))
     )
-    if (metric == "DOR") analysis.summary <- c(
-        analysis.summary,
+    if (metric == "DOR") summary <- c(
+        summary,
         paste0("Continuity correction: ", as.character(params$correction.policy %||% "All studies if any zero exists")),
         "Plot method: Deeks funnel plot using effective sample size"
     )
+    paste(summary, collapse="\n")
+}
+
+.small.study.render.plots <- function(om.data, prepared, trimfill) {
+    if (prepared$diagnostic && !isTRUE(prepared$derived$raw))
+        return(list(images=character(), plot_capabilities=list(), plot_names=character(),
+                    plot_params_paths=list(), image_order=character(), failures=character()))
+    .small.study.plots(
+        om.data, prepared$metafor.pooled, prepared$params, prepared$metric,
+        common.center=prepared$pooled$TE.common, prepared=prepared$derived,
+        trimfill=trimfill,
+        diagnostic.model=if (prepared$diagnostic) prepared$native.model else NULL
+    )
+}
+
+.small.study.serialize <- function(prepared, tests, failures, primary, trimfill,
+                                   extrapolation, plots) {
     output <- list(
-        Warning=warning.text,
-        `Data and eligibility`=paste(analysis.summary, collapse="\n"),
-        Tests=.small.study.tests.text(tests, confidence.level),
+        Warning=.small.study.warning.text(prepared$metric, prepared$eligibility, primary$text),
+        `Data and eligibility`=.small.study.analysis.summary(prepared, primary$name),
+        Tests=.small.study.tests.text(tests, prepared$confidence.level),
         References=character(),
         Failures=if (length(failures)) paste(failures, collapse="\n") else NULL,
-        eligibility=eligibility,
+        eligibility=prepared$eligibility,
         tests.data=tests,
         `Trim-and-fill data`=if (!is.null(trimfill)) trimfill else NULL
     )
-    if (!diagnostic) output <- append(output, list(`Pooled comparison`=.small.study.pooled.text(pooled, metric, confidence.level)), after=3L)
+    if (!prepared$diagnostic) output <- append(
+        output,
+        list(`Pooled comparison`=.small.study.pooled.text(
+            prepared$pooled, prepared$metric, prepared$confidence.level
+        )),
+        after=3L
+    )
     output <- c(output, list(
         `Method details`=.small.study.method.details(tests),
-        `Methods not applicable`=.small.study.methods.not.applicable(eligibility)
+        `Methods not applicable`=.small.study.methods.not.applicable(prepared$eligibility)
     ))
     if (!is.null(trimfill)) output <- c(output, trimfill$text)
     if (!is.null(extrapolation)) output <- c(output, extrapolation)
-    plots <- if (diagnostic && !isTRUE(derived$raw))
-        list(images=character(), plot_capabilities=list(), plot_names=character(),
-             plot_params_paths=list(), image_order=character(), failures=character()) else
-        .small.study.plots(om.data, metafor.pooled, params, metric,
-            common.center=pooled$TE.common, prepared=derived, trimfill=trimfill,
-            diagnostic.model=if (diagnostic) native.model else NULL)
     trimfill.failures <- trimfill$failures %||% character()
-    if (length(trimfill.failures))
-        trimfill.failures <- paste0("trim-and-fill: ", trimfill.failures)
+    if (length(trimfill.failures)) trimfill.failures <- paste0("trim-and-fill: ", trimfill.failures)
     plot.failures <- c(trimfill.failures, plots$failures %||% character())
-    if (length(plot.failures))
-        output$Failures <- paste(c(failures, plot.failures), collapse="\n")
+    if (length(plot.failures)) output$Failures <- paste(c(failures, plot.failures), collapse="\n")
     output$References <- .small.study.references(names(tests), names(plots$images))
     plots$failures <- NULL
-    output <- c(output, plots)
-    output
+    c(output, plots)
+}
+
+.small.study.fit.report <- function(om.data, params, prepared) {
+    selected <- .small.study.select.methods(
+        prepared$eligibility, params, prepared$metric, prepared$diagnostic
+    )
+    fitted <- .small.study.fit.tests(om.data, prepared, selected)
+    primary <- .small.study.primary.summary(
+        prepared$eligibility, selected, fitted$tests, prepared$confidence.level
+    )
+    trimfill <- if (isTRUE(params$trim.and.fill) && prepared$metric != "DOR" &&
+                        !prepared$metric %in% c("PR", "PLN", "PLO", "PAS", "PFT"))
+        .small.study.trimfill(
+            prepared$pooled, params, prepared$metric, prepared=prepared$derived
+        ) else NULL
+    extrapolation <- if (prepared$diagnostic) NULL else .small.study.extrapolation(
+        fitted$tests, params, prepared$metric, eligibility=prepared$eligibility
+    )
+    plots <- .small.study.render.plots(om.data, prepared, trimfill)
+    .small.study.serialize(
+        prepared, fitted$tests, fitted$failures, primary, trimfill,
+        extrapolation, plots
+    )
 }
 
 publication.bias.effects <- function(om.data, params) {

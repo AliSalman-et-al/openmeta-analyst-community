@@ -664,15 +664,10 @@ rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, par
          warnings=warnings)
 }
 
-rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
+rcmetar.reitsma.extract.standard.components <- function(prepared, fitted) {
     diagnostic.data <- prepared$data
     params <- prepared$params
     level <- prepared$level
-    digits <- prepared$digits
-    method <- prepared$method
-    adjust <- prepared$adjust
-    policy <- prepared$policy
-    fit.warnings <- fitted$warnings
     fit <- fitted$fit
     section.warnings <- character()
     summary.capture <- rcmetar.reitsma.capture.warnings(summary(fit, level=level))
@@ -709,11 +704,6 @@ rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
     section.warnings <- c(section.warnings,
         rcmetar.reitsma.operation.messages(plot.capture, "SROC-derived geometry"))
     if (!is.null(plot.data$warnings)) section.warnings <- c(section.warnings, plot.data$warnings)
-    rendered <- rcmetar.reitsma.render.standard(plot.data, diagnostic.data, fit, params)
-    images <- rendered$images
-    plot.paths <- rendered$paths
-    capabilities <- rendered$capabilities
-    section.warnings <- c(section.warnings, rendered$warnings)
     # mada's full AUC uses .01 through .99, while its normalized partial AUC
     # uses the observed FPR range clipped to those same endpoints.
     observed.fpr <- fit$freqdata$FP / (fit$freqdata$FP + fit$freqdata$TN)
@@ -739,8 +729,29 @@ rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
         `Sensitivity-specificity correlation`=if (is.null(clinical.correlation)) NULL else clinical.correlation[1, 2],
         Interpretation="SDs and covariance are on the model logit scale; correlation is unitless."
     )
-    clinical.interpretation <- if (!is.null(point)) paste0(
-        "Across ", length(diagnostic.data@study.names), " studies, summary sensitivity was ",
+    aic.capture <- rcmetar.reitsma.capture.warnings(stats::AIC(fit))
+    bic.capture <- rcmetar.reitsma.capture.warnings(stats::BIC(fit))
+    section.warnings <- c(section.warnings,
+        rcmetar.reitsma.operation.messages(aic.capture, "AIC"),
+        rcmetar.reitsma.operation.messages(bic.capture, "BIC"))
+    list(
+        summary=sm, point=point, ratios=ratios, auc=auc, plot.data=plot.data,
+        prediction=prediction.summary, heterogeneity=heterogeneity, i2=i2,
+        partial.auc.bounds=pauc.bounds, summary.seed=summary.seed,
+        summary.iterations=summary.iterations,
+        summary.warnings=unique(summary.warnings), section.warnings=section.warnings,
+        AIC=aic.capture$value, BIC=bic.capture$value
+    )
+}
+
+rcmetar.reitsma.clinical.interpretation <- function(point, studies, level, digits) {
+    if (is.null(point)) return(paste0(
+        "Across ", studies,
+        " studies, the summary operating point could not be calculated. ",
+        "Other valid model outputs are shown below."
+    ))
+    paste0(
+        "Across ", studies, " studies, summary sensitivity was ",
         rcmetar.reitsma.display.percent(point$sensitivity[["estimate"]], digits), " (", sprintf("%g%%", level * 100), " confidence interval ",
         rcmetar.reitsma.display.percent(point$sensitivity[["lower"]], digits), " to ", rcmetar.reitsma.display.percent(point$sensitivity[["upper"]], digits),
         ") and summary specificity was ", rcmetar.reitsma.display.percent(point$specificity[["estimate"]], digits), " (",
@@ -749,34 +760,36 @@ rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
         "These are average operating characteristics across the included study thresholds. ",
         "The Reitsma bivariate and HSROC formulations are equivalent parameterizations of this model; that equivalence does not assume a common threshold. ",
         "Use the prediction intervals to assess how performance may vary in a new setting."
-    ) else paste0(
-        "Across ", length(diagnostic.data@study.names),
-        " studies, the summary operating point could not be calculated. " ,
-        "Other valid model outputs are shown below."
     )
-    aic.capture <- rcmetar.reitsma.capture.warnings(stats::AIC(fit))
-    bic.capture <- rcmetar.reitsma.capture.warnings(stats::BIC(fit))
-    section.warnings <- c(section.warnings,
-        rcmetar.reitsma.operation.messages(aic.capture, "AIC"),
-        rcmetar.reitsma.operation.messages(bic.capture, "BIC"))
-    summary.warnings <- unique(summary.warnings)
+}
+
+rcmetar.reitsma.report.standard <- function(prepared, fitted, extracted, rendered) {
+    diagnostic.data <- prepared$data
+    level <- prepared$level
+    digits <- prepared$digits
+    fit <- fitted$fit
+    point <- extracted$point
+    summary.warnings <- extracted$summary.warnings
     summary.warnings <- summary.warnings[!is.na(summary.warnings) & nzchar(trimws(summary.warnings))]
-    all.warnings <- unique(c(fit.warnings, summary.warnings, section.warnings))
+    all.warnings <- unique(c(fitted$warnings, summary.warnings,
+                             extracted$section.warnings, rendered$warnings))
     all.warnings <- all.warnings[!is.na(all.warnings) & nzchar(trimws(all.warnings))]
+    clinical.interpretation <- rcmetar.reitsma.clinical.interpretation(
+        point, length(diagnostic.data@study.names), level, digits
+    )
     if (length(all.warnings)) clinical.interpretation <- paste(
         clinical.interpretation,
         paste(c("Analysis warnings:", paste0("- ", all.warnings)), collapse="\n"),
         sep="\n\n"
     )
-    i2.summary <- rcmetar.reitsma.display.i2.summary(i2, digits)
     model.info <- list(
-        estimator=toupper(method), studies.used=length(diagnostic.data@study.names),
-        correction.factor=adjust, correction.policy=policy,
+        estimator=toupper(prepared$method), studies.used=length(diagnostic.data@study.names),
+        correction.factor=prepared$adjust, correction.policy=prepared$policy,
         converged=fit$converged, logLik=as.numeric(fit$logLik),
-        summary.seed=summary.seed, summary.iterations=summary.iterations,
+        summary.seed=extracted$summary.seed, summary.iterations=extracted$summary.iterations,
         summary.warnings=summary.warnings, warnings=all.warnings,
-        AIC=if (is.null(aic.capture$value)) NULL else as.numeric(aic.capture$value),
-        BIC=if (is.null(bic.capture$value)) NULL else as.numeric(bic.capture$value),
+        AIC=if (is.null(extracted$AIC)) NULL else as.numeric(extracted$AIC),
+        BIC=if (is.null(extracted$BIC)) NULL else as.numeric(extracted$BIC),
         formula="cbind(tsens, tfpr) ~ 1",
         package.version=as.character(packageVersion("mada"))
     )
@@ -785,43 +798,52 @@ rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
         `Summary specificity`=rcmetar.reitsma.display.interval(point$specificity, level, "CI", digits),
         `False-positive rate`=rcmetar.reitsma.display.interval(point$false.positive.rate, level, "CI", digits)
     )
-    prediction.display <- if (is.null(prediction.summary)) NULL else list(
+    prediction.display <- if (is.null(extracted$prediction)) NULL else list(
         description="Underlying new-study operating characteristics",
-        intervals=lapply(prediction.summary, rcmetar.reitsma.display.interval, level=level, kind="PI", digits=digits)
+        intervals=lapply(extracted$prediction, rcmetar.reitsma.display.interval,
+                         level=level, kind="PI", digits=digits)
     )
-    if (!is.null(prediction.display)) {
+    if (!is.null(prediction.display))
         names(prediction.display$intervals) <- c("Sensitivity", "Specificity", "False-positive rate")
-    }
     summary <- list(
         "Clinical interpretation"=clinical.interpretation,
         "Summary operating point"=summary.point.display,
-        "Sampling-based summary ratios"=rcmetar.reitsma.display.ratios(ratios, level, digits),
+        "Sampling-based summary ratios"=rcmetar.reitsma.display.ratios(extracted$ratios, level, digits),
         "Marginal prediction"=prediction.display,
-        "Between-study heterogeneity"=heterogeneity,
+        "Between-study heterogeneity"=extracted$heterogeneity,
         "Diagnostic I-squared"=list(
-            `I-squared summary`=i2.summary,
-            `I-squared estimates`=rcmetar.reitsma.display.i2(i2, digits),
+            `I-squared summary`=rcmetar.reitsma.display.i2.summary(extracted$i2, digits),
+            `I-squared estimates`=rcmetar.reitsma.display.i2(extracted$i2, digits),
             Interpretation="I-squared is shown as percent unexplained heterogeneity; Zhou-Dendukuri and Holling are distinct estimators."
         ),
         "Model information"=model.info
     )
-    if (!is.null(auc)) summary[["SROC AUC"]] <- list(
-        AUC=auc[["AUC"]] %||% NULL, normalized.partial.AUC=auc[["pAUC"]] %||% NULL,
-        full.FPR.bounds=c(0.01, 0.99), partial.FPR.bounds=pauc.bounds,
+    if (!is.null(extracted$auc)) summary[["SROC AUC"]] <- list(
+        AUC=extracted$auc[["AUC"]] %||% NULL,
+        normalized.partial.AUC=extracted$auc[["pAUC"]] %||% NULL,
+        full.FPR.bounds=c(0.01, 0.99), partial.FPR.bounds=extracted$partial.auc.bounds,
         note="The Reitsma bivariate and HSROC models are equivalent parameterizations of the same threshold-aware diagnostic model; this does not imply a common threshold.",
-        `AUC confidence interval`="Not provided by mada::AUC(); no invented AUC CI.")
-    # Keep the most useful sections first while ensuring optional AUC remains
-    # near the other SROC outputs when it is available.
-    if (!is.null(auc)) {
+        `AUC confidence interval`="Not provided by mada::AUC(); no invented AUC CI."
+    )
+    if (!is.null(extracted$auc)) {
         desired.order <- c("Clinical interpretation", "Summary operating point",
             "Sampling-based summary ratios", "SROC AUC", "Marginal prediction",
             "Between-study heterogeneity", "Diagnostic I-squared", "Model information")
         summary <- summary[intersect(desired.order, names(summary))]
     }
-    plot.names <- if (length(images)) setNames("sroc", names(images)) else character()
-    list(images=images, image_order=names(images), plot_names=plot.names, plot_params_paths=plot.paths,
-         plot_capabilities=capabilities, Summary=summary,
+    plot.names <- if (length(rendered$images)) setNames("sroc", names(rendered$images)) else character()
+    list(images=rendered$images, image_order=names(rendered$images), plot_names=plot.names,
+         plot_params_paths=rendered$paths, plot_capabilities=rendered$capabilities,
+         Summary=summary,
          References=rcmetar.unique.references(c(rcmetar.method.references("reitsma"), rcmetar.method.references("rutter.gatsonis"))))
+}
+
+rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
+    extracted <- rcmetar.reitsma.extract.standard.components(prepared, fitted)
+    rendered <- rcmetar.reitsma.render.standard(
+        extracted$plot.data, prepared$data, fitted$fit, prepared$params
+    )
+    rcmetar.reitsma.report.standard(prepared, fitted, extracted, rendered)
 }
 
 rcmetar.reitsma.require.package <- function() {
