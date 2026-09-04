@@ -603,6 +603,40 @@ def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path)
     )
 
 
+def test_golden_capture_uses_public_title_for_semantic_image_descriptor(tmp_path):
+    display_path = tmp_path / "forest.display.svg"
+    display_path.write_text("<svg />", encoding="utf-8")
+    result = {
+        "images": {"diagnostic.DOR.forest": str(tmp_path / "forest.png")},
+        "display_images": {"diagnostic.DOR.forest": str(display_path)},
+        "plot_capabilities": {
+            "diagnostic.DOR.forest": {
+                "plot_kind": "forest",
+                "editable": True,
+                "styleable": True,
+                "composition": "single",
+                "regenerator": "forest",
+            }
+        },
+        "sections": [
+            {
+                "kind": "image",
+                "title": "Odds Ratio Forest Plot",
+                "source_key": "diagnostic.DOR.forest",
+            }
+        ],
+    }
+
+    descriptor = verify_golden_compatibility.golden_analysis._capture_plot_descriptors(
+        {"artifacts": {"Odds Ratio Forest Plot": "forest.png"}}, result
+    )[0]
+
+    assert descriptor["artifact_label"] == "Odds Ratio Forest Plot"
+    assert descriptor["display"]["identity"] == "Odds Ratio Forest Plot"
+    assert descriptor["display"]["name"] == "forest.display.svg"
+    assert descriptor["capability"]["kind"] == "forest"
+
+
 def test_current_golden_manifest_requires_exact_rpy2_identities():
     expected = dict(verify_golden_compatibility.REQUIRED_RPY2_IDENTITIES)
     case = {

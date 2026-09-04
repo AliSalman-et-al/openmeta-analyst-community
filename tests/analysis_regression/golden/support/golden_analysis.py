@@ -598,6 +598,23 @@ def _matching_key(mapping, expected):
     return None
 
 
+def _artifact_source_key(result, label, images):
+    for section in result.get("sections", ()):
+        if (
+            _section_value(section, "kind") == "image"
+            and _section_value(section, "title") == label
+            and _section_value(section, "source_key") in images
+        ):
+            return _section_value(section, "source_key")
+    return _matching_key(images, label)
+
+
+def _section_value(section, name):
+    if isinstance(section, dict):
+        return section.get(name)
+    return getattr(section, name, None)
+
+
 def run_curated_golden_set(report_path=None):
     r_bridge.RLibraryLoader().load_rcmetar()
     reports = []
@@ -776,11 +793,16 @@ def _capture_plot_descriptors(bundle, result):
     capabilities = result.get("plot_capabilities", {})
     descriptors = []
     for label in sorted(bundle.get("artifacts", {})):
-        display_label = _matching_key(displays, label)
+        image_key = _artifact_source_key(result, label, result.get("images", {}))
+        display_label = (
+            image_key if image_key in displays else _matching_key(displays, label)
+        )
         display_path = (
             displays.get(display_label) if display_label is not None else None
         )
-        capability_label = _matching_key(capabilities, label)
+        capability_label = (
+            image_key if image_key in capabilities else _matching_key(capabilities, label)
+        )
         capability = (
             capabilities.get(capability_label, {})
             if capability_label is not None
@@ -790,7 +812,7 @@ def _capture_plot_descriptors(bundle, result):
             {
                 "artifact_label": label,
                 "display": {
-                    "identity": display_label,
+                    "identity": label if display_label is not None else None,
                     "name": os.path.basename(display_path) if display_path else None,
                     "type": (
                         os.path.splitext(display_path)[1].lower().lstrip(".")
