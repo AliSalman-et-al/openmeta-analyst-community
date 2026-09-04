@@ -45,14 +45,21 @@ def ensure_analysis_unit(
     groups: Sequence[str],
 ) -> AnalysisUnit:
     """Return the selected unit, creating missing structure for new studies."""
-    if outcome not in study.analysis_units_by_outcome:
+    try:
+        analysis_unit = study.get_analysis_unit(outcome, follow_up)
+    except KeyError:
         study.add_outcome(
             dataset.get_outcome_obj(outcome), group_names=dataset.get_group_names()
         )
-    if follow_up not in study.analysis_units_by_outcome[outcome]:
-        study.add_outcome_at_follow_up(dataset.get_outcome_obj(outcome), follow_up)
-
-    analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
+        try:
+            analysis_unit = study.get_analysis_unit(outcome, follow_up)
+        except KeyError:
+            study.add_outcome_at_follow_up(
+                dataset.get_outcome_obj(outcome),
+                follow_up,
+                follow_up_id=dataset.get_follow_up_stable_id(outcome, follow_up),
+            )
+            analysis_unit = study.get_analysis_unit(outcome, follow_up)
     for group in groups:
         if group not in analysis_unit.get_group_names():
             analysis_unit.add_group(group)

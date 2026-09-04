@@ -795,15 +795,13 @@ class DatasetTableModel(QAbstractTableModel):
             double_value if converted_ok else ""
         )
         follow_up = self.get_current_follow_up_name()
-        study.analysis_units_by_outcome[self.current_outcome_name][follow_up] = (
-            analysis_unit
-        )
+        study.replace_analysis_unit(self.current_outcome_name, follow_up, analysis_unit)
         try:
             self.update_outcome_if_possible(index.row())
         except Exception as exc:
-            study.analysis_units_by_outcome[self.current_outcome_name][
-                follow_up
-            ] = live_analysis_unit
+            study.replace_analysis_unit(
+                self.current_outcome_name, follow_up, live_analysis_unit
+            )
             study.include = old_include
             study.manually_excluded = old_manually_excluded
             self._reject_edit(
@@ -811,8 +809,8 @@ class DatasetTableModel(QAbstractTableModel):
             )
             return False
         live_analysis_unit.adopt_calculated_state(analysis_unit)
-        study.analysis_units_by_outcome[self.current_outcome_name][follow_up] = (
-            live_analysis_unit
+        study.replace_analysis_unit(
+            self.current_outcome_name, follow_up, live_analysis_unit
         )
         return True
 
@@ -830,6 +828,7 @@ class DatasetTableModel(QAbstractTableModel):
                 )
                 return False
         study.covariate_values[cov.name] = new_value
+        study.covariate_values_by_id[cov.stable_id] = new_value
         return True
 
     def _edit_outcome(

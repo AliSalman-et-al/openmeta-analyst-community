@@ -45,6 +45,8 @@ class AnalysisUnit:
         """
         self.is_diagnostic = outcome.data_type == DIAGNOSTIC
         self.outcome = outcome
+        self.follow_up_id = None
+        self.follow_up_label = None
         self.stable_id = stable_id or _new_identity()
 
         if group_names is None and not self.is_diagnostic:
@@ -54,6 +56,7 @@ class AnalysisUnit:
 
         # Group IDs keep effect entries stable when users rename groups.
         self.groups = {}
+        self.groups_by_id = {}
 
         self.raw_data_length = 0
         if outcome.data_type == BINARY:
@@ -117,9 +120,11 @@ class AnalysisUnit:
                 group.stable_id = candidate_group.stable_id
                 group.raw_data[:] = copy.deepcopy(candidate_group.raw_data)
             existing_groups[name] = group
+            self.groups_by_id[group.stable_id] = group
         for name in tuple(existing_groups):
             if name not in candidate.groups:
-                del existing_groups[name]
+                removed = existing_groups.pop(name)
+                self.groups_by_id.pop(removed.stable_id, None)
         self.effects = copy.deepcopy(candidate.effects)
         self.entered_effects = self.effects
         self.derived_effect_previews = copy.deepcopy(candidate.derived_effect_previews)
@@ -435,10 +440,13 @@ class AnalysisUnit:
         if raw_data is None:
             raw_data = [""] * self.raw_data_length
         self._add_effect_entries_for_group(name)
-        self.groups[name] = Group(group_id, name, raw_data)
+        group = Group(group_id, name, raw_data)
+        self.groups[name] = group
+        self.groups_by_id[group.stable_id] = group
 
     def remove_group(self, name):
-        self.groups.pop(name)
+        group = self.groups.pop(name)
+        self.groups_by_id.pop(group.stable_id, None)
 
     def rename_group(self, old_name, new_name):
         if old_name == new_name:
@@ -448,6 +456,7 @@ class AnalysisUnit:
         group = self.groups.pop(old_name)
         group.name = new_name
         self.groups[new_name] = group
+        self.groups_by_id[group.stable_id] = group
 
         # Effect keys are persisted as either one group name or an ordered
         # ``left-right`` pair. Build the known keys from the group collection;

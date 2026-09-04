@@ -13,6 +13,12 @@ def test_editable_labels_do_not_change_domain_identities():
     outcome_id = outcome.stable_id
     study_id = study.stable_id
     follow_up_id = dataset.get_follow_up_stable_id("Outcome", "week 2")
+    unit_id = unit.stable_id
+
+    assert dataset.outcomes_by_id[outcome_id] is outcome
+    assert dataset.follow_ups_by_outcome_id[outcome_id][follow_up_id].label == "week 2"
+    assert study.analysis_units_by_id[unit_id] is unit
+    assert unit.groups_by_id[group_id] is unit.groups["tx A"]
 
     dataset.change_outcome_name("Outcome", "Renamed outcome")
     dataset.change_follow_up_name("Renamed outcome", "week 2", "Renamed follow-up")
@@ -27,6 +33,12 @@ def test_editable_labels_do_not_change_domain_identities():
     assert study.get_analysis_unit("Renamed outcome", "Renamed follow-up").groups[
         "Renamed group"
     ].stable_id == group_id
+    assert dataset.outcomes_by_id[outcome_id] is outcome
+    assert dataset.follow_ups_by_outcome_id[outcome_id][follow_up_id].label == (
+        "Renamed follow-up"
+    )
+    assert study.analysis_units_by_id[unit_id] is unit
+    assert unit.groups_by_id[group_id] is unit.groups["Renamed group"]
 
 
 def test_effect_authority_is_explicit_and_preview_is_not_entered_data():

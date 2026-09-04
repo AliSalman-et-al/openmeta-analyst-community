@@ -12,6 +12,7 @@ from typing import Protocol
 from rc_metastudio import analysis_dataset
 from rc_metastudio import analysis_unit
 from rc_metastudio import two_way_dict
+from rc_metastudio.project_domain import AnalysisDataset, reconstruct_analysis_dataset
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
@@ -29,6 +30,7 @@ class RuntimeProject:
     dataset: analysis_dataset.Dataset
     model_state: JsonObject
     restored_selection: bool
+    semantic_dataset: AnalysisDataset
 
 
 class ProjectStateModel(Protocol):
@@ -89,18 +91,18 @@ def _project_outcomes(
 ) -> tuple[list[JsonValue], set[str]]:
     outcomes: list[JsonValue] = []
     families = set()
-    for name in dataset.get_outcome_names():
-        outcome = dataset.get_outcome_obj(name)
+    canonical_outcomes = tuple(getattr(dataset, "outcomes_by_id", {}).values())
+    for outcome in canonical_outcomes:
+        name = outcome.name
         if outcome is None:
             raise ProjectAdapterError(f"outcome {name!r} has no definition")
         families.add(outcome.data_type)
         follow_ups = [
-            value
-            for _, value in sorted(
-                dataset.follow_ups_by_outcome[name].items(),
-                key=lambda pair: pair[0],
-            )
-            if value is not None
+            follow_up.label
+            for follow_up in dataset.follow_ups_by_outcome_id[
+                outcome.stable_id
+            ].values()
+            if follow_up.label is not None
         ]
         outcomes.append(
             {
@@ -121,26 +123,33 @@ def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
     studies: list[JsonValue] = []
     for study in dataset.studies:
         units: list[JsonValue] = []
-        for outcome_name in sorted(study.analysis_units_by_outcome):
-            for follow_up, unit in sorted(
-                study.analysis_units_by_outcome[outcome_name].items(),
-                key=lambda pair: (pair[0] is not None, str(pair[0])),
-            ):
-                units.append(
-                    {
-                        "outcome": str(outcome_name),
-                        "follow_up": follow_up,
-                        "groups": [
-                            {
-                                "id": group.id,
-                                "name": str(name),
-                                "raw_data": _portable_value(group.raw_data),
-                            }
-                            for name, group in sorted(unit.groups.items())
-                        ],
-                        "entered_effects": _entered_effects(unit.effects),
-                    }
-                )
+        canonical_units = getattr(study, "analysis_units", ())
+        for unit in canonical_units:
+            follow_up = next(
+                (
+                    label
+                    for label, identity in dataset.follow_up_stable_ids_by_outcome.get(
+                        unit.outcome.name, {}
+                    ).items()
+                    if identity == getattr(unit, "follow_up_id", None)
+                ),
+                None,
+            )
+            units.append(
+                {
+                    "outcome": str(unit.outcome.name),
+                    "follow_up": follow_up,
+                    "groups": [
+                        {
+                            "id": group.id,
+                            "name": str(name),
+                            "raw_data": _portable_value(group.raw_data),
+                        }
+                        for name, group in sorted(unit.groups.items())
+                    ],
+                    "entered_effects": _entered_effects(unit.effects),
+                }
+            )
         studies.append(
             {
                 "id": study.id,
@@ -265,6 +274,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             sub_type=_optional_text(item["sub_type"], "outcome subtype"),
             stable_id=f"outcome:{index}",
         )
+        dataset.outcomes_by_id[outcomes[outcome_name].stable_id] = outcomes[outcome_name]
     dataset.follow_ups_by_outcome = {}
     dataset.follow_up_stable_ids_by_outcome = {}
     for item in outcome_items:
@@ -285,6 +295,12 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 mapping.values(), follow_up_ids, strict=True
             )
             if follow_up is not None and stable_id is not None
+        }
+        dataset.follow_ups_by_outcome_id[outcomes[outcome_name].stable_id] = {
+            stable_id: analysis_dataset.FollowUp(stable_id, follow_up)
+            for follow_up, stable_id in dataset.follow_up_stable_ids_by_outcome[
+                outcome_name
+            ].items()
         }
 
     covariate_items = [
@@ -322,6 +338,10 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         study.covariate_values = copy.deepcopy(
             _object(item["covariates"], "study covariates")
         )
+        study.covariate_values_by_id = {
+            covariate.stable_id: study.covariate_values.get(covariate.name)
+            for covariate in dataset.covariates
+        }
         study.outcomes = [outcomes[name] for name in outcomes]
         for unit_value in _array(item["analysis_units"], "analysis units"):
             unit_data = _object(unit_value, "analysis unit")
@@ -349,6 +369,8 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 group_names=group_names,
                 stable_id=unit_id,
             )
+            unit.follow_up_id = follow_up_id
+            unit.follow_up_label = follow_up
             for group_index, group_data in enumerate(group_items):
                 group_name = _text(group_data["name"], "analysis group name")
                 unit.groups[group_name].id = _integer(
@@ -365,9 +387,9 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                         )
                     values = _object(values_value, "effect values")
                     unit.effects[metric][comparison].update(copy.deepcopy(values))
-            study.analysis_units_by_outcome.setdefault(outcome_name, {})[follow_up] = (
-                unit
-            )
+            study.analysis_units_by_outcome.setdefault(outcome_name, {})[follow_up] = unit
+            study.analysis_units_by_id[unit.stable_id] = unit
+            study.analysis_units.append(unit)
         dataset.studies.append(study)
     return dataset
 
@@ -416,10 +438,12 @@ def state_to_model_state(
 
 def document_to_runtime_project(document: ProjectDocument) -> RuntimeProject:
     """Reconstruct the application dataset and durable state from a document."""
+    semantic_dataset = reconstruct_analysis_dataset(document.project, document.state)
     dataset = project_to_dataset(document.project)
     model_state = state_to_model_state(dataset, document.state)
     return RuntimeProject(
         dataset=dataset,
         model_state=model_state,
         restored_selection=document.state["active_outcome"] is not None,
+        semantic_dataset=semantic_dataset,
     )
