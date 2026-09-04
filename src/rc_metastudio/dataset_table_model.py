@@ -893,41 +893,62 @@ class DatasetTableModel(QAbstractTableModel):
         limit = self.columnCount() if orientation == Qt.Orientation.Horizontal else self.rowCount()
         if orientation not in (Qt.Orientation.Horizontal, Qt.Orientation.Vertical) or not 0 <= section < limit:
             return None
-        if orientation == Qt.Orientation.Horizontal and role == WORKSPACE_COLUMN_IDENTITY_ROLE:
+        if orientation == Qt.Orientation.Horizontal:
+            return self._horizontal_header_data(section, role)
+        return self._vertical_header_data(section, role)
+
+    def _horizontal_header_data(self, section, role):
+        if role == WORKSPACE_COLUMN_IDENTITY_ROLE:
             return self.workspace_column_identity(section)
         if role == Qt.ItemDataRole.ToolTipRole:
-            if orientation == Qt.Orientation.Horizontal:
-                return self._horizontal_header_tooltip(section)
-            if self._study_has_entered_data(section):
-                return "Use calculator to fill-in missing information"
-        if role == Qt.ItemDataRole.DecorationRole and orientation == Qt.Orientation.Vertical:
-            return QIcon(":/icons/table/calculator.svg") if self._study_has_entered_data(section) else _item_data()
+            return self._horizontal_header_tooltip(section)
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+            return self._header_alignment()
         if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Vertical:
-                return _item_data(section + 1)
-            result = self._basic_horizontal_header_data(
-                section,
-                data_type=self.get_current_outcome_type(get_str=False),
-                sub_type=self.get_current_outcome_subtype(),
-                raw_columns=self.RAW_DATA,
-                outcome_columns=self.OUTCOMES,
-                current_effect=self.current_effect,
-                groups=self.current_groups,
-                outcome_is_present=self.current_outcome_name is not None,
-            )
-            if result:
-                return result
-            covariate = (
-                self.get_covariate_for_column(section)
-                if self.current_outcome_name is not None and section > max(self.OUTCOMES)
-                else None
-            )
-            if covariate is not None:
-                return _item_data(f"{covariate.name} ({covariate.get_type_str()[0]})")
-            return _item_data("")
+            return self._horizontal_header_display(section)
         return _item_data()
+
+    def _vertical_header_data(self, section, role):
+        if role == Qt.ItemDataRole.ToolTipRole and self._study_has_entered_data(section):
+            return "Use calculator to fill-in missing information"
+        if role == Qt.ItemDataRole.DecorationRole:
+            return (
+                QIcon(":/icons/table/calculator.svg")
+                if self._study_has_entered_data(section)
+                else _item_data()
+            )
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return self._header_alignment()
+        if role == Qt.ItemDataRole.DisplayRole:
+            return _item_data(section + 1)
+        return _item_data()
+
+    @staticmethod
+    def _header_alignment():
+        return _item_data(int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter))
+
+    def _horizontal_header_display(self, section):
+        result = self._basic_horizontal_header_data(
+            section,
+            data_type=self.get_current_outcome_type(get_str=False),
+            sub_type=self.get_current_outcome_subtype(),
+            raw_columns=self.RAW_DATA,
+            outcome_columns=self.OUTCOMES,
+            current_effect=self.current_effect,
+            groups=self.current_groups,
+            outcome_is_present=self.current_outcome_name is not None,
+        )
+        if result:
+            return result
+        covariate = self._header_covariate(section)
+        if covariate is None:
+            return _item_data("")
+        return _item_data(f"{covariate.name} ({covariate.get_type_str()[0]})")
+
+    def _header_covariate(self, section):
+        if self.current_outcome_name is None or section <= max(self.OUTCOMES):
+            return None
+        return self.get_covariate_for_column(section)
 
     def workspace_column_identity(self, section):
         """Return identity independent of mutable labels and column position."""
