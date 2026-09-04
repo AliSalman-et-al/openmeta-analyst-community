@@ -473,28 +473,11 @@ class AnalysisUnit:
         self._groups_by_id.pop(group.stable_id)
         self._groups_by_id[group.stable_id] = group
 
-        # Effect keys are persisted as either one group name or an ordered
-        # ``left-right`` pair. Build the known keys from the group collection;
-        # splitting on "-" corrupts legitimate names such as "Usual-care".
-        key_replacements = {old_name: new_name}
-        for left_group in original_group_names:
-            for right_group in original_group_names:
-                if left_group == right_group:
-                    continue
-                old_key = "-".join((left_group, right_group))
-                new_key = "-".join(
-                    (
-                        new_name if left_group == old_name else left_group,
-                        new_name if right_group == old_name else right_group,
-                    )
-                )
-                if old_key != new_key:
-                    key_replacements[old_key] = new_key
-
+        replacements = _group_key_replacements(
+            original_group_names, old_name, new_name
+        )
         for effect_values in self.effects.values():
-            for old_key, new_key in key_replacements.items():
-                if old_key in effect_values:
-                    effect_values[new_key] = effect_values.pop(old_key)
+            _rename_effect_keys(effect_values, replacements)
 
     def get_raw_data_for_group(self, group_name):
         return self.groups[group_name].raw_data
@@ -519,6 +502,31 @@ class AnalysisUnit:
 
     def get_group_names(self):
         return [group.name for group in self._groups_by_id.values()]
+
+
+def _group_key_replacements(group_names, old_name, new_name):
+    """Build replacements without parsing names that may contain hyphens."""
+    replacements = {old_name: new_name}
+    for left_group in group_names:
+        for right_group in group_names:
+            if left_group == right_group:
+                continue
+            old_key = "-".join((left_group, right_group))
+            new_key = "-".join(
+                (
+                    new_name if left_group == old_name else left_group,
+                    new_name if right_group == old_name else right_group,
+                )
+            )
+            if old_key != new_key:
+                replacements[old_key] = new_key
+    return replacements
+
+
+def _rename_effect_keys(effect_values, replacements):
+    for old_key, new_key in replacements.items():
+        if old_key in effect_values:
+            effect_values[new_key] = effect_values.pop(old_key)
 
 
 class Group:

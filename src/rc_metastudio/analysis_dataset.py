@@ -89,18 +89,17 @@ class Dataset:
     def change_group_name(
         self, old_group_name, new_group_name, outcome=None, follow_up=None
     ):
-        if (outcome is None and follow_up is not None) or (
-            follow_up is None and outcome is not None
-        ):
+        if (outcome is None) != (follow_up is None):
             raise ValueError(
                 "outcome and follow_up must either both be provided or both be omitted"
             )
 
         for study in self.studies:
-            if outcome is None and follow_up is None:
-                units = study.analysis_units
-            else:
-                units = [study.get_analysis_unit(outcome, follow_up)]
+            units = (
+                study.analysis_units
+                if outcome is None
+                else [study.get_analysis_unit(outcome, follow_up)]
+            )
             for analysis_unit in units:
                 analysis_unit.rename_group(old_group_name, new_group_name)
 
@@ -653,6 +652,17 @@ def _follow_up_label_index(follow_ups):
     return result
 
 
+def _unit_matches(unit, outcome, outcome_id, follow_up):
+    if outcome_id is not None and unit.outcome.stable_id != outcome_id:
+        return False
+    if outcome_id is None and unit.outcome.name != outcome:
+        return False
+    return follow_up in {
+        getattr(unit, "follow_up_id", None),
+        getattr(unit, "follow_up_label", None),
+    }
+
+
 class FollowUp:
     """Editable follow-up label owned by one immutable identity."""
 
@@ -765,17 +775,12 @@ class Study:
         outcome_id = outcome.stable_id if isinstance(outcome, Outcome) else None
         legacy_first = None
         for unit in self.analysis_units:
-            if outcome_id is not None and unit.outcome.stable_id != outcome_id:
+            if not _unit_matches(unit, outcome, outcome_id, follow_up):
                 continue
-            if outcome_id is None and unit.outcome.name != outcome:
-                continue
-            if follow_up in {
-                getattr(unit, "follow_up_id", None),
-                getattr(unit, "follow_up_label", None),
-            }:
-                return unit
             if follow_up == "first" and getattr(unit, "follow_up_id", None) is None:
                 legacy_first = unit
+                continue
+            return unit
         if legacy_first is not None:
             return legacy_first
         try:
