@@ -21,6 +21,11 @@ import pytest
             ("smoke.json", "1.25"),
         ),
         (
+            ["RCMetaStudio", "--automation-wizard-layout-smoke"],
+            "start_wizard_layout_smoke",
+            (),
+        ),
+        (
             ["RCMetaStudio", "--automation-startup-wizard-smoke", "wizard.json", "sample.rcms"],
             "start_startup_wizard_smoke",
             ("wizard.json", "sample.rcms"),

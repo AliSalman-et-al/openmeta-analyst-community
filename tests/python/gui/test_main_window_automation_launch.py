@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, cast
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from rc_metastudio import automation
-from tests.python.gui.support import automation_scenarios
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QHeaderView
 
@@ -5126,7 +5125,7 @@ def test_wizard_layout_smoke_renders_core_wizard_pages():
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
     )
 
-    assert automation_scenarios.start_wizard_layout_smoke() == 0
+    assert automation.start_wizard_layout_smoke() == 0
     assert [
         widget
         for widget in app.topLevelWidgets()
