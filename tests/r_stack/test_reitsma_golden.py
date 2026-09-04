@@ -199,10 +199,10 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
         data_type=meta_globals.DIAGNOSTIC,
     )
     standard = headless_analysis.run_headless_analysis(case)
-    point = standard["texts"]["Summary operating point"]
+    point = standard.texts["Summary operating point"]
     assert "Sensitivity" in point and "Specificity" in point, point
     assert "Lower bound" in point and "Upper bound" in point, point
-    assert "Model information" in standard["texts"]
+    assert "Model information" in standard.texts
 
     # Build the comparison fit through mada's public API.  The expected
     # values are derived independently from the public fit, not from any

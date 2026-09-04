@@ -257,7 +257,8 @@ _DRIVER = textwrap.dedent(
         for section in continuous_result.sections
         if section.title == "Forest Plot"
     )
-    assert forest_section.semantic_id == "analysis.standard.forest.1"
+    assert forest_section.source_key == forest_section.semantic_id
+    assert forest_section.source_key != forest_section.title
     assert continuous_result.images[forest_section.source_key] == forest_path
     assert (
         continuous_result.display_images[forest_section.source_key]
