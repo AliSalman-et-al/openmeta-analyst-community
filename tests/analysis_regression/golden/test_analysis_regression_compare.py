@@ -34,6 +34,26 @@ import verify_golden_compatibility  # noqa: E402 - scripts path bootstrap
 import verify_rcmetar_r_stack  # noqa: E402 - scripts path bootstrap
 
 
+def _text_result(title, text):
+    return {
+        "version": 1,
+        "texts": {title: text},
+        "sections": [
+            {
+                "id": "test.%s" % title.lower(),
+                "kind": "text",
+                "order": 0,
+                "title": title,
+                "source_key": title,
+            }
+        ],
+    }
+
+
+def _empty_result():
+    return {"version": 1, "texts": {}, "images": {}, "sections": []}
+
+
 def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
     report = compare_golden_baseline(_baseline(), _current())
 
@@ -896,10 +916,10 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_workflow_analysis",
-            lambda workflow, method, params: {
-                "texts": {"Summary": "%s:%s" % (workflow, method)}
-            },
+            "run_versioned_analysis_request",
+            lambda request: _text_result(
+                "Summary", "%s:%s" % (request["workflow"], request["method"])
+            ),
             raising=False,
         )
 
@@ -957,8 +977,8 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_binary_analysis",
-            lambda method, params: {"texts": {"Summary": params["measure"]}},
+            "run_versioned_analysis_request",
+            lambda request: _text_result("Summary", request["params"]["measure"]),
             raising=False,
         )
 
@@ -1021,9 +1041,11 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
             def convert(self, model, **kwargs):
                 self.conversions.append((model, kwargs))
 
-            def run(self, method_names, parameter_values):
+            def run(self, requests):
+                method_names = [request["method"] for request in requests]
+                parameter_values = [request["params"] for request in requests]
                 self.runs.append((method_names, parameter_values))
-                return {"texts": {}, "images": {}}
+                return _empty_result()
 
         model = DiagnosticModel()
         backend = DiagnosticBackend()
@@ -1040,7 +1062,7 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             backend.run,
             raising=False,
         )
@@ -1126,10 +1148,8 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_meta_regression",
-            lambda dataset, studies, covs, metric, confidence_level=None, params=None, **kwargs: {
-                "texts": {"Summary": metric}
-            },
+            "run_versioned_analysis_request",
+            lambda request: _text_result("Summary", request["metric"]),
             raising=False,
         )
 
