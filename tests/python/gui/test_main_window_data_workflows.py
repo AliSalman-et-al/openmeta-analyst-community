@@ -438,11 +438,13 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         assert window.workspace.is_dirty
 
         window.undo()
+        model = window.model
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [10, 94, 2]
         assert not window.workspace.is_dirty
         window.redo()
+        model = window.model
         assert window.workspace.is_dirty
 
         undo_count = window.workspace.can_undo
@@ -591,11 +593,13 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         assert window.workspace.is_dirty
 
         window.undo()
+        model = window.model
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [12, 3, 4, 21]
         assert not window.workspace.is_dirty
         window.redo()
+        model = window.model
 
         undo_count = window.workspace.can_undo
 
@@ -1575,7 +1579,7 @@ def test_main_window_dialog_text_slots_accept_native_pyqt6_line_edit_strings(
                 self.outcome_name_le = QtWidgets.QLineEdit()
                 self.outcome_name_le.setText("Recovery")
                 self.datatype_cbo_box = QtWidgets.QComboBox()
-                self.datatype_cbo_box.addItem("Continuous")
+                self.datatype_cbo_box.addItem("Binary")
 
             def exec(self):
                 return True

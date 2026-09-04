@@ -317,16 +317,16 @@ class DatasetTableModel(QAbstractTableModel):
 
     def _sync_display_studies(self):
         canonical = list(self.dataset.studies)
-        canonical_by_identity = {id(study): study for study in canonical}
+        canonical_by_id = {study.id: study for study in canonical}
         visible = []
         seen = set()
         for study in self._display_studies:
-            identity = id(study)
-            if identity in canonical_by_identity:
-                visible.append(canonical_by_identity[identity])
-                seen.add(identity)
-        visible.extend(study for study in canonical if id(study) not in seen)
-        if self._blank_study is not None and id(self._blank_study) not in canonical_by_identity:
+            replacement = canonical_by_id.get(study.id)
+            if replacement is not None:
+                visible.append(replacement)
+                seen.add(study.id)
+        visible.extend(study for study in canonical if study.id not in seen)
+        if self._blank_study is not None and self._blank_study.id not in canonical_by_id:
             visible.append(self._blank_study)
         self._display_studies = visible
 
@@ -438,10 +438,11 @@ class DatasetTableModel(QAbstractTableModel):
     def _raw_cell_data(self, index, role, study):
         if self._is_blank_study(study) or self.current_outcome_name is None:
             return _item_data("")
+        study = self._study_for_row(index.row())
         if self.current_outcome_name not in study.analysis_units_by_outcome:
             return _item_data("")
         raw_data = self.get_current_analysis_unit_for_study(
-            study_index=self.dataset.studies.index(study)
+            study_index=index.row()
         ).get_raw_data_for_groups(self.current_groups)
         adjusted_index = index.column() - 3
         if len(raw_data) <= adjusted_index:
@@ -471,9 +472,7 @@ class DatasetTableModel(QAbstractTableModel):
     def _outcome_cell_data(self, index, role, study):
         if not self._outcome_cell_is_available(study):
             return _item_data("")
-        unit = self.get_analysis_unit(study=study, outcome=self.current_outcome_name,
-                                      follow_up=self.get_current_follow_up_name(),
-                                      groups=self.current_groups)
+        unit = self.get_current_analysis_unit_for_study(index.row())
         source = self._display_effect_source(unit)
         comparison = self.get_current_group_comparison()
         outcome_index = index.column() - self.OUTCOMES[0]
@@ -1449,6 +1448,7 @@ class DatasetTableModel(QAbstractTableModel):
         # reset so a continuous project cannot momentarily use the previous
         # binary or diagnostic outcome indices.
         self.update_column_indices()
+        self._sync_display_studies()
         self.reset_model()
 
     def raw_data_is_complete_for_study(self, study_index, first_arm_only=False):
