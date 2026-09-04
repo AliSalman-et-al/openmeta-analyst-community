@@ -12,19 +12,16 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
 from rc_metastudio import calculator_routines as calc_fncs
-from rc_metastudio import name_validation, project_adapter, qt_text, r_backend, r_bridge
+from rc_metastudio import name_validation, project_adapter, qt_text, workspace_editing
 from rc_metastudio.analysis_dataset import Covariate, Dataset, Outcome, Study
 from rc_metastudio.dataset_analysis_domain import (
-    calculate_raw_effects,
     ensure_analysis_unit,
     has_entered_data,
     has_study_entered_data,
     included_studies_have_effects,
     included_studies_have_raw_data,
-    make_display_scale_converter,
     raw_data_is_complete,
     raw_data_is_empty,
-    to_calculation_scale,
 )
 from rc_metastudio.meta_globals import (
     ALL_METRIC_NAMES,
@@ -55,6 +52,10 @@ from rc_metastudio.workspace_column_identity import (
     WorkspaceColumnIdentity,
     stable_covariate_identity,
 )
+
+# Compatibility export for callers that used to patch the bridge through this
+# module. The model itself delegates all bridge calls to ``editing_service``.
+r_bridge = workspace_editing.r_bridge
 
 # number of (empty) rows in the spreadsheet to show
 # following the last study.
@@ -232,6 +233,9 @@ class DatasetTableModel(QAbstractTableModel):
     ):
         super().__init__()
 
+        self.editing_service = workspace_editing.WorkspaceEditingService()
+        # Kept as a module-level compatibility seam for existing test and
+        # plugin code. Calculations go through ``editing_service`` below.
         self.confidence_level = self.set_confidence_level(DEFAULT_CONFIDENCE_LEVEL)
 
         self.dataset = dataset if dataset is not None else Dataset()
@@ -1080,16 +1084,15 @@ class DatasetTableModel(QAbstractTableModel):
         effect = self.get_current_analysis_unit_for_study(index.row()).entered_effects[
             self.current_effect
         ][self.get_current_group_comparison()]
-        if not target.study.manually_excluded:
-            target.study.include = True
-        required_keys = (
-            ("est", "SE")
-            if target.data_type == CONTINUOUS
-            and target.outcome_subtype == "generic_effect"
-            else ("upper", "lower", "est")
+        self.editing_service.update_inclusion_after_edit(
+            target.study,
+            diagnostic=self.is_diagnostic(),
+            inclusion_column=target.column == self.INCLUDE_STUDY,
+            outcome_selected=self.current_outcome_name is not None,
+            effect=effect,
+            data_type=target.data_type,
+            outcome_subtype=target.outcome_subtype,
         )
-        if any(effect[key] is None for key in required_keys):
-            target.study.include = False
 
     def _publish_workspace_edit(
         self, index, target, added_study_id, before_workspace_snapshot
@@ -1154,17 +1157,20 @@ class DatasetTableModel(QAbstractTableModel):
             project_adapter.dataset_to_project(copy.deepcopy(self.dataset)),
             project_adapter.model_to_state(self),
         )
-        applied, added_study_id = self._apply_edit(
-            index,
-            value,
-            target,
-            inclusion_value,
-            import_csv,
-            allow_empty_names,
-        )
-        if not applied:
-            return False
-        self._update_inclusion_after_edit(index, target)
+        with self.editing_service.transaction(self.dataset) as transaction:
+            applied, added_study_id = self._apply_edit(
+                index,
+                value,
+                target,
+                inclusion_value,
+                import_csv,
+                allow_empty_names,
+            )
+            if not applied:
+                transaction.rollback()
+                return False
+            self._update_inclusion_after_edit(index, target)
+            transaction.commit()
         self._publish_workspace_edit(
             index, target, added_study_id, before_workspace_snapshot
         )
@@ -2044,8 +2050,7 @@ class DatasetTableModel(QAbstractTableModel):
             if not self.dataset.studies[study_index].manually_excluded:
                 self.dataset.studies[study_index].include = True
 
-            calculated = calculate_raw_effects(
-                r_bridge,
+            calculated = self.editing_service.preview_raw_effects(
                 data_type,
                 self.current_effect,
                 self.get_current_raw_data_for_study(study_index),
@@ -2066,7 +2071,7 @@ class DatasetTableModel(QAbstractTableModel):
                     analysis_unit.calculate_display_effect_and_ci(
                         metric,
                         group_comparison,
-                        make_display_scale_converter(r_bridge, data_type, metric),
+                        self.editing_service.display_scale_converter(data_type, metric),
                         confidence_level=self.get_confidence_level(),
                         confidence_multiplier=self.confidence_multiplier,
                     )
@@ -2085,8 +2090,8 @@ class DatasetTableModel(QAbstractTableModel):
                 analysis_unit.calculate_display_effect_and_ci(
                     self.current_effect,
                     group_comparison,
-                    make_display_scale_converter(
-                        r_bridge, data_type, self.current_effect, n1
+                    self.editing_service.display_scale_converter(
+                        data_type, self.current_effect, n1
                     ),
                     confidence_level=self.get_confidence_level(),
                     confidence_multiplier=self.confidence_multiplier,
@@ -2114,8 +2119,8 @@ class DatasetTableModel(QAbstractTableModel):
                 analysis_unit.calculate_display_effect_and_ci(
                     self.current_effect,
                     group_comparison,
-                    make_display_scale_converter(
-                        r_bridge, data_type, self.current_effect
+                    self.editing_service.display_scale_converter(
+                        data_type, self.current_effect
                     ),
                     confidence_level=self.get_confidence_level(),
                     confidence_multiplier=self.confidence_multiplier,
@@ -2311,12 +2316,14 @@ class DatasetTableModel(QAbstractTableModel):
                     )
 
     def _get_conv_to_display_scale(self, data_type, effect, n1=None):
-        return make_display_scale_converter(r_bridge, data_type, effect, n1)
+        return self.editing_service.display_scale_converter(data_type, effect, n1)
 
     def _get_calc_scale_value(
         self, display_scale_val=None, data_type=None, effect=None, n1=None
     ):
-        return to_calculation_scale(r_bridge, display_scale_val, data_type, effect, n1)
+        return self.editing_service.to_calculation_scale(
+            display_scale_val, data_type, effect, n1
+        )
 
     def set_confidence_level(self, confidence_level):
         """Sets multiplier as well (~1.96 for 95% conf level)"""
@@ -2324,14 +2331,10 @@ class DatasetTableModel(QAbstractTableModel):
 
         self.confidence_level = confidence_level
 
-        if r_backend.is_backend_installed():
-            self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
-                confidence_level
-            )
-            r_bridge.set_confidence_level(confidence_level)
-        else:
-            tail = (1.0 + confidence_level / 100.0) / 2.0
-            self.confidence_multiplier = NormalDist().inv_cdf(tail)
+        settings = self.editing_service.confidence_settings(confidence_level)
+        self.confidence_level = settings.level
+        self.confidence_multiplier = settings.multiplier
+        self.editing_service.set_backend_confidence_level(settings.level)
 
         self.confLevelChanged.emit()
 

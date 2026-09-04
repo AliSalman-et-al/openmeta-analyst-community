@@ -69,7 +69,7 @@ def ensure_analysis_unit(
 
 
 def make_display_scale_converter(
-    bridge: object, data_type: str | None, effect: str | None, n1: object = None
+    bridge: object, data_type: object, effect: str | None, n1: object = None
 ) -> Callable[[object], object]:
     """Build the calculation-to-display conversion for one outcome family."""
     checked = _checked_bridge(bridge)
@@ -91,7 +91,7 @@ def make_display_scale_converter(
 def to_calculation_scale(
     bridge: object,
     value: object,
-    data_type: str | None,
+    data_type: object,
     effect: str | None,
     n1: object = None,
 ) -> object:
@@ -110,7 +110,7 @@ def to_calculation_scale(
 
 def calculate_raw_effects(
     bridge: object,
-    data_type: str | None,
+    data_type: object,
     effect: str | None,
     raw_data: Sequence[object],
     confidence_level: float,
