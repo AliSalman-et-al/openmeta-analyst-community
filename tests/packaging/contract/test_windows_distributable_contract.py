@@ -690,6 +690,18 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     )
 
 
+def test_windows_packager_authenticates_probe_after_smoke_observations():
+    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
+    build = script.split("Assert-AppLayout -Root $appDir", 1)[1]
+
+    assert relative_order(
+        build,
+        "Invoke-PackagedAppSmokeTest -Root $appDir",
+        "scripts\\inspect_windows_deployment.py inspect",
+        "Compress-AppDirectory -SourceDirectory $appDir",
+    )
+
+
 def test_generated_ui_collection_matches_the_canonical_package_manifest(tmp_path):
     from scripts.qt6_build_impl import CANONICAL_FORMS
 

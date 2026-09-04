@@ -796,6 +796,10 @@ $sipVersion = (& $PythonExe -c "import importlib.metadata as m; print(m.version(
 $sipRuntimeVersion = (& $PythonExe -c "from PyQt6 import sip; print(sip.SIP_VERSION_STR)").Trim()
 $rpy2Version = (& $PythonExe -c "import importlib.metadata as m; print(m.version('rpy2'))").Trim()
 $rVersion = (& (Join-Path $resolvedRRuntimeRoot "bin\Rscript.exe") -e "cat(as.character(getRversion()))").Trim()
+if (-not $SkipSmoke) {
+    Write-Step "Running packaged Windows smoke checks"
+    Invoke-PackagedAppSmokeTest -Root $appDir
+}
 Write-Step "Inspecting coherent Windows x64 deployment"
 & $PythonExe scripts\inspect_windows_deployment.py inspect `
     --app-root $appDir --output $deploymentManifestPath --source-commit $sourceCommit --source-provenance $sourceProvenancePath `
@@ -805,10 +809,6 @@ Write-Step "Inspecting coherent Windows x64 deployment"
     --r-version $rVersion --rpy2-version $rpy2Version `
     --pyinstaller-version $requiredPyInstallerVersion
 if ($LASTEXITCODE -ne 0) { throw "Windows deployment inspection failed." }
-if (-not $SkipSmoke) {
-    Write-Step "Running packaged Windows smoke checks"
-    Invoke-PackagedAppSmokeTest -Root $appDir
-}
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName
 if (-not $SkipSmoke) {
