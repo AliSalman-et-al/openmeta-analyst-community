@@ -268,7 +268,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 except project_adapter.ProjectAdapterError:
                     document = None
                 if document is not None and document != self.workspace.document:
-                    self.workspace.replace(document, record_history=False)
+                    try:
+                        self.workspace.replace(document, record_history=False)
+                    except project_format.ProjectFormatError:
+                        # A transient editor may still hold an invalid duplicate
+                        # label; keep the last validated workspace document.
+                        pass
                 self.workspace.mark_saved()
                 self.workspace_is_dirty = False
             else:
