@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, cast
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 
 if TYPE_CHECKING:
-    from PyQt6 import QtGui, QtWidgets
+    from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -308,93 +308,16 @@ def _capture_window(
     destination: Path,
     attempts: int = MAX_CAPTURE_ATTEMPTS,
 ) -> dict[str, object]:
-    from PyQt6 import QtCore, QtGui, sip
+    from PyQt6 import QtCore
 
     last_problem = "window was not exposed"
     for attempt in range(1, attempts + 1):
-        screen = window.screen()
-        if screen is None:
-            last_problem = "window was not attached to a screen"
-        elif not window.isVisible() or window.isMinimized():
-            last_problem = "window was hidden or minimized"
-        else:
-            frame = window.frameGeometry()
-            screen_geometry = screen.geometry()
-            if not screen_geometry.contains(frame):
-                last_problem = "window frame did not fit its screen"
-            else:
-                # Force a synchronous client paint before asking the Windows
-                # compositor for the desktop.  qwindows can otherwise block in
-                # grabWindow() while a newly shown widget still has a pending
-                # paint event.
-                paint_probe = window.grab()
-                if paint_probe.isNull() or not _image_has_variation(
-                    paint_probe.toImage()
-                ):
-                    last_problem = "window client was not painted"
-                    desktop = QtGui.QPixmap()
-                else:
-                    desktop = screen.grabWindow(sip.voidptr(0))
-                if desktop.isNull():
-                    if attempt < attempts:
-                        QtCore.QThread.msleep(50)
-                        app.processEvents()
-                    continue
-                dpr = float(desktop.devicePixelRatioF())
-                physical = QtCore.QRect(
-                    logical_extent_to_physical_pixels(
-                        frame.x() - screen_geometry.x(), dpr
-                    ),
-                    logical_extent_to_physical_pixels(
-                        frame.y() - screen_geometry.y(), dpr
-                    ),
-                    logical_extent_to_physical_pixels(frame.width(), dpr),
-                    logical_extent_to_physical_pixels(frame.height(), dpr),
-                )
-                captured = (
-                    desktop.copy(physical) if not desktop.isNull() else QtGui.QPixmap()
-                )
-                expected_size = [physical.width(), physical.height()]
-                actual_size = [captured.width(), captured.height()]
-                if captured.isNull() or actual_size != expected_size:
-                    last_problem = "desktop crop did not match the physical frame"
-                elif not _image_has_variation(captured.toImage()):
-                    last_problem = "desktop crop was blank or single-colour"
-                else:
-                    image_dpr = float(captured.devicePixelRatioF())
-                    captured.setDevicePixelRatio(dpr)
-                    if not captured.save(str(destination), "PNG"):
-                        raise RuntimeError("failed to save native Qt6 frame capture")
-                    payload = destination.read_bytes()
-                    return {
-                        "attempts": attempt,
-                        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
-                        "device_pixel_ratio": dpr,
-                        "image_device_pixel_ratio": image_dpr,
-                        "logical_frame": {
-                            "x": frame.x(),
-                            "y": frame.y(),
-                            "width": frame.width(),
-                            "height": frame.height(),
-                        },
-                        "path": destination.name,
-                        "physical_crop": {
-                            "x": physical.x(),
-                            "y": physical.y(),
-                            "width": physical.width(),
-                            "height": physical.height(),
-                        },
-                        "pixel_size": actual_size,
-                        "screen_geometry": {
-                            "x": screen_geometry.x(),
-                            "y": screen_geometry.y(),
-                            "width": screen_geometry.width(),
-                            "height": screen_geometry.height(),
-                        },
-                        "sha256": hashlib.sha256(payload).hexdigest(),
-                        "size_bytes": len(payload),
-                        "varied_pixels": True,
-                    }
+        captured, problem = _capture_window_attempt(
+            window, destination, attempt, last_problem
+        )
+        if captured is not None:
+            return captured
+        last_problem = problem
         if attempt < attempts:
             QtCore.QThread.msleep(50)
             app.processEvents()
@@ -402,6 +325,120 @@ def _capture_window(
         "%s native frame capture failed after %s attempts: %s"
         % (window.objectName() or window.windowTitle(), attempts, last_problem)
     )
+
+
+def _capture_window_attempt(
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempt: int,
+    last_problem: str,
+) -> tuple[dict[str, object] | None, str]:
+    geometry = _window_capture_geometry(window)
+    if isinstance(geometry, str):
+        return None, geometry
+    screen, frame, screen_geometry = geometry
+    return _capture_window_frame(
+        window, destination, attempt, screen, frame, screen_geometry, last_problem
+    )
+
+
+def _window_capture_geometry(
+    window: QtWidgets.QWidget,
+) -> tuple[QtGui.QScreen, QtCore.QRect, QtCore.QRect] | str:
+    screen = window.screen()
+    if screen is None:
+        return "window was not attached to a screen"
+    if not window.isVisible() or window.isMinimized():
+        return "window was hidden or minimized"
+    frame = window.frameGeometry()
+    screen_geometry = screen.geometry()
+    if not screen_geometry.contains(frame):
+        return "window frame did not fit its screen"
+    return screen, frame, screen_geometry
+
+
+def _capture_window_frame(
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempt: int,
+    screen: QtGui.QScreen,
+    frame: QtCore.QRect,
+    screen_geometry: QtCore.QRect,
+    last_problem: str,
+) -> tuple[dict[str, object] | None, str]:
+    from PyQt6 import QtCore, sip
+
+    # Force a synchronous client paint before asking the compositor for the
+    # desktop, which avoids grabbing a newly shown widget's pending paint.
+    paint_probe = window.grab()
+    if paint_probe.isNull() or not _image_has_variation(paint_probe.toImage()):
+        return None, "window client was not painted"
+    desktop = screen.grabWindow(sip.voidptr(0))
+    if desktop.isNull():
+        return None, last_problem
+    dpr = float(desktop.devicePixelRatioF())
+    physical = QtCore.QRect(
+        logical_extent_to_physical_pixels(frame.x() - screen_geometry.x(), dpr),
+        logical_extent_to_physical_pixels(frame.y() - screen_geometry.y(), dpr),
+        logical_extent_to_physical_pixels(frame.width(), dpr),
+        logical_extent_to_physical_pixels(frame.height(), dpr),
+    )
+    captured = desktop.copy(physical)
+    actual_size = [captured.width(), captured.height()]
+    if captured.isNull() or actual_size != [physical.width(), physical.height()]:
+        return None, "desktop crop did not match the physical frame"
+    if not _image_has_variation(captured.toImage()):
+        return None, "desktop crop was blank or single-colour"
+    image_dpr = float(captured.devicePixelRatioF())
+    captured.setDevicePixelRatio(dpr)
+    if not captured.save(str(destination), "PNG"):
+        raise RuntimeError("failed to save native Qt6 frame capture")
+    return _capture_window_record(
+        destination,
+        attempt,
+        dpr,
+        image_dpr,
+        frame,
+        physical,
+        actual_size,
+        screen_geometry,
+    )
+
+
+def _capture_window_record(
+    destination: Path,
+    attempt: int,
+    dpr: float,
+    image_dpr: float,
+    frame: QtCore.QRect,
+    physical: QtCore.QRect,
+    pixel_size: list[int],
+    screen_geometry: QtCore.QRect,
+) -> tuple[dict[str, object], str]:
+    payload = destination.read_bytes()
+    return {
+        "attempts": attempt,
+        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
+        "device_pixel_ratio": dpr,
+        "image_device_pixel_ratio": image_dpr,
+        "logical_frame": _rect_record(frame),
+        "path": destination.name,
+        "physical_crop": _rect_record(physical),
+        "pixel_size": pixel_size,
+        "screen_geometry": _rect_record(screen_geometry),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+        "varied_pixels": True,
+    }, ""
+
+
+def _rect_record(rect: QtCore.QRect) -> dict[str, int]:
+    return {
+        "x": rect.x(),
+        "y": rect.y(),
+        "width": rect.width(),
+        "height": rect.height(),
+    }
 
 
 def _native_device_pixel_ratio(repo_root: Path) -> float:

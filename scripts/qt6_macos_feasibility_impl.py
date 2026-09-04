@@ -13,7 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Callable
+from typing import Callable, cast
 
 from rc_metastudio.macos_macho import (
     is_macho_candidate as _is_macho_candidate,
@@ -356,62 +356,7 @@ def _maybe_archs(path: Path) -> list[str]:
 
 def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, object]:
     root = app_root.resolve()
-    files: list[dict[str, object]] = []
-    total_bytes = 0
-    for current, directories, filenames in os.walk(root, followlinks=False):
-        current_path = Path(current)
-        for name in list(directories):
-            path = current_path / name
-            if path.is_symlink():
-                directories.remove(name)
-                resolved = path.resolve(strict=True)
-                if not resolved.is_relative_to(root):
-                    raise RuntimeError(
-                        f"packaged symlink escapes the app bundle: {path}"
-                    )
-                size = path.lstat().st_size
-                files.append(
-                    {
-                        "path": path.relative_to(root).as_posix(),
-                        "kind": "symlink",
-                        "size": size,
-                        "link_target": os.readlink(path),
-                        "resolved_path": resolved.relative_to(root).as_posix(),
-                    }
-                )
-                total_bytes += size
-        for name in filenames:
-            path = current_path / name
-            relative = path.relative_to(root).as_posix()
-            if path.is_symlink():
-                resolved = path.resolve(strict=True)
-                if not resolved.is_relative_to(root):
-                    raise RuntimeError(
-                        f"packaged symlink escapes the app bundle: {path}"
-                    )
-                size = path.lstat().st_size
-                record: dict[str, object] = {
-                    "path": relative,
-                    "kind": "symlink",
-                    "size": size,
-                    "link_target": os.readlink(path),
-                    "resolved_path": resolved.relative_to(root).as_posix(),
-                }
-            else:
-                size = path.stat().st_size
-                record = {
-                    "path": relative,
-                    "kind": "file",
-                    "size": size,
-                    "sha256": _sha256(path),
-                    "architectures": _maybe_archs(path),
-                }
-            files.append(record)
-            total_bytes += size
-        if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
-            raise RuntimeError(
-                "minimal PyInstaller deployment exceeded its inventory bound"
-            )
+    files, total_bytes = _collect_deployment_files(root)
     files.sort(key=lambda record: record["path"])
     inventory = {
         "schema_version": 2,
@@ -425,6 +370,74 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
         newline="\n",
     )
     return inventory
+
+
+def _collect_deployment_files(
+    root: Path,
+) -> tuple[list[dict[str, object]], int]:
+    files: list[dict[str, object]] = []
+    total_bytes = 0
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        entries, entry_bytes = _collect_deployment_directory(
+            current_path, directories, filenames, root
+        )
+        files.extend(entries)
+        total_bytes += entry_bytes
+        if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
+            raise RuntimeError(
+                "minimal PyInstaller deployment exceeded its inventory bound"
+            )
+    return files, total_bytes
+
+
+def _collect_deployment_directory(
+    current: Path,
+    directories: list[str],
+    filenames: list[str],
+    root: Path,
+) -> tuple[list[dict[str, object]], int]:
+    records: list[dict[str, object]] = []
+    total_bytes = 0
+    for name in list(directories):
+        path = current / name
+        if not path.is_symlink():
+            continue
+        directories.remove(name)
+        record = _deployment_symlink_record(path, root)
+        records.append(record)
+        total_bytes += cast(int, record["size"])
+    for name in filenames:
+        path = current / name
+        record = _deployment_file_record(path, root)
+        records.append(record)
+        total_bytes += cast(int, record["size"])
+    return records, total_bytes
+
+
+def _deployment_symlink_record(path: Path, root: Path) -> dict[str, object]:
+    resolved = path.resolve(strict=True)
+    if not resolved.is_relative_to(root):
+        raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "kind": "symlink",
+        "size": path.lstat().st_size,
+        "link_target": os.readlink(path),
+        "resolved_path": resolved.relative_to(root).as_posix(),
+    }
+
+
+def _deployment_file_record(path: Path, root: Path) -> dict[str, object]:
+    if path.is_symlink():
+        return _deployment_symlink_record(path, root)
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "kind": "file",
+        "size": path.stat().st_size,
+        "sha256": _sha256(path),
+        "architectures": _maybe_archs(path),
+    }
 
 
 def _retained_record(

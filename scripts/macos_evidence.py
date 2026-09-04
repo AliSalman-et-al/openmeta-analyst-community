@@ -119,6 +119,15 @@ def _validate_retained_file_record(
     *,
     architecture_reader: Callable[[Path], list[str]],
 ) -> None:
+    size, digest = _retained_file_metadata(record, label)
+    if evidence_dir is None:
+        return
+    retained = _retained_path(record, label, evidence_dir)
+    _validate_retained_bytes(retained, size, digest, label)
+    _validate_retained_architectures(record, retained, label, architecture_reader)
+
+
+def _retained_file_metadata(record: dict[str, object], label: str) -> tuple[int, str]:
     digest = record.get("sha256")
     size = record.get("size")
     if not isinstance(record.get("retained_path"), str) or not isinstance(digest, str):
@@ -129,18 +138,30 @@ def _validate_retained_file_record(
         character not in "0123456789abcdef" for character in digest
     ):
         _fail(f"{label} has an invalid SHA-256 digest")
-    if evidence_dir is not None:
-        retained = _retained_path(record, label, evidence_dir)
-        if (
-            not retained.is_file()
-            or retained.stat().st_size != size
-            or _sha256(retained) != digest
-        ):
-            _fail(f"{label} does not match its retained bytes")
-        architectures = record.get("architectures")
-        if isinstance(architectures, list) and architectures:
-            if architecture_reader(retained) != architectures:
-                _fail(f"{label} architectures do not match retained bytes")
+    return size, digest
+
+
+def _validate_retained_bytes(
+    retained: Path, size: int, digest: str, label: str
+) -> None:
+    if (
+        not retained.is_file()
+        or retained.stat().st_size != size
+        or _sha256(retained) != digest
+    ):
+        _fail(f"{label} does not match its retained bytes")
+
+
+def _validate_retained_architectures(
+    record: dict[str, object],
+    retained: Path,
+    label: str,
+    architecture_reader: Callable[[Path], list[str]],
+) -> None:
+    architectures = record.get("architectures")
+    if isinstance(architectures, list) and architectures:
+        if architecture_reader(retained) != architectures:
+            _fail(f"{label} architectures do not match retained bytes")
 
 
 def _normalize_inventory_link(parent: str, link_target: str) -> str:
@@ -183,62 +204,71 @@ def _validate_inventory_record_path(path: object, label: str) -> str:
 def _validate_inventory_symlinks(
     records: dict[str, dict[str, object]],
 ) -> dict[str, str]:
-    virtual_nodes = set(records)
-    for path in records:
-        components = path.split("/")
-        virtual_nodes.update(
-            "/".join(components[:index]) for index in range(1, len(components))
-        )
-
+    virtual_nodes = _inventory_virtual_nodes(records)
     resolution_cache: dict[str, str] = {}
-
-    def resolve(start: str) -> str:
-        current = start
-        seen: set[str] = set()
-        cacheable: list[str] = []
-        hop_bound = len(records)
-        for _hop in range(hop_bound + 1):
-            components = current.split("/")
-            symlink_path = None
-            suffix: list[str] = []
-            for index in range(1, len(components) + 1):
-                prefix = "/".join(components[:index])
-                record = records.get(prefix)
-                if record is not None and record.get("kind") == "symlink":
-                    symlink_path = prefix
-                    suffix = components[index:]
-                    break
-            if symlink_path is None:
-                for path in cacheable:
-                    resolution_cache[path] = current
-                return current
-            if symlink_path in seen:
-                _fail(
-                    f"deployment inventory contains a cyclic symlink at {symlink_path}"
-                )
-            seen.add(symlink_path)
-            if not suffix:
-                cacheable.append(symlink_path)
-            cached = resolution_cache.get(symlink_path)
-            if cached is None:
-                record = records[symlink_path]
-                cached = _normalize_inventory_link(
-                    posixpath.dirname(symlink_path), cast(str, record["link_target"])
-                )
-            current = posixpath.join(cached, *suffix) if suffix else cached
-        _fail(f"deployment inventory symlink hop bound exceeded at {start}")
-
     resolved_links: dict[str, str] = {}
     for path, record in records.items():
         if record.get("kind") != "symlink":
             continue
-        resolved = resolve(path)
+        resolved = _resolve_inventory_link(path, records, resolution_cache)
         if resolved not in virtual_nodes:
             _fail(f"deployment inventory contains a dangling symlink at {path}")
         if record.get("resolved_path") != resolved:
             _fail(f"deployment inventory symlink resolution mismatch at {path}")
         resolved_links[path] = resolved
     return resolved_links
+
+
+def _inventory_virtual_nodes(records: dict[str, dict[str, object]]) -> set[str]:
+    virtual_nodes = set(records)
+    for path in records:
+        components = path.split("/")
+        virtual_nodes.update(
+            "/".join(components[:index]) for index in range(1, len(components))
+        )
+    return virtual_nodes
+
+
+def _find_inventory_symlink(
+    current: str, records: dict[str, dict[str, object]]
+) -> tuple[str, list[str]] | None:
+    components = current.split("/")
+    for index in range(1, len(components) + 1):
+        prefix = "/".join(components[:index])
+        record = records.get(prefix)
+        if record is not None and record.get("kind") == "symlink":
+            return prefix, components[index:]
+    return None
+
+
+def _resolve_inventory_link(
+    start: str,
+    records: dict[str, dict[str, object]],
+    resolution_cache: dict[str, str],
+) -> str:
+    current = start
+    seen: set[str] = set()
+    cacheable: list[str] = []
+    for _hop in range(len(records) + 1):
+        found = _find_inventory_symlink(current, records)
+        if found is None:
+            for path in cacheable:
+                resolution_cache[path] = current
+            return current
+        symlink_path, suffix = found
+        if symlink_path in seen:
+            _fail(f"deployment inventory contains a cyclic symlink at {symlink_path}")
+        seen.add(symlink_path)
+        if not suffix:
+            cacheable.append(symlink_path)
+        cached = resolution_cache.get(symlink_path)
+        if cached is None:
+            record = records[symlink_path]
+            cached = _normalize_inventory_link(
+                posixpath.dirname(symlink_path), cast(str, record["link_target"])
+            )
+        current = posixpath.join(cached, *suffix) if suffix else cached
+    _fail(f"deployment inventory symlink hop bound exceeded at {start}")
 
 
 def _is_shiboken_native_payload(parts: list[str], name: str) -> bool:
@@ -801,6 +831,12 @@ def _validate_deployment_inventory(
 
 def _validate_pyinstaller_build_plan(value: object) -> None:
     plan = _mapping(value, "PyInstaller build plan")
+    arguments = _build_plan_arguments(plan)
+    _validate_build_plan_collection_options(arguments)
+    _validate_build_plan_allowlist(arguments)
+
+
+def _build_plan_arguments(plan: dict[str, object]) -> list[str]:
     if set(plan) != {"schema_version", "builder", "arguments", "manual_qt_inputs"}:
         _fail("PyInstaller build plan contains missing or unknown fields")
     arguments_value = plan.get("arguments")
@@ -812,7 +848,10 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
         or not all(isinstance(argument, str) for argument in arguments_value)
     ):
         _fail("PyInstaller build plan is malformed")
-    arguments = _string_list(arguments_value, "PyInstaller arguments")
+    return _string_list(arguments_value, "PyInstaller arguments")
+
+
+def _validate_build_plan_collection_options(arguments: list[str]) -> None:
     collection_options = {
         "--add-binary",
         "--collect-all",
@@ -828,6 +867,9 @@ def _validate_pyinstaller_build_plan(value: object) -> None:
     }
     if normalized_options & collection_options:
         _fail("PyInstaller build plan contains a manual Qt collection mechanism")
+
+
+def _validate_build_plan_allowlist(arguments: list[str]) -> None:
     expected_options = ["--noconfirm", "--clean", "--distpath", "--workpath"]
     if [
         argument for argument in arguments if argument.startswith("--")
