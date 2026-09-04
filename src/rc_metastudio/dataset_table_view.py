@@ -862,7 +862,7 @@ class DatasetTableView(QtWidgets.QTableView):
                 self._main_gui().set_model(
                     original_dataset, state_dict=original_state_dict
                 )
-                self._main_gui().restore_workspace_after_failed_edit(original_unsaved)
+                self._main_gui().restore_workspace_after_failed_edit(bool(original_unsaved))
             else:
                 original_model.dataset = original_dataset
                 original_model.set_state(original_state_dict)
