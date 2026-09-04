@@ -109,7 +109,7 @@ def test_adapter_round_trip_preserves_every_multi_arm_group(family: str) -> None
     ]
 
 
-def test_adapter_persists_internal_identities_across_reopen() -> None:
+def test_adapter_reconstructs_internal_identities_across_reopen() -> None:
     dataset = project_adapter.project_to_dataset(_multi_arm_project("binary"))
     original = (
         dataset.studies[0].stable_id,
@@ -132,6 +132,23 @@ def test_adapter_persists_internal_identities_across_reopen() -> None:
         .groups["Tx 1"]
         .stable_id,
     )
+
+
+def test_adapter_does_not_write_internal_identities_to_v1() -> None:
+    project = project_adapter.dataset_to_project(
+        project_adapter.project_to_dataset(_multi_arm_project("binary"))
+    )
+    dataset = _object(project["dataset"])
+    outcome = _objects(dataset["outcomes"])[0]
+    study = _objects(dataset["studies"])[0]
+    unit = _objects(study["analysis_units"])[0]
+    group = _objects(unit["groups"])[0]
+
+    assert "stable_id" not in outcome
+    assert "follow_up_ids" not in outcome
+    assert "stable_id" not in study
+    assert "stable_id" not in unit
+    assert "stable_id" not in group
 
 
 def test_adapter_derives_repeatable_identities_for_legacy_projects() -> None:

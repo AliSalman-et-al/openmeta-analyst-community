@@ -105,14 +105,9 @@ def _project_outcomes(
         outcomes.append(
             {
                 "name": str(name),
-                "stable_id": getattr(outcome, "stable_id", None),
                 "data_type": outcome.data_type,
                 "sub_type": getattr(outcome, "sub_type", None),
                 "follow_ups": follow_ups,
-                "follow_up_ids": [
-                    dataset.get_follow_up_stable_id(name, follow_up)
-                    for follow_up in follow_ups
-                ],
             }
         )
     if len(families) > 1 or next(iter(families), 0) not in _FAMILY_NAMES:
@@ -133,13 +128,11 @@ def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
             ):
                 units.append(
                     {
-                        "stable_id": getattr(unit, "stable_id", None),
                         "outcome": str(outcome_name),
                         "follow_up": follow_up,
                         "groups": [
                             {
                                 "id": group.id,
-                                "stable_id": getattr(group, "stable_id", None),
                                 "name": str(name),
                                 "raw_data": _portable_value(group.raw_data),
                             }
@@ -151,7 +144,6 @@ def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
         studies.append(
             {
                 "id": study.id,
-                "stable_id": getattr(study, "stable_id", None),
                 "name": str(study.name),
                 "year": study.year,
                 "include": bool(study.include),
@@ -267,12 +259,11 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
     outcomes = {}
     for index, item in enumerate(outcome_items):
         outcome_name = _text(item["name"], "outcome name")
-        stable_id = _optional_text(item.get("stable_id"), "outcome stable id")
         outcomes[outcome_name] = analysis_dataset.Outcome(
             outcome_name,
             _integer(item["data_type"], "outcome data type"),
             sub_type=_optional_text(item["sub_type"], "outcome subtype"),
-            stable_id=stable_id or f"outcome:{index}",
+            stable_id=f"outcome:{index}",
         )
     dataset.follow_ups_by_outcome = {}
     dataset.follow_up_stable_ids_by_outcome = {}
@@ -284,15 +275,10 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         ):
             mapping[index] = _optional_text(follow_up, "follow-up")
         dataset.follow_ups_by_outcome[outcome_name] = mapping
-        stored_ids = _array(item.get("follow_up_ids", []), "follow-up identities")
+        outcome_id = outcomes[outcome_name].stable_id
         follow_up_ids = [
-            _optional_text(value, "follow-up stable id") for value in stored_ids
+            f"{outcome_id}:follow-up:{index}" for index in range(len(mapping))
         ]
-        if len(follow_up_ids) != len(mapping):
-            outcome_id = outcomes[outcome_name].stable_id
-            follow_up_ids = [
-                f"{outcome_id}:follow-up:{index}" for index in range(len(mapping))
-            ]
         dataset.follow_up_stable_ids_by_outcome[outcome_name] = {
             follow_up: stable_id
             for follow_up, stable_id in zip(
@@ -321,13 +307,12 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
 
     for study_index, study_value in enumerate(_array(source["studies"], "studies")):
         item = _object(study_value, "study")
-        study_id = _optional_text(item.get("stable_id"), "study stable id")
         study = analysis_dataset.Study(
             _integer(item["id"], "study id"),
             _text(item["name"], "study name"),
             _optional_integer(item["year"], "study year"),
             include=_boolean(item["include"], "study inclusion"),
-            stable_id=study_id or f"study:{study_index}",
+            stable_id=f"study:{study_index}",
         )
         study.sample_size = copy.deepcopy(item["sample_size"])
         study.notes = _text(item["notes"], "study notes")
@@ -357,10 +342,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             follow_up_id = dataset.follow_up_stable_ids_by_outcome[outcome_name].get(
                 follow_up
             )
-            unit_id = (
-                _optional_text(unit_data.get("stable_id"), "analysis unit stable id")
-                or f"{outcome.stable_id}:{follow_up_id or 'default'}"
-            )
+            unit_id = f"{outcome.stable_id}:{follow_up_id or 'default'}"
             unit = analysis_unit.AnalysisUnit(
                 outcome,
                 raw_data=raw_data,
@@ -372,12 +354,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 unit.groups[group_name].id = _integer(
                     group_data["id"], "analysis group id"
                 )
-                unit.groups[group_name].stable_id = (
-                    _optional_text(
-                        group_data.get("stable_id"), "analysis group stable id"
-                    )
-                    or f"{unit_id}:group:{group_index}"
-                )
+                unit.groups[group_name].stable_id = f"{unit_id}:group:{group_index}"
             entered_effects = _object(unit_data["entered_effects"], "entered effects")
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")

@@ -60,9 +60,7 @@
       "properties": {
         "data_type": {"enum": [0, 1, 2]},
         "follow_ups": {"type": "array", "items": {"type": "string"}},
-        "follow_up_ids": {"type": "array", "items": {"type": ["string", "null"]}},
         "name": {"type": "string"},
-        "stable_id": {"type": ["string", "null"]},
         "sub_type": {"enum": ["proportion", "proportions", "mean", "means", "smd", "reg_coef", "generic_effect", null]}
       }
     },
@@ -74,7 +72,6 @@
         "analysis_units": {"type": "array", "items": {"$ref": "#/$defs/analysis_unit"}},
         "covariates": {"type": "object", "additionalProperties": {"$ref": "#/$defs/scalar"}},
         "id": {"type": "integer"},
-        "stable_id": {"type": ["string", "null"]},
         "include": {"type": "boolean"},
         "manually_excluded": {"type": "boolean"},
         "name": {"type": "string"},
@@ -97,7 +94,6 @@
           }
         },
         "follow_up": {"type": ["string", "null"]},
-        "stable_id": {"type": ["string", "null"]},
         "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}},
         "outcome": {"type": "string"}
       }
@@ -108,7 +104,6 @@
       "required": ["id", "name", "raw_data"],
       "properties": {
         "id": {"type": "integer"},
-        "stable_id": {"type": ["string", "null"]},
         "name": {"type": "string"},
         "raw_data": {"type": "array", "items": {"$ref": "#/$defs/scalar"}}
       }

@@ -434,18 +434,11 @@ def _wire_pairs(value: Mapping[str, object]) -> tuple[tuple[str, JsonValue], ...
 
 def _typed_outcome(value: Mapping[str, object], index: int) -> OutcomeSnapshot:
     label = cast(str, value["name"])
-    identity = OutcomeId(cast(str, value.get("stable_id") or f"outcome:{index}"))
+    identity = OutcomeId(f"outcome:{index}")
     labels = cast(list[str], value["follow_ups"])
-    stored_ids = cast(list[object], value.get("follow_up_ids") or [])
     follow_ups = tuple(
         FollowUpSnapshot(
-            FollowUpId(
-                cast(str, stored_ids[follow_up_index])
-                if follow_up_index < len(stored_ids)
-                and isinstance(stored_ids[follow_up_index], str)
-                and stored_ids[follow_up_index]
-                else f"{identity}:follow-up:{follow_up_index}"
-            ),
+            FollowUpId(f"{identity}:follow-up:{follow_up_index}"),
             name,
         )
         for follow_up_index, name in enumerate(labels)
@@ -477,7 +470,7 @@ def _follow_up_snapshot(
 
 
 def _typed_group(value: Mapping[str, object], unit_identity: str, index: int):
-    identity = cast(str, value.get("stable_id") or f"{unit_identity}:group:{index}")
+    identity = f"{unit_identity}:group:{index}"
     raw_data = tuple(
         cast(JsonValue, copy.deepcopy(item))
         for item in cast(list[object], value["raw_data"])
@@ -500,11 +493,7 @@ def _typed_unit(
     fallback_identity = (
         follow_up_snapshot.identity if follow_up_snapshot is not None else "default"
     )
-    unit_identity = cast(
-        str,
-        value.get("stable_id")
-        or f"{outcome_snapshot.identity}:{fallback_identity}",
-    )
+    unit_identity = f"{outcome_snapshot.identity}:{fallback_identity}"
     groups = tuple(
         _typed_group(group, unit_identity, index)
         for index, group in enumerate(
@@ -536,7 +525,7 @@ def _typed_study(
         for item in _array(value["analysis_units"], "analysis_units")
     )
     return StudySnapshot(
-        StudyId(cast(str, value.get("stable_id") or f"study:{index}")),
+        StudyId(f"study:{index}"),
         name,
         year,
         cast(bool, value["include"]),
