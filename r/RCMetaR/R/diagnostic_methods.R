@@ -178,12 +178,13 @@ rcmetar.diagnostic.extract <- function(fit, params) {
     if (length(images)) sections[[length(sections) + 1L]] <- list(
         id=plot.key, kind="image", order=1L, title=plot.title,
         source_key=plot.key)
+    image.order <- if (length(images)) names(images) else character()
     list(summary=summary, images=images, plot.paths=plot.paths,
          sections=sections,
          plot.names=fit$plot_names %||% character(),
          plot.capabilities=capabilities,
          references=fit$References %||% character(),
-         image.order=fit$image_order %||% names(images))
+         image.order=image.order)
 }
 
 rcmetar.diagnostic.report <- function(extracted, results, images, image.order,

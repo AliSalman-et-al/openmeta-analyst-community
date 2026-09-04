@@ -1494,6 +1494,22 @@ test_that("diagnostic Default Forest Style builds and renders count columns on t
   expect_gte(png_size[["height"]], 500)
 })
 
+test_that("diagnostic extraction keeps image order aligned with semantic forest keys", {
+  fit <- list(
+    Summary = list(),
+    images = c("forest.png" = "forest.png"),
+    plot_params_paths = c("Forest Plot" = "forest.rds"),
+    image_order = "Forest Plot"
+  )
+
+  extracted <- rcmetar.diagnostic.extract(fit, list(measure = "Sens"))
+
+  expect_identical(names(extracted$images), "diagnostic.Sens.forest")
+  expect_identical(names(extracted$plot.paths), "diagnostic.Sens.forest")
+  expect_identical(extracted$image.order, "diagnostic.Sens.forest")
+  expect_identical(extracted$sections[[2]]$title, "Sensitivity Forest Plot")
+})
+
 test_that("diagnostic multi-metric workflows save independent metafor forest plots", {
   fixture <- metafor_diagnostic_fixture(measure = "Sens")
   run_metrics <- function(measures) {
@@ -1507,21 +1523,32 @@ test_that("diagnostic multi-metric workflows save independent metafor forest plo
       rep("diagnostic.random", length(measures)),
       params
     )
-    expected_names <- paste(
+    expected_titles <- paste(
       vapply(measures, pretty.metric.name, character(1)),
       "Forest Plot"
     )
+    expected_keys <- paste0("diagnostic.", measures, ".forest")
 
-    expect_true(all(expected_names %in% names(result$images)))
-    expect_true(all(expected_names %in% names(result$plot_params_paths)))
-    expect_true(all(expected_names %in% result$image_order))
+    expect_identical(names(result$images), expected_keys)
+    expect_identical(names(result$plot_params_paths), expected_keys)
+    expect_identical(result$image_order, expected_keys)
     expect_false(any(grepl(" and ", names(result$images), fixed = TRUE)))
 
+    image.sections <- Filter(function(section) identical(section$kind, "image"), result$sections)
+    expect_identical(
+      vapply(image.sections, function(section) section$source_key, character(1)),
+      expected_keys
+    )
+    expect_identical(
+      vapply(image.sections, function(section) section$title, character(1)),
+      expected_titles
+    )
+
     for (measure in measures) {
-      title <- paste(pretty.metric.name(measure), "Forest Plot")
-      image_path <- unname(result$images[[title]])
+      key <- paste0("diagnostic.", measure, ".forest")
+      image_path <- unname(result$images[[key]])
       plot_data <- load_saved_plot_data(
-        unname(result$plot_params_paths[[title]])
+        unname(result$plot_params_paths[[key]])
       )
 
       expect_true(rcmetar.is.metafor.forest.bundle(plot_data))
