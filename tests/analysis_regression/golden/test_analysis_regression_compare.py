@@ -1283,7 +1283,7 @@ def _import_legacy_golden_modules():
         from rc_metastudio import meta_globals
         import rc_metastudio.analysis_adapter as analysis_adapter
 
-        analysis_adapter.r_bridge = r_boundary
+        setattr(analysis_adapter, "r_bridge", r_boundary)
 
         yield golden_analysis, headless_analysis, meta_globals
     finally:
