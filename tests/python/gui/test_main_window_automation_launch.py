@@ -4683,10 +4683,11 @@ def test_main_window_save_as_round_trips_representative_projects(tmp_path, monke
             window.save_as()
             assert os.path.exists(saved_path)
             assert window.workspace.is_dirty is False
-            main_window = sys.modules["rc_metastudio.main_window"]
-            reopened, _state, _restored_selection = (
-                main_window._load_structured_project(saved_path)
-            )
+            from rc_metastudio import project_adapter
+            from rc_metastudio.workspace_session import WorkspaceSession
+
+            document = WorkspaceSession().open(saved_path)
+            reopened = project_adapter.project_to_dataset(document.project)
             assert _dataset_summary(reopened) == expected
             if name == "meantime.rcms":
                 values = [
