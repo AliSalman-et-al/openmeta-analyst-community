@@ -725,7 +725,7 @@ def grimp_evidence(root: Path | None = None, revision: str | None = None) -> dic
 
 def _grimp_graph(root: Path, revision: str | None):
     if revision is None:
-        return build_graph("rc_metastudio", include_external_packages=False)
+        return _grimp_snapshot_graph(str(root / "src"))
     return _grimp_revision_graph(root, revision)
 
 
