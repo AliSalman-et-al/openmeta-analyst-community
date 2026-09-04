@@ -116,7 +116,9 @@
     if (metric %in% c("PR", "PLN", "PLO", "PAS", "PFT")) warnings <- c(warnings, "One-arm proportion results are descriptive effect-SE artifacts; no formal automatic primary asymmetry test is configured.")
     if (metric %in% c("RR", "RD")) warnings <- c(warnings, "No automatic primary asymmetry test is configured for this effect measure; ordinary and contour plots remain descriptive.")
     if (metric == "SMD") warnings <- c(warnings, "Ordinary SMD Egger is a separate effect-SE artifact and is never an automatic primary method.")
+    included.indices <- which(is.finite(prepared$y) & is.finite(prepared$se) & prepared$se > 0)
     list(`data.type`=data.type, metric=metric, `usable.studies`=length(standard.error),
+         `included.indices`=included.indices,
          `raw.data.available`=isTRUE(prepared$raw),
          `standard.error.range`=if (length(standard.error)) range(standard.error) else numeric(),
          `reml.tau2`=if (exists("tau")) as.numeric(tau) else NA_real_,
@@ -197,7 +199,9 @@
     diagnostic <- is(om.data, "DiagnosticData") && metric == "DOR"
     if (diagnostic) params$funnels <- "deeks"
     derived <- .small.study.reconstruct(om.data, metric, params)
-    keep <- is.finite(derived$y) & is.finite(derived$se) & derived$se > 0
+    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
+    keep <- logical(length(derived$y))
+    keep[eligibility$included.indices] <- TRUE
     if (!any(keep)) stop("Small-study effects analysis requires finite effects and standard errors.")
     y <- derived$y[keep]
     se <- derived$se[keep]
@@ -207,7 +211,6 @@
     pooled <- if (metric == "OR") prepared.model else native.model
     metafor.pooled <- metafor::rma.uni(yi=y, sei=se, method="REML", level=confidence.level)
     params$reml.tau2 <- pooled$tau2 %||% NA_real_
-    eligibility <- .small.study.eligibility(om.data, params, prepared=derived)
     eligibility$raw.data.available <- isTRUE(derived$raw)
     list(metric=metric, confidence.level=confidence.level, diagnostic=diagnostic,
          derived=derived, keep=keep, y=y, se=se, prepared.model=prepared.model,

@@ -158,17 +158,28 @@ rcmetar.diagnostic.fit <- function(prepared.data, method, params) {
 rcmetar.diagnostic.extract <- function(fit, params) {
     if (!is.list(fit)) stop("Diagnostic authority result must be a list.", call.=FALSE)
     metric <- as.character(params$measure %||% "")
-    summary.title <- paste(diagnostic.summary.metric.name(metric), "Summary", sep=" ")
-    plot.title <- paste(diagnostic.summary.metric.name(metric), "Forest Plot", sep=" ")
-    summary <- if (!is.null(fit$Summary)) stats::setNames(list(fit$Summary), summary.title) else list()
-    images <- if (!is.null(fit$images)) stats::setNames(fit$images, plot.title) else character()
-    plot.paths <- if (!is.null(fit$plot_params_paths)) stats::setNames(fit$plot_params_paths, plot.title) else character()
+    display.prefix <- diagnostic.summary.metric.name(metric)
+    summary.title <- paste(display.prefix, "Summary", sep=" ")
+    plot.title <- paste(display.prefix, "Forest Plot", sep=" ")
+    summary.key <- paste0("diagnostic.", metric, ".summary")
+    plot.key <- paste0("diagnostic.", metric, ".forest")
+    summary <- if (!is.null(fit$Summary)) stats::setNames(list(fit$Summary), summary.key) else list()
+    images <- if (!is.null(fit$images)) stats::setNames(fit$images, plot.key) else character()
+    plot.paths <- if (!is.null(fit$plot_params_paths)) stats::setNames(fit$plot_params_paths, plot.key) else character()
     capabilities <- fit$plot_capabilities %||% list()
     if (length(images) && !length(capabilities)) {
         capabilities <- stats::setNames(list(.rcmetar.plot.descriptor.for.kind(
             "forest", has.params=length(plot.paths) > 0)), names(images))
     }
+    sections <- list()
+    if (length(summary)) sections[[length(sections) + 1L]] <- list(
+        id=summary.key, kind="text", order=0L, title=summary.title,
+        source_key=summary.key)
+    if (length(images)) sections[[length(sections) + 1L]] <- list(
+        id=plot.key, kind="image", order=1L, title=plot.title,
+        source_key=plot.key)
     list(summary=summary, images=images, plot.paths=plot.paths,
+         sections=sections,
          plot.names=fit$plot_names %||% character(),
          plot.capabilities=capabilities,
          references=fit$References %||% character(),
@@ -184,7 +195,8 @@ rcmetar.diagnostic.report <- function(extracted, results, images, image.order,
          plot.names=c(plot.names, extracted$plot.names),
          plot.params.paths=c(plot.paths, extracted$plot.paths),
          plot.capabilities=c(plot.capabilities, extracted$plot.capabilities),
-         references=c(references, extracted$references))
+         references=c(references, extracted$references),
+         sections=extracted$sections)
 }
 
 multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
@@ -197,6 +209,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
     plot.names <- c()
     plot.params.paths <- c()
     plot.capabilities <- list()
+	sections <- list()
     plot.pdfs.paths <- c()
     remove.indices <- c()
 	references <- c()
@@ -243,6 +256,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
             plot.params.paths <- reported$plot.params.paths
             plot.capabilities <- reported$plot.capabilities
             references <- reported$references
+			sections <- c(sections, reported$sections %||% list())
         }
     }
 
@@ -252,6 +266,7 @@ multiple.diagnostic <- function(fnames, params.list, diagnostic.data) {
                                "plot_names"=plot.names,
                                "plot_params_paths"=plot.params.paths,
                                "plot_capabilities"=plot.capabilities,
+							   "sections"=sections,
 							   "References"=rcmetar.unique.references(references)))
     results
 }
