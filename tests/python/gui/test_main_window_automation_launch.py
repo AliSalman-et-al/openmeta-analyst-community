@@ -5683,6 +5683,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
             ]
         )
 
+        _mark_workspace_saved(window)
         assert window.open(_sample_project_path("continuous.rcms")) is True
         model = window.model
         dialogs.append(
