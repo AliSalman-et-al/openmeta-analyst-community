@@ -159,12 +159,42 @@ def _observe_save_reopen(window, operation: str) -> dict:
     destination.unlink()
     try:
         window.out_path = str(destination)
-        reopened = edited and window.save() is True and window.open(str(destination), raise_on_error=True)
-        result = _run_binary_analysis(window, main_window) if reopened and operation == "save-reopen-analysis" else None
-        observed = reopened and (operation == "save-reopen" or result is not None and bool(result.texts.get("Summary")))
-        return {"operation": operation, "observed": bool(observed), "analysis_after_reopen_observed": bool(observed and operation == "save-reopen-analysis"), "summary": result.texts.get("Summary", "") if result else "", "svg_paths": dict(result.display_images) if result else {}}
+        reopened = _save_and_reopen(window, destination, edited)
+        result = _analysis_after_reopen(window, operation, reopened, main_window)
+        observed = _save_reopen_observed(operation, reopened, result)
+        return {"operation": operation, "observed": bool(observed), "analysis_after_reopen_observed": _analysis_after_reopen_observed(operation, observed), **_analysis_artifacts(result)}
     finally:
         destination.unlink(missing_ok=True)
+
+
+def _save_and_reopen(window, destination: Path, edited: bool) -> bool:
+    if not edited:
+        return False
+    return window.save() is True and window.open(str(destination), raise_on_error=True)
+
+
+def _analysis_after_reopen(window, operation: str, reopened: bool, main_window):
+    if not reopened or operation != "save-reopen-analysis":
+        return None
+    return _run_binary_analysis(window, main_window)
+
+
+def _save_reopen_observed(operation: str, reopened: bool, result) -> bool:
+    if not reopened:
+        return False
+    if operation == "save-reopen":
+        return True
+    return result is not None and bool(result.texts.get("Summary"))
+
+
+def _analysis_after_reopen_observed(operation: str, observed: bool) -> bool:
+    return operation == "save-reopen-analysis" and bool(observed)
+
+
+def _analysis_artifacts(result) -> dict:
+    if result is None:
+        return {"summary": "", "svg_paths": {}}
+    return {"summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
 
 
 def _run_binary_analysis(window, main_window):
