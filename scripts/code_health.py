@@ -371,23 +371,37 @@ class _RuntimeNormalizer(ast.NodeTransformer):
         self.typing_names = {"typing", "typing_extensions"}
         self.type_checking_names = {"TYPE_CHECKING"}
         self.type_only_constructors: set[str] = set()
+        self._collect_type_names(tree)
+
+    def _collect_type_names(self, tree: ast.AST) -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name in self.typing_names:
-                        self.typing_names.add(alias.asname or alias.name.split(".")[0])
-            elif isinstance(node, ast.ImportFrom) and node.module in self.typing_names:
-                for alias in node.names:
-                    if alias.name == "cast":
-                        self.cast_names.add(alias.asname or alias.name)
-                    if alias.name == "TYPE_CHECKING":
-                        self.type_checking_names.add(alias.asname or alias.name)
-            elif isinstance(node, ast.ClassDef) and any(
-                (isinstance(base, ast.Name) and base.id == "TypedDict")
-                or (isinstance(base, ast.Attribute) and base.attr == "TypedDict")
-                for base in node.bases
-            ):
+                self._collect_typing_imports(node)
+            elif isinstance(node, ast.ImportFrom):
+                self._collect_typing_from_import(node)
+            elif isinstance(node, ast.ClassDef) and self._is_typed_dict(node):
                 self.type_only_constructors.add(node.name)
+
+    def _collect_typing_imports(self, node: ast.Import) -> None:
+        for alias in node.names:
+            if alias.name in self.typing_names:
+                self.typing_names.add(alias.asname or alias.name.split(".")[0])
+
+    def _collect_typing_from_import(self, node: ast.ImportFrom) -> None:
+        if node.module not in self.typing_names:
+            return
+        for alias in node.names:
+            if alias.name == "cast":
+                self.cast_names.add(alias.asname or alias.name)
+            elif alias.name == "TYPE_CHECKING":
+                self.type_checking_names.add(alias.asname or alias.name)
+
+    def _is_typed_dict(self, node: ast.ClassDef) -> bool:
+        return any(
+            isinstance(base, ast.Name) and base.id == "TypedDict"
+            or isinstance(base, ast.Attribute) and base.attr == "TypedDict"
+            for base in node.bases
+        )
 
     def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.FunctionDef | ast.AsyncFunctionDef:
         node.returns = None
@@ -429,21 +443,36 @@ class _RuntimeNormalizer(ast.NodeTransformer):
         return cast(ast.Expr, self.generic_visit(node))
 
     def visit_Call(self, node: ast.Call) -> ast.Call | ast.expr:
-        if self._is_cast_call(node) and len(node.args) >= 2 and not node.keywords:
-            return cast(ast.expr, self.visit(node.args[1]))
-        if (
+        cast_value = self._cast_value(node)
+        if cast_value is not None:
+            return cast_value
+        typed_dict = self._typed_dict_value(node)
+        if typed_dict is not None:
+            return typed_dict
+        return cast(ast.Call, self.generic_visit(node))
+
+    def _cast_value(self, node: ast.Call) -> ast.expr | None:
+        if not self._is_cast_call(node) or len(node.args) < 2 or node.keywords:
+            return None
+        return cast(ast.expr, self.visit(node.args[1]))
+
+    def _typed_dict_value(self, node: ast.Call) -> ast.Dict | None:
+        if not self._is_typed_dict_call(node):
+            return None
+        result = ast.Dict(
+            keys=[ast.Constant(keyword.arg) for keyword in node.keywords],
+            values=[cast(ast.expr, self.visit(keyword.value)) for keyword in node.keywords],
+        )
+        setattr(result, "_type_only_dict", True)
+        return result
+
+    def _is_typed_dict_call(self, node: ast.Call) -> bool:
+        return (
             isinstance(node.func, ast.Name)
             and node.func.id in self.type_only_constructors
             and not node.args
             and all(keyword.arg is not None for keyword in node.keywords)
-        ):
-            result = ast.Dict(
-                keys=[ast.Constant(keyword.arg) for keyword in node.keywords],
-                values=[cast(ast.expr, self.visit(keyword.value)) for keyword in node.keywords],
-            )
-            setattr(result, "_type_only_dict", True)
-            return result
-        return cast(ast.Call, self.generic_visit(node))
+        )
 
     def _collapse_typed_dict_temps(self, body: list[ast.stmt]) -> list[ast.stmt]:
         result: list[ast.stmt] = []
@@ -451,21 +480,10 @@ class _RuntimeNormalizer(ast.NodeTransformer):
         while index < len(body):
             assignment = body[index]
             following = body[index + 1] if index + 1 < len(body) else None
-            if (
-                isinstance(assignment, ast.Assign)
-                and len(assignment.targets) == 1
-                and isinstance(assignment.targets[0], ast.Name)
-                and isinstance(assignment.value, ast.Dict)
-                and getattr(assignment.value, "_type_only_dict", False)
-                and isinstance(following, ast.Expr)
-                and isinstance(following.value, ast.Call)
-                and isinstance(following.value.func, ast.Attribute)
-                and following.value.func.attr == "append"
-                and len(following.value.args) == 1
-                and isinstance(following.value.args[0], ast.Name)
-                and following.value.args[0].id == assignment.targets[0].id
-                and not following.value.keywords
-            ):
+            if self._typed_dict_temp_pair(assignment, following):
+                assert isinstance(following, ast.Expr)
+                assert isinstance(assignment, ast.Assign)
+                assert isinstance(following.value, ast.Call)
                 following.value.args[0] = assignment.value
                 result.append(following)
                 index += 2
@@ -473,6 +491,29 @@ class _RuntimeNormalizer(ast.NodeTransformer):
             result.append(assignment)
             index += 1
         return result
+
+    def _typed_dict_temp_pair(self, assignment: ast.stmt, following: ast.stmt | None) -> bool:
+        target = self._typed_dict_assignment_target(assignment)
+        if target is None or not isinstance(following, ast.Expr):
+            return False
+        return self._is_append_of(following.value, target.id)
+
+    def _typed_dict_assignment_target(self, node: ast.stmt) -> ast.Name | None:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            return None
+        target = node.targets[0]
+        value = node.value
+        if not isinstance(target, ast.Name) or not isinstance(value, ast.Dict):
+            return None
+        return target if getattr(value, "_type_only_dict", False) else None
+
+    def _is_append_of(self, node: ast.expr, target: str) -> bool:
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            return False
+        if node.func.attr != "append" or len(node.args) != 1 or node.keywords:
+            return False
+        value = node.args[0]
+        return isinstance(value, ast.Name) and value.id == target
 
     def _collapse_nested_statement_lists(self, node: ast.AST) -> None:
         for field, value in ast.iter_fields(node):
@@ -540,30 +581,46 @@ def runtime_changed_function_keys(
     changed: dict[str, set[int]],
 ) -> set[tuple[str, str, int, int]]:
     """Return changed functions whose normalized executable bodies differ."""
-    current_revision = run_git(root, "rev-parse", "HEAD").strip()
-    base_revision = None if base in {"HEAD", current_revision} else base
-    head_revision = None if head in {"HEAD", current_revision} else head
+    base_revision, head_revision = _measurement_revisions(root, base, head)
     paths = {metric.path for metric in metrics if metric.path.endswith(".py")}
-    baseline_bodies = {
-        path: _runtime_function_bodies(source)
-        for path in paths
-        if (source := _source_at_revision(root, path, base_revision)) is not None
-    }
-    head_bodies = {
-        path: _runtime_function_bodies(source)
-        for path in paths
-        if (source := _source_at_revision(root, path, head_revision)) is not None
-    }
+    baseline_bodies = _bodies_for_paths(root, paths, base_revision)
+    head_bodies = _bodies_for_paths(root, paths, head_revision)
     result: set[tuple[str, str, int, int]] = set()
     for metric in metrics:
-        if not any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set())):
-            continue
-        if not metric.path.endswith(".py"):
-            result.add((metric.path, metric.name, metric.line, metric.end_line))
-            continue
-        if baseline_bodies.get(metric.path, {}).get(metric.name) != head_bodies.get(metric.path, {}).get(metric.name):
+        if _runtime_metric_changed(metric, changed, baseline_bodies, head_bodies):
             result.add((metric.path, metric.name, metric.line, metric.end_line))
     return result
+
+
+def _measurement_revisions(root: Path, base: str, head: str) -> tuple[str | None, str | None]:
+    current = run_git(root, "rev-parse", "HEAD").strip()
+    return (
+        None if base in {"HEAD", current} else base,
+        None if head in {"HEAD", current} else head,
+    )
+
+
+def _bodies_for_paths(root: Path, paths: set[str], revision: str | None) -> dict[str, dict[str, list[str]]]:
+    result: dict[str, dict[str, list[str]]] = {}
+    for path in paths:
+        source = _source_at_revision(root, path, revision)
+        if source is not None:
+            result[path] = _runtime_function_bodies(source)
+    return result
+
+
+def _runtime_metric_changed(
+    metric: FunctionMetric,
+    changed: dict[str, set[int]],
+    baseline: dict[str, dict[str, list[str]]],
+    head: dict[str, dict[str, list[str]]],
+) -> bool:
+    lines = changed.get(metric.path, set())
+    if not any(metric.line <= line <= metric.end_line for line in lines):
+        return False
+    if not metric.path.endswith(".py"):
+        return True
+    return baseline.get(metric.path, {}).get(metric.name) != head.get(metric.path, {}).get(metric.name)
 
 
 def import_name(node: ast.Import | ast.ImportFrom) -> str:
@@ -651,33 +708,7 @@ def grimp_evidence(root: Path | None = None, revision: str | None = None) -> dic
     """Collect package-level coupling from the locked Grimp analyzer."""
     root = root or repo_root()
     try:
-        if revision is None:
-            package_graph = build_graph("rc_metastudio", include_external_packages=False)
-        else:
-            with tempfile.TemporaryDirectory(prefix="code-health-") as temporary:
-                archive = subprocess.run(
-                    ["git", "archive", "--format=tar", revision, "--", "src/rc_metastudio"],
-                    cwd=root,
-                    check=True,
-                    capture_output=True,
-                ).stdout
-                with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
-                    tar.extractall(temporary)
-                package_root = str(Path(temporary) / "src")
-                saved_modules = {
-                    name: sys.modules.pop(name)
-                    for name in list(sys.modules)
-                    if name == "rc_metastudio" or name.startswith("rc_metastudio.")
-                }
-                sys.path.insert(0, package_root)
-                try:
-                    package_graph = build_graph("rc_metastudio", include_external_packages=False)
-                finally:
-                    sys.path.remove(package_root)
-                    for name in list(sys.modules):
-                        if name == "rc_metastudio" or name.startswith("rc_metastudio."):
-                            sys.modules.pop(name)
-                    sys.modules.update(saved_modules)
+        package_graph = _grimp_graph(root, revision)
     except (ImportError, ModuleNotFoundError):
         return None
     edges = sum(
@@ -690,6 +721,42 @@ def grimp_evidence(root: Path | None = None, revision: str | None = None) -> dic
         "edges": edges,
         "cycle_breakers": len(package_graph.nominate_cycle_breakers("rc_metastudio")),
     }
+
+
+def _grimp_graph(root: Path, revision: str | None):
+    if revision is None:
+        return build_graph("rc_metastudio", include_external_packages=False)
+    return _grimp_revision_graph(root, revision)
+
+
+def _grimp_revision_graph(root: Path, revision: str):
+    with tempfile.TemporaryDirectory(prefix="code-health-") as temporary:
+        archive = subprocess.run(
+            ["git", "archive", "--format=tar", revision, "--", "src/rc_metastudio"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
+            tar.extractall(temporary)
+        return _grimp_snapshot_graph(str(Path(temporary) / "src"))
+
+
+def _grimp_snapshot_graph(package_root: str):
+    saved_modules = {
+        name: sys.modules.pop(name)
+        for name in list(sys.modules)
+        if name == "rc_metastudio" or name.startswith("rc_metastudio.")
+    }
+    sys.path.insert(0, package_root)
+    try:
+        return build_graph("rc_metastudio", include_external_packages=False)
+    finally:
+        sys.path.remove(package_root)
+        for name in list(sys.modules):
+            if name == "rc_metastudio" or name.startswith("rc_metastudio."):
+                sys.modules.pop(name)
+        sys.modules.update(saved_modules)
 
 
 def changed_lines(root: Path, base: str, head: str) -> dict[str, set[int]]:
