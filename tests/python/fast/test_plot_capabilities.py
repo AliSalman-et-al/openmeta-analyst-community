@@ -99,8 +99,8 @@ def test_analysis_result_parser_validates_all_boundary_fields():
         }
     )
 
-    assert parsed["texts"] == {"Summary": "ok"}
-    assert parsed["image_order"] == ()
+    assert parsed.texts == {"Summary": "ok"}
+    assert parsed.image_order == ()
 
     with pytest.raises(ValueError, match="texts keys and values must be text"):
         parse_analysis_result({"version": 1, "texts": {"Summary": 42}, "sections": []})
@@ -138,7 +138,7 @@ def test_analysis_result_parser_returns_immutable_values():
     with pytest.raises(TypeError):
         from typing import cast
 
-        cast(dict[str, str], parsed["texts"])["Summary"] = "changed"
+        cast(dict[str, str], parsed.texts)["Summary"] = "changed"
 
 
 def test_option_groups_are_keyed_by_explicit_plot_kind():

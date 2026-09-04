@@ -383,7 +383,7 @@ def _execute_binary_request(
     r_bridge.dataset_to_simple_binary_r_object(
         model, **_conversion_kwargs(selected_covariates)
     )
-    return _typed_result(_run_binary_request(requests[0]))
+    return _typed_result(r_bridge.run_versioned_analysis_request(requests[0].to_mapping()))
 
 
 def _execute_continuous_request(
@@ -396,7 +396,9 @@ def _execute_continuous_request(
     r_bridge.dataset_to_simple_continuous_r_object(
         model, **_conversion_kwargs(selected_covariates)
     )
-    return _typed_result(_run_continuous_request(requests[0]))
+    return _typed_result(
+        r_bridge.run_versioned_analysis_request(requests[0].to_mapping())
+    )
 
 
 def _execute_diagnostic_request(
@@ -473,14 +475,6 @@ def _run_diagnostic_backend(workflow, method_names, parameter_values):
         for method, params in zip(method_names, parameter_values, strict=True)
     ]
     return r_bridge.run_versioned_analysis_requests(requests)
-
-
-def _run_binary_request(request):
-    return r_bridge.run_versioned_analysis_request(request.to_mapping())
-
-
-def _run_continuous_request(request):
-    return r_bridge.run_versioned_analysis_request(request.to_mapping())
 
 
 def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
@@ -605,7 +599,7 @@ def _merge_diagnostic_texts(
     merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
     merged_texts = cast(dict[str, str], merged_result["texts"])
-    metric_texts = cast(Mapping[str, str], metric_result.get("texts", {}))
+    metric_texts = metric_result.texts
     merged_references = _merge_reference_texts(
         merged_texts.get("References"), metric_texts.get("References")
     )
@@ -619,22 +613,20 @@ def _merge_diagnostic_texts(
 def _merge_diagnostic_artifacts(
     merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
-    for key in (
-        "images",
-        "display_images",
-        "image_var_names",
-        "image_params_paths",
-        "plot_capabilities",
+    for key, values in (
+        ("images", metric_result.images),
+        ("display_images", metric_result.display_images),
+        ("image_var_names", metric_result.image_var_names),
+        ("image_params_paths", metric_result.image_params_paths),
+        ("plot_capabilities", metric_result.plot_capabilities),
     ):
-        cast(dict[str, object], merged_result[key]).update(
-            cast(Mapping[str, object], metric_result.get(key, {}))
-        )
+        cast(dict[str, object], merged_result[key]).update(values)
 
 
 def _merge_diagnostic_image_order(
     merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
-    image_order = cast(Sequence[str] | None, metric_result.get("image_order"))
+    image_order = metric_result.image_order
     if not image_order:
         return
     merged_order = cast(list[str] | None, merged_result["image_order"])
@@ -679,7 +671,7 @@ def _merge_diagnostic_sections(
 
 def _diagnostic_result_has_successes(result: AnalysisResult) -> bool:
     return bool(
-        result["images"] or any(not key.endswith(" Error") for key in result["texts"])
+        result.images or any(not key.endswith(" Error") for key in result.texts)
     )
 
 

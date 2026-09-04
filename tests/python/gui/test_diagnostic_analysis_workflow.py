@@ -469,11 +469,11 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
 
         assert shown == []
         assert len(results) == 1
-        assert results[0]["texts"]["Sens Error"] == "Reitsma bivariate model failed to converge"
-        assert results[0]["texts"]["DOR Summary"] == "DOR ok"
-        assert results[0]["texts"]["PLR Summary"] == "PLR ok"
-        assert results[0]["texts"]["NLR Summary"] == "NLR ok"
-        assert results[0]["image_order"] == (
+        assert results[0].texts["Sens Error"] == "Reitsma bivariate model failed to converge"
+        assert results[0].texts["DOR Summary"] == "DOR ok"
+        assert results[0].texts["PLR Summary"] == "PLR ok"
+        assert results[0].texts["NLR Summary"] == "NLR ok"
+        assert results[0].image_order == (
             "NLR Forest plot",
             "PLR Forest plot",
             "DOR Forest plot",
@@ -752,7 +752,7 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
     )()
     result = analysis_adapter.execute_analysis_requests(model, requests)
 
-    assert result["display_images"] == {
+    assert result.display_images == {
         "Sens Forest Plot": "sens.display.svg",
         "Spec Forest Plot": "spec.display.svg",
     }
@@ -981,7 +981,7 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
 
         assert built_metrics == ["Sens", "Spec"]
         assert [call[1][0]["measure"] for call in multi_calls] == ["Sens", "Spec"]
-        assert results and sorted(results[0]["texts"]) == [
+        assert results and sorted(results[0].texts) == [
             "Sens Summary",
             "Spec Summary",
         ]

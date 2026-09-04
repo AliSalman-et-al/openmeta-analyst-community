@@ -141,7 +141,7 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
 
     result = analysis_adapter.execute_analysis_requests(model, requests)
 
-    assert result["texts"] == {
+    assert result.texts == {
         "Sens Error": "Sens conversion failed",
         "Spec Summary": "Spec",
     }
@@ -177,7 +177,7 @@ def test_diagnostic_fallback_merges_references_in_stable_order():
 
     result = analysis_adapter._run_diagnostic_methods_per_metric(requests, run_metric)
 
-    assert result["texts"]["Spec Error"] == "specificity backend failed"
-    assert result["texts"]["References"] == (
+    assert result.texts["Spec Error"] == "specificity backend failed"
+    assert result.texts["References"] == (
         "1. Shared method reference\n2. Sensitivity reference\n3. DOR reference\n"
     )

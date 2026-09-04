@@ -301,20 +301,15 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         results = _normalize_results(results)
         self.results = results
 
-        self.images = results["images"]
-        self.display_images = results["display_images"]
-        self.image_order = None
-        if "image_order" in results:
-            self.image_order = results["image_order"]
-
-        self.params_paths = {}
-        if "image_params_paths" in results:
-            self.params_paths = results["image_params_paths"]
-        self.plot_capabilities = results["plot_capabilities"]
+        self.images = results.images
+        self.display_images = results.display_images
+        self.image_order = results.image_order
+        self.params_paths = results.image_params_paths
+        self.plot_capabilities = results.plot_capabilities
 
         self.items_to_coords = {}
         self._wrapped_text_items = []
-        self.texts = results["texts"]
+        self.texts = results.texts
         self.references_text = next(
             (
                 section.value
@@ -339,7 +334,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def add_result_sections(self):
         # Ordering and plot capabilities come from the immutable result
         # contract.  The title is used only when painting display text.
-        for section in sorted(self.results["sections"], key=lambda item: item.order):
+        for section in sorted(self.results.sections, key=lambda item: item.order):
             if section.semantic_id == "text:references":
                 continue
             if section.kind == "text":
@@ -1137,15 +1132,15 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 def _normalize_results(results: AnalysisResult) -> AnalysisResult:
     normalized: dict[str, object] = {
         "version": results.version,
-        "texts": dict(results["texts"]),
-        "images": dict(results["images"]),
-        "display_images": dict(results["display_images"]),
-        "image_var_names": dict(results["image_var_names"]),
-        "image_params_paths": dict(results["image_params_paths"]),
+        "texts": dict(results.texts),
+        "images": dict(results.images),
+        "display_images": dict(results.display_images),
+        "image_var_names": dict(results.image_var_names),
+        "image_params_paths": dict(results.image_params_paths),
         "image_order": None
-        if results["image_order"] is None
-        else list(results["image_order"]),
-        "plot_capabilities": dict(results["plot_capabilities"]),
+        if results.image_order is None
+        else list(results.image_order),
+        "plot_capabilities": dict(results.plot_capabilities),
         "sections": [
             {
                 "id": section.semantic_id,

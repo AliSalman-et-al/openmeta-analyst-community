@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, TypedDict, cast, overload
+from typing import Literal, TypedDict
 
 
 PlotKind = Literal[
@@ -107,73 +107,6 @@ class AnalysisResult:
     image_order: tuple[str, ...] | None
     plot_capabilities: Mapping[str, PlotCapability]
     sections: tuple[ResultSection, ...]
-
-    @overload
-    def __getitem__(self, key: Literal["version"]) -> int: ...
-
-    @overload
-    def __getitem__(self, key: Literal["texts"]) -> Mapping[str, str]: ...
-
-    @overload
-    def __getitem__(
-        self,
-        key: Literal[
-            "images", "display_images", "image_var_names", "image_params_paths"
-        ],
-    ) -> Mapping[str, str]: ...
-
-    @overload
-    def __getitem__(self, key: Literal["image_order"]) -> tuple[str, ...] | None: ...
-
-    @overload
-    def __getitem__(
-        self, key: Literal["plot_capabilities"]
-    ) -> Mapping[str, PlotCapability]: ...
-
-    @overload
-    def __getitem__(self, key: Literal["sections"]) -> tuple[ResultSection, ...]: ...
-
-    @overload
-    def __getitem__(self, key: str) -> object: ...
-
-    def __getitem__(self, key: str) -> object:
-        values = {
-            "version": self.version,
-            "texts": self.texts,
-            "images": self.images,
-            "display_images": self.display_images,
-            "image_var_names": self.image_var_names,
-            "image_params_paths": self.image_params_paths,
-            "image_order": self.image_order,
-            "plot_capabilities": self.plot_capabilities,
-            "sections": self.sections,
-        }
-        return values[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(
-            (
-                "version",
-                "texts",
-                "images",
-                "display_images",
-                "image_var_names",
-                "image_params_paths",
-                "image_order",
-                "plot_capabilities",
-                "sections",
-            )
-        )
-
-    def __len__(self) -> int:
-        return 9
-
-    def get(self, key: str, default: object = None) -> object:
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
 
 def _sections(
     texts: Mapping[str, str],

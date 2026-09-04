@@ -251,8 +251,8 @@ _DRIVER = textwrap.dedent(
         },
         data_name="issue146_continuous",
     )
-    assert continuous_result["images"]["Forest Plot"] == forest_path
-    assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
+    assert continuous_result.images["Forest Plot"] == forest_path
+    assert continuous_result.display_images["Forest Plot"] == forest_display_path
 
     from PyQt6 import QtWidgets
     from rc_metastudio import results_window
@@ -441,7 +441,7 @@ _DRIVER = textwrap.dedent(
     finally:
         if previous_scratch_dir is not None:
             os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
-    assert "Sensitivity coefficients" in diagnostic_meta_result["texts"]
+        assert "Sensitivity coefficients" in diagnostic_meta_result.texts
     assert list(ro.r("tmp_obj@study.names")) == [
         "Included 1",
         "Included 2",
@@ -472,7 +472,7 @@ _DRIVER = textwrap.dedent(
         if bundle["id"] == "amino-binary-subgroup"
     ][0]
     subgroup_result = golden_analysis.headless_analysis.run_headless_analysis(subgroup_bundle["case"])
-    assert "Subgroup Summary" in subgroup_result["texts"]
+    assert "Subgroup Summary" in subgroup_result.texts
 
     sys.stdout.write("OK\\n")
     # Hard-exit so embedded-R finalizers don't run: rpy2/R teardown can
@@ -504,17 +504,17 @@ _NULL_RESULT_DRIVER = textwrap.dedent(
         "list(Warning='kept', `Trim-and-fill data`=NULL, References='refs')"
     )
     parsed_null_section = r_bridge.parse_out_results(null_section_result)
-    assert "Trim-and-fill data" not in parsed_null_section["texts"]
-    assert parsed_null_section["texts"]["Warning"] == "kept"
+    assert "Trim-and-fill data" not in parsed_null_section.texts
+    assert parsed_null_section.texts["Warning"] == "kept"
     nested_section_result = r_bridge.ro.r(
         "list(Warning='kept', Summary='kept summary', `Trim-and-fill data`="
         "list(fit=list(effect=c(0.1, 0.2), se=c(0.05, 0.06)), side='left'), "
         "References='refs')"
     )
     parsed_nested_section = r_bridge.parse_out_results(nested_section_result)
-    assert "Trim-and-fill data" not in parsed_nested_section["texts"]
-    assert parsed_nested_section["texts"]["Warning"] == "kept"
-    assert parsed_nested_section["texts"]["Summary"] == "kept summary"
+    assert "Trim-and-fill data" not in parsed_nested_section.texts
+    assert parsed_nested_section.texts["Warning"] == "kept"
+    assert parsed_nested_section.texts["Summary"] == "kept summary"
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
@@ -562,7 +562,7 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
         ))
         '''
     )
-    text = r_bridge.parse_out_results(r_result)["texts"]["Summary"]
+    text = r_bridge.parse_out_results(r_result).texts["Summary"]
     assert tau_squared in text, text
     assert "t²" not in text, text
 
@@ -728,12 +728,12 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
         )
         meta_reg_result = ro.r(meta_regression_expr)
         parsed_meta_regression = r_bridge.parse_out_results(meta_reg_result)
-        regression_summary = parsed_meta_regression["texts"]["Summary"]
+        regression_summary = parsed_meta_regression.texts["Summary"]
         assert "Overall moderators (Qₘ)" in regression_summary, regression_summary
         assert "Residual heterogeneity (Qₑ)" in regression_summary, regression_summary
         assert "Q<U+2098>" not in regression_summary, regression_summary
         assert "Q<U+2091>" not in regression_summary, regression_summary
-        weights = parsed_meta_regression["texts"]["Weights"]
+        weights = parsed_meta_regression.texts["Weights"]
         assert weights.splitlines()[0].strip() == "Study names  Weights", weights
         assert "study names" not in weights, weights
         assert "Gonzalez" in weights, weights
@@ -911,8 +911,8 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
         parsed_funnel_result = r_bridge.parse_out_results(
             ro.globalenv["funnel_result"]
         )
-        assert "Method details" in parsed_funnel_result["texts"]
-        method_details = parsed_funnel_result["texts"]["Method details"]
+        assert "Method details" in parsed_funnel_result.texts
+        method_details = parsed_funnel_result.texts["Method details"]
         assert "Package:" in method_details
         assert (
             "Weighting: inverse-variance weights with REML heterogeneity"
