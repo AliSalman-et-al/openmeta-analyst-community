@@ -57,7 +57,7 @@ cum.ma.binary <- function(fname, binary.data, params){
     params.cum$fp_col2_str <- "Cumulative Estimate"
     plot.data.cum <- create.plot.data.cum(om.data=binary.data, params.cum, res=cum.results)
     if (rcmetar.metafor.default.supported(params.cum)) {
-        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params.cum, cum.results, "cumulative", study.names)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     }
@@ -467,7 +467,7 @@ loo.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.plot.data.loo(binary.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     if (rcmetar.metafor.default.supported(params)) {
-        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        plot.data <- rcmetar.build.sequential.metafor.bundle(binary.data, params, loo.results, "leave-one-out", study.names)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     } else {
@@ -557,7 +557,7 @@ cum.ma.continuous <- function(fname, cont.data, params){
     params.cum$fp_col2_str <- "Cumulative Estimate"
     plot.data.cum <- create.plot.data.cum(om.data=cont.data, params.cum, res=cum.results)
     if (rcmetar.metafor.default.supported(params.cum)) {
-        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params.cum, cum.results, "cumulative", study.names)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     }
@@ -630,7 +630,7 @@ cum.ma.diagnostic <- function(fname, diagnostic.data, params){
 	params.cum$fp_col2_str <- "Cumulative Estimate"
 	plot.data.cum <- create.plot.data.cum(om.data=diagnostic.data, params.cum, res=cum.results)
 	if (rcmetar.metafor.default.supported(params.cum)) {
-		plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params.cum, cum.results, "cumulative", study.names, plot.data.cum)
+		plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params.cum, cum.results, "cumulative", study.names)
 		changed.params <- plot.data$changed.params
 		params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
 	}
@@ -754,7 +754,7 @@ loo.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.plot.data.loo(cont.data, params, res=loo.results)
     changed.params <- plot.data$changed.params
     if (rcmetar.metafor.default.supported(params)) {
-        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params, loo.results, "leave-one-out", study.names, plot.data)
+        plot.data <- rcmetar.build.sequential.metafor.bundle(cont.data, params, loo.results, "leave-one-out", study.names)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     } else {
@@ -833,7 +833,7 @@ subgroup.ma.binary <- function(fname, binary.data, params){
     plot.data <- create.subgroup.plot.data.binary(subgroup.data, params)
     changed.params <- plot.data$changed.params
     if (rcmetar.metafor.default.supported(params)) {
-        plot.data <- rcmetar.build.subgroup.metafor.bundle(binary.data, params, subgroup.data, plot.data)
+            plot.data <- rcmetar.build.subgroup.metafor.bundle(binary.data, params, subgroup.data)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     } else {
@@ -922,7 +922,7 @@ subgroup.ma.continuous <- function(fname, cont.data, params){
     plot.data <- create.subgroup.plot.data.cont(subgroup.data, params)
     changed.params <- plot.data$changed.params
     if (rcmetar.metafor.default.supported(params)) {
-        plot.data <- rcmetar.build.subgroup.metafor.bundle(cont.data, params, subgroup.data, plot.data)
+            plot.data <- rcmetar.build.subgroup.metafor.bundle(cont.data, params, subgroup.data)
         changed.params <- plot.data$changed.params
         params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
     } else {
@@ -1139,7 +1139,7 @@ loo.ma.diagnostic <- function(fname, diagnostic.data, params){
         forest.path <- paste(params$fp_outpath, sep="")
         changed.params <- plot.data$changed.params
         if (rcmetar.metafor.default.supported(params)) {
-            plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params, loo.results, "leave-one-out", study.names, plot.data)
+            plot.data <- rcmetar.build.sequential.metafor.bundle(diagnostic.data, params, loo.results, "leave-one-out", study.names)
             changed.params <- plot.data$changed.params
             params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
         } else {
@@ -1251,7 +1251,7 @@ subgroup.ma.diagnostic <- function(fname, diagnostic.data, params, selected.cov)
         plot.data <- create.subgroup.plot.data.diagnostic(subgroup.data, params)
         changed.params <- plot.data$changed.params
         if (rcmetar.metafor.default.supported(params)) {
-            plot.data <- rcmetar.build.subgroup.metafor.bundle(diagnostic.data, params, subgroup.data, plot.data)
+            plot.data <- rcmetar.build.subgroup.metafor.bundle(diagnostic.data, params, subgroup.data)
             changed.params <- plot.data$changed.params
             params.changed.in.forest.plot <- rcmetar.draw.forest.plot(plot.data, forest.path)
         } else {

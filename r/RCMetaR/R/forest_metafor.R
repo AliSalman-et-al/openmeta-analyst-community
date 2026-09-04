@@ -262,17 +262,74 @@ rcmetar.validate.forest.regeneration.state <- function(state) {
     )
 }
 
-rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, variant, labels, legacy.plot.data=NULL) {
+rcmetar.metafor.plot.sample.sizes <- function(om.data, params) {
+    if (as.character(params$measure) == "PFT" &&
+            length(om.data@g1O1) > 0 && length(om.data@g1O2) > 0) {
+        return(as.numeric(om.data@g1O1) + as.numeric(om.data@g1O2))
+    }
+    NULL
+}
+
+rcmetar.metafor.plot.fields <- function(om.data, params, y, lb, ub, sample.sizes=NULL) {
+    plot.options <- set.plot.options(params)
+    transform.name <- get.transform.name(om.data)
+    transform <- rcmetar.transform.by.name(transform.name, params$measure)
+    y <- as.numeric(y)
+    lb <- as.numeric(lb)
+    ub <- as.numeric(ub)
+    display <- function(values) {
+        if (!is.null(sample.sizes) && length(values) == length(sample.sizes) + 1) {
+            return(c(
+                transform$display.scale(values[-length(values)], ni=sample.sizes),
+                transform$display.scale(values[[length(values)]], ni=sample.sizes)
+            ))
+        }
+        transform$display.scale(values, ni=sample.sizes)
+    }
+    y.disp <- display(y)
+    lb.disp <- display(lb)
+    ub.disp <- display(ub)
+    effects <- if (metric.is.log.scale(params$measure)) {
+        list(ES=y, LL=lb, UL=ub)
+    } else {
+        list(ES=y.disp, LL=lb.disp, UL=ub.disp)
+    }
+    plot.range <- calc.plot.range(effects, plot.options)
+    display.range <- if (metric.is.log.scale(params$measure)) {
+        transform$display.scale(plot.range, ni=sample.sizes)
+    } else {
+        plot.range
+    }
+    changed.params <- plot.options$changed.params
+    if (plot.options$plot.lb != display.range[[1]]) {
+        changed.params$fp_plot_lb <- display.range[[1]]
+    }
+    if (plot.options$plot.ub != display.range[[2]]) {
+        changed.params$fp_plot_ub <- display.range[[2]]
+    }
+    list(
+        plot_range=plot.range,
+        changed.params=changed.params,
+        effect_display=list(y.disp=y.disp, lb.disp=lb.disp, ub.disp=ub.disp)
+    )
+}
+
+rcmetar.metafor.standard.plot.fields <- function(om.data, params, res) {
+    sample.sizes <- rcmetar.metafor.plot.sample.sizes(om.data, params)
+    study.bounds <- calc.ci.bounds(om.data, params, ni=sample.sizes)
+    rcmetar.metafor.plot.fields(
+        om.data,
+        params,
+        c(om.data@y, res$b[[1]]),
+        c(study.bounds$lb, res$ci.lb[[1]]),
+        c(study.bounds$ub, res$ci.ub[[1]]),
+        sample.sizes=sample.sizes
+    )
+}
+
+rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, variant, labels) {
     params <- rcmetar.normalize.plot.text.params(params)
     labels <- rcmetar.truncate.plot.display.text(labels)
-    if (is.null(legacy.plot.data)) {
-        legacy.plot.data <- switch(
-            variant,
-            cumulative=create.plot.data.cum(om.data, params, results),
-            "leave-one-out"=create.plot.data.loo(om.data, params, results),
-            NULL
-        )
-    }
 
     yi <- rcmetar.result.vector(results, "b")
     ci.lb <- rcmetar.result.vector(results, "ci.lb")
@@ -288,6 +345,14 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
     if ("BinaryData" %in% class(om.data) && as.character(params$measure) %in% binary.one.arm.metrics) {
         sample.sizes <- rcmetar.binary.one.arm.raw.total(om.data)
     }
+    fields <- rcmetar.metafor.plot.fields(
+        om.data,
+        params,
+        yi,
+        ci.lb,
+        ci.ub,
+        sample.sizes=sample.sizes
+    )
 
     bundle <- list(
         render_engine = "metafor",
@@ -308,9 +373,9 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
         weights = NULL,
         sample_sizes = sample.sizes,
         params = params,
-        plot_range = legacy.plot.data$plot.range,
-        changed.params = legacy.plot.data$changed.params,
-        legacy_plot_data = legacy.plot.data
+        plot_range = fields$plot_range,
+        changed.params = fields$changed.params,
+        effect_display = fields$effect_display
     )
     param.overrides <- if (identical(variant, "cumulative")) {
         list(fp_col1_str=params$fp_col1_str, fp_col2_str=params$fp_col2_str)
@@ -323,16 +388,8 @@ rcmetar.build.sequential.metafor.bundle <- function(om.data, params, results, va
     bundle
 }
 
-rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data, legacy.plot.data=NULL) {
+rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data) {
     params <- rcmetar.normalize.plot.text.params(params)
-    if (is.null(legacy.plot.data)) {
-        legacy.plot.data <- switch(
-            .rcmetar.data.type(om.data),
-            binary=create.subgroup.plot.data.binary(subgroup.data, params),
-            continuous=create.subgroup.plot.data.cont(subgroup.data, params),
-            diagnostic=create.subgroup.plot.data.diagnostic(subgroup.data, params)
-        )
-    }
 
     subgroup.list <- as.character(subgroup.data$subgroup.list)
     display.subgroup.list <- rcmetar.truncate.plot.display.text(subgroup.list)
@@ -352,6 +409,11 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
     if ("BinaryData" %in% class(om.data) && as.character(params$measure) %in% binary.one.arm.metrics) {
         sample.sizes <- unlist(lapply(study.data, rcmetar.binary.one.arm.raw.total), use.names=FALSE)
     }
+    field.y <- numeric(0)
+    field.lb <- numeric(0)
+    field.ub <- numeric(0)
+    field.sample.sizes <- if (!is.null(sample.sizes)) numeric(0) else NULL
+    all.study.sample.sizes <- numeric(0)
     flat.ilab <- lapply(study.data, rcmetar.ilab.for.data, params=params, res=NULL)
     ilab.matrix <- do.call(rbind, lapply(flat.ilab, function(ilab) ilab$matrix))
     if (is.null(ilab.matrix)) {
@@ -370,7 +432,27 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         study.rows[[i]] <- seq(from=cursor - 1.0, length.out=n, by=-1)
         polygon.rows[[i]] <- min(study.rows[[i]]) - 1
         cursor <- polygon.rows[[i]] - 2.2
+        group.y <- as.numeric(study.data[[i]]@y)
+        group.lb <- group.y - mult * as.numeric(study.data[[i]]@SE)
+        group.ub <- group.y + mult * as.numeric(study.data[[i]]@SE)
+        field.y <- c(field.y, group.y, subgroup.results[[i]]$b[[1]])
+        field.lb <- c(field.lb, group.lb, subgroup.results[[i]]$ci.lb[[1]])
+        field.ub <- c(field.ub, group.ub, subgroup.results[[i]]$ci.ub[[1]])
+        if (!is.null(field.sample.sizes)) {
+            group.sizes <- rcmetar.binary.one.arm.raw.total(study.data[[i]])
+            all.study.sample.sizes <- c(all.study.sample.sizes, group.sizes)
+            field.sample.sizes <- c(field.sample.sizes, group.sizes, sum(group.sizes))
+        }
     }
+    field.y <- c(field.y, subgroup.results[[length(subgroup.list) + 1]]$b[[1]])
+    field.lb <- c(field.lb, subgroup.results[[length(subgroup.list) + 1]]$ci.lb[[1]])
+    field.ub <- c(field.ub, subgroup.results[[length(subgroup.list) + 1]]$ci.ub[[1]])
+    if (!is.null(field.sample.sizes)) {
+        field.sample.sizes <- c(field.sample.sizes, sum(all.study.sample.sizes))
+    }
+    fields <- rcmetar.metafor.plot.fields(
+        om.data, params, field.y, field.lb, field.ub, field.sample.sizes
+    )
 
     bundle <- list(
         render_engine = "metafor",
@@ -390,9 +472,9 @@ rcmetar.build.subgroup.metafor.bundle <- function(om.data, params, subgroup.data
         weights = NULL,
         sample_sizes = sample.sizes,
         params = params,
-        plot_range = legacy.plot.data$plot.range,
-        changed.params = legacy.plot.data$changed.params,
-        legacy_plot_data = legacy.plot.data,
+        plot_range = fields$plot_range,
+        changed.params = fields$changed.params,
+        effect_display = fields$effect_display,
         subgroups = list(
             names = display.subgroup.list,
             results = subgroup.results[seq_along(subgroup.list)],
@@ -434,11 +516,9 @@ rcmetar.metafor.subgroup.difference.test <- function(yi, sei, subgroup.values, p
     list(QM=res$QM, QMp=res$QMp, df=res$p - 1)
 }
 
-rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy.plot.data=NULL) {
+rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res) {
     params <- rcmetar.normalize.plot.text.params(params)
-    if (is.null(legacy.plot.data)) {
-        legacy.plot.data <- create.plot.data.generic(binary.data, params, res)
-    }
+    fields <- rcmetar.metafor.standard.plot.fields(binary.data, params, res)
 
     single.study <- !inherits(res, "rma")
     effect <- NULL
@@ -464,18 +544,16 @@ rcmetar.build.binary.metafor.bundle <- function(binary.data, params, res, legacy
         weights = rcmetar.metafor.weights(res),
         sample_sizes = if (as.character(params$measure) %in% binary.one.arm.metrics) rcmetar.binary.one.arm.raw.total(binary.data) else NULL,
         params = params,
-        plot_range = legacy.plot.data$plot.range,
-        changed.params = legacy.plot.data$changed.params,
-        legacy_plot_data = legacy.plot.data
+        plot_range = fields$plot_range,
+        changed.params = fields$changed.params,
+        effect_display = fields$effect_display
     )
     rcmetar.decorate.metafor.bundle(bundle)
 }
 
-rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, legacy.plot.data=NULL) {
+rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res) {
     params <- rcmetar.normalize.plot.text.params(params)
-    if (is.null(legacy.plot.data)) {
-        legacy.plot.data <- create.plot.data.generic(cont.data, params, res)
-    }
+    fields <- rcmetar.metafor.standard.plot.fields(cont.data, params, res)
 
     single.study <- !inherits(res, "rma")
     effect <- NULL
@@ -500,18 +578,16 @@ rcmetar.build.continuous.metafor.bundle <- function(cont.data, params, res, lega
         slab = rcmetar.study.labels(cont.data),
         weights = rcmetar.metafor.weights(res),
         params = params,
-        plot_range = legacy.plot.data$plot.range,
-        changed.params = legacy.plot.data$changed.params,
-        legacy_plot_data = legacy.plot.data
+        plot_range = fields$plot_range,
+        changed.params = fields$changed.params,
+        effect_display = fields$effect_display
     )
     rcmetar.decorate.metafor.bundle(bundle)
 }
 
-rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res, legacy.plot.data=NULL) {
+rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res) {
     params <- rcmetar.normalize.plot.text.params(params)
-    if (is.null(legacy.plot.data)) {
-        legacy.plot.data <- create.plot.data.generic(diagnostic.data, params, res)
-    }
+    fields <- rcmetar.metafor.standard.plot.fields(diagnostic.data, params, res)
 
     single.study <- !inherits(res, "rma")
     effect <- NULL
@@ -536,9 +612,9 @@ rcmetar.build.diagnostic.metafor.bundle <- function(diagnostic.data, params, res
         slab = rcmetar.study.labels(diagnostic.data),
         weights = rcmetar.metafor.weights(res),
         params = params,
-        plot_range = legacy.plot.data$plot.range,
-        changed.params = legacy.plot.data$changed.params,
-        legacy_plot_data = legacy.plot.data
+        plot_range = fields$plot_range,
+        changed.params = fields$changed.params,
+        effect_display = fields$effect_display
     )
     rcmetar.decorate.metafor.bundle(bundle)
 }
@@ -693,17 +769,16 @@ rcmetar.metafor.alim <- function(bundle) {
 }
 
 rcmetar.metafor.effect.labels <- function(bundle) {
-    legacy <- bundle$legacy_plot_data
     digits <- as.integer(bundle$params$digits)
     if (!is.null(bundle$forest_variant) && !identical(bundle$forest_variant, "standard")) {
         transform <- rcmetar.bundle.transform(bundle)
         y <- transform$display.scale(bundle$effect$yi)
         lb <- transform$display.scale(bundle$effect$ci.lb)
         ub <- transform$display.scale(bundle$effect$ci.ub)
-    } else if (!is.null(legacy$effects.disp)) {
-        y <- legacy$effects.disp$y.disp
-        lb <- legacy$effects.disp$lb.disp
-        ub <- legacy$effects.disp$ub.disp
+    } else if (!is.null(bundle$effect_display)) {
+        y <- bundle$effect_display$y.disp
+        lb <- bundle$effect_display$lb.disp
+        ub <- bundle$effect_display$ub.disp
     } else if (isTRUE(bundle$single_study)) {
         transform <- rcmetar.bundle.transform(bundle)
         y <- transform$display.scale(bundle$effect$yi)

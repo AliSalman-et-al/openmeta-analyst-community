@@ -162,7 +162,7 @@ create.plot.data.binary <- function(binary.data, params, res, selected.cov = NUL
     }
 
     if (rcmetar.metafor.binary.default.supported(binary.data, params, selected.cov=selected.cov)) {
-        plot.data <- rcmetar.build.binary.metafor.bundle(binary.data, params, res, plot.data)
+        plot.data <- rcmetar.build.binary.metafor.bundle(binary.data, params, res)
     }
 
     plot.data
@@ -195,7 +195,7 @@ create.plot.data.diagnostic <- function(diagnostic.data, params, res, selected.c
         plot.data$changed.params <- changed.params
     }
     if (rcmetar.metafor.diagnostic.default.supported(diagnostic.data, params, selected.cov=selected.cov)) {
-        plot.data <- rcmetar.build.diagnostic.metafor.bundle(diagnostic.data, params, res, plot.data)
+        plot.data <- rcmetar.build.diagnostic.metafor.bundle(diagnostic.data, params, res)
     }
     plot.data
 }
@@ -203,7 +203,7 @@ create.plot.data.diagnostic <- function(diagnostic.data, params, res, selected.c
 create.plot.data.continuous <- function(cont.data, params, res, selected.cov = NULL){
     plot.data <- create.plot.data.generic(cont.data, params, res, selected.cov=selected.cov)
     if (rcmetar.metafor.continuous.default.supported(cont.data, params, selected.cov=selected.cov)) {
-        plot.data <- rcmetar.build.continuous.metafor.bundle(cont.data, params, res, plot.data)
+        plot.data <- rcmetar.build.continuous.metafor.bundle(cont.data, params, res)
     }
     plot.data
 }

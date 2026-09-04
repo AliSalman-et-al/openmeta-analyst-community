@@ -219,6 +219,8 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$data_type, "binary")
   expect_equal(bundle$fp_style, "default")
+  expect_true("effect_display" %in% names(bundle))
+  expect_false("legacy_plot_data" %in% names(bundle))
   expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
   expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "119", "11", "128"))
   expect_equal(bundle$ilab$groups, c("Intervention", "Control"))
@@ -592,8 +594,7 @@ test_that("Forest Layout Preflight records sparse and compact RevMan templates w
       list(b = fixture$data@y[[2]], ci.lb = fixture$data@y[[2]] - fixture$data@SE[[2]], ci.ub = fixture$data@y[[2]] + fixture$data@SE[[2]], se = fixture$data@SE[[2]])
     ),
     "cumulative",
-    labels = c("Entered Binary 1", "+ Entered Binary 2"),
-    legacy.plot.data = list(plot.range = NULL, changed.params = fixture$params)
+    labels = c("Entered Binary 1", "+ Entered Binary 2")
   )
   compact.plan <- rcmetar.forest.layout.preflight(sequential.bundle, style = "revman")
 
