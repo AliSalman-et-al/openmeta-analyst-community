@@ -109,7 +109,7 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                 "follow_ups": follow_ups,
             }
         )
-    if len(families) != 1 or next(iter(families), None) not in _FAMILY_NAMES:
+    if len(families) > 1 or next(iter(families), 0) not in _FAMILY_NAMES:
         raise ProjectAdapterError(
             "a project must contain outcomes from exactly one supported analysis family"
         )
@@ -151,7 +151,7 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
             }
         )
 
-    family = _FAMILY_NAMES[next(iter(families))]
+    family = _FAMILY_NAMES[next(iter(families), 2 if dataset.is_diagnostic else 0)]
     return {
         "schema_version": 1,
         "dataset": {

@@ -799,7 +799,7 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
         assert _dataset_summary(window.model.dataset) == loaded_summary
         assert window.current_outcome_label.text() == loaded_outcome
         assert window.current_follow_up_label.text() == loaded_follow_up
-        assert window.tableView.undoStack.canRedo() is False
+        assert window.workspace.can_redo is False
 
         model = window.model
         original_name = _cell_text(model, 0, model.NAME)
@@ -2136,7 +2136,7 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
         assert window.action_meta_regression.isEnabled() is False
         assert window.action_subgroup_ma.isEnabled() is False
 
-        window.tableView.undoStack.undo()
+        window.undo()
 
         assert [cov.name for cov in window.model.dataset.covariates] == ["region"]
         assert window.action_meta_regression.isEnabled()

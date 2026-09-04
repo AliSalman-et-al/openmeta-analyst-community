@@ -392,8 +392,6 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
         unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
 
         callback_errors = []
@@ -437,7 +435,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         window.redo()
         assert window.current_data_unsaved is True
 
-        undo_count = table.undoStack.count()
+        undo_count = window.workspace.can_undo
         before_invalid = copy.deepcopy(model.get_current_analysis_unit_for_study(0))
 
         def reject_invalid_edit():
@@ -449,7 +447,7 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         QtCore.QTimer.singleShot(0, reject_invalid_edit)
         table.row_header_clicked(0)
         assert warnings[-1] == "N must be a non-negative whole number."
-        assert table.undoStack.count() == undo_count
+        assert window.workspace.can_undo == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_groups(
             model.current_groups
         ) == before_invalid.get_raw_data_for_groups(model.current_groups)
@@ -545,8 +543,6 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         table = window.tableView
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
 
         def accept_edit():
@@ -582,7 +578,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         assert window.current_data_unsaved is False
         window.redo()
 
-        undo_count = table.undoStack.count()
+        undo_count = window.workspace.can_undo
 
         def reject_invalid_edit():
             dialog = QtWidgets.QApplication.activeModalWidget()
@@ -593,7 +589,7 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         QtCore.QTimer.singleShot(0, reject_invalid_edit)
         table.row_header_clicked(0)
         assert "whole number" in warnings[-1]
-        assert table.undoStack.count() == undo_count
+        assert window.workspace.can_undo == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [13.0, 3.0, 4.0, 21.0]
@@ -788,7 +784,7 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         assert window.model.current_effect == "OR"
         assert window.model.get_confidence_level() == 90.0
         assert window.current_data_unsaved is False
-        assert window.tableView.undoStack.isClean()
+        assert not window.workspace.is_dirty
     finally:
         _close_without_prompt(app, window)
 
@@ -819,8 +815,6 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         # the native Windows Qt backend. Set the explicit paste origin after
         # selecting so the edit/undo focus contract is deterministic.
         table.setCurrentIndex(paste_origin)
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
         table.paste_from_clipboard(paste_origin)
         assert _cell_text(model, 1, model.NAME) == "Beta"
@@ -889,8 +883,6 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
         model = window.model
         table = window.tableView
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
         warnings = []
         monkeypatch.setattr(
@@ -908,8 +900,7 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
             "",
             "",
         ]
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
+        assert not window.workspace.is_dirty
         assert window.current_data_unsaved is False
         assert warnings[-1][1:] == ("Warning", "Raw data needs to be numeric.")
     finally:
@@ -924,8 +915,6 @@ def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch)
         _create_binary_dataset(window)
         model = window.model
         table = window.tableView
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
         warnings = []
         monkeypatch.setattr(
@@ -940,8 +929,7 @@ def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch)
         assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
 
         assert _cell_text(window.model, 0, window.model.NAME) == ""
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
+        assert not window.workspace.is_dirty
         assert window.current_data_unsaved is False
         assert warnings[-1][1:] == ("Warning", "Simulated commit failure.")
     finally:
@@ -962,8 +950,6 @@ def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypat
         table.selectionModel().select(origin, QItemSelectionModel.SelectionFlag.Select)
         original_count = len(model.dataset.studies)
         original_names = [study.name for study in model.dataset.studies]
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
         warnings = []
         monkeypatch.setattr(
@@ -992,8 +978,7 @@ def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypat
         assert calls == 2
         assert len(window.model.dataset.studies) == original_count
         assert [study.name for study in window.model.dataset.studies] == original_names
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
+        assert not window.workspace.is_dirty
         assert window.current_data_unsaved is False
         assert table.currentIndex() == window.model.index(0, window.model.NAME)
         assert [
@@ -1024,8 +1009,6 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         model.dataset.studies[0].manually_excluded = False
         table.setCurrentIndex(inclusion)
         table.selectRow(0)
-        table.undoStack.clear()
-        table.undoStack.setClean()
         window.current_data_unsaved = False
 
         assert (
@@ -1705,7 +1688,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
         _create_binary_dataset(window)
         original_dataset = window.model.dataset
         original_names = [study.name for study in original_dataset.studies]
-        original_undo_count = window.tableView.undoStack.count()
+        original_history = window.workspace.document
 
         def reject_after_editing_copy(dialog):
             dialog.dataset.studies[0].name = "Rejected dataset edit"
@@ -1717,7 +1700,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
 
         assert window.model.dataset is original_dataset
         assert [study.name for study in window.model.dataset.studies] == original_names
-        assert window.tableView.undoStack.count() == original_undo_count
+        assert window.workspace.document == original_history
     finally:
         _close_without_prompt(app, window)
 
@@ -1747,7 +1730,7 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
 
     app, window = automation.start_automation()
     try:
-        original_undo_count = window.tableView.undoStack.count()
+        original_history = window.workspace.document
         monkeypatch.setattr(
             edit_dialog.EditDialog,
             "exec",
@@ -1758,7 +1741,7 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
 
         assert window.model.dataset.get_outcome_names() == []
         assert window.model.current_outcome_name is None
-        assert window.tableView.undoStack.count() == original_undo_count + 1
+        assert window.workspace.can_undo
     finally:
         _close_without_prompt(app, window)
 
@@ -1772,7 +1755,7 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
         original_dataset = window.model.dataset
         original_name = original_dataset.studies[0].name
         renamed_study = "Renamed through Edit Dataset"
-        original_undo_count = window.tableView.undoStack.count()
+        original_history = window.workspace.document
 
         def accept_after_renaming_study(dialog):
             dialog.dataset.studies[0].name = renamed_study
@@ -1785,9 +1768,9 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
         assert window.model.dataset is not original_dataset
         assert window.model.dataset.studies[0].name == renamed_study
         assert original_dataset.studies[0].name == original_name
-        assert window.tableView.undoStack.count() == original_undo_count + 1
+        assert window.workspace.can_undo
 
-        window.tableView.undoStack.undo()
+        window.undo()
         assert window.model.dataset.studies[0].name == original_name
     finally:
         _close_without_prompt(app, window)

@@ -146,10 +146,18 @@ def _format_open_project_error(file_path, exception):
 
 
 def _document_from_model(model):
+    state = project_adapter.model_to_state(model)
+    if not model.dataset.get_outcome_names():
+        state.update(
+            active_outcome=None,
+            active_follow_up=None,
+            active_groups=[],
+            active_effect=None,
+        )
     return project_format.ProjectDocument(
         1,
         project_adapter.dataset_to_project(model.dataset),
-        project_adapter.model_to_state(model),
+        state,
     )
 
 
@@ -886,17 +894,17 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
-        if self.model.dataset.get_outcome_names():
+        try:
             document = _document_from_model(self.model)
+        except project_adapter.ProjectAdapterError:
+            self.workspace.mark_dirty()
+        else:
             if self.workspace.document is None:
                 self.workspace.new(document)
                 self.workspace.mark_dirty()
             elif document != self.workspace.document:
                 self.workspace.replace(document)
-            self.workspace_is_dirty = self.workspace.is_dirty
-        else:
-            self.workspace.mark_dirty()
-            self.workspace_is_dirty = True
+        self.workspace_is_dirty = self.workspace.is_dirty
 
     def record_workspace_change(self, before, after):
         """Publish one adapter edit as one immutable workspace change."""
@@ -1767,6 +1775,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self._commit_model_operation(rename_cov_command.redo)
 
     def delete_covariate(self, covariate):
+        # Synchronize direct model edits made by an adapter before publishing
+        # the next atomic workspace change.
+        self.data_dirtied()
         covariate_values_by_study = self.model.dataset.get_covariate_values(
             covariate.name
         )
