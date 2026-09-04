@@ -4262,7 +4262,6 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     assert calls[0][0] == "prepare"
     assert calls[1][0] == "run"
     assert calls[0][2] == {
-        "include_raw_data": False,
         "covs_to_include": (covariate,),
         "studies": tuple(studies),
     }

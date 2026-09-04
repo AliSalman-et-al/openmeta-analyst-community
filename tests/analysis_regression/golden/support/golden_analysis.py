@@ -795,6 +795,14 @@ def _capture_plot_descriptors(bundle, result: AnalysisResult):
         display_path = (
             displays.get(display_label) if display_label is not None else None
         )
+        display_identity = next(
+            (
+                section.title
+                for section in result.sections
+                if section.kind == "image" and section.source_key == image_key
+            ),
+            label if display_label is not None else None,
+        )
         capability_label = (
             image_key if image_key in capabilities else _matching_key(capabilities, label)
         )
@@ -807,7 +815,7 @@ def _capture_plot_descriptors(bundle, result: AnalysisResult):
             {
                 "artifact_label": label,
                 "display": {
-                    "identity": label if display_label is not None else None,
+                    "identity": display_identity if display_path else None,
                     "name": os.path.basename(display_path) if display_path else None,
                     "type": (
                         os.path.splitext(display_path)[1].lower().lstrip(".")

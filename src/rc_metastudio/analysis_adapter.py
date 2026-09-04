@@ -445,7 +445,7 @@ def execute_meta_regression_request(
         r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
     elif request.data_type == "binary":
         r_bridge.dataset_to_simple_binary_r_object(
-            model, include_raw_data=False, **conversion_kwargs
+            model, **conversion_kwargs
         )
     else:
         raise ValueError(

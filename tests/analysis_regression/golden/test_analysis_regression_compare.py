@@ -699,7 +699,7 @@ def test_golden_capture_maps_case_only_artifact_title_drift_to_typed_metadata(
         {"artifacts": {"Leave-one-out Forest plot": str(image_path)}}, result
     )[0]
 
-    assert descriptor["display"]["identity"] == "Leave-one-out Forest plot"
+    assert descriptor["display"]["identity"] == "Leave-one-out Forest Plot"
     assert descriptor["display"]["name"] == "loo.display.svg"
     assert descriptor["capability"]["kind"] == "leave_one_out_forest"
 
@@ -1295,7 +1295,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
 
         assert headless_analysis.run_headless_analysis(case).texts["Summary"] == "OR"
         data_call = next(call for call in calls if call[0] == "data")
-        assert data_call[1]["include_raw_data"] is False
+        assert "include_raw_data" not in data_call[1]
         assert data_call[1]["studies"] == model.studies
         assert data_call[1]["covs_to_include"][0].name == "golden_year"
         added_covariate = next(call[1] for call in calls if call[0] == "covariate")
