@@ -112,16 +112,9 @@ def _validate_official_config(path: Path) -> None:
         )
 
 
-def configure(
-    resources: Path, *, configure_build: bool = True, architecture: str = "arm64"
-) -> None:
-    # R.framework/Resources is normally a Versions/Current symlink.  Resolve
-    # that framework-level link, then reject links in the launcher payload.
-    root = resources.resolve(strict=True)
-    binary, rscript = root / "bin/R", root / "bin/Rscript"
+def _configure_build_files(root, configure_build, configured_wrapper):
     config = root / "bin/config"
     real_config = root / "bin/config.real"
-    configured_wrapper = private_config(architecture)
     if configure_build:
         if real_config.exists() or real_config.is_symlink():
             _validate_official_config(real_config)
@@ -135,6 +128,9 @@ def configure(
                 )
         else:
             _validate_official_config(config)
+
+
+def _rewrite_r_launcher(binary):
     _require_executable(binary, "official R launcher bin/R")
     text = binary.read_text(encoding="utf-8")
     if all(value in text for value in OFFICIAL):
@@ -149,7 +145,12 @@ def configure(
         encoding="utf-8"
     ):
         raise RuntimeError("relocated R launcher retains an absolute framework path")
-    _safe_file(rscript) if rscript.exists() else None
+
+
+def _rewrite_rscript(root):
+    rscript = root / "bin/Rscript"
+    if rscript.exists():
+        _safe_file(rscript)
     real_rscript = root / "bin/Rscript.real"
     if real_rscript.exists():
         _safe_file(real_rscript)
@@ -170,6 +171,20 @@ def configure(
         rscript.unlink()
     rscript.write_text(RELATIVE, encoding="utf-8")
     rscript.chmod(0o755)
+
+
+def configure(
+    resources: Path, *, configure_build: bool = True, architecture: str = "arm64"
+) -> None:
+    # R.framework/Resources is normally a Versions/Current symlink.  Resolve
+    # that framework-level link, then reject links in the launcher payload.
+    root = resources.resolve(strict=True)
+    configured_wrapper = private_config(architecture)
+    _configure_build_files(root, configure_build, configured_wrapper)
+    _rewrite_r_launcher(root / "bin/R")
+    _rewrite_rscript(root)
+    config = root / "bin/config"
+    real_config = root / "bin/config.real"
     if configure_build and not real_config.exists():
         config.rename(real_config)
         real_config.chmod(0o755)

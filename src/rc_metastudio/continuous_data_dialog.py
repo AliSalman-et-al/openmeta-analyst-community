@@ -505,43 +505,40 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         self.update_back_calculation_button()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                self.calculator.continuous_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-                elif val_str == "correlation_pre_post" and not is_empty(new_text):
-                    get_disp_scale_val_if_valid(
-                        opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
-                        opt_cmp_msg="Correlation must be between -1 and +1",
-                    )
-            # Scale conversion crosses the optional R backend boundary. Any
-            # backend failure makes the user-entered value invalid here.
-            except Exception:
-                return False, False
-        return True, display_scale_val
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        is_correlation = val_str == "correlation_pre_post"
+        if ci_param is None and not is_correlation:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                options = {}
+                if is_correlation:
+                    options = {
+                        "opt_cmp_fn": lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
+                        "opt_cmp_msg": "Correlation must be between -1 and +1",
+                    }
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.continuous_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                    **options,
+                )
+        except Exception:
+            return False, False
+        return True, "" if is_correlation else display_scale_val
 
     def _text_from_value(self, value):
         if value == "est":
@@ -1124,16 +1121,10 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         )
         se1, se2 = self._get_float(0, 3), self._get_float(1, 3)
 
-        if (
-            not any([self._is_empty_value(x) for x in [n1, m1, sd1, n2, m2, sd2]])
-            or not any([self._is_empty_value(x) for x in [m1, se1, m2, se2]])
-            and self.current_effect == "MD"
-            or not any([self._is_empty_value(x) for x in [n1, m1, sd1]])
-            and self.current_effect in CONTINUOUS_ONE_ARM_METRICS
-        ):
-            est_and_ci_d = None
-            if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
-                est_and_ci_d = self.calculator.continuous_effect_for_study(
+        if not self._has_complete_raw_effect_data(n1, m1, sd1, n2, m2, sd2, se1, se2):
+            return
+        if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
+            est_and_ci_d = self.calculator.continuous_effect_for_study(
                     n1,
                     m1,
                     sd1,
@@ -1145,31 +1136,31 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     metric=self.current_effect,
                     confidence_level=self.confidence_level,
                 )
-            else:
-                # continuous, one-arm metric
-                est_and_ci_d = self.calculator.continuous_effect_for_study(
-                    n1,
-                    m1,
-                    sd1,
-                    two_arm=False,
-                    metric=self.current_effect,
-                    confidence_level=self.confidence_level,
-                )
+        else:
+            est_and_ci_d = self.calculator.continuous_effect_for_study(
+                n1, m1, sd1, two_arm=False, metric=self.current_effect,
+                confidence_level=self.confidence_level,
+            )
+        est, low, high = self.calculator.effect_triplet(
+            est_and_ci_d, "calc_scale", metric=self.current_effect
+        )
+        self.analysis_unit.set_effect_and_ci(
+            self.current_effect, self.group_comparison, est, low, high,
+            confidence_multiplier=self.confidence_multiplier,
+        )
+        self.set_current_effect()
 
-            est, low, high = self.calculator.effect_triplet(
-                est_and_ci_d,
-                "calc_scale",
-                metric=self.current_effect,
-            )
-            self.analysis_unit.set_effect_and_ci(
-                self.current_effect,
-                self.group_comparison,
-                est,
-                low,
-                high,
-                confidence_multiplier=self.confidence_multiplier,
-            )
-            self.set_current_effect()
+    def _has_complete_raw_effect_data(self, n1, m1, sd1, n2, m2, sd2, se1, se2):
+        two_arm = [n1, m1, sd1, n2, m2, sd2]
+        mean_se = [m1, se1, m2, se2]
+        one_arm = [n1, m1, sd1]
+        return (
+            not any(self._is_empty_value(value) for value in two_arm)
+            or self.current_effect == "MD"
+            and not any(self._is_empty_value(value) for value in mean_se)
+            or self.current_effect in CONTINUOUS_ONE_ARM_METRICS
+            and not any(self._is_empty_value(value) for value in one_arm)
+        )
 
     def _capture_dialog_state(self):
         return {

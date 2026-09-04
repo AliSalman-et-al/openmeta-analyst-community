@@ -593,35 +593,31 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         self._update_effect_choice_accessibility()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                self.calculator.binary_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-            except Exception:
-                return False, False
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        if ci_param is None:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.binary_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                )
+        except Exception:
+            return False, False
         return True, display_scale_val
 
     def _text_from_value(self, value):

@@ -27,26 +27,19 @@ def _canonical_manifest_digest(manifest):
     return hashlib.sha256(payload).hexdigest()
 
 
-def _frozen_kit_identity(root):
-    app_root = Path(root).resolve()
-    metadata_root = (
-        app_root.parent / "Resources" / "r-integration-kit"
-        if sys.platform == "darwin"
-        else app_root / "r-integration-kit"
-    )
+def _load_frozen_identity(metadata_root):
     try:
-        manifest = json.loads(
-            (metadata_root / "manifest.json").read_text(encoding="utf-8")
-        )
-        derivation = json.loads(
-            (metadata_root / "derivation.json").read_text(encoding="utf-8")
-        )
+        manifest = json.loads((metadata_root / "manifest.json").read_text(encoding="utf-8"))
+        derivation = json.loads((metadata_root / "derivation.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(
             "Frozen R integration-kit identity is missing or unreadable."
         ) from exc
-    target = "macos-arm64" if sys.platform == "darwin" else "windows-x64"
-    if not (
+    return manifest, derivation
+
+
+def _validate_frozen_identity_manifest(manifest, derivation, target):
+    valid = (
         manifest.get("kind") == "rc-metastudio-r-integration-kit"
         and manifest.get("target") == target
         and manifest.get("cffi_mode") == "API"
@@ -54,8 +47,59 @@ def _frozen_kit_identity(root):
         and derivation.get("schema_version") == 1
         and derivation.get("kit_sha256") == manifest.get("kit_sha256")
         and derivation.get("target") == target
-    ):
+    )
+    if not valid:
         raise RuntimeError("Frozen R integration-kit identity is invalid.")
+
+
+def _validate_frozen_path(record, app_root, name):
+    path = (app_root / str(record.get("path", ""))).resolve()
+    bundle_root = app_root.parent if sys.platform == "darwin" else app_root
+    valid = path.is_relative_to(bundle_root) and path.is_file()
+    if not valid or _sha256(path) != record.get("sha256"):
+        raise RuntimeError(f"Frozen R derivation record is invalid for {name}.")
+
+
+def _validate_frozen_derivation_record(
+    name, source, pre_sign, final, transformations, manifest_files, app_root
+):
+    source_record = source.get(name, {})
+    pre_sign_record = pre_sign.get(name, {})
+    record = final.get(name, {})
+    manifest_record = manifest_files.get(source_record.get("path"), {})
+    transformation = transformations.get(name)
+    pre_sign_is_derived = pre_sign_record.get("sha256") == source_record.get("sha256")
+    if name == "api_bridge" and isinstance(transformation, dict):
+        pre_sign_is_derived = pre_sign_is_derived or (
+            transformation.get("kind") == "mach-o-load-command-relocation"
+            and transformation.get("source", {}).get("sha256")
+            == source_record.get("sha256")
+            and transformation.get("output", {}).get("sha256")
+            == pre_sign_record.get("sha256")
+            and bool(transformation.get("changes"))
+        )
+    valid_chain = (
+        source_record.get("sha256") == manifest_record.get("sha256")
+        and pre_sign_is_derived
+        and record.get("path") == pre_sign_record.get("path")
+        and pre_sign_record.get("signing_identity")
+        and record.get("signing_identity")
+    )
+    if not valid_chain:
+        raise RuntimeError(f"Frozen R derivation chain is invalid for {name}.")
+    _validate_frozen_path(record, app_root, name)
+
+
+def _frozen_kit_identity(root):
+    app_root = Path(root).resolve()
+    metadata_root = (
+        app_root.parent / "Resources" / "r-integration-kit"
+        if sys.platform == "darwin"
+        else app_root / "r-integration-kit"
+    )
+    manifest, derivation = _load_frozen_identity(metadata_root)
+    target = "macos-arm64" if sys.platform == "darwin" else "windows-x64"
+    _validate_frozen_identity_manifest(manifest, derivation, target)
     final = derivation.get("final", {})
     source = derivation.get("source", {})
     pre_sign = derivation.get("pre_sign", {})
@@ -67,40 +111,9 @@ def _frozen_kit_identity(root):
         if record.get("kind") == "file"
     }
     for name in required:
-        source_record = source.get(name, {})
-        pre_sign_record = pre_sign.get(name, {})
-        record = final.get(name, {})
-        manifest_record = manifest_files.get(source_record.get("path"), {})
-        transformation = transformations.get(name)
-        pre_sign_is_derived = pre_sign_record.get("sha256") == source_record.get(
-            "sha256"
-        ) or (
-            name == "api_bridge"
-            and isinstance(transformation, dict)
-            and transformation.get("kind") == "mach-o-load-command-relocation"
-            and transformation.get("source", {}).get("sha256")
-            == source_record.get("sha256")
-            and transformation.get("output", {}).get("sha256")
-            == pre_sign_record.get("sha256")
-            and bool(transformation.get("changes"))
+        _validate_frozen_derivation_record(
+            name, source, pre_sign, final, transformations, manifest_files, app_root
         )
-        if not (
-            source_record.get("sha256") == manifest_record.get("sha256")
-            and pre_sign_is_derived
-            and record.get("path") == pre_sign_record.get("path")
-            and pre_sign_record.get("signing_identity")
-            and record.get("signing_identity")
-        ):
-            raise RuntimeError(f"Frozen R derivation chain is invalid for {name}.")
-        path = (app_root / str(record.get("path", ""))).resolve()
-        if (
-            not path.is_relative_to(
-                app_root.parent if sys.platform == "darwin" else app_root
-            )
-            or not path.is_file()
-            or _sha256(path) != record.get("sha256")
-        ):
-            raise RuntimeError(f"Frozen R derivation record is invalid for {name}.")
     return manifest, derivation
 
 
@@ -145,42 +158,35 @@ def macos_r_framework_version(r_version: str) -> str:
     return ".".join(parts[:2])
 
 
-def configure_bundled_r_environment(app_root=None):
+def _configure_frozen_runtime(root, direct_spike):
     global _BOOTSTRAP_THREAD_ID, _RUNTIME_IDENTITY
-    root = app_root or _app_root()
-    frozen = bool(getattr(sys, "frozen", False))
-    manifest = None
-    derivation = None
-    direct_spike_marker = Path(root).parent / "Resources" / "direct-r-spike.marker"
-    direct_spike = frozen and sys.platform == "darwin" and direct_spike_marker.is_file()
-    if frozen:
-        if threading.current_thread() is not threading.main_thread():
-            raise RuntimeError(
-                "Frozen R bootstrap must run on the application main thread."
-            )
-        if _BOOTSTRAP_THREAD_ID not in (None, threading.get_ident()):
-            raise RuntimeError(
-                "Frozen R bootstrap was already initialized by another thread."
-            )
-        if _RUNTIME_IDENTITY is not None:
-            return dict(_RUNTIME_IDENTITY)
-        # Direct macOS packages carry an authenticated, target-native R closure
-        # assembled by the same job. Older macOS packages consume the separately
-        # derived integration-kit identity instead.
-        if not direct_spike and sys.platform != "win32":
-            manifest, derivation = _frozen_kit_identity(root)
-        _configure_private_runtime_directories(root)
-        _set_windows_dll_policy()
-    runtime_candidates = [
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("Frozen R bootstrap must run on the application main thread.")
+    if _BOOTSTRAP_THREAD_ID not in (None, threading.get_ident()):
+        raise RuntimeError("Frozen R bootstrap was already initialized by another thread.")
+    if _RUNTIME_IDENTITY is not None:
+        return dict(_RUNTIME_IDENTITY)
+    if not direct_spike and sys.platform != "win32":
+        manifest, derivation = _frozen_kit_identity(root)
+    else:
+        manifest, derivation = None, None
+    _configure_private_runtime_directories(root)
+    _set_windows_dll_policy()
+    return manifest, derivation
+
+
+def _runtime_candidates(root, frozen):
+    candidates = [
         os.path.join(root, "..", "Frameworks", "R.framework", "Resources"),
         os.path.join(root, "R"),
     ]
     if not frozen:
-        runtime_candidates.insert(0, os.environ.get("RCMS_R_HOME"))
-    r_home = _first_existing(
-        runtime_candidates,
-        required_child=os.path.join("bin"),
-    )
+        candidates.insert(0, os.environ.get("RCMS_R_HOME"))
+    return candidates
+
+
+def _configure_r_home(root, frozen):
+    r_home = _first_existing(_runtime_candidates(root, frozen), required_child=os.path.join("bin"))
     if r_home:
         os.environ["R_HOME"] = r_home
         dll_paths = [
@@ -191,32 +197,32 @@ def configure_bundled_r_environment(app_root=None):
         if frozen and sys.platform == "win32":
             dll_paths.extend(_private_windows_dll_directories(r_home))
         elif frozen and sys.platform == "darwin":
-            # Rscript is a shell wrapper that requires fixed macOS system tools
-            # such as dirname. Keep the ambient runner PATH isolated while
-            # retaining only Apple's standard, non-R command directories.
             dll_paths.extend(("/usr/bin", "/bin", "/usr/sbin", "/sbin"))
         _prepend_path(dll_paths, preserve_existing=not frozen)
         _add_dll_directories(dll_paths)
     elif frozen:
         raise RuntimeError("Frozen application is missing its private R runtime.")
+    return r_home
 
-    library_candidates = [
+
+def _configure_r_libraries(root, r_home, frozen):
+    candidates = [
         os.path.join(r_home, "library") if r_home else None,
         os.path.join(root, "..", "Frameworks", "R.framework", "Resources", "library"),
         os.path.join(root, "R", "library"),
     ]
     if not frozen:
-        library_candidates.insert(0, os.environ.get("RCMS_R_LIBS"))
-    r_libs = _first_existing(
-        library_candidates,
-        required_child=os.path.join("RCMetaR"),
-    )
+        candidates.insert(0, os.environ.get("RCMS_R_LIBS"))
+    r_libs = _first_existing(candidates, required_child=os.path.join("RCMetaR"))
     if r_libs:
         os.environ["R_LIBS"] = r_libs
         os.environ["R_LIBS_USER"] = r_libs
     elif frozen:
         raise RuntimeError("Frozen application is missing its private RCMetaR library.")
+    return r_libs
 
+
+def _set_r_environment():
     os.environ["RPY2_CFFI_MODE"] = "API"
     os.environ["R_ENVIRON_USER"] = os.devnull
     os.environ["R_PROFILE_USER"] = os.devnull
@@ -225,6 +231,23 @@ def configure_bundled_r_environment(app_root=None):
     os.environ["R_DEFAULT_PACKAGES"] = "utils,grDevices,graphics,stats,methods"
     os.environ["LC_NUMERIC"] = "C"
     locale.setlocale(locale.LC_NUMERIC, "C")
+
+
+def configure_bundled_r_environment(app_root=None):
+    global _BOOTSTRAP_THREAD_ID, _RUNTIME_IDENTITY
+    root = app_root or _app_root()
+    frozen = bool(getattr(sys, "frozen", False))
+    direct_spike_marker = Path(root).parent / "Resources" / "direct-r-spike.marker"
+    direct_spike = frozen and sys.platform == "darwin" and direct_spike_marker.is_file()
+    manifest = derivation = None
+    if frozen:
+        frozen_identity = _configure_frozen_runtime(root, direct_spike)
+        if isinstance(frozen_identity, dict):
+            return frozen_identity
+        manifest, derivation = frozen_identity
+    r_home = _configure_r_home(root, frozen)
+    r_libs = _configure_r_libraries(root, r_home, frozen)
+    _set_r_environment()
     identity = {
         "R_HOME": os.environ.get("R_HOME"),
         "R_LIBS": os.environ.get("R_LIBS"),

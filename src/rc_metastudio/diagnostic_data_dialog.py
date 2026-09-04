@@ -623,43 +623,40 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         return d
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                self.calculator.diagnostic_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-                elif val_str == "prevalence" and not is_empty(new_text):
-                    get_disp_scale_val_if_valid(
-                        opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
-                        opt_cmp_msg="Prevalence must be between 0 and 1.",
-                    )
-            # Scale conversion crosses the optional R backend boundary. Any
-            # backend failure makes the user-entered value invalid here.
-            except Exception:
-                return False, False
-        return True, display_scale_val
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        is_prevalence = val_str == "prevalence"
+        if ci_param is None and not is_prevalence:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                options = {}
+                if is_prevalence:
+                    options = {
+                        "opt_cmp_fn": lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
+                        "opt_cmp_msg": "Prevalence must be between 0 and 1.",
+                    }
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.diagnostic_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                    **options,
+                )
+        except Exception:
+            return False, False
+        return True, "" if is_prevalence else display_scale_val
 
     def _text_from_value(self, value):
         if value == "est":
