@@ -99,39 +99,32 @@ def start_automation_smoke(
 def start_package_operation(output_path: str, sample_path: str, operation: str, locale_name: str = "en_US") -> int:
     """Perform one ordinary packaged-project operation for developer tooling."""
     from PyQt6 import QtCore
-    from rc_metastudio import main_window
+    from rc_metastudio import main_window, qt_text
 
     app, window = start_automation()
     try:
         if not window.open(os.path.abspath(sample_path), raise_on_error=True):
             raise RuntimeError("packaged workflow observation could not open project")
         model = window.tableView.model()
-        model = window.tableView.model()
         if operation == "edit":
             observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
         elif operation in {"analysis", "locale"}:
             raw_index = model.index(0, model.RAW_DATA[0])
-            raw_value = float(str(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole)).replace(",", "."))
-            numeric_text = f"{raw_value:.1f}" if locale_name == "en_US" else f"{raw_value:.1f}".replace(".", ",")
+            locale = QtCore.QLocale(locale_name)
+            QtCore.QLocale.setDefault(locale)
+            observed_locale = QtCore.QLocale()
+            raw_value, valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
+            if not valid:
+                raise RuntimeError("packaged locale operation could not parse the product value")
+            numeric_text = observed_locale.toString(raw_value, "f", 1)
             observed = bool(model.setData(raw_index, numeric_text))
-            captured = {}
-            dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
-            original = window.analysis
-            try:
-                dialog.current_method = "binary.random"
-                dialog.current_param_vals = {}
-                dialog.setup_params()
-                dialog.current_param_vals.update(dialog.current_defaults)
-                window.analysis = lambda result: captured.setdefault("result", result)
-                dialog.run_ma()
-            finally:
-                window.analysis = original
-                dialog.close()
-            result = captured.get("result")
+            canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
+            observed = observed and canonical_valid and canonical_value == raw_value
+            result = _run_binary_analysis(window, main_window)
             if result is None:
                 raise RuntimeError("packaged analysis operation produced no result")
             observed = observed and bool(result.texts.get("Summary"))
-        elif operation == "save-reopen":
+        elif operation in {"save-reopen", "save-reopen-analysis"}:
             observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
             handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
             os.close(handle)
@@ -139,6 +132,9 @@ def start_package_operation(output_path: str, sample_path: str, operation: str, 
             destination.unlink()
             window.out_path = str(destination)
             observed = observed and window.save() is True and window.open(str(destination), raise_on_error=True)
+            if operation == "save-reopen-analysis" and observed:
+                result = _run_binary_analysis(window, main_window)
+                observed = result is not None and bool(result.texts.get("Summary"))
             destination.unlink(missing_ok=True)
         else:
             raise ValueError(f"unknown packaged operation: {operation}")
@@ -146,7 +142,9 @@ def start_package_operation(output_path: str, sample_path: str, operation: str, 
         destination.parent.mkdir(parents=True, exist_ok=True)
         observation = {"operation": operation, "observed": observed}
         if operation in {"analysis", "locale"}:
-            observation.update({"locale": locale_name, "input": numeric_text, "canonical_value": raw_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)})
+            observation.update({"locale": observed_locale.name(), "decimal_point": observed_locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)})
+        if operation == "save-reopen-analysis":
+            observation.update({"analysis_after_reopen_observed": observed, "summary": result.texts.get("Summary", "") if result else "", "svg_paths": dict(result.display_images) if result else {}})
         destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return 0
     finally:
@@ -155,6 +153,23 @@ def start_package_operation(output_path: str, sample_path: str, operation: str, 
         app.processEvents()
         _dispose_qobjects(app, (window,))
         app.quit()
+
+
+def _run_binary_analysis(window, main_window):
+    captured = {}
+    dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
+    original = window.analysis
+    try:
+        dialog.current_method = "binary.random"
+        dialog.current_param_vals = {}
+        dialog.setup_params()
+        dialog.current_param_vals.update(dialog.current_defaults)
+        window.analysis = lambda result: captured.setdefault("result", result)
+        dialog.run_ma()
+    finally:
+        window.analysis = original
+        dialog.close()
+    return captured.get("result")
 
 
 def _run_automation_smoke(callback):
@@ -234,6 +249,9 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     """Observe one scale's native Qt surfaces and write only that record."""
     from PyQt6 import QtCore, QtGui, QtNetwork, QtWidgets
 
+    configured_locale = os.environ.get("RCMS_PACKAGE_LOCALE")
+    if configured_locale:
+        QtCore.QLocale.setDefault(QtCore.QLocale(configured_locale))
     app = app_error_handler.get_or_create_application(sys.argv)
     _configure_application(app)
     qt6_resources.ensure_application_resources()
@@ -290,13 +308,15 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
         "active_style": window.style().objectName(),
         "available_styles": list(QtWidgets.QStyleFactory.keys()),
         "image_formats": sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats()),
-        "locale": "de_DE",
         "platform_plugin": platform_name,
     }
     # Keep these bounded observations local to the packaged process; policy and
     # pass/fail comparison remain in the developer deployment inspectors.
     if sys.platform == "darwin":
         record["accessibility"]["native"] = _observe_cocoa_accessibility(control)
+    actual_locale = QtCore.QLocale()
+    record["locale"] = actual_locale.name()
+    record["decimal_point"] = actual_locale.decimalPoint()
     record["native_file_dialog"] = _observe_native_file_dialog(window)
     record["critical_dialog"] = _observe_critical_dialog(window)
     record["cleanup"] = {"close_accepted": bool(window.close()), "window_visible": window.isVisible()}

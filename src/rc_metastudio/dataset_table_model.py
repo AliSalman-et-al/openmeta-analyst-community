@@ -403,20 +403,19 @@ class DatasetTableModel(QAbstractTableModel):
             return _item_data(_editable_data(study.name))
         if column == self.YEAR:
             return _item_data("" if study.year in (None, "", 0) else study.year)
-        if self.current_outcome_name is not None and column in self.RAW_DATA:
+        if column in self.RAW_DATA:
             return self._raw_cell_data(index, role, study)
-        if (
-            self.current_outcome_name is not None
-            and self.get_current_follow_up_name() is not None
-            and column in self.OUTCOMES
-        ):
+        if column in self.OUTCOMES:
             return self._outcome_cell_data(index, role)
-        if self.OUTCOMES and column != self.INCLUDE_STUDY and column > max(self.OUTCOMES):
+        if self._is_covariate_column(column):
             return self._covariate_cell_data(column, role, study)
         return _item_data()
 
+    def _is_covariate_column(self, column):
+        return bool(self.OUTCOMES) and column != self.INCLUDE_STUDY and column > max(self.OUTCOMES)
+
     def _raw_cell_data(self, index, role, study):
-        if self.current_outcome_name not in study.analysis_units_by_outcome:
+        if self.current_outcome_name is None or self.current_outcome_name not in study.analysis_units_by_outcome:
             return _item_data("")
         raw_data = self.get_current_analysis_unit_for_study(
             index.row()
@@ -438,6 +437,8 @@ class DatasetTableModel(QAbstractTableModel):
             return _item_data(_to_native_text(value))
 
     def _outcome_cell_data(self, index, role):
+        if self.current_outcome_name is None or self.get_current_follow_up_name() is None:
+            return _item_data("")
         unit = self.get_current_analysis_unit_for_study(index.row())
         source = self._display_effect_source(unit)
         comparison = self.get_current_group_comparison()
@@ -446,8 +447,7 @@ class DatasetTableModel(QAbstractTableModel):
         subtype = self.get_current_outcome_subtype()
         effect = self.current_effect
         if self.is_diagnostic():
-            effect = "Spec" if outcome_index >= 3 else "Sens"
-            outcome_index %= 3
+            return self._diagnostic_outcome_cell_data(unit, source, comparison, outcome_index, role)
         if data_type == CONTINUOUS and subtype == "generic_effect":
             values = unit.get_display_effect_and_se_for_source(source, effect, comparison)
         else:
@@ -455,9 +455,15 @@ class DatasetTableModel(QAbstractTableModel):
         value = values[outcome_index]
         if value is None:
             return _item_data("")
-        digits = 12 if role == Qt.ItemDataRole.EditRole else None
-        if self.is_diagnostic() and digits is None:
-            digits = 3
+        return _item_data(self.format_float(value, num_digits=12 if role == Qt.ItemDataRole.EditRole else None))
+
+    def _diagnostic_outcome_cell_data(self, unit, source, comparison, outcome_index, role):
+        effect = "Spec" if outcome_index >= 3 else "Sens"
+        values = unit.get_display_effect_and_ci_for_source(source, effect, comparison)
+        value = values[outcome_index % 3]
+        if value is None:
+            return _item_data("")
+        digits = 12 if role == Qt.ItemDataRole.EditRole else 3
         return _item_data(self.format_float(value, num_digits=digits))
 
     def _covariate_cell_data(self, column, role, study):

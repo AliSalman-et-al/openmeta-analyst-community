@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 else:
     from rc_metastudio.forms.ui_analysis_setup_dialog import Ui_AnalysisSetupDialog
 
-from rc_metastudio import plot_editor_dialog, results_window
+from rc_metastudio import plot_editor_dialog, plot_service, results_window
 
 REPO_ROOT = os.getcwd()
 
@@ -3299,25 +3299,25 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
         )
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda *a, **k: None,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_plot_data",
         lambda: None,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: image_path.write_text(
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800">'
@@ -3328,7 +3328,7 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: None,
         raising=False,
@@ -3388,13 +3388,13 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3444,13 +3444,13 @@ def test_results_window_save_handler_accepts_backend_export_formats(
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3499,13 +3499,13 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3867,7 +3867,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
             }
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda params, write_them_out=False, outpath=None: calls.append(
             ("update", params, write_them_out, outpath)
@@ -3875,7 +3875,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_regression_plot_data",
         lambda: calls.append(("regenerate",)),
         raising=False,
@@ -3892,13 +3892,13 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_reg_plot",
         generate_reg_plot,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: calls.append(("write", path)),
         raising=False,
@@ -4431,13 +4431,13 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
             return dict(self._params)
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda updated_params, write_them_out=False, outpath=None: calls.append(
             ("update", updated_params, write_them_out, outpath)
@@ -4445,7 +4445,7 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_plot_data",
         lambda: calls.append(("regenerate",)),
         raising=False,
@@ -4462,13 +4462,13 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
         )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         generate_forest_plot,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: calls.append(("write", path)),
         raising=False,

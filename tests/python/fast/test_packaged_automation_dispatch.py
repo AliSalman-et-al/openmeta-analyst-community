@@ -72,12 +72,13 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
         "summary": "Binary Random-Effects Model\nEstimate 1",
         "svg_paths": {"forest": str(tmp_path / "forest.svg")},
         "locale_inputs": [
-            {"locale": "en_US", "input": "1.2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
-            {"locale": "de_DE", "input": "1,2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
+            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
         ],
         "edit_observed": True,
         "analysis_observed": True,
         "reopen_observed": True,
+        "analysis_after_reopen_observed": True,
     }), encoding="utf-8")
     (tmp_path / "forest.svg").write_text("<svg />", encoding="utf-8")
     surfaces_path = tmp_path / "surfaces.json"
@@ -99,6 +100,8 @@ def test_frozen_hook_contains_no_scenario_or_result_comparison_logic():
     source = Path("src/rc_metastudio/automation.py").read_text(encoding="utf-8")
     for marker in ("locale_variants", "expected_normalized_summary_sha256", "normalize_packaged_summary_identity", "raw_summary_sha256"):
         assert marker not in source
+    assert "QLocale.setDefault" in source
+    assert 'os.environ.get("RCMS_PACKAGE_LOCALE")' in source
 
 
 def test_package_pipelines_assemble_atomic_observations_before_validation():
@@ -115,3 +118,55 @@ def test_package_pipelines_assemble_atomic_observations_before_validation():
         assert "--sample-root" in script
         assert "--executable" in script
         assert "--output" in script
+
+
+def test_assembler_runs_surface_probes_with_requested_scale_and_locale():
+    source = Path("scripts/assemble_packaged_smoke_evidence.py").read_text(encoding="utf-8")
+    assert 'environment["QT_SCALE_FACTOR"] = scale' in source
+    assert 'environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline' in source
+    assert 'environment["RCMS_PACKAGE_LOCALE"] = "de_DE"' in source
+
+
+def test_assembler_rejects_unobserved_reopen_analysis(tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    workflow = tmp_path / "workflow.json"
+    workflow.write_text(json.dumps({"edit_observed": True, "analysis_observed": True, "reopen_observed": True, "analysis_after_reopen_observed": False}), encoding="utf-8")
+    surfaces = tmp_path / "surfaces.json"
+    surfaces.write_text("[]", encoding="utf-8")
+    samples = tmp_path / "samples.json"
+    samples.write_text("{}", encoding="utf-8")
+    with pytest.raises((ValueError, KeyError)):
+        assembler.assemble(workflow_observation=workflow, surface_records=surfaces, sample_observations=samples, sample="BCG.rcms", output=tmp_path / "out.json")
+
+
+def test_assembler_rejects_reused_locale_operation_observation(tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    svg = tmp_path / "forest.svg"
+    svg.write_text("<svg />", encoding="utf-8")
+    locale = {
+        "operation": "analysis",
+        "locale": "en_US",
+        "decimal_point": ".",
+        "input": "1.2",
+        "canonical_value": 1.2,
+        "summary": "summary",
+        "svg_paths": {"forest": str(svg)},
+    }
+    workflow = tmp_path / "workflow.json"
+    workflow.write_text(json.dumps({
+        "summary": "summary",
+        "svg_paths": {"forest": str(svg)},
+        "locale_inputs": [locale, {**locale, "locale": "de_DE", "decimal_point": ",", "input": "1,2"}],
+        "edit_observed": True,
+        "analysis_observed": True,
+        "reopen_observed": True,
+        "analysis_after_reopen_observed": True,
+    }), encoding="utf-8")
+    surfaces = tmp_path / "surfaces.json"
+    surfaces.write_text("[]", encoding="utf-8")
+    samples = tmp_path / "samples.json"
+    samples.write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="distinct locale operations"):
+        assembler.assemble(workflow_observation=workflow, surface_records=surfaces, sample_observations=samples, sample="BCG.rcms", output=tmp_path / "out.json")

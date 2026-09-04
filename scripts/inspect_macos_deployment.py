@@ -1834,6 +1834,18 @@ def _workflow_locale_valid(
 ) -> bool:
     if [item.get("locale") for item in locale_variants] != ["en_US", "de_DE"]:
         return False
+    if (
+        locale_variants[0].get("decimal_point") != "."
+        or locale_variants[1].get("decimal_point") != ","
+        or "." not in str(locale_variants[0].get("input"))
+        or "," not in str(locale_variants[1].get("input"))
+        or locale_variants[0].get("canonical_value")
+        != locale_variants[1].get("canonical_value")
+        or locale_variants[0].get("svg_sha256")
+        != locale_variants[1].get("svg_sha256")
+        or locale_variants[0].get("svg_sha256") != workflows.get("svg_sha256")
+    ):
+        return False
     return all(
         item.get("normalized_summary_sha256") == expected_summary
         and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")

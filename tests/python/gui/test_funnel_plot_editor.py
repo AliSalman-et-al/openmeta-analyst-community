@@ -8,8 +8,8 @@ from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 
-from rc_metastudio import funnel_plot_editor_dialog, results_window
-from rc_metastudio.analysis_results import PlotCapability
+from rc_metastudio import funnel_plot_editor_dialog, plot_service, results_window
+from rc_metastudio.analysis_results import PlotCapability, empty_analysis_result
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 
 
@@ -240,7 +240,7 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
         _funnel_capability(),
         params_path=str(base),
     )
-    window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
+    window = results_window.ResultsWindow(empty_analysis_result())
     window._refresh_plot_item = lambda *args: None
     regenerate_count = [0]
 
@@ -258,10 +258,10 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
         raise RuntimeError("render failed")
 
     monkeypatch.setattr(
-        results_window.r_bridge, "update_plot_params", write_params, raising=False
+        plot_service.r_bridge, "update_plot_params", write_params, raising=False
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_small_study_effects_funnel",
         regenerate,
         raising=False,
@@ -294,7 +294,7 @@ def test_funnel_editor_rejects_svgz_output_path(qapp):
         _funnel_capability(),
         params_path="funnel",
     )
-    window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
+    window = results_window.ResultsWindow(empty_analysis_result())
 
     class Dialog:
         def plot_params(self):

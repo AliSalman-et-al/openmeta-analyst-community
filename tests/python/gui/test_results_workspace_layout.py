@@ -16,7 +16,7 @@ os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verificat
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-from rc_metastudio import plot_editor_dialog, results_window
+from rc_metastudio import plot_editor_dialog, plot_service, results_window
 
 
 def _empty_results(summary="Summary text"):
@@ -736,13 +736,13 @@ def test_results_window_regenerates_each_supported_export_format(
         params_path=str(tmp_path / "forest-params"),
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("generate", path)),
         raising=False,
@@ -777,13 +777,13 @@ def test_results_window_exports_sroc_with_format_specific_default_name(
         params_path=str(tmp_path / "sroc-params"),
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_sroc_plot",
         lambda path: calls.append(("generate", path)),
         raising=False,
@@ -818,13 +818,13 @@ def test_results_window_rejects_svgz_for_funnel_export_before_r(
     )
     calls = []
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_small_study_effects_funnel",
         lambda path: calls.append(("generate", path)),
         raising=False,

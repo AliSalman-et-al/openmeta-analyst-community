@@ -38,6 +38,7 @@ def capture_atomic_observations(
         environment = os.environ.copy()
         environment["QT_SCALE_FACTOR"] = scale
         environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline
+        environment["RCMS_PACKAGE_LOCALE"] = "de_DE"
         subprocess.run(
             [str(executable), "--automation-package-surface-smoke", str(record), scale],
             check=True,
@@ -57,7 +58,7 @@ def capture_workflow_observations(
         "edit": ("edit",),
         "analysis_en": ("analysis", "en_US"),
         "analysis_de": ("locale", "de_DE"),
-        "save_reopen": ("save-reopen",),
+        "save_reopen": ("save-reopen-analysis",),
     }
     observations = {}
     for name, operation in commands.items():
@@ -76,9 +77,10 @@ def capture_workflow_observations(
         "edit_observed": observations["edit"]["observed"],
         "analysis_observed": analysis["observed"],
         "reopen_observed": observations["save_reopen"]["observed"],
+        "analysis_after_reopen_observed": observations["save_reopen"].get("analysis_after_reopen_observed", False),
         "locale_inputs": [
-            {key: analysis[key] for key in ("locale", "input", "canonical_value", "summary", "svg_paths")},
-            {key: locale[key] for key in ("locale", "input", "canonical_value", "summary", "svg_paths")},
+            {"operation": analysis["operation"], **{key: analysis[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
+            {"operation": locale["operation"], **{key: locale[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
         ],
     }, indent=2) + "\n", encoding="utf-8")
 
@@ -120,12 +122,22 @@ def assemble(
     else:
         surfaces = json.loads(surface_records.read_text(encoding="utf-8"))
     samples = json.loads(sample_observations.read_text(encoding="utf-8"))
-    if not all(observation[key] for key in ("edit_observed", "analysis_observed", "reopen_observed")):
+    if not all(observation[key] for key in ("edit_observed", "analysis_observed", "reopen_observed", "analysis_after_reopen_observed")):
         raise ValueError("workflow observation contains an unsuccessful operation")
     base_identity = _identity(observation)
     locale_variants = observation["locale_inputs"]
     if [item["locale"] for item in locale_variants] != ["en_US", "de_DE"]:
         raise ValueError("workflow observation must contain both locale variants")
+    if [item.get("operation") for item in locale_variants] != ["analysis", "locale"]:
+        raise ValueError("workflow observation must contain distinct locale operations")
+    if (
+        locale_variants[0]["decimal_point"] != "."
+        or locale_variants[1]["decimal_point"] != ","
+        or "." not in locale_variants[0]["input"]
+        or "," not in locale_variants[1]["input"]
+        or locale_variants[0]["canonical_value"] != locale_variants[1]["canonical_value"]
+    ):
+        raise ValueError("workflow observation did not exercise distinct locale inputs")
     workflows = {
         "automation_entry_point": True,
         "converted_sample": sample,
@@ -135,11 +147,11 @@ def assemble(
         "expected_normalized_summary_sha256": base_identity["normalized_summary_sha256"],
         **base_identity,
         "locale_variants": [
-            {"locale": item["locale"], "input": item["input"], "canonical_value": item["canonical_value"], **_identity(item)}
+            {"operation": item["operation"], "locale": item["locale"], "decimal_point": item["decimal_point"], "input": item["input"], "canonical_value": item["canonical_value"], **_identity(item)}
             for item in locale_variants
         ],
         "save_reopen": bool(observation["reopen_observed"]),
-        "analysis_after_reopen": bool(observation["analysis_observed"] and observation["reopen_observed"]),
+        "analysis_after_reopen": bool(observation["analysis_after_reopen_observed"]),
         "sample_projects": samples,
     }
     evidence = {"schema_version": 1, "passed": True, "workflows": workflows,

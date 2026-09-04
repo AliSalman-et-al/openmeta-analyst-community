@@ -48,7 +48,6 @@ from rc_metastudio import (
     adaptive_window,
     app_error_handler,
     plot_capabilities,
-    r_bridge,
 )
 from rc_metastudio.analysis_results import (
     AnalysisResult,
@@ -248,7 +247,12 @@ def _pixmap_device_independent_size(pixmap):
 
 
 class ResultsWindow(QMainWindow, Ui_ResultsWindow):
-    def __init__(self, results: AnalysisResult, parent=None):
+    def __init__(
+        self,
+        results: AnalysisResult,
+        parent=None,
+        plot_service: PlotService | None = None,
+    ):
 
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
@@ -274,7 +278,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.buffer_size = 2
         self.borders = []
         self._active_text_context_menu = None
-        self.plot_service = PlotService()
+        self.plot_service = plot_service or PlotService()
 
         self.nav_tree.itemClicked.connect(
             app_error_handler.safe_slot(self.item_clicked, parent=self)
@@ -884,7 +888,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self._edit_sroc_plot(artifact, plot_item)
 
     def _edit_sroc_plot(self, artifact, plot_item):
-        plot_params = self._plots().load_params(artifact.params_path)
+        plot_params = self.plot_service.load_params(artifact.params_path)
         if plot_params is None:
             return
         dialog = EditPlotDialog(
@@ -901,7 +905,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_sroc_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("fp_outpath") or artifact.image_path
-        self._plots().apply_edits(
+        self.plot_service.apply_edits(
             regenerator="sroc",
             params_path=artifact.params_path,
             updated_params=updated_params,
@@ -910,7 +914,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _edit_funnel_plot(self, artifact, plot_item):
-        plot_params = self._plots().load_params(artifact.params_path)
+        plot_params = self.plot_service.load_params(artifact.params_path)
         if plot_params is None:
             return
         dialog = FunnelPlotEditorDialog(
@@ -932,7 +936,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 "SVGZ output is not supported when editing funnel plots; use SVG instead."
             )
         try:
-            self._plots().apply_edits(
+            self.plot_service.apply_edits(
                 regenerator="funnel",
                 params_path=artifact.params_path,
                 updated_params=updated_params,
@@ -945,7 +949,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         dialog.mark_commit_succeeded()
 
     def _edit_forest_plot(self, artifact, plot_item):
-        plot_params = self._plots().load_params(artifact.params_path)
+        plot_params = self.plot_service.load_params(artifact.params_path)
         if plot_params is None:
             return
 
@@ -959,7 +963,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         dialog.exec()
 
     def edit_regression_plot(self, artifact, plot_item):
-        plot_params = self._plots().load_params(artifact.params_path)
+        plot_params = self.plot_service.load_params(artifact.params_path)
         if plot_params is None:
             return
 
@@ -977,7 +981,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_regression_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["bp_outpath"] or artifact.image_path
-        self._plots().apply_edits(
+        self.plot_service.apply_edits(
             regenerator="regression",
             params_path=artifact.params_path,
             updated_params=updated_params,
@@ -988,7 +992,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_forest_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or artifact.image_path
-        self._plots().apply_edits(
+        self.plot_service.apply_edits(
             regenerator="forest",
             params_path=artifact.params_path,
             updated_params=updated_params,
@@ -1055,7 +1059,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 file_path = _path_with_export_extension(
                     file_path, export_format, allow_svgz=allow_svgz
                 )
-                self._plots().export(
+                self.plot_service.export(
                     regenerator=regenerator,
                     params_path=artifact.params_path,
                     output_path=file_path,
@@ -1075,9 +1079,6 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
     def position(self):
         return QPointF(float(self.x_coord), float(self.y_coord))
-
-    def _plots(self) -> PlotService:
-        return self.__dict__.get("plot_service") or PlotService()
 
     def _viewport_width(self) -> int:
         viewport = self.graphics_view.viewport()

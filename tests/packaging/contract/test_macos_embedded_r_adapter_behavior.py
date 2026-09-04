@@ -650,10 +650,14 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
                     "locale_variants": [
                         {
                             "locale": locale,
+                            "decimal_point": decimal_point,
+                            "input": input_value,
+                            "canonical_value": 1.2,
+                            "svg_sha256": {"forest": "b" * 64},
                             "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
                             "raw_summary_sha256": "a" * 64,
                         }
-                        for locale in ("en_US", "de_DE")
+                        for locale, decimal_point, input_value in (("en_US", ".", "1.2"), ("de_DE", ",", "1,2"))
                     ],
                     "sample_projects": {
                         "passed": True,
