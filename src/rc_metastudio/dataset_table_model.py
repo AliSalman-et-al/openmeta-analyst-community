@@ -1662,6 +1662,8 @@ class DatasetTableModel(QAbstractTableModel):
         )
 
     def recalculate_display_scale(self):
+        if self.current_outcome_name is None or self.get_current_follow_up_name() is None:
+            return
         effect = self.current_effect
         group_comparison = self.get_current_group_comparison()
         current_data_type = self.dataset.get_outcome_type(self.current_outcome_name)

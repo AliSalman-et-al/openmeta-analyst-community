@@ -65,6 +65,7 @@ def start_automation(phase_callback=None):
         if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
             load_R_libraries(app, None, phase_callback=phase_callback)
         meta = main_window.MainWindow()
+        _mark_workspace_saved(meta)
         _show_main_window(meta)
         return app, meta
     except BaseException:

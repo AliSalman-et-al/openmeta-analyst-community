@@ -43,6 +43,14 @@ def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drif
     assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
 
 
+def test_recalculate_display_scale_ignores_workspace_without_active_outcome():
+    dataset = analysis_dataset.Dataset()
+    dataset.add_study(analysis_dataset.Study(1, name="Alpha"))
+    model = dataset_table_model.DatasetTableModel(dataset=dataset, add_blank_study=False)
+
+    model.recalculate_display_scale()
+
+
 def test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation():
     model = _diagnostic_model_with_empty_cells()
     model.dataset.add_covariate(
