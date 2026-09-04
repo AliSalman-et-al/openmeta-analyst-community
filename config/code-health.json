@@ -21,6 +21,7 @@
       "python_metrics": "combines two analyzers while preserving per-function identity",
       "history_for_path": "parses Git's commit/numstat stream across three time windows",
       "python_import_graph": "boundary parser must classify imports, relative modules, and policy violations",
+      "grimp_evidence": "revision snapshots require an isolated archived package for the locked analyzer",
       "gate": "combines independent cycle, import, and changed-function gates",
       "build_evidence": "assembles the versioned evidence document from independent measurements"
     },

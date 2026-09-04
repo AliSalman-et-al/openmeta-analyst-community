@@ -1,12 +1,37 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+from complexipy import code_complexity
+
+from scripts.code_health import git_as_of, history_for_path, python_metrics
+
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _git(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _commit(cwd: Path, message: str, timestamp: str) -> str:
+    env = os.environ | {
+        "GIT_AUTHOR_NAME": "Code Health Test",
+        "GIT_AUTHOR_EMAIL": "code-health@example.test",
+        "GIT_COMMITTER_NAME": "Code Health Test",
+        "GIT_COMMITTER_EMAIL": "code-health@example.test",
+        "GIT_AUTHOR_DATE": timestamp,
+        "GIT_COMMITTER_DATE": timestamp,
+    }
+    subprocess.run(["git", "add", "src/pkg.py"], cwd=cwd, check=True, env=env)
+    subprocess.run(["git", "commit", "-m", message], cwd=cwd, check=True, env=env, capture_output=True)
+    return _git(cwd, "rev-parse", "HEAD")
 
 
 def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) -> None:
@@ -39,3 +64,50 @@ def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) 
     assert payload["dependency_tooling"]["tool"] == "grimp"
     assert "Code health" in report.read_text(encoding="utf-8")
     assert "Code health" in result.stdout
+
+
+def test_history_for_path_stops_at_measured_revision(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "src").mkdir()
+    source = tmp_path / "src/pkg.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+    _commit(tmp_path, "Add source", "2025-01-01T00:00:00+00:00")
+    source.write_text("value = 2\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "Fix baseline", "2025-01-10T00:00:00+00:00")
+    source.write_text("value = 3\n", encoding="utf-8")
+    head = _commit(tmp_path, "Fix later branch", "2025-01-20T00:00:00+00:00")
+
+    as_of = git_as_of(tmp_path, None, baseline)
+    churn, defects = history_for_path(tmp_path, "src/pkg.py", as_of, baseline)
+    head_as_of = git_as_of(tmp_path, None, head)
+    head_churn, head_defects = history_for_path(tmp_path, "src/pkg.py", head_as_of, head)
+
+    assert defects == 1
+    assert churn["180"] < head_churn["180"]
+    assert head_defects == 2
+
+
+def test_python_metrics_uses_complexipy_at_each_revision(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "src").mkdir()
+    source = tmp_path / "src/pkg.py"
+    source.write_text("def measure(value):\n    return value\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "Add source", "2025-01-01T00:00:00+00:00")
+    source.write_text(
+        "def measure(value):\n"
+        "    if value:\n"
+        "        if value > 1:\n"
+        "            return value\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    head = _commit(tmp_path, "Increase cognitive complexity", "2025-01-02T00:00:00+00:00")
+
+    baseline_metric = python_metrics(tmp_path, ["src/pkg.py"], baseline)[0]
+    head_metric = python_metrics(tmp_path, ["src/pkg.py"], head)[0]
+    baseline_source = _git(tmp_path, "show", f"{baseline}:src/pkg.py")
+    head_source = _git(tmp_path, "show", f"{head}:src/pkg.py")
+
+    assert baseline_metric.cognitive == code_complexity(baseline_source).functions[0].complexity
+    assert head_metric.cognitive == code_complexity(head_source).functions[0].complexity
+    assert head_metric.cognitive > baseline_metric.cognitive

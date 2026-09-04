@@ -28,16 +28,20 @@ uv run python scripts/verify.py r-stack
 ```
 
 For deterministic complexity, dependency, churn, and hotspot evidence, run the
-locked code-health command against a comparison commit. The command writes
-machine-readable JSON and a short text report; the exit status enforces only
-new cycles, forbidden boundary imports, and changed-function thresholds.
+locked code-health command against a comparison commit. Both snapshots are
+measured from their named revisions: history is bounded at the measured head,
+and Radon, Complexipy, and Grimp analyze that revision's source. The command
+writes machine-readable JSON and a short text report; the exit status enforces
+only new cycles, forbidden boundary imports, and changed-function thresholds.
 
 ```powershell
-uv run python scripts/code_health.py --base 4aa0740 --head HEAD `
+uv run python scripts/code_health.py --base 8b7796b --head HEAD `
   --output artifacts/code-health/final.json `
   --report artifacts/code-health/final.txt
 ```
 
+Use the stable rewrite baseline `8b7796b` for trend snapshots (as the CI
+workflow does) and use the PR or push base separately for changed-code gates.
 Use the same commit for `--base` and `--head` to capture a baseline snapshot.
 The report records rename-aware 30-, 90-, and 180-day line churn. Hotspots are
 ranked as normalized 180-day churn multiplied by cyclomatic complexity density;

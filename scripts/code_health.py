@@ -11,15 +11,18 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
+import io
 import json
 import subprocess
 import sys
+import tarfile
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Iterable, TypedDict, cast
 
-from complexipy import file_complexity
+from complexipy import code_complexity
 from grimp import build_graph
 from radon.complexity import cc_visit_ast
 from radon.metrics import mi_visit
@@ -281,11 +284,10 @@ def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None
             (block.name, block.lineno): block.complexity
             for block in cc_visit_ast(tree)
         }
-        cognitive_metrics: dict[tuple[str, int], int] = {}
-        if revision is None:
-            for block in file_complexity(str(root / relative)).functions:
-                name = block.name.rsplit("::", 1)[-1]
-                cognitive_metrics[(name, block.line_start)] = block.complexity
+        cognitive_metrics = {
+            (block.name.rsplit("::", 1)[-1], block.line_start): block.complexity
+            for block in code_complexity(source).functions
+        }
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 metrics.append(
@@ -317,35 +319,36 @@ def _resolve_imported_module(module: str, imported: str, modules: set[str]) -> s
     return None
 
 
-def git_as_of(root: Path, requested: str | None) -> datetime:
+def git_as_of(root: Path, requested: str | None, revision: str = "HEAD") -> datetime:
     if requested:
         try:
             return datetime.fromisoformat(requested).replace(tzinfo=UTC)
         except ValueError as exc:
             raise CodeHealthError("--as-of must be ISO-8601 date or datetime") from exc
-    stamp = run_git(root, "show", "-s", "--format=%cI", "HEAD").strip()
+    stamp = run_git(root, "show", "-s", "--format=%cI", revision).strip()
     try:
         return datetime.fromisoformat(stamp)
     except ValueError as exc:
-        raise CodeHealthError("HEAD has no usable commit timestamp") from exc
+        raise CodeHealthError(f"{revision} has no usable commit timestamp") from exc
 
 
-def history_for_path(root: Path, path: str, as_of: datetime) -> tuple[dict[str, int], int]:
+def history_for_path(root: Path, path: str, as_of: datetime, revision: str = "HEAD") -> tuple[dict[str, int], int]:
     result = {"30": 0, "90": 0, "180": 0}
     since = (as_of - timedelta(days=180)).date().isoformat()
-    output = run_git(root, "log", "--follow", "--since", since, "--numstat", "--format=%ct%x00%s", "--", path)
+    output = run_git(root, "log", revision, "--follow", "--since", since, "--numstat", "--format=%ct%x00%s", "--", path)
     commit_timestamp: int | None = None
     defect_commits = 0
+    as_of_timestamp = as_of.timestamp()
     for line in output.splitlines():
         if "\x00" in line:
             timestamp, subject = line.split("\x00", 1)
             if timestamp.isdigit():
                 commit_timestamp = int(timestamp)
-                if any(word in subject.lower() for word in ("fix", "bug", "regression", "crash")):
+                if commit_timestamp <= as_of_timestamp and any(word in subject.lower() for word in ("fix", "bug", "regression", "crash")):
                     defect_commits += 1
             continue
         parts = line.split("\t")
-        if commit_timestamp is None or len(parts) != 3:
+        if commit_timestamp is None or commit_timestamp > as_of_timestamp or len(parts) != 3:
             continue
         added, deleted = parts[:2]
         if not (added.isdigit() and deleted.isdigit()):
@@ -439,10 +442,37 @@ def cycles(graph: dict[str, set[str]]) -> list[list[str]]:
     return [list(cycle) for cycle in sorted(found)]
 
 
-def grimp_evidence() -> dict[str, object] | None:
+def grimp_evidence(root: Path | None = None, revision: str | None = None) -> dict[str, object] | None:
     """Collect package-level coupling from the locked Grimp analyzer."""
+    root = root or repo_root()
     try:
-        package_graph = build_graph("rc_metastudio", include_external_packages=False)
+        if revision is None:
+            package_graph = build_graph("rc_metastudio", include_external_packages=False)
+        else:
+            with tempfile.TemporaryDirectory(prefix="code-health-") as temporary:
+                archive = subprocess.run(
+                    ["git", "archive", "--format=tar", revision, "--", "src/rc_metastudio"],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
+                    tar.extractall(temporary)
+                package_root = str(Path(temporary) / "src")
+                saved_modules = {
+                    name: sys.modules.pop(name)
+                    for name in list(sys.modules)
+                    if name == "rc_metastudio" or name.startswith("rc_metastudio.")
+                }
+                sys.path.insert(0, package_root)
+                try:
+                    package_graph = build_graph("rc_metastudio", include_external_packages=False)
+                finally:
+                    sys.path.remove(package_root)
+                    for name in list(sys.modules):
+                        if name == "rc_metastudio" or name.startswith("rc_metastudio."):
+                            sys.modules.pop(name)
+                    sys.modules.update(saved_modules)
     except (ImportError, ModuleNotFoundError):
         return None
     edges = sum(
@@ -542,7 +572,7 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
         except CodeHealthError:
             source = ""
         line_count = len(source.splitlines())
-        churn, defect_count = history_for_path(root, path, as_of)
+        churn, defect_count = history_for_path(root, path, as_of, head)
         function_subset = [metric for metric in functions if metric.path == path]
         total_cyclomatic = sum(metric.cyclomatic for metric in function_subset)
         complexity_density = total_cyclomatic / max(line_count, 1)
@@ -558,7 +588,7 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
             "defect_history": defect_count,
         })
     file_metrics.sort(key=lambda item: (-item["hotspot_score"], item["path"]))
-    tooling = grimp_evidence()
+    tooling = grimp_evidence(root, head_revision)
     return {
         "schema_version": 1,
         "generated_at": as_of.isoformat(),
@@ -610,7 +640,7 @@ def main() -> int:
     args = parser.parse_args()
     root = repo_root()
     config = load_config(root)
-    evidence = build_evidence(root, args.base, args.head, git_as_of(root, args.as_of), config)
+    evidence = build_evidence(root, args.base, args.head, git_as_of(root, args.as_of, args.head), config)
     output = (root / args.output).resolve() if not args.output.is_absolute() else args.output
     report = (root / args.report).resolve() if not args.report.is_absolute() else args.report
     output.parent.mkdir(parents=True, exist_ok=True)
