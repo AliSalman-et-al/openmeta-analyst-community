@@ -102,48 +102,7 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
     from rc_metastudio import results_window
     from rc_metastudio import settings
 
-    plot_path = _create_intrinsic_ratio_artifact(output)
-    results = results_window.ResultsWindow(
-        parse_analysis_result(
-            {
-                "version": 1,
-                "texts": {
-                    "Summary": (
-                        "Native adaptive-layout package evidence\n\n"
-                        "Required Content remains readable while the Results navigation "
-                        "and content panes are resized independently."
-                    )
-                },
-                "images": {"Aspect-Ratio Plot": str(plot_path)},
-                "plot_capabilities": {
-                    "Aspect-Ratio Plot": {
-                        "plot_kind": "other",
-                        "editable": False,
-                        "styleable": False,
-                        "regenerator": "none",
-                        "composition": "single",
-                    }
-                },
-                "sections": [
-                    {
-                        "id": "adaptive.summary",
-                        "kind": "text",
-                        "order": 0,
-                        "title": "Summary",
-                        "source_key": "Summary",
-                    },
-                    {
-                        "id": "adaptive.aspect-ratio-plot",
-                        "kind": "image",
-                        "order": 1,
-                        "title": "Aspect-Ratio Plot",
-                        "source_key": "Aspect-Ratio Plot",
-                    },
-                ],
-            }
-        ),
-        parent=main_window,
-    )
+    plot_path, results = _create_results_surface(results_window, main_window, output)
     workflow = main_wizard.MainWizard(path="new_dataset", parent=main_window)
     transactional = about_legal_dialog.AboutLegalDialog(parent=main_window)
     transient = progress_dialog.AnalysisProgressDialog(parent=main_window)
@@ -159,68 +118,19 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         ("analysis-progress", "transient", transient),
     ]
 
-    records = []
-    unavailable_scenarios = []
     try:
-        for viewport_name, viewport in (
-            ("constrained", CONSTRAINED_WORKSPACE),
-            ("full-usability", FULL_USABILITY_WORKSPACE),
-        ):
-            for surface_name, _archetype, window in surfaces[:2]:
-                scenario_name = "%s-%s" % (surface_name, viewport_name)
-                unavailable = _exact_client_size_unavailability(
-                    app, window, viewport, scenario_name
-                )
-                if unavailable is not None:
-                    if viewport != FULL_USABILITY_WORKSPACE:
-                        raise RuntimeError(
-                            "%s is required even on a constrained native screen."
-                            % scenario_name
-                        )
-                    unavailable_scenarios.append(unavailable)
-                    continue
-                _show_at_exact_client_size(app, window, viewport)
-                if window is main_window:
-                    _exercise_main_workspace(main_window)
-                record = _capture_surface(
-                    app,
-                    window,
-                    screenshots,
-                    scenario_name,
-                    "workspace",
-                    viewport,
-                )
-                records.append(record)
-
-        _show_at_exact_client_size(app, main_window, CONSTRAINED_WORKSPACE)
-        for surface_name, archetype, window in surfaces[2:]:
-            _show_content_driven_surface(app, window, archetype)
-            records.append(
-                _capture_surface(
-                    app,
-                    window,
-                    screenshots,
-                    "%s-constrained-owner" % surface_name,
-                    archetype,
-                    window.size(),
-                    owning_workspace_client_size=CONSTRAINED_WORKSPACE,
-                )
-            )
-            window.hide()
-            _flush(app)
+        records, unavailable_scenarios = _capture_workspace_scenarios(
+            app, main_window, surfaces[:2], screenshots
+        )
+        records.extend(
+            _capture_owned_surfaces(app, main_window, surfaces[2:], screenshots)
+        )
 
         runtime_resize = _exercise_runtime_resize(app, main_window)
         remembered_geometry = _exercise_remembered_geometry(main_window, settings)
         splitter = _exercise_results_splitter(app, results)
         intrinsic_artifact = _intrinsic_artifact_record(results, plot_path)
-        table_record = {
-            "rows": model.rowCount(),
-            "columns": model.columnCount(),
-            "column_widths": [
-                main_window.tableView.columnWidth(index)
-                for index in range(model.columnCount())
-            ],
-        }
+        table_record = _table_record(main_window, model)
     finally:
         for _name, _archetype, window in reversed(surfaces[1:]):
             window.close()
@@ -229,9 +139,146 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
 
     shutil.rmtree(output / "settings", ignore_errors=True)
 
+    manifest = _evidence_manifest(
+        app,
+        plugin,
+        table_record,
+        splitter,
+        intrinsic_artifact,
+        remembered_geometry,
+        runtime_resize,
+        records,
+        unavailable_scenarios,
+    )
+    (output / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (output / "HUMAN_REVIEW.md").write_text(
+        _human_review_template(manifest), encoding="utf-8"
+    )
+    return manifest
+
+
+def _create_results_surface(results_window, main_window, output):
+    plot_path = _create_intrinsic_ratio_artifact(output)
+    result = parse_analysis_result(
+        {
+            "version": 1,
+            "texts": {
+                "Summary": (
+                    "Native adaptive-layout package evidence\n\n"
+                    "Required Content remains readable while the Results navigation "
+                    "and content panes are resized independently."
+                )
+            },
+            "images": {"Aspect-Ratio Plot": str(plot_path)},
+            "plot_capabilities": {
+                "Aspect-Ratio Plot": {
+                    "plot_kind": "other",
+                    "editable": False,
+                    "styleable": False,
+                    "regenerator": "none",
+                    "composition": "single",
+                }
+            },
+            "sections": [
+                {
+                    "id": "adaptive.summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                },
+                {
+                    "id": "adaptive.aspect-ratio-plot",
+                    "kind": "image",
+                    "order": 1,
+                    "title": "Aspect-Ratio Plot",
+                    "source_key": "Aspect-Ratio Plot",
+                },
+            ],
+        }
+    )
+    return plot_path, results_window.ResultsWindow(result, parent=main_window)
+
+
+def _capture_workspace_scenarios(app, main_window, surfaces, screenshots):
+    records = []
+    unavailable_scenarios = []
+    viewports = (
+        ("constrained", CONSTRAINED_WORKSPACE),
+        ("full-usability", FULL_USABILITY_WORKSPACE),
+    )
+    for viewport_name, viewport in viewports:
+        for surface_name, _archetype, window in surfaces:
+            scenario_name = "%s-%s" % (surface_name, viewport_name)
+            unavailable = _exact_client_size_unavailability(
+                app, window, viewport, scenario_name
+            )
+            if unavailable is not None:
+                if viewport != FULL_USABILITY_WORKSPACE:
+                    raise RuntimeError(
+                        "%s is required even on a constrained native screen."
+                        % scenario_name
+                    )
+                unavailable_scenarios.append(unavailable)
+                continue
+            _show_at_exact_client_size(app, window, viewport)
+            if window is main_window:
+                _exercise_main_workspace(main_window)
+            records.append(
+                _capture_surface(
+                    app, window, screenshots, scenario_name, "workspace", viewport
+                )
+            )
+    return records, unavailable_scenarios
+
+
+def _capture_owned_surfaces(app, main_window, surfaces, screenshots):
+    _show_at_exact_client_size(app, main_window, CONSTRAINED_WORKSPACE)
+    records = []
+    for surface_name, archetype, window in surfaces:
+        _show_content_driven_surface(app, window, archetype)
+        records.append(
+            _capture_surface(
+                app,
+                window,
+                screenshots,
+                "%s-constrained-owner" % surface_name,
+                archetype,
+                window.size(),
+                owning_workspace_client_size=CONSTRAINED_WORKSPACE,
+            )
+        )
+        window.hide()
+        _flush(app)
+    return records
+
+
+def _table_record(main_window, model):
+    return {
+        "rows": model.rowCount(),
+        "columns": model.columnCount(),
+        "column_widths": [
+            main_window.tableView.columnWidth(index)
+            for index in range(model.columnCount())
+        ],
+    }
+
+
+def _evidence_manifest(
+    app,
+    plugin,
+    table,
+    splitter,
+    intrinsic_artifact,
+    remembered_geometry,
+    runtime_resize,
+    surfaces,
+    unavailable_scenarios,
+):
     screen = app.primaryScreen()
-    font = app.font()
-    manifest = {
+    return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "platform": platform.platform(),
@@ -244,14 +291,14 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
         "screen": _screen_record(screen),
         "logical_dpi": round(screen.logicalDotsPerInch(), 2),
         "device_pixel_ratio": round(screen.devicePixelRatio(), 2),
-        "font": _font_record(font),
+        "font": _font_record(app.font()),
         "icon_available": not app.windowIcon().isNull(),
-        "table": table_record,
+        "table": table,
         "splitter": splitter,
         "intrinsic_artifact": intrinsic_artifact,
         "remembered_geometry": remembered_geometry,
         "runtime_resize": runtime_resize,
-        "surfaces": records,
+        "surfaces": surfaces,
         "unavailable_scenarios": unavailable_scenarios,
         "human_review": {
             "status": "required",
@@ -265,13 +312,6 @@ def run_native_adaptive_layout_evidence(app, main_window, sample_path, output_di
             ],
         },
     }
-    (output / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    (output / "HUMAN_REVIEW.md").write_text(
-        _human_review_template(manifest), encoding="utf-8"
-    )
-    return manifest
 
 
 def _show_at_exact_client_size(app, window, requested):
