@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 
 from rc_metastudio import app_error_handler, qt6_resources, settings
 from rc_metastudio.launch import (
@@ -20,6 +21,12 @@ from rc_metastudio.launch import (
 
 
 AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
+
+
+def _force_table_paint(app, window) -> None:
+    """Allow packaged qualification to flush the ordinary Qt table path."""
+    del window
+    app.processEvents()
 
 
 def _log(message: str) -> None:
@@ -74,7 +81,7 @@ def assert_opened_project_for_startup_smoke(
         raise SystemExit("startup project did not open: %s" % project_path)
     if completion_marker:
         with open(completion_marker, "w", encoding="utf-8") as marker:
-            marker.write("startup-project:complete\n")
+            json.dump({"project": os.path.basename(project_path)}, marker)
     window.workspace_is_dirty = False
     window.close()
     app.processEvents()

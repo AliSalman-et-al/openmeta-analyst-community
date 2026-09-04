@@ -263,6 +263,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 self.workspace.mark_dirty()
                 self.workspace_is_dirty = True
             elif self.workspace.document is not None:
+                try:
+                    document = _document_from_model(self.model)
+                except project_adapter.ProjectAdapterError:
+                    document = None
+                if document is not None and document != self.workspace.document:
+                    self.workspace.replace(document, record_history=False)
                 self.workspace.mark_saved()
                 self.workspace_is_dirty = False
             else:
@@ -923,9 +929,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         elif self.workspace.document == after_document:
             self.workspace_is_dirty = self.workspace.is_dirty
             return
-        elif self.workspace.document != before_document:
-            self.workspace.replace(before_document, record_history=False)
-            self.workspace.mark_saved()
         self.workspace.replace(after_document)
         self.workspace_is_dirty = self.workspace.is_dirty
 
@@ -1072,6 +1075,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         current = self.tableView.currentIndex()
         position = (current.row(), current.column()) if current.isValid() else None
         previous_model = self.model
+        observers = self.__dict__.setdefault("_workspace_model_observers", [])
+        if previous_model not in observers:
+            observers.append(previous_model)
         runtime = project_adapter.document_to_runtime_project(document)
         self.set_model(
             runtime.dataset,
@@ -1081,8 +1087,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         )
         # Keep observers holding the Qt adapter's model reference coherent
         # while the view itself follows the newly decoded workspace snapshot.
-        previous_model.dataset = self.model.dataset
-        previous_model.set_state(runtime.model_state)
+        for observer in observers:
+            observer.dataset = self.model.dataset
+            observer.set_state(runtime.model_state)
         self.out_path = str(self.workspace.path) if self.workspace.path else None
         self.workspace_is_dirty = self.workspace.is_dirty
         if position is not None:
