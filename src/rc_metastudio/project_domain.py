@@ -8,12 +8,70 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
-from typing import TypeAlias, cast
+from typing import NewType, TypeAlias, cast
 
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
+StudyId = NewType("StudyId", int)
+OutcomeId = NewType("OutcomeId", str)
+FollowUpId = NewType("FollowUpId", str)
+GroupId = NewType("GroupId", int)
+CovariateId = NewType("CovariateId", str)
+
+
+@dataclass(frozen=True, slots=True)
+class FollowUpSnapshot:
+    identity: FollowUpId
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class OutcomeSnapshot:
+    identity: OutcomeId
+    label: str
+    data_type: int
+    sub_type: str | None
+    follow_ups: tuple[FollowUpSnapshot, ...]
+    wire: tuple[tuple[str, JsonValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CovariateSnapshot:
+    identity: CovariateId
+    label: str
+    data_type: int
+    wire: tuple[tuple[str, JsonValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GroupSnapshot:
+    identity: GroupId
+    label: str
+    raw_data: tuple[JsonValue, ...]
+    wire: tuple[tuple[str, JsonValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class UnitSnapshot:
+    outcome: OutcomeId
+    follow_up: FollowUpId | None
+    groups: tuple[GroupSnapshot, ...]
+    entered_effects: Mapping[str, JsonValue]
+    wire: tuple[tuple[str, JsonValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StudySnapshot:
+    identity: StudyId
+    label: str
+    year: int | None
+    include: bool
+    sample_size: float | None
+    covariates: Mapping[str, JsonValue]
+    units: tuple[UnitSnapshot, ...]
+    wire: tuple[tuple[str, JsonValue], ...]
 
 
 class ProjectSemanticError(ValueError):
@@ -26,9 +84,9 @@ class AnalysisDataset:
 
     analysis_family: str
     title: str
-    outcomes: tuple[JsonObject, ...]
-    covariates: tuple[JsonObject, ...]
-    studies: tuple[JsonObject, ...]
+    outcomes: tuple[OutcomeSnapshot, ...]
+    covariates: tuple[CovariateSnapshot, ...]
+    studies: tuple[StudySnapshot, ...]
     is_diagnostic: bool
     notes: str
     summary: JsonValue
@@ -36,11 +94,11 @@ class AnalysisDataset:
     def to_json(self) -> JsonObject:
         return {
             "analysis_family": self.analysis_family,
-            "covariates": cast(list[JsonValue], copy.deepcopy(list(self.covariates))),
+            "covariates": [dict(item.wire) for item in self.covariates],
             "is_diagnostic": self.is_diagnostic,
             "notes": self.notes,
-            "outcomes": cast(list[JsonValue], copy.deepcopy(list(self.outcomes))),
-            "studies": cast(list[JsonValue], copy.deepcopy(list(self.studies))),
+            "outcomes": [dict(item.wire) for item in self.outcomes],
+            "studies": [dict(item.wire) for item in self.studies],
             "summary": copy.deepcopy(self.summary),
             "title": self.title,
         }
@@ -370,25 +428,98 @@ def validate_project_semantics(
         raise ProjectSemanticError("active group is not declared")
 
 
+def _wire_pairs(value: Mapping[str, object]) -> tuple[tuple[str, JsonValue], ...]:
+    return tuple((key, cast(JsonValue, copy.deepcopy(item))) for key, item in value.items())
+
+
+def _typed_outcome(value: Mapping[str, object]) -> OutcomeSnapshot:
+    label = cast(str, value["name"])
+    follow_ups = tuple(
+        FollowUpSnapshot(FollowUpId(f"{label}:{name}"), name)
+        for name in cast(list[str], value["follow_ups"])
+    )
+    return OutcomeSnapshot(
+        OutcomeId(cast(str, value.get("stable_id") or label)),
+        label,
+        cast(int, value["data_type"]),
+        cast(str | None, value["sub_type"]),
+        follow_ups,
+        _wire_pairs(value),
+    )
+
+
+def _typed_covariate(value: Mapping[str, object]) -> CovariateSnapshot:
+    label = cast(str, value["name"])
+    return CovariateSnapshot(
+        CovariateId(cast(str, value.get("stable_id") or label)),
+        label,
+        cast(int, value["data_type"]),
+        _wire_pairs(value),
+    )
+
+
+def _typed_unit(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]) -> UnitSnapshot:
+    outcome = cast(str, value["outcome"])
+    follow_up = cast(str | None, value["follow_up"])
+    groups = tuple(
+        GroupSnapshot(
+            GroupId(cast(int, group["id"])),
+            cast(str, group["name"]),
+            tuple(cast(JsonValue, copy.deepcopy(item)) for item in cast(list[object], group["raw_data"])),
+            _wire_pairs(group),
+        )
+        for group in (_object(item, "group") for item in _array(value["groups"], "groups"))
+    )
+    return UnitSnapshot(
+        outcomes[outcome].identity,
+        None if follow_up is None else FollowUpId(f"{outcome}:{follow_up}"),
+        groups,
+        cast(Mapping[str, JsonValue], copy.deepcopy(_object(value["entered_effects"], "entered_effects"))),
+        _wire_pairs(value),
+    )
+
+
+def _typed_study(value: Mapping[str, object], outcomes: Mapping[str, OutcomeSnapshot]) -> StudySnapshot:
+    name = cast(str, value["name"])
+    year = cast(int | None, value["year"])
+    sample_size = cast(float | None, value["sample_size"])
+    units = tuple(
+        _typed_unit(_object(item, "analysis unit"), outcomes)
+        for item in _array(value["analysis_units"], "analysis_units")
+    )
+    return StudySnapshot(
+        StudyId(cast(int, value["id"])),
+        name,
+        year,
+        cast(bool, value["include"]),
+        sample_size,
+        cast(Mapping[str, JsonValue], copy.deepcopy(_object(value["covariates"], "covariates"))),
+        units,
+        _wire_pairs(value),
+    )
+
+
 def reconstruct_analysis_dataset(
     project: Mapping[str, JsonValue], state: Mapping[str, JsonValue]
 ) -> AnalysisDataset:
     validate_project_semantics(project, state)
     dataset = _object(project["dataset"], "project.json/dataset")
+    typed_outcomes = tuple(
+        _typed_outcome(_object(value, "outcome"))
+        for value in _array(dataset["outcomes"], "outcomes")
+    )
+    outcomes_by_label = {item.label: item for item in typed_outcomes}
     return AnalysisDataset(
         analysis_family=cast(str, dataset["analysis_family"]),
         title=cast(str, dataset["title"]),
-        outcomes=tuple(
-            cast(JsonObject, copy.deepcopy(v))
-            for v in cast(list[object], dataset["outcomes"])
-        ),
+        outcomes=typed_outcomes,
         covariates=tuple(
-            cast(JsonObject, copy.deepcopy(v))
-            for v in cast(list[object], dataset["covariates"])
+            _typed_covariate(_object(value, "covariate"))
+            for value in _array(dataset["covariates"], "covariates")
         ),
         studies=tuple(
-            cast(JsonObject, copy.deepcopy(v))
-            for v in cast(list[object], dataset["studies"])
+            _typed_study(_object(value, "study"), outcomes_by_label)
+            for value in _array(dataset["studies"], "studies")
         ),
         is_diagnostic=cast(bool, dataset["is_diagnostic"]),
         notes=cast(str, dataset["notes"]),

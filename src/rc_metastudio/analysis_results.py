@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+import hashlib
 from types import MappingProxyType
 from typing import Literal, Self, SupportsIndex, TypedDict, overload
 
@@ -75,6 +76,20 @@ class RawAnalysisResult(TypedDict, total=False):
     plot_capabilities: dict[str, dict[str, object]]
 
 
+@dataclass(frozen=True, slots=True)
+class ResultSection:
+    """Stable result identity and stored display/regeneration data."""
+
+    semantic_id: str
+    kind: Literal["text", "image"]
+    order: int
+    title: str
+    value: str
+    plot_kind: PlotKind | None = None
+    plot_data: str | None = None
+    capability: PlotCapability | None = None
+
+
 class FrozenStrings(Sequence[str]):
     """Tuple-backed sequence that keeps the old list equality contract."""
 
@@ -116,6 +131,7 @@ class AnalysisResult:
     image_params_paths: Mapping[str, str]
     image_order: FrozenStrings | None
     plot_capabilities: Mapping[str, PlotCapability]
+    sections: tuple[ResultSection, ...]
 
     @overload
     def __getitem__(self, key: Literal["texts"]) -> Mapping[str, str]: ...
@@ -128,6 +144,9 @@ class AnalysisResult:
 
     @overload
     def __getitem__(self, key: Literal["plot_capabilities"]) -> Mapping[str, PlotCapability]: ...
+
+    @overload
+    def __getitem__(self, key: Literal["sections"]) -> tuple[ResultSection, ...]: ...
 
     @overload
     def __getitem__(self, key: str) -> object: ...
@@ -147,19 +166,43 @@ class AnalysisResult:
             return self.image_order
         if key == "plot_capabilities":
             return self.plot_capabilities
+        if key == "sections":
+            return self.sections
         raise KeyError(key)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(("texts", "images", "display_images", "image_var_names", "image_params_paths", "image_order", "plot_capabilities"))
+        return iter(("texts", "images", "display_images", "image_var_names", "image_params_paths", "image_order", "plot_capabilities", "sections"))
 
     def __len__(self) -> int:
-        return 7
+        return 8
 
     def get(self, key: str, default: object = None) -> object:
         try:
             return self[key]
         except KeyError:
             return default
+
+
+def _section_id(kind: str, key: str) -> str:
+    return hashlib.sha256(f"{kind}\0{key}".encode("utf-8")).hexdigest()[:24]
+
+
+def _sections(
+    texts: Mapping[str, str],
+    images: Mapping[str, str],
+    image_params_paths: Mapping[str, str],
+    capabilities: Mapping[str, PlotCapability],
+) -> tuple[ResultSection, ...]:
+    result: list[ResultSection] = []
+    order = 0
+    for title, value in texts.items():
+        result.append(ResultSection(_section_id("text", title), "text", order, title, value))
+        order += 1
+    for title, value in images.items():
+        capability = capabilities[title]
+        result.append(ResultSection(_section_id("image", title), "image", order, title, value, capability.plot_kind, image_params_paths.get(title), capability))
+        order += 1
+    return tuple(result)
 
 
 class _FrozenList(list[str]):
@@ -189,14 +232,18 @@ def _freeze_result(
     image_order: Iterable[str] | None,
     plot_capabilities: Mapping[str, PlotCapability],
 ) -> AnalysisResult:
+    frozen_images = MappingProxyType(dict(images))
+    frozen_params = MappingProxyType(dict(image_params_paths))
+    frozen_capabilities = MappingProxyType(dict(plot_capabilities))
     return AnalysisResult(
         texts=MappingProxyType(dict(texts)),
-        images=MappingProxyType(dict(images)),
+        images=frozen_images,
         display_images=MappingProxyType(dict(display_images)),
         image_var_names=MappingProxyType(dict(image_var_names)),
-        image_params_paths=MappingProxyType(dict(image_params_paths)),
+        image_params_paths=frozen_params,
         image_order=None if image_order is None else FrozenStrings(image_order),
-        plot_capabilities=MappingProxyType(dict(plot_capabilities)),
+        plot_capabilities=frozen_capabilities,
+        sections=_sections(texts, images, image_params_paths, plot_capabilities),
     )
 
 

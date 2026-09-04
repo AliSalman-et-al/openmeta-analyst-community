@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Domain operations shared by the dataset table adapter."""
 
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import Protocol, TypeAlias
 
 from rc_metastudio.analysis_dataset import Dataset, Study
 from rc_metastudio.analysis_unit import AnalysisUnit
@@ -16,6 +16,18 @@ from rc_metastudio.meta_globals import (
     DIAGNOSTIC_METRICS,
     EMPTY_VALS,
 )
+
+Scalar: TypeAlias = float | int | str | None
+
+
+class ScaleBridge(Protocol):
+    def binary_convert_scale(self, value: object, effect: object, *, convert_to: str, n1: object = None) -> object: ...
+    def continuous_convert_scale(self, value: object, effect: object, *, convert_to: str) -> object: ...
+    def diagnostic_convert_scale(self, value: object, effect: object, *, convert_to: str) -> object: ...
+    def effect_for_study(self, *args: object, **kwargs: object) -> object: ...
+    def continuous_effect_for_study(self, *args: object, **kwargs: object) -> object: ...
+    def effect_triplet(self, value: object, scale: str, *, metric: object) -> tuple[Scalar, Scalar, Scalar]: ...
+    def diagnostic_effects_for_study(self, *args: object, **kwargs: object) -> Mapping[str, object]: ...
 
 
 def ensure_analysis_unit(
@@ -41,8 +53,8 @@ def ensure_analysis_unit(
 
 
 def make_display_scale_converter(
-    bridge: Any, data_type: str | None, effect: str | None, n1: Any = None
-) -> Callable[[Any], Any]:
+    bridge: ScaleBridge, data_type: str | None, effect: str | None, n1: object = None
+) -> Callable[[object], object]:
     """Build the calculation-to-display conversion for one outcome family."""
     if data_type == BINARY:
         return lambda value: bridge.binary_convert_scale(
@@ -60,12 +72,12 @@ def make_display_scale_converter(
 
 
 def to_calculation_scale(
-    bridge: Any,
-    value: Any,
+    bridge: ScaleBridge,
+    value: object,
     data_type: str | None,
     effect: str | None,
-    n1: Any = None,
-) -> Any:
+    n1: object = None,
+) -> object:
     """Convert a user-facing value to the backend's calculation scale."""
     if data_type == BINARY:
         return bridge.binary_convert_scale(
@@ -79,12 +91,12 @@ def to_calculation_scale(
 
 
 def calculate_raw_effects(
-    bridge: Any,
+    bridge: ScaleBridge,
     data_type: str | None,
     effect: str | None,
-    raw_data: Sequence[Any],
+    raw_data: Sequence[object],
     confidence_level: float,
-) -> tuple[tuple[Any, Any, Any], Any] | dict[str, tuple[Any, Any, Any]]:
+) -> tuple[tuple[Scalar, Scalar, Scalar], object] | dict[str, tuple[Scalar, Scalar, Scalar]]:
     """Calculate backend effects from one study's raw data."""
     if data_type == BINARY:
         e1, n1, e2, n2 = raw_data
@@ -147,11 +159,11 @@ def calculate_raw_effects(
     raise ValueError(f"Unsupported outcome type: {data_type!r}")
 
 
-def raw_data_is_complete(raw_data: Sequence[Any]) -> bool:
+def raw_data_is_complete(raw_data: Sequence[object]) -> bool:
     return all(value not in ("", None) for value in raw_data)
 
 
-def raw_data_is_empty(raw_data: Sequence[Any]) -> bool:
+def raw_data_is_empty(raw_data: Sequence[object]) -> bool:
     return all(value in EMPTY_VALS for value in raw_data)
 
 
@@ -184,7 +196,7 @@ def has_study_entered_data(study: Study) -> bool:
 
 def included_studies_have_raw_data(
     studies: Sequence[Study],
-    raw_data_for_study: Callable[[int, bool], Sequence[Any]],
+    raw_data_for_study: Callable[[int, bool], Sequence[object]],
     one_arm: bool,
 ) -> bool:
     for index, study in enumerate(studies[:-1]):
@@ -197,7 +209,7 @@ def included_studies_have_raw_data(
 
 def included_studies_have_effects(
     studies: Sequence[Study],
-    effect_for_study: Callable[[int], Sequence[Any]],
+    effect_for_study: Callable[[int], Sequence[object]],
 ) -> bool:
     return all(
         all(value is not None for value in effect_for_study(index))

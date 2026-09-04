@@ -300,6 +300,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.scene = QGraphicsScene(self)
 
         results = _normalize_results(results)
+        self.results = results
 
         self.images = results["images"]
         self.display_images = results["display_images"]
@@ -332,18 +333,19 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self._apply_restored_splitter_proportions()
 
     def add_result_sections(self):
-        ordered_sections = result_sections.order_display_sections(
-            texts=list(self.texts.items()),
-            images=list(self.images.items()),
-            explicit_image_order=self.image_order,
-        )
-
-        for section in ordered_sections:
+        # Ordering and plot capabilities come from the immutable result
+        # contract.  The title is used only when painting display text.
+        for section in sorted(self.results["sections"], key=lambda item: item.order):
+            if section.title == result_sections.REFERENCE_SECTION_TITLE:
+                continue
+            display_title = result_sections.section_display_title(
+                section.title, {"text_titles": list(self.texts), "image_titles": list(self.images)}, section.kind
+            )
             if section.kind == "text":
-                self.add_text_section(section.key, section.display_title, section.value)
+                self.add_text_section(section.title, display_title, section.value)
             elif section.kind == "image":
                 self.add_image_section(
-                    section.key, section.display_title, section.value
+                    section.title, display_title, section.value
                 )
 
     def add_image_section(self, title, display_title, image):
