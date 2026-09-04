@@ -1045,7 +1045,7 @@ def run_versioned_analysis_requests(
         if not isinstance(values, Mapping):
             raise TypeError("analysis request params must be a mapping")
         methods.append(method)
-        param_values.append(dict(values))
+        param_values.append({str(key): item for key, item in values.items()})
     normalized_workflow = _normalize_rcmetar_workflow(workflow)
     if getattr(run_diagnostic_multi, "__module__", __name__) != __name__:
         if normalized_workflow == "standard":

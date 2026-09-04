@@ -1156,7 +1156,15 @@ if __name__ == "__main__":
     from rc_metastudio import settings
     from rc_metastudio.analysis_results import empty_analysis_result
 
-    test_results = empty_analysis_result()
+    test_results: dict[str, object] = {
+        "images": {},
+        "texts": {},
+        "display_images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": None,
+        "plot_capabilities": {},
+    }
     test_results["images"] = {
         "Forest Plot": settings.analysis_output_path("forest.png")
     }
@@ -1171,6 +1179,6 @@ if __name__ == "__main__":
     test_results["image_order"] = None
 
     app = app_error_handler.get_or_create_application(sys.argv)
-    resultswindow = ResultsWindow(test_results)
+    resultswindow = ResultsWindow(parse_analysis_result(test_results))
     resultswindow.show()
     sys.exit(app.exec())

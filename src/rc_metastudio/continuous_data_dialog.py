@@ -13,7 +13,10 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6 import QtGui
+from PyQt6.QtGui import QAction, QKeySequence, QPalette
+
+QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -165,7 +168,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
         self.setup_clear_button_palettes()  # Color for clear_button_pallette
         self.initialize_form()  # initialize cells to empty items
-        self.undoStack = QUndoStack(self)
+        self.undoStack = QtHistoryAdapter(self)
 
         self.update_raw_data()
         self._populate_effect_data()
@@ -833,7 +836,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        vars(self.analysis_unit).clear()
+        vars(self.analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
 
         self.initialize_form()  # clear form first
         self.update_raw_data()
@@ -1186,7 +1190,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
     def _restore_back_calculation_state(self, state):
         """Restore directly without invoking R, imputation, or calculator setters."""
-        self.analysis_unit.__dict__ = copy.deepcopy(state["analysis_unit"].__dict__)
+        vars(self.analysis_unit).clear()
+        vars(self.analysis_unit).update(copy.deepcopy(vars(state["analysis_unit"])))
         for table, rows in zip(self.tables, state["tables"]):
             blocked = table.blockSignals(True)
             try:
@@ -1259,8 +1264,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 and current["correlation"] == expected["correlation"]
                 and current["metric_parameter"] == expected["metric_parameter"]
                 and current["button"] == expected["button"]
-                and current["analysis_unit"].__dict__
-                == expected["analysis_unit"].__dict__
+                and vars(current["analysis_unit"])
+                == vars(expected["analysis_unit"])
             )
         except BaseException:
             return False

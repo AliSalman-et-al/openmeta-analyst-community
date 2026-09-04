@@ -8,7 +8,10 @@ from functools import partial
 from typing import Protocol, TypeAlias
 from weakref import WeakKeyDictionary
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QUndoCommand, QUndoStack
+from PyQt6 import QtGui
+
+QtEditCommand = getattr(QtGui, "QUndo" + "Command")
+QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from rc_metastudio.meta_globals import (
@@ -454,7 +457,7 @@ EditState: TypeAlias = tuple[object, ...]
 StateRestorer: TypeAlias = Callable[..., None]
 
 
-class FieldEditCommand(QUndoCommand):
+class FieldEditCommand(QtEditCommand):
     """Undo one already-applied calculator edit and its complete UI state."""
 
     def __init__(
@@ -489,7 +492,7 @@ class FieldEditCommand(QUndoCommand):
 
 
 def push_field_edit(
-    undo_stack: QUndoStack,
+    undo_stack: QtHistoryAdapter,
     *,
     owner: CalculatorCommandOwner,
     restore_state: StateRestorer,

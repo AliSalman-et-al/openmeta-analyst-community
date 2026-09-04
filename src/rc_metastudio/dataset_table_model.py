@@ -796,7 +796,8 @@ class DatasetTableModel(QAbstractTableModel):
         try:
             self.update_outcome_if_possible(index.row())
         except Exception as exc:
-            analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+            vars(analysis_unit).clear()
+            vars(analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
             study.include = old_include
             study.manually_excluded = old_manually_excluded
             self._reject_edit(

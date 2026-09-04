@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 import json
-from typing import Literal, Protocol, TypeAlias, runtime_checkable
+from typing import Literal, Protocol, TypeAlias, cast, runtime_checkable
 
 from rc_metastudio import r_bridge
 from rc_metastudio import analysis_dataset
@@ -422,11 +422,11 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
             metric_result = parse_analysis_result(run_metric(request))
         except DiagnosticExecutionError as e:
             failures.append((metric, e))
-            merged_result["texts"]["%s Error" % metric] = str(e)
+            cast(dict[str, str], merged_result["texts"])["%s Error" % metric] = str(e)
         else:
             _merge_diagnostic_result(merged_result, metric_result)
 
-    if failures and not _diagnostic_result_has_successes(merged_result):
+    if failures and not _diagnostic_result_has_successes(parse_analysis_result(merged_result)):
         raise RuntimeError(_format_diagnostic_failures(failures))
 
     if not merged_result["image_order"]:
@@ -454,12 +454,13 @@ def _merge_diagnostic_result(
     # every metric except the last successful one.  Merge them first, keeping
     # producer order and the existing reference formatter's de-duplication
     # rules; the remaining keyed sections are intentionally metric-scoped.
+    merged_texts = cast(dict[str, str], merged_result["texts"])
+    metric_texts = cast(Mapping[str, str], metric_result.get("texts", {}))
     merged_references = _merge_reference_texts(
-        merged_result["texts"].get("References"),
-        metric_result.get("texts", {}).get("References"),
+        merged_texts.get("References"), metric_texts.get("References")
     )
     if merged_references:
-        merged_result["texts"]["References"] = merged_references
+        merged_texts["References"] = merged_references
 
     for key in (
         "texts",
@@ -470,19 +471,21 @@ def _merge_diagnostic_result(
         "plot_capabilities",
     ):
         if key == "texts":
-            merged_result[key].update(
+            merged_texts.update(
                 {
                     name: value
-                    for name, value in metric_result.get(key, {}).items()
+                    for name, value in metric_texts.items()
                     if name != "References"
                 }
             )
         else:
-            merged_result[key].update(metric_result.get(key, {}))
+            cast(dict[str, object], merged_result[key]).update(
+                cast(Mapping[str, object], metric_result.get(key, {}))
+            )
 
-    image_order = metric_result.get("image_order")
+    image_order = cast(Sequence[str] | None, metric_result.get("image_order"))
     if image_order:
-        merged_order = merged_result["image_order"]
+        merged_order = cast(list[str] | None, merged_result["image_order"])
         if merged_order is None:
             merged_result["image_order"] = list(image_order)
         else:

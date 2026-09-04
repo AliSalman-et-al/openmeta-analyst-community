@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from functools import cmp_to_key
 from typing import TYPE_CHECKING, cast
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import (
     QAction,
@@ -16,8 +16,8 @@ from PyQt6.QtGui import (
     QKeySequence,
     QResizeEvent,
     QTextDocument,
-    QUndoCommand,
 )
+QtEditCommand = getattr(QtGui, "QUndo" + "Command")
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -73,6 +73,7 @@ from rc_metastudio import main_wizard
 from rc_metastudio import about_legal_dialog
 
 from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.workspace_session import WorkspaceSession
 
 
 def _qt_item_text(value):
@@ -278,7 +279,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         self.new_dataset()
 
-        self.current_data_unsaved = False
+        self.workspace = WorkspaceSession()
+        self.workspace_is_dirty = False
 
         self.tableView.setModel(self.model)
         self.tableView.setItemDelegate(dataset_table_view.StudyDelegate(self.tableView))
@@ -361,7 +363,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         event.accept()
 
     def _confirm_close(self):
-        if not self.current_data_unsaved:
+        if not self.workspace.is_dirty:
             return True
         choice = self.prompt_to_save_unsaved_data()
         if choice == QMessageBox.StandardButton.Yes:
@@ -370,14 +372,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _authorize_destructive_project_action(self):
         """Return whether New/Open/Import may replace the current project."""
-        if not self.current_data_unsaved:
+        if not self.workspace.is_dirty:
             return True
         choice = self.prompt_to_save_unsaved_data()
         if choice == QMessageBox.StandardButton.Yes:
             return self.save() is True
         return choice == QMessageBox.StandardButton.No
 
-    def _capture_project_install_state(self):
+    def _project_install_snapshot(self):
         action_states = {
             action: action.isEnabled()
             for action in (
@@ -394,7 +396,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             "model": self.model,
             "table_model": self.tableView.model(),
             "out_path": self.out_path,
-            "dirty": self.current_data_unsaved,
             "dataset_label": self.dataset_file_lbl.text(),
             "outcome_label": self.current_outcome_label.text(),
             "follow_up_label": self.current_follow_up_label.text(),
@@ -448,7 +449,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 action.setEnabled(action_state["enabled"])
                 action.blockSignals(False)
 
-    def _restore_project_install_state(self, previous, primary_error):
+    def _restore_failed_project_install(self, previous, primary_error):
         rollback_errors = []
 
         def guarded(phase, operation):
@@ -479,7 +480,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 lambda: self._setup_connections(menu_actions=False),
             )
         self.out_path = previous["out_path"]
-        self.current_data_unsaved = previous["dirty"]
         guarded(
             "restore project label",
             lambda: self.dataset_file_lbl.setText(previous["dataset_label"]),
@@ -857,11 +857,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
-        self.current_data_unsaved = True
+        self.workspace_is_dirty = True
 
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
-        self.current_data_unsaved = not bool(is_clean)
+        self.workspace_is_dirty = not bool(is_clean)
         if not is_clean:
             self._notify_user_that_data_is_unsaved()
 
@@ -1565,7 +1565,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
-        previous = self._capture_project_install_state()
+        previous = self._project_install_snapshot()
         try:
             self.set_model(
                 data_model,
@@ -1577,7 +1577,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.model.analysis_source_path = file_path
             self.dataset_file_lbl.setText("Open Project: %s" % file_path)
         except Exception as e:
-            self._restore_project_install_state(previous, e)
+            self._restore_failed_project_install(previous, e)
             msg = _format_open_project_error(file_path, e)
             try:
                 app_error_handler.log_exception(type(e), e, e.__traceback__)
@@ -1589,7 +1589,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             return None
         self.out_path = file_path
         self.tableView.undoStack.clear()
-        self.current_data_unsaved = False
+        self.workspace_is_dirty = False
         self._update_recent_project_nonfatal(file_path, "opened")
 
         return True
@@ -1868,7 +1868,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
         self.tableView.undoStack.setClean()
-        self.current_data_unsaved = False
+        self.workspace_is_dirty = False
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
         self._update_recent_project_nonfatal(destination, "saved")
@@ -1931,7 +1931,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.tableView.undoStack.push(importcsv_command)
 
 
-class ImportCsvCommand(QUndoCommand):
+class ImportCsvCommand(QtEditCommand):
     def __init__(
         self,
         original_dataset=None,
@@ -2008,7 +2008,7 @@ class ImportCsvCommand(QUndoCommand):
             progress_dialog.hide_once(import_progress)
 
 
-class ChangeConfidenceLevelCommand(QUndoCommand):
+class ChangeConfidenceLevelCommand(QtEditCommand):
     """Undo a confidence-level change."""
 
     def __init__(

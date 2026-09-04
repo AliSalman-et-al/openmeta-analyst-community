@@ -8,7 +8,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 from types import MappingProxyType
-from typing import Literal, Self, SupportsIndex, TypedDict, overload
+from typing import Generic, Literal, Self, SupportsIndex, TypedDict, TypeVar, overload
 
 
 PlotKind = Literal[
@@ -27,6 +27,26 @@ PlotKind = Literal[
 ]
 PlotComposition = Literal["single"]
 PlotRegenerator = Literal["forest", "regression", "funnel", "sroc", "none"]
+_T = TypeVar("_T")
+
+
+class FrozenMapping(Mapping[str, _T], Generic[_T]):
+    """Read-only mapping with a typed mutation trap for legacy callers."""
+
+    def __init__(self, values: Mapping[str, _T]) -> None:
+        self._values = MappingProxyType(dict(values))
+
+    def __getitem__(self, key: str) -> _T:
+        return self._values[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __setitem__(self, _key: str, _value: _T) -> None:
+        raise TypeError("analysis result values are immutable")
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,26 +144,26 @@ class FrozenStrings(Sequence[str]):
 class AnalysisResult:
     """Validated immutable result contract consumed by application adapters."""
 
-    texts: Mapping[str, str]
-    images: Mapping[str, str]
-    display_images: Mapping[str, str]
-    image_var_names: Mapping[str, str]
-    image_params_paths: Mapping[str, str]
+    texts: FrozenMapping[str]
+    images: FrozenMapping[str]
+    display_images: FrozenMapping[str]
+    image_var_names: FrozenMapping[str]
+    image_params_paths: FrozenMapping[str]
     image_order: FrozenStrings | None
-    plot_capabilities: Mapping[str, PlotCapability]
+    plot_capabilities: FrozenMapping[PlotCapability]
     sections: tuple[ResultSection, ...]
 
     @overload
-    def __getitem__(self, key: Literal["texts"]) -> Mapping[str, str]: ...
+    def __getitem__(self, key: Literal["texts"]) -> FrozenMapping[str]: ...
 
     @overload
-    def __getitem__(self, key: Literal["images", "display_images", "image_var_names", "image_params_paths"]) -> Mapping[str, str]: ...
+    def __getitem__(self, key: Literal["images", "display_images", "image_var_names", "image_params_paths"]) -> FrozenMapping[str]: ...
 
     @overload
     def __getitem__(self, key: Literal["image_order"]) -> FrozenStrings | None: ...
 
     @overload
-    def __getitem__(self, key: Literal["plot_capabilities"]) -> Mapping[str, PlotCapability]: ...
+    def __getitem__(self, key: Literal["plot_capabilities"]) -> FrozenMapping[PlotCapability]: ...
 
     @overload
     def __getitem__(self, key: Literal["sections"]) -> tuple[ResultSection, ...]: ...
@@ -232,17 +252,14 @@ def _freeze_result(
     image_order: Iterable[str] | None,
     plot_capabilities: Mapping[str, PlotCapability],
 ) -> AnalysisResult:
-    frozen_images = MappingProxyType(dict(images))
-    frozen_params = MappingProxyType(dict(image_params_paths))
-    frozen_capabilities = MappingProxyType(dict(plot_capabilities))
     return AnalysisResult(
-        texts=MappingProxyType(dict(texts)),
-        images=frozen_images,
-        display_images=MappingProxyType(dict(display_images)),
-        image_var_names=MappingProxyType(dict(image_var_names)),
-        image_params_paths=frozen_params,
+        texts=FrozenMapping(texts),
+        images=FrozenMapping(images),
+        display_images=FrozenMapping(display_images),
+        image_var_names=FrozenMapping(image_var_names),
+        image_params_paths=FrozenMapping(image_params_paths),
         image_order=None if image_order is None else FrozenStrings(image_order),
-        plot_capabilities=frozen_capabilities,
+        plot_capabilities=FrozenMapping(plot_capabilities),
         sections=_sections(texts, images, image_params_paths, plot_capabilities),
     )
 

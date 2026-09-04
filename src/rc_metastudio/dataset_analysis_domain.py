@@ -3,7 +3,7 @@
 """Domain operations shared by the dataset table adapter."""
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import Protocol, TypeAlias
+from typing import Protocol, TypeAlias, runtime_checkable
 
 from rc_metastudio.analysis_dataset import Dataset, Study
 from rc_metastudio.analysis_unit import AnalysisUnit
@@ -20,6 +20,7 @@ from rc_metastudio.meta_globals import (
 Scalar: TypeAlias = float | int | str | None
 
 
+@runtime_checkable
 class ScaleBridge(Protocol):
     def binary_convert_scale(self, value: object, effect: object, *, convert_to: str, n1: object = None) -> object: ...
     def continuous_convert_scale(self, value: object, effect: object, *, convert_to: str) -> object: ...
@@ -28,6 +29,12 @@ class ScaleBridge(Protocol):
     def continuous_effect_for_study(self, *args: object, **kwargs: object) -> object: ...
     def effect_triplet(self, value: object, scale: str, *, metric: object) -> tuple[Scalar, Scalar, Scalar]: ...
     def diagnostic_effects_for_study(self, *args: object, **kwargs: object) -> Mapping[str, object]: ...
+
+
+def _checked_bridge(value: object) -> ScaleBridge:
+    if not isinstance(value, ScaleBridge):
+        raise TypeError("analysis boundary requires a scale bridge")
+    return value
 
 
 def ensure_analysis_unit(
@@ -53,71 +60,74 @@ def ensure_analysis_unit(
 
 
 def make_display_scale_converter(
-    bridge: ScaleBridge, data_type: str | None, effect: str | None, n1: object = None
+    bridge: object, data_type: str | None, effect: str | None, n1: object = None
 ) -> Callable[[object], object]:
     """Build the calculation-to-display conversion for one outcome family."""
+    checked = _checked_bridge(bridge)
     if data_type == BINARY:
-        return lambda value: bridge.binary_convert_scale(
+        return lambda value: checked.binary_convert_scale(
             value, effect, convert_to="display.scale", n1=n1
         )
     if data_type == CONTINUOUS:
-        return lambda value: bridge.continuous_convert_scale(
+        return lambda value: checked.continuous_convert_scale(
             value, effect, convert_to="display.scale"
         )
     if data_type == DIAGNOSTIC:
-        return lambda value: bridge.diagnostic_convert_scale(
+        return lambda value: checked.diagnostic_convert_scale(
             value, effect, convert_to="display.scale"
         )
     raise ValueError(f"Unsupported outcome type: {data_type!r}")
 
 
 def to_calculation_scale(
-    bridge: ScaleBridge,
+    bridge: object,
     value: object,
     data_type: str | None,
     effect: str | None,
     n1: object = None,
 ) -> object:
     """Convert a user-facing value to the backend's calculation scale."""
+    checked = _checked_bridge(bridge)
     if data_type == BINARY:
-        return bridge.binary_convert_scale(
+        return checked.binary_convert_scale(
             value, effect, convert_to="calc.scale", n1=n1
         )
     if data_type == CONTINUOUS:
-        return bridge.continuous_convert_scale(value, effect, convert_to="calc.scale")
+        return checked.continuous_convert_scale(value, effect, convert_to="calc.scale")
     if data_type == DIAGNOSTIC:
-        return bridge.diagnostic_convert_scale(value, effect, convert_to="calc.scale")
+        return checked.diagnostic_convert_scale(value, effect, convert_to="calc.scale")
     raise ValueError(f"Unsupported outcome type: {data_type!r}")
 
 
 def calculate_raw_effects(
-    bridge: ScaleBridge,
+    bridge: object,
     data_type: str | None,
     effect: str | None,
     raw_data: Sequence[object],
     confidence_level: float,
 ) -> tuple[tuple[Scalar, Scalar, Scalar], object] | dict[str, tuple[Scalar, Scalar, Scalar]]:
     """Calculate backend effects from one study's raw data."""
+    checked = _checked_bridge(bridge)
     if data_type == BINARY:
         e1, n1, e2, n2 = raw_data
         if effect in BINARY_TWO_ARM_METRICS:
-            result = bridge.effect_for_study(
+            result = checked.effect_for_study(
                 e1, n1, e2, n2, metric=effect, confidence_level=confidence_level
             )
         else:
-            result = bridge.effect_for_study(
+            result = checked.effect_for_study(
                 e1, n1, two_arm=False, metric=effect, confidence_level=confidence_level
             )
         triplet = (
             (None, None, None)
             if result is None
-            else bridge.effect_triplet(result, "calc_scale", metric=effect)
+            else checked.effect_triplet(result, "calc_scale", metric=effect)
         )
         return triplet, n1
     if data_type == CONTINUOUS:
         n1, m1, sd1, n2, m2, sd2 = raw_data
         if effect in CONTINUOUS_TWO_ARM_METRICS:
-            result = bridge.continuous_effect_for_study(
+            result = checked.continuous_effect_for_study(
                 n1,
                 m1,
                 sd1,
@@ -128,7 +138,7 @@ def calculate_raw_effects(
                 confidence_level=confidence_level,
             )
         else:
-            result = bridge.continuous_effect_for_study(
+            result = checked.continuous_effect_for_study(
                 n1,
                 m1,
                 sd1,
@@ -139,12 +149,12 @@ def calculate_raw_effects(
         triplet = (
             (None, None, None)
             if result is None
-            else bridge.effect_triplet(result, "calc_scale", metric=effect)
+            else checked.effect_triplet(result, "calc_scale", metric=effect)
         )
         return triplet, n1
     if data_type == DIAGNOSTIC:
         tp, fn, fp, tn = raw_data
-        results = bridge.diagnostic_effects_for_study(
+        results = checked.diagnostic_effects_for_study(
             tp,
             fn,
             fp,
@@ -153,7 +163,7 @@ def calculate_raw_effects(
             confidence_level=confidence_level,
         )
         return {
-            metric: bridge.effect_triplet(results[metric], "calc_scale", metric=metric)
+            metric: checked.effect_triplet(results[metric], "calc_scale", metric=metric)
             for metric in DIAGNOSTIC_METRICS
         }
     raise ValueError(f"Unsupported outcome type: {data_type!r}")

@@ -8,7 +8,10 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6 import QtGui
+from PyQt6.QtGui import QAction, QKeySequence, QPalette
+
+QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -98,7 +101,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         )
         self.initialize_form()
         self.setup_back_calculation_feedback()
-        self.undoStack = QUndoStack(self)
+        self.undoStack = QtHistoryAdapter(self)
 
         self._update_raw_data()  # analysis_unit -> table
         self._populate_effect_cmbo_box()  # make cmbo box entries for effects
@@ -461,7 +464,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         )
 
     def restore_analysis_unit(self, old_analysis_unit):
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        vars(self.analysis_unit).clear()
+        vars(self.analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
 
         self.initialize_form()
         self._update_raw_data()

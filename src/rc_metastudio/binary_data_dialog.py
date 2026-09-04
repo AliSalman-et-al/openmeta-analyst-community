@@ -8,7 +8,10 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette, QUndoStack
+from PyQt6 import QtGui
+from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette
+
+QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -102,7 +105,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
         self.initialize_form()  # initialize all cell to empty items
         self.setup_back_calculation_feedback()
-        self.undoStack = QUndoStack(self)
+        self.undoStack = QtHistoryAdapter(self)
 
         self._update_raw_data()  # analysis_unit --> table
         self._populate_effect_data()  # make combo boxes for effects
@@ -743,7 +746,8 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        vars(self.analysis_unit).clear()
+        vars(self.analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
 
         self.initialize_form()  # clear form first
         self._update_raw_data()

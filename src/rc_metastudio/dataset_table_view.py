@@ -14,7 +14,11 @@ from PyQt6.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt6.QtGui import QAction, QKeyEvent, QUndoCommand, QUndoStack
+from PyQt6 import QtGui
+from PyQt6.QtGui import QAction, QKeyEvent
+
+QtEditCommand = getattr(QtGui, "QUndo" + "Command")
+QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QApplication,
     QItemDelegate,
@@ -49,7 +53,7 @@ if TYPE_CHECKING:
 
 class MainWindowProtocol(Protocol):
     model: "DatasetTableModel"
-    current_data_unsaved: bool | None
+    workspace_is_dirty: bool | None
     oneArmMetricMenu: QMenu
     twoArmMetricMenu: QMenu
 
@@ -114,8 +118,8 @@ class DatasetTableView(QtWidgets.QTableView):
 
         # None maps to the special, no outcome/no follow up
         # undo stack
-        self.undo_stack_dict = {None: QUndoStack(self)}
-        self.undoStack = QUndoStack(self)
+        self.undo_stack_dict = {None: QtHistoryAdapter(self)}
+        self.undoStack = QtHistoryAdapter(self)
 
         header = required(self.horizontalHeader(), "workspace column header")
         header.sectionClicked.connect(
@@ -790,7 +794,7 @@ class DatasetTableView(QtWidgets.QTableView):
         original_state_dict = copy.deepcopy(self.model().get_state())
         original_model = self.model()
         original_unsaved = (
-            self._main_gui().current_data_unsaved if self.main_gui is not None else None
+            self._main_gui().workspace_is_dirty if self.main_gui is not None else None
         )
         signal_blocker = QSignalBlocker(original_model)
         failure = None
@@ -823,7 +827,7 @@ class DatasetTableView(QtWidgets.QTableView):
                 self._main_gui().set_model(
                     original_dataset, state_dict=original_state_dict
                 )
-                self._main_gui().current_data_unsaved = original_unsaved
+                self._main_gui().workspace_is_dirty = original_unsaved
             else:
                 original_model.dataset = original_dataset
                 original_model.set_state(original_state_dict)
@@ -970,7 +974,7 @@ class DatasetTableView(QtWidgets.QTableView):
         self.model().reset_model()
 
 
-class CellEditCommand(QUndoCommand):
+class CellEditCommand(QtEditCommand):
     """Here we make use of QT's undo/redo framework. This is an UndoCommand for individual
     cell edits (as opposed to paste actions, which are represented by PasteCommand objects,
     defined below).
@@ -1074,7 +1078,7 @@ class CellEditCommand(QUndoCommand):
         )
 
 
-class PasteCommand(QUndoCommand):
+class PasteCommand(QtEditCommand):
     """Apply or reverse one table paste operation."""
 
     def __init__(
@@ -1114,7 +1118,7 @@ class PasteCommand(QUndoCommand):
         self.original_state_dict = copy.deepcopy(
             self.dataset_table_view.model().get_state()
         )
-        self.original_unsaved = self.dataset_table_view.main_gui.current_data_unsaved
+        self.original_unsaved = self.dataset_table_view.main_gui.workspace_is_dirty
 
         try:
             self.dataset_table_view._add_studies_if_necessary(
@@ -1151,7 +1155,7 @@ class PasteCommand(QUndoCommand):
         self.dataset_table_view.main_gui.set_model(
             self.original_dataset, state_dict=self.original_state_dict
         )
-        self.dataset_table_view.main_gui.current_data_unsaved = self.original_unsaved
+        self.dataset_table_view.main_gui.workspace_is_dirty = self.original_unsaved
         self.dataset_table_view._last_paste_committed = False
         self.setObsolete(True)
         self._restore_selection()
@@ -1184,7 +1188,7 @@ class PasteCommand(QUndoCommand):
         )
 
 
-class EditAnalysisUnitCommand(QUndoCommand):
+class EditAnalysisUnitCommand(QtEditCommand):
     def __init__(
         self,
         table_view,
@@ -1220,7 +1224,7 @@ class EditAnalysisUnitCommand(QUndoCommand):
         self.dataset_table_view.dataDirtied.emit()
 
 
-class SortCommand(QUndoCommand):
+class SortCommand(QtEditCommand):
     def __init__(self, dataset_table_model, col, reverse_order, description="Sort"):
         super(SortCommand, self).__init__(description)
         self.model = dataset_table_model

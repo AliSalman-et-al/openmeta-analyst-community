@@ -14,7 +14,7 @@ DIAGNOSTIC_SECTION_GROUPS = (
     ("likelihood", "nlr", "plr"),
 )
 
-SECTION_TITLE_REPLACEMENTS = {
+DISPLAY_TITLE_RULES = {
     "Leave-one-out Forest plot": "Leave-One-Out Forest Plot",
     "SROC": "Summary ROC Plot",
     "Warning": "Interpretation",
@@ -129,13 +129,13 @@ def order_display_sections(texts, images, explicit_image_order=None):
         )
     ]
 
-    if _is_small_study_effects_result(context):
+    if _small_study_contract(context):
         return _order_small_study_effects_sections(text_sections, image_sections)
-    if _is_reitsma_meta_regression_result(context):
+    if _reitsma_regression_contract(context):
         return _order_reitsma_meta_regression_sections(text_sections, image_sections)
-    if _is_reitsma_result(context):
+    if _reitsma_contract(context):
         return _order_reitsma_sections(text_sections, image_sections)
-    if _is_standard_meta_analysis_result(context):
+    if _standard_meta_contract(context):
         return _order_standard_meta_analysis_sections(text_sections, image_sections)
     return text_sections + image_sections
 
@@ -151,8 +151,8 @@ def section_display_title(title, context=None, kind=None):
     if kind == "image" and title in ("Trim-and-fill left", "Trim-and-fill right"):
         side = "Left" if title.endswith("left") else "Right"
         return "Trim-and-Fill: %s Plot" % side
-    if title in SECTION_TITLE_REPLACEMENTS:
-        return SECTION_TITLE_REPLACEMENTS[title]
+    if title in DISPLAY_TITLE_RULES:
+        return DISPLAY_TITLE_RULES[title]
     return _normalize_metric_title(title)
 
 
@@ -169,7 +169,7 @@ def _section_context(texts, images):
     }
 
 
-def _is_standard_meta_analysis_result(context):
+def _standard_meta_contract(context):
     return (
         "Summary" in context["text_titles"]
         and WEIGHTS_SECTION_TITLE in context["text_titles"]
@@ -177,14 +177,14 @@ def _is_standard_meta_analysis_result(context):
     )
 
 
-def _is_small_study_effects_result(context):
+def _small_study_contract(context):
     return "Warning" in context["text_titles"] and (
         "Data and eligibility" in context["text_titles"]
         or any("Funnel Plot" in title for title in context["image_titles"])
     )
 
 
-def _is_reitsma_result(context):
+def _reitsma_contract(context):
     titles = set(context["text_titles"])
     # AUC is an optional derived quantity: mada can fail to provide it for a
     # valid fit (for example when the SROC geometry is undefined).  The
@@ -203,7 +203,7 @@ def _is_reitsma_result(context):
     )
 
 
-def _is_reitsma_meta_regression_result(context):
+def _reitsma_regression_contract(context):
     titles = set(context["text_titles"])
     return "Overall ML likelihood-ratio test" in titles and (
         "Sensitivity coefficients" in titles or "Specificity coefficients" in titles
