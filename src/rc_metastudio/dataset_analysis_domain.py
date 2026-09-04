@@ -109,64 +109,65 @@ def calculate_raw_effects(
     """Calculate backend effects from one study's raw data."""
     checked = _checked_bridge(bridge)
     if data_type == BINARY:
-        e1, n1, e2, n2 = raw_data
-        if effect in BINARY_TWO_ARM_METRICS:
-            result = checked.effect_for_study(
-                e1, n1, e2, n2, metric=effect, confidence_level=confidence_level
-            )
-        else:
-            result = checked.effect_for_study(
-                e1, n1, two_arm=False, metric=effect, confidence_level=confidence_level
-            )
-        triplet = (
-            (None, None, None)
-            if result is None
-            else checked.effect_triplet(result, "calc_scale", metric=effect)
-        )
-        return triplet, n1
+        return _binary_raw_effect(checked, effect, raw_data, confidence_level)
     if data_type == CONTINUOUS:
-        n1, m1, sd1, n2, m2, sd2 = raw_data
-        if effect in CONTINUOUS_TWO_ARM_METRICS:
-            result = checked.continuous_effect_for_study(
-                n1,
-                m1,
-                sd1,
-                n2=n2,
-                m2=m2,
-                sd2=sd2,
-                metric=effect,
-                confidence_level=confidence_level,
-            )
-        else:
-            result = checked.continuous_effect_for_study(
-                n1,
-                m1,
-                sd1,
-                two_arm=False,
-                metric=effect,
-                confidence_level=confidence_level,
-            )
-        triplet = (
-            (None, None, None)
-            if result is None
-            else checked.effect_triplet(result, "calc_scale", metric=effect)
-        )
-        return triplet, n1
+        return _continuous_raw_effect(checked, effect, raw_data, confidence_level)
     if data_type == DIAGNOSTIC:
-        tp, fn, fp, tn = raw_data
-        results = checked.diagnostic_effects_for_study(
-            tp,
-            fn,
-            fp,
-            tn,
-            metrics=DIAGNOSTIC_METRICS,
-            confidence_level=confidence_level,
-        )
-        return {
-            metric: checked.effect_triplet(results[metric], "calc_scale", metric=metric)
-            for metric in DIAGNOSTIC_METRICS
-        }
+        return _diagnostic_raw_effect(checked, raw_data, confidence_level)
     raise ValueError(f"Unsupported outcome type: {data_type!r}")
+
+
+def _effect_triplet(checked: ScaleBridge, result: object, effect: str | None) -> tuple[Scalar, Scalar, Scalar]:
+    if result is None:
+        return (None, None, None)
+    return checked.effect_triplet(result, "calc_scale", metric=effect)
+
+
+def _binary_raw_effect(
+    checked: ScaleBridge,
+    effect: str | None,
+    raw_data: Sequence[object],
+    confidence_level: float,
+) -> tuple[tuple[Scalar, Scalar, Scalar], object]:
+    e1, n1, e2, n2 = raw_data
+    if effect in BINARY_TWO_ARM_METRICS:
+        result = checked.effect_for_study(e1, n1, e2, n2, metric=effect, confidence_level=confidence_level)
+    else:
+        result = checked.effect_for_study(e1, n1, two_arm=False, metric=effect, confidence_level=confidence_level)
+    return _effect_triplet(checked, result, effect), n1
+
+
+def _continuous_raw_effect(
+    checked: ScaleBridge,
+    effect: str | None,
+    raw_data: Sequence[object],
+    confidence_level: float,
+) -> tuple[tuple[Scalar, Scalar, Scalar], object]:
+    n1, m1, sd1, n2, m2, sd2 = raw_data
+    if effect in CONTINUOUS_TWO_ARM_METRICS:
+        result = checked.continuous_effect_for_study(
+            n1, m1, sd1, n2=n2, m2=m2, sd2=sd2, metric=effect, confidence_level=confidence_level
+        )
+    else:
+        result = checked.continuous_effect_for_study(
+            n1, m1, sd1, two_arm=False, metric=effect, confidence_level=confidence_level
+        )
+    return _effect_triplet(checked, result, effect), n1
+
+
+def _diagnostic_raw_effect(
+    checked: ScaleBridge,
+    raw_data: Sequence[object],
+    confidence_level: float,
+) -> dict[str, tuple[Scalar, Scalar, Scalar]]:
+    tp, fn, fp, tn = raw_data
+    results = checked.diagnostic_effects_for_study(
+        tp, fn, fp, tn, metrics=DIAGNOSTIC_METRICS, confidence_level=confidence_level
+    )
+    return {
+        metric: checked.effect_triplet(results[metric], "calc_scale", metric=metric)
+        for metric in DIAGNOSTIC_METRICS
+    }
 
 
 def raw_data_is_complete(raw_data: Sequence[object]) -> bool:

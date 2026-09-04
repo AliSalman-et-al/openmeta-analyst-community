@@ -172,23 +172,17 @@ class AnalysisResult:
     def __getitem__(self, key: str) -> object: ...
 
     def __getitem__(self, key: str) -> object:
-        if key == "texts":
-            return self.texts
-        if key == "images":
-            return self.images
-        if key == "display_images":
-            return self.display_images
-        if key == "image_var_names":
-            return self.image_var_names
-        if key == "image_params_paths":
-            return self.image_params_paths
-        if key == "image_order":
-            return self.image_order
-        if key == "plot_capabilities":
-            return self.plot_capabilities
-        if key == "sections":
-            return self.sections
-        raise KeyError(key)
+        values = {
+            "texts": self.texts,
+            "images": self.images,
+            "display_images": self.display_images,
+            "image_var_names": self.image_var_names,
+            "image_params_paths": self.image_params_paths,
+            "image_order": self.image_order,
+            "plot_capabilities": self.plot_capabilities,
+            "sections": self.sections,
+        }
+        return values[key]
 
     def __iter__(self) -> Iterator[str]:
         return iter(("texts", "images", "display_images", "image_var_names", "image_params_paths", "image_order", "plot_capabilities", "sections"))

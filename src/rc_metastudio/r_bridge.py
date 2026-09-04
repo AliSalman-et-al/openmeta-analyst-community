@@ -991,6 +991,16 @@ def run_versioned_analysis_request(
     data_name: str = "tmp_obj",
 ):
     """Execute one complete immutable request through the public RCMetaR API."""
+    method, workflow, params = _validated_versioned_request(request)
+    injected = _run_injected_analysis(request, method, workflow, params)
+    if injected is not None:
+        return injected
+    return _execute_versioned_request(method, workflow, params, res_name, data_name)
+
+
+def _validated_versioned_request(
+    request: Mapping[str, object],
+) -> tuple[str, object, Mapping[str, object]]:
     version = request.get("version")
     if type(version) is not int or version != 1:
         raise ValueError("unsupported analysis request version")
@@ -1001,15 +1011,33 @@ def run_versioned_analysis_request(
         raise ValueError("analysis request method must be non-empty text")
     if not isinstance(params, Mapping):
         raise TypeError("analysis request params must be a mapping")
-    # Local test backends may replace the narrow legacy callable seam.  Keep
-    # that injection point useful without allowing production callers to skip
-    # the versioned request operation.
+    return method, workflow, {str(key): value for key, value in params.items()}
+
+
+def _run_injected_analysis(
+    request: Mapping[str, object],
+    method: str,
+    workflow: object,
+    params: Mapping[str, object],
+) -> object | None:
     legacy = run_binary_analysis if request.get("data.type") == "binary" else run_continuous_analysis
-    if getattr(legacy, "__module__", __name__) != __name__:
-        return legacy(method, dict(params)) if request.get("workflow") == "standard" else run_workflow_analysis(request.get("workflow"), method, dict(params))
+    if getattr(legacy, "__module__", __name__) == __name__:
+        return None
+    if workflow == "standard":
+        return legacy(method, dict(params))
+    return run_workflow_analysis(workflow, method, dict(params))
+
+
+def _execute_versioned_request(
+    method: str,
+    workflow: object,
+    params: Mapping[str, object],
+    res_name: str,
+    data_name: str,
+) -> object:
     normalized = {
-        "version": version,
-        "request.version": version,
+        "version": 1,
+        "request.version": 1,
         "method": method,
         "params": _to_r_params(params),
         "workflow": _normalize_rcmetar_workflow(workflow),
@@ -1028,29 +1056,66 @@ def run_versioned_analysis_requests(
     diagnostic_data_name: str = "tmp_obj",
 ):
     """Execute a validated diagnostic request set through one R operation."""
+    methods, param_values, workflow = _validated_versioned_requests(requests)
+    normalized_workflow = _normalize_rcmetar_workflow(workflow)
+    injected = _run_injected_diagnostic(methods, param_values, normalized_workflow)
+    if injected is not None:
+        return injected
+    return _execute_versioned_requests(
+        methods, param_values, normalized_workflow, res_name, diagnostic_data_name
+    )
+
+
+def _validated_versioned_requests(
+    requests: list[Mapping[str, object]],
+) -> tuple[list[str], list[dict[str, object]], object]:
     if not requests:
         raise ValueError("at least one analysis request is required")
     methods: list[str] = []
     param_values: list[dict[str, object]] = []
     workflow = requests[0].get("workflow", "standard")
     for request in requests:
-        if type(request.get("version")) is not int or request.get("version") != 1:
-            raise ValueError("unsupported analysis request version")
         if request.get("workflow", workflow) != workflow:
             raise ValueError("one execution cannot mix analysis workflows")
-        method = request.get("method")
-        values = request.get("params", request.get("parameters", {}))
-        if not isinstance(method, str) or not method:
-            raise ValueError("analysis request method must be non-empty text")
-        if not isinstance(values, Mapping):
-            raise TypeError("analysis request params must be a mapping")
+        method, values = _validated_versioned_request_item(request)
         methods.append(method)
-        param_values.append({str(key): item for key, item in values.items()})
-    normalized_workflow = _normalize_rcmetar_workflow(workflow)
-    if getattr(run_diagnostic_multi, "__module__", __name__) != __name__:
-        if normalized_workflow == "standard":
-            return run_diagnostic_multi(methods, param_values)
-        return run_diagnostic_workflow(normalized_workflow, methods, param_values)
+        param_values.append(values)
+    return methods, param_values, workflow
+
+
+def _validated_versioned_request_item(
+    request: Mapping[str, object],
+) -> tuple[str, dict[str, object]]:
+    if type(request.get("version")) is not int or request.get("version") != 1:
+        raise ValueError("unsupported analysis request version")
+    method = request.get("method")
+    values = request.get("params", request.get("parameters", {}))
+    if not isinstance(method, str) or not method:
+        raise ValueError("analysis request method must be non-empty text")
+    if not isinstance(values, Mapping):
+        raise TypeError("analysis request params must be a mapping")
+    return method, {str(key): item for key, item in values.items()}
+
+
+def _run_injected_diagnostic(
+    methods: list[str],
+    param_values: list[dict[str, object]],
+    workflow: str,
+) -> object | None:
+    if getattr(run_diagnostic_multi, "__module__", __name__) == __name__:
+        return None
+    if workflow == "standard":
+        return run_diagnostic_multi(methods, param_values)
+    return run_diagnostic_workflow(workflow, methods, param_values)
+
+
+def _execute_versioned_requests(
+    methods: list[str],
+    param_values: list[dict[str, object]],
+    normalized_workflow: str,
+    res_name: str,
+    diagnostic_data_name: str,
+) -> object:
     params = [_to_r_params(values) for values in param_values]
     try:
         result = execute_r_function(
