@@ -506,24 +506,44 @@ def _validate_record_dependencies(
 ):
     loader = (root / record["path"]).resolve().parent
     for dependency in record.get("dependencies", []):
-        if dependency == record.get("install_id") or dependency.startswith(
-            ("/usr/lib/", "/System/Library/")
-        ):
-            continue
-        candidates = _dependency_candidates(
-            dependency, record, loader, executable_dir, executable_rpaths
+        _validate_record_dependency(
+            record,
+            dependency,
+            by_resolved,
+            executable_dir,
+            executable_rpaths,
+            architecture,
+            loader,
         )
-        matches = {path for path in candidates if path in by_resolved}
-        if len(matches) != 1:
-            raise MacOSDeploymentInspectionError(
-                f"Mach-O dependency for {record['path']} does not resolve uniquely: "
-                f"{dependency} ({sorted(str(path) for path in matches)})"
-            )
-        target = by_resolved[next(iter(matches))]
-        if target.get("architectures") != [architecture]:
-            raise MacOSDeploymentInspectionError(
-                f"Mach-O dependency target is not {architecture}-only: {target['path']}"
-            )
+
+
+def _validate_record_dependency(
+    record,
+    dependency,
+    by_resolved,
+    executable_dir,
+    executable_rpaths,
+    architecture,
+    loader,
+):
+    if dependency == record.get("install_id") or dependency.startswith(
+        ("/usr/lib/", "/System/Library/")
+    ):
+        return
+    candidates = _dependency_candidates(
+        dependency, record, loader, executable_dir, executable_rpaths
+    )
+    matches = {path for path in candidates if path in by_resolved}
+    if len(matches) != 1:
+        raise MacOSDeploymentInspectionError(
+            f"Mach-O dependency for {record['path']} does not resolve uniquely: "
+            f"{dependency} ({sorted(str(path) for path in matches)})"
+        )
+    target = by_resolved[next(iter(matches))]
+    if target.get("architectures") != [architecture]:
+        raise MacOSDeploymentInspectionError(
+            f"Mach-O dependency target is not {architecture}-only: {target['path']}"
+        )
 
 
 def _dependency_candidates(
@@ -701,22 +721,35 @@ def _validate_qt_probe(probe: dict, frameworks: Path) -> None:
     library_paths = {
         _normalize_runtime_path(item) for item in qt.get("library_paths", [])
     }
-    valid = (
-        qt.get("pyqt_version") == EXPECTED_VERSIONS["pyqt6"]
-        and qt.get("compiled_qt_version") == "6.11.0"
-        and qt.get("runtime_qt_version") == EXPECTED_VERSIONS["qt"]
-        and qt.get("sip_runtime_version") == EXPECTED_VERSIONS["sip_runtime"]
-        and qt.get("platform_plugin") == "cocoa"
-        and plugin_path.is_relative_to(frameworks)
-        and plugin_path in library_paths
-        and qt.get("scale_factor_environment") is None
-        and float(qt.get("baseline_device_pixel_ratio", 0)) > 0
-        and float(qt.get("baseline_logical_dpi", 0)) > 0
+    valid = _qt_probe_versions_ok(qt) and (
+        _qt_probe_paths_ok(qt, plugin_path, library_paths, frameworks)
     )
     if not valid:
         raise MacOSDeploymentInspectionError(
             "frozen Qt probe does not match the Cocoa deployment"
         )
+
+
+def _qt_probe_versions_ok(qt: dict) -> bool:
+    return (
+        qt.get("pyqt_version") == EXPECTED_VERSIONS["pyqt6"]
+        and qt.get("compiled_qt_version") == "6.11.0"
+        and qt.get("runtime_qt_version") == EXPECTED_VERSIONS["qt"]
+        and qt.get("sip_runtime_version") == EXPECTED_VERSIONS["sip_runtime"]
+        and qt.get("platform_plugin") == "cocoa"
+    )
+
+
+def _qt_probe_paths_ok(
+    qt: dict, plugin_path: Path, library_paths: set[Path], frameworks: Path
+) -> bool:
+    return (
+        plugin_path.is_relative_to(frameworks)
+        and plugin_path in library_paths
+        and qt.get("scale_factor_environment") is None
+        and float(qt.get("baseline_device_pixel_ratio", 0)) > 0
+        and float(qt.get("baseline_logical_dpi", 0)) > 0
+    )
 
 
 def _validate_rpy2_probe(probe: dict, frameworks: Path) -> None:
@@ -758,20 +791,9 @@ def _validate_r_probe(probe: dict, app_root: Path, frameworks: Path) -> None:
         if direct_spike
         else _valid_sha256(r.get("kit_sha256"))
     )
-    valid = (
-        r.get("version") == EXPECTED_VERSIONS["r"]
-        and _normalize_runtime_path(r.get("home")) == expected_r_home.resolve()
-        and _normalize_runtime_path(r.get("configured_home")) == expected_r_home.resolve()
-        and _normalize_runtime_path(r.get("configured_library"))
-        == expected_r_library.resolve()
-        and expected_r_library.resolve() in r_libraries
-        and r.get("lc_numeric") == "C"
-        and _valid_sha256(r.get("shared_library_sha256"))
-        and _normalize_runtime_path(r.get("shared_library_path")).is_relative_to(
-            frameworks
-        )
-        and valid_identity
-    )
+    valid = _r_probe_versions_ok(r) and _r_probe_paths_ok(
+        r, expected_r_home, expected_r_library, r_libraries, frameworks
+    ) and valid_identity
     if not valid:
         raise MacOSDeploymentInspectionError(
             "frozen R probe does not use the bundled runtime"
@@ -779,10 +801,43 @@ def _validate_r_probe(probe: dict, app_root: Path, frameworks: Path) -> None:
     _validate_r_product_profile(r)
 
 
+def _r_probe_versions_ok(r: dict) -> bool:
+    return (
+        r.get("version") == EXPECTED_VERSIONS["r"]
+        and r.get("lc_numeric") == "C"
+        and _valid_sha256(r.get("shared_library_sha256"))
+    )
+
+
+def _r_probe_paths_ok(
+    r: dict, expected_r_home: Path, expected_r_library: Path,
+    r_libraries: set[Path], frameworks: Path
+) -> bool:
+    return (
+        _normalize_runtime_path(r.get("home")) == expected_r_home.resolve()
+        and
+        _normalize_runtime_path(r.get("configured_home")) == expected_r_home.resolve()
+        and _normalize_runtime_path(r.get("configured_library"))
+        == expected_r_library.resolve()
+        and expected_r_library.resolve() in r_libraries
+        and _normalize_runtime_path(r.get("shared_library_path")).is_relative_to(
+            frameworks
+        )
+    )
+
+
 def _validate_r_product_profile(r: dict) -> None:
     policy = r.get("macos_product_profile")
     png = policy.get("default_png", {}) if isinstance(policy, dict) else {}
-    valid = (
+    valid = _r_profile_flags_ok(policy, png) and _r_profile_png_ok(png)
+    if not valid:
+        raise MacOSDeploymentInspectionError(
+            "frozen R probe lacks the macOS Quartz product-profile evidence"
+        )
+
+
+def _r_profile_flags_ok(policy: object, png: dict) -> bool:
+    return (
         isinstance(policy, dict)
         and policy.get("tcltk_available") is False
         and policy.get("tcltk_loaded") is False
@@ -790,12 +845,11 @@ def _validate_r_product_profile(r: dict) -> None:
         and policy.get("bitmap_type") == "quartz"
         and isinstance(png.get("size"), int)
         and png["size"] > 0
-        and _valid_sha256(png.get("sha256"))
     )
-    if not valid:
-        raise MacOSDeploymentInspectionError(
-            "frozen R probe lacks the macOS Quartz product-profile evidence"
-        )
+
+
+def _r_profile_png_ok(png: dict) -> bool:
+    return _valid_sha256(png.get("sha256"))
 
 
 def _validate_runtime_probe(
@@ -984,34 +1038,40 @@ def validate_rpy2_api_payload(records: object) -> None:
     ):
         raise MacOSDeploymentInspectionError("rpy2 inventory is not a record list")
     typed_records = cast(list[dict[str, Any]], records)
-    if any(
-        "_rinterface_cffi_abi" in str(record.get("path", "")).lower()
-        for record in typed_records
-    ):
+    if _has_abi_bridge(typed_records):
         raise MacOSDeploymentInspectionError(
             "deployment contains the forbidden rpy2 ABI-mode fallback bridge"
         )
-    api_native = [
-        record
-        for record in typed_records
-        if "architectures" in record
-        and "_rinterface_cffi_api" in str(record.get("path", "")).lower()
-    ]
+    api_native = _matching_rpy2_records(typed_records, "_rinterface_cffi_api")
     if len(api_native) != 1:
         raise MacOSDeploymentInspectionError(
             "deployment must contain exactly one rpy2 API-mode bridge"
         )
-    api_support = [
-        record
-        for record in typed_records
-        if "architectures" in record
-        and "/rpy2/rinterface_lib/_bufferprotocol"
-        in str(record.get("path", "")).lower()
-    ]
+    api_support = _matching_rpy2_records(
+        typed_records, "/rpy2/rinterface_lib/_bufferprotocol"
+    )
     if len(api_support) != 1:
         raise MacOSDeploymentInspectionError(
             "deployment must contain exactly one rpy2 API bridge support extension"
         )
+
+
+def _has_abi_bridge(records: list[dict[str, Any]]) -> bool:
+    return any(
+        "_rinterface_cffi_abi" in str(record.get("path", "")).lower()
+        for record in records
+    )
+
+
+def _matching_rpy2_records(
+    records: list[dict[str, Any]], marker: str
+) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if "architectures" in record
+        and marker in str(record.get("path", "")).lower()
+    ]
 
 
 def _validate_deployment_contract(
@@ -1022,9 +1082,7 @@ def _validate_deployment_contract(
 ) -> tuple[dict, Path]:
     if versions != EXPECTED_VERSIONS:
         raise MacOSDeploymentInspectionError(f"locked stack mismatch: {versions}")
-    if len(source_commit) != 40 or any(
-        char not in "0123456789abcdef" for char in source_commit
-    ):
+    if not _valid_source_commit(source_commit):
         raise MacOSDeploymentInspectionError(
             "source commit must be a full lowercase Git SHA"
         )
@@ -1048,6 +1106,12 @@ def _validate_deployment_contract(
             f"Info.plist is not the qualified macOS {minimum_macos} bundle contract"
         )
     return info, executable
+
+
+def _valid_source_commit(source_commit: str) -> bool:
+    return len(source_commit) == 40 and all(
+        char in "0123456789abcdef" for char in source_commit
+    )
 
 
 def _inventory_symlink(path: Path, app_root: Path) -> dict:
@@ -1570,35 +1634,44 @@ def _validate_direct_ppm_records(ppm_archives: list[dict]) -> None:
     seen_paths: set[str] = set()
     for record in ppm_archives:
         path = record.get("path")
-        valid_path = (
-            isinstance(path, str)
-            and bool(path)
-            and "\\" not in path
-            and not path.startswith("/")
-            and all(part not in {"", ".", ".."} for part in path.split("/"))
-            and path.casefold() not in seen_paths
-        )
-        if not valid_path:
+        if not _valid_ppm_path(path, seen_paths):
             raise MacOSDeploymentInspectionError(
                 "direct-build manifest contains an invalid PPM archive path"
             )
+        path = cast(str, path)
         seen_paths.add(path.casefold())
         package = record.get("package")
         version = record.get("version")
         archive_url = record.get("archive_url")
-        valid_metadata = (
-            isinstance(package, str)
-            and bool(package)
-            and isinstance(version, str)
-            and bool(version)
-            and isinstance(archive_url, str)
-            and archive_url.startswith(DIRECT_R_PPM_SNAPSHOT + "/")
-            and archive_url.endswith("/" + path)
-        )
-        if not valid_metadata:
+        if not _valid_ppm_metadata(package, version, archive_url, path):
             raise MacOSDeploymentInspectionError(
-                "direct-build PPM archive lacks package, version, or authoritative URL"
-            )
+            "direct-build PPM archive lacks package, version, or authoritative URL"
+        )
+
+
+def _valid_ppm_path(path: object, seen_paths: set[str]) -> bool:
+    return (
+        isinstance(path, str)
+        and bool(path)
+        and "\\" not in path
+        and not path.startswith("/")
+        and all(part not in {"", ".", ".."} for part in path.split("/"))
+        and path.casefold() not in seen_paths
+    )
+
+
+def _valid_ppm_metadata(
+    package: object, version: object, archive_url: object, path: str
+) -> bool:
+    return (
+        isinstance(package, str)
+        and bool(package)
+        and isinstance(version, str)
+        and bool(version)
+        and isinstance(archive_url, str)
+        and archive_url.startswith(DIRECT_R_PPM_SNAPSHOT + "/")
+        and archive_url.endswith("/" + path)
+    )
 
 
 def _validate_rcmetar_provenance(payload: dict, source_commit: str, inputs: dict) -> None:
