@@ -90,6 +90,8 @@ class Dataset:
 
     def add_study(self, study, study_index=None):
         # Empty outcomes and follow-ups remain valid until analysis execution.
+        for covariate in self.covariates:
+            study.covariate_values.setdefault(covariate.name, None)
         if study_index is None:
             self.studies.append(study)
         else:

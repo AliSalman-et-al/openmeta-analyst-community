@@ -12,7 +12,7 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon
 
 from rc_metastudio import calculator_routines as calc_fncs
-from rc_metastudio import name_validation, qt_text, r_backend, r_bridge
+from rc_metastudio import name_validation, project_adapter, qt_text, r_backend, r_bridge
 from rc_metastudio.analysis_dataset import Covariate, Dataset, Outcome, Study
 from rc_metastudio.dataset_analysis_domain import (
     calculate_raw_effects,
@@ -199,6 +199,7 @@ class WorkspaceEdit:
     changed_top_left: QModelIndex
     changed_bottom_right: QModelIndex
     roles: tuple[int, ...]
+    before_workspace_snapshot: tuple[object, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -1092,7 +1093,9 @@ class DatasetTableModel(QAbstractTableModel):
         if any(effect[key] is None for key in required_keys):
             target.study.include = False
 
-    def _publish_workspace_edit(self, index, target, added_study_id):
+    def _publish_workspace_edit(
+        self, index, target, added_study_id, before_workspace_snapshot
+    ):
         changed_first_column = target.column
         changed_last_column = target.column
         roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
@@ -1129,6 +1132,7 @@ class DatasetTableModel(QAbstractTableModel):
                 changed_top_left=QModelIndex(changed_top_left),
                 changed_bottom_right=QModelIndex(changed_bottom_right),
                 roles=tuple(role_values),
+                before_workspace_snapshot=before_workspace_snapshot,
             )
         )
 
@@ -1148,6 +1152,10 @@ class DatasetTableModel(QAbstractTableModel):
         target = self._prepare_edit_target(index, value, allow_empty_names)
         if target is None:
             return False
+        before_workspace_snapshot = (
+            project_adapter.dataset_to_project(copy.deepcopy(self.dataset)),
+            project_adapter.model_to_state(self),
+        )
         applied, added_study_id = self._apply_edit(
             index,
             value,
@@ -1159,7 +1167,9 @@ class DatasetTableModel(QAbstractTableModel):
         if not applied:
             return False
         self._update_inclusion_after_edit(index, target)
-        self._publish_workspace_edit(index, target, added_study_id)
+        self._publish_workspace_edit(
+            index, target, added_study_id, before_workspace_snapshot
+        )
         return True
 
     @staticmethod

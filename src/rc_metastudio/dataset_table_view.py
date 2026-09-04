@@ -32,7 +32,7 @@ from rc_metastudio import diagnostic_data_dialog
 from rc_metastudio import app_error_handler
 from rc_metastudio import qt_layout
 from rc_metastudio import meta_globals
-from rc_metastudio import project_adapter
+from rc_metastudio import project_adapter, project_format
 from rc_metastudio import analysis_dataset
 from rc_metastudio import qt_text
 from rc_metastudio import tabular_data
@@ -130,6 +130,7 @@ class DatasetTableView(QtWidgets.QTableView):
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
+        self._batch_editing = False
 
         # the main gui is assumed to be the form
         # that owns this table view, i.e., the 'main'
@@ -545,7 +546,6 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    self.dataDirtied.emit()
                     _publish_workspace_snapshot(self, before, self._main_gui())
             elif data_type == "continuous":
                 before = _workspace_snapshot(self.model())
@@ -570,7 +570,6 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    self.dataDirtied.emit()
                     _publish_workspace_snapshot(self, before, self._main_gui())
             else:
                 # then this is diagnostic data
@@ -595,7 +594,6 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.model().reset_model()
                     self.model().try_to_update_outcomes()
                     self.synchronize_column_widths()
-                    self.dataDirtied.emit()
                     _publish_workspace_snapshot(self, before, self._main_gui())
         finally:
             del signal_blocker
@@ -605,6 +603,12 @@ class DatasetTableView(QtWidgets.QTableView):
         old_val = edit.old_value
         new_val = edit.new_value
         study_added = edit.added_study_id
+        if not self._batch_editing and edit.before_workspace_snapshot is not None:
+            after = _workspace_snapshot(self.model())
+            if after is not None:
+                self._main_gui().record_workspace_change(
+                    edit.before_workspace_snapshot, after
+                )
         # Only make a cell edit if the old values and new values are different
         # DatasetTableModel has already applied the edit.  The owning window's
         # data-dirtied boundary snapshots it into WorkspaceSession, which is
@@ -683,7 +687,6 @@ class DatasetTableView(QtWidgets.QTableView):
         self.model().sort_studies(column, self.reverse_column_sorts[column])
         self.model().reset_model()
         self.reverse_column_sorts[column] = not self.reverse_column_sorts[column]
-        self.dataDirtied.emit()
         _publish_workspace_snapshot(self, before, self._main_gui())
 
     def _normalize_newlines(self, qstr_text):
@@ -716,7 +719,8 @@ class DatasetTableView(QtWidgets.QTableView):
 
         lower_row = upper_left_index.row() + len(new_content)
         lower_col = upper_left_index.column() + len(new_content[0])
-        studies_pre_paste = list(self.model().dataset.studies)
+        original_dataset = copy.deepcopy(self.model().dataset)
+        original_state_dict = copy.deepcopy(self.model().get_state())
         lower_right_index = self.model().createIndex(lower_row - 1, lower_col - 1)
         old_content = self._str_to_matrix(
             self.copy_contents_in_range(
@@ -727,10 +731,22 @@ class DatasetTableView(QtWidgets.QTableView):
         before = _workspace_snapshot(self.model())
         self._add_studies_if_necessary(upper_left_index, new_content)
         if not self.paste_contents(upper_left_index, new_content):
+            if self.main_gui is not None:
+                self._main_gui().set_model(
+                    original_dataset, state_dict=original_state_dict
+                )
+                self._main_gui().workspace.new(
+                    project_format.ProjectDocument(
+                        1,
+                        *(_workspace_snapshot(self.model()) or ({}, {})),
+                    )
+                )
+                self._main_gui().current_data_unsaved = False
+                self.setCurrentIndex(self.model().index(upper_left_index.row(), upper_left_index.column()))
             return False
         self._last_paste_committed = True
-        self.dataDirtied.emit()
         _publish_workspace_snapshot(self, before, self._main_gui())
+        self.setCurrentIndex(upper_left_index)
         return True
 
     def _preflight_paste(self, upper_left_index, content):
@@ -822,6 +838,7 @@ class DatasetTableView(QtWidgets.QTableView):
         )
         signal_blocker = QSignalBlocker(original_model)
         failure = None
+        self._batch_editing = True
         try:
             for src_row in range(len(source_content)):
                 # do we need to append a row?
@@ -845,6 +862,7 @@ class DatasetTableView(QtWidgets.QTableView):
             failure = "Exception while pasting: %s" % exc
         finally:
             del signal_blocker
+            self._batch_editing = False
 
         if failure is not None:
             if self.main_gui is not None:
@@ -865,6 +883,7 @@ class DatasetTableView(QtWidgets.QTableView):
         if not self.model().setData(index, val):
             self._report_model_data_error(self._model_data_error_message())
         self.model().reset_model()
+        self.setCurrentIndex(index)
 
     def _model_data_error_message(self):
         return (

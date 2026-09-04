@@ -908,10 +908,24 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def record_workspace_change(self, before, after):
         """Publish one adapter edit as one immutable workspace change."""
-        before_document = project_format.ProjectDocument(1, *before)
-        after_document = project_format.ProjectDocument(1, *after)
+        before_document = (
+            before
+            if isinstance(before, project_format.ProjectDocument)
+            else project_format.ProjectDocument(1, *before)
+        )
+        after_document = (
+            after
+            if isinstance(after, project_format.ProjectDocument)
+            else project_format.ProjectDocument(1, *after)
+        )
         if self.workspace.document is None:
             self.workspace.new(before_document)
+        elif self.workspace.document == after_document:
+            self.workspace_is_dirty = self.workspace.is_dirty
+            return
+        elif self.workspace.document != before_document:
+            self.workspace.replace(before_document, record_history=False)
+            self.workspace.mark_saved()
         self.workspace.replace(after_document)
         self.workspace_is_dirty = self.workspace.is_dirty
 
@@ -926,8 +940,11 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             after = _document_from_model(self.model)
         except project_adapter.ProjectAdapterError:
             after = None
-        if before is not None and after is not None and before != after:
-            self.workspace.replace(after)
+        if before is not None and after is not None:
+            if before == after and self.workspace.document == after:
+                self.workspace.replace(after)
+            else:
+                self.record_workspace_change(before, after)
         self.workspace_is_dirty = self.workspace.is_dirty
 
     def _undo_clean_changed(self, is_clean):
@@ -1054,6 +1071,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     def _install_workspace_document(self, document):
         current = self.tableView.currentIndex()
         position = (current.row(), current.column()) if current.isValid() else None
+        previous_model = self.model
         runtime = project_adapter.document_to_runtime_project(document)
         self.set_model(
             runtime.dataset,
@@ -1061,6 +1079,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             preserve_state_selection=runtime.restored_selection,
             recalculate_outcomes=False,
         )
+        # Keep observers holding the Qt adapter's model reference coherent
+        # while the view itself follows the newly decoded workspace snapshot.
+        previous_model.dataset = self.model.dataset
+        previous_model.set_state(runtime.model_state)
         self.out_path = str(self.workspace.path) if self.workspace.path else None
         self.workspace_is_dirty = self.workspace.is_dirty
         if position is not None:
