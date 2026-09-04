@@ -655,16 +655,14 @@
     }, text.names, seq_along(text.names) - 1L))
     image.names <- names(plots$images %||% character())
     if (length(image.names)) {
-        kinds <- vapply(image.names, function(key) {
-            kind <- plots$plot_names[[key]] %||% "plot"
-            as.character(kind)
-        }, character(1))
-        occurrences <- ave(seq_along(kinds), kinds, FUN=seq_along)
-        image.sections <- unname(Map(function(key, kind, occurrence, order) list(
-            id=paste0("small-study.", kind, ".", occurrence), kind="image",
-            order=as.integer(order), title=plots$plot_titles[[key]] %||% key,
-            source_key=key
-        ), image.names, kinds, occurrences,
+        image.sections <- unname(Map(function(key, order) {
+            source.key <- plots$plot_source_keys[[key]] %||% key
+            list(
+                id=source.key, kind="image", order=as.integer(order),
+                title=plots$plot_titles[[key]] %||% key,
+                source_key=source.key, value_key=key
+            )
+        }, image.names,
         length(sections) + seq_along(image.names) - 1L))
         sections <- c(sections, image.sections)
     }
@@ -674,7 +672,8 @@
 .small.study.render.plots <- function(om.data, prepared, trimfill) {
     if (prepared$diagnostic && !isTRUE(prepared$derived$raw))
         return(list(images=character(), plot_titles=character(), plot_capabilities=list(), plot_names=character(),
-                    plot_params_paths=list(), image_order=character(), failures=character()))
+                    plot_params_paths=list(), plot_source_keys=character(),
+                    image_order=character(), failures=character()))
     .small.study.plots(
         om.data, prepared$metafor.pooled, prepared$params, prepared$metric,
         common.center=prepared$pooled$TE.common, prepared=prepared$derived,
@@ -1147,15 +1146,18 @@ publication.bias.effects <- function(om.data, params) {
 .small.study.collect.plots <- function(artifacts) {
     valid <- artifacts[vapply(artifacts, function(item) !is.null(item$title), logical(1))]
     failures <- as.character(unlist(lapply(artifacts, `[[`, "failure"), use.names=FALSE))
-    keys <- vapply(valid, `[[`, character(1), "key")
+    keys <- vapply(valid, `[[`, character(1), "title")
+    source.keys <- vapply(valid, `[[`, character(1), "key")
     paths <- stats::setNames(vapply(valid, `[[`, character(1), "path"), keys)
     kinds <- stats::setNames(vapply(valid, `[[`, character(1), "kind"), keys)
-    titles <- stats::setNames(vapply(valid, `[[`, character(1), "title"), keys)
+    titles <- stats::setNames(keys, keys)
     params.paths <- stats::setNames(vapply(valid, `[[`, character(1), "params.path"),
                                     names(paths))
     capabilities <- stats::setNames(lapply(valid, `[[`, "capability"), names(paths))
+    source.keys <- stats::setNames(source.keys, keys)
     list(images=paths, plot_titles=titles, plot_capabilities=capabilities, plot_names=kinds,
-         plot_params_paths=params.paths, image_order=keys, failures=failures)
+         plot_params_paths=params.paths, plot_source_keys=source.keys,
+         image_order=keys, failures=failures)
 }
 
 .small.study.plots <- function(om.data, pooled, params, metric, common.center=0,

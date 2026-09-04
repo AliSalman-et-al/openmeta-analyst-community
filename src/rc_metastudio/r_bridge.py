@@ -1223,6 +1223,22 @@ def parse_out_results(result):
     text_d, text_sources = _apply_text_value_keys(
         text_d, text_sources, metadata["sections"]
     )
+    (
+        metadata["images"],
+        metadata["display_images"],
+        metadata["image_var_names"],
+        metadata["image_params_paths"],
+        metadata["plot_capabilities"],
+        metadata["image_order"],
+    ) = _apply_image_value_keys(
+        metadata["images"],
+        metadata["display_images"],
+        metadata["image_var_names"],
+        metadata["image_params_paths"],
+        metadata["plot_capabilities"],
+        metadata["image_order"],
+        metadata["sections"],
+    )
     sections = _text_section_metadata(text_sources, metadata["sections"])
     image_offset = len(sections)
     sections.extend(
@@ -1286,6 +1302,37 @@ def _result_metadata(result):
     }
 
 
+def _apply_image_value_keys(
+    images,
+    display_images,
+    variable_names,
+    params_paths,
+    capabilities,
+    image_order,
+    producer_sections,
+):
+    """Map producer display-keyed plot values to stable section source keys."""
+    aliases = {
+        section["value_key"]: section["source_key"]
+        for section in producer_sections
+        if section.get("kind") == "image"
+        and isinstance(section.get("value_key"), str)
+        and isinstance(section.get("source_key"), str)
+    }
+
+    def remap(values):
+        return {aliases.get(key, key): value for key, value in values.items()}
+
+    return (
+        remap(images),
+        remap(display_images),
+        remap(variable_names),
+        remap(params_paths),
+        remap(capabilities),
+        None if image_order is None else [aliases.get(key, key) for key in image_order],
+    )
+
+
 _RESULT_METADATA_KEYS = frozenset(
     {
         "images",
@@ -1293,6 +1340,7 @@ _RESULT_METADATA_KEYS = frozenset(
         "image_order",
         "plot_names",
         "plot_titles",
+        "plot_source_keys",
         "plot_params_paths",
         "plot_capabilities",
         "sections",

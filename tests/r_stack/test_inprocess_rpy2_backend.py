@@ -524,6 +524,20 @@ _NULL_RESULT_DRIVER = textwrap.dedent(
     parsed_semantic_section = r_bridge.parse_out_results(semantic_section_result)
     assert parsed_semantic_section.texts["small-study.warning"] == "kept"
     assert parsed_semantic_section.sections[0].title == "Warning"
+    semantic_image_result = r_bridge.ro.r(
+        "list(images=c('Ordinary Funnel Plot'='plot.png'), "
+        "plot_names=c('Ordinary Funnel Plot'='funnel'), "
+        "plot_params_paths=c('Ordinary Funnel Plot'='params'), "
+        "plot_capabilities=list('Ordinary Funnel Plot'=list(plot_kind='funnel', "
+        "editable=FALSE, styleable=TRUE, composition='single', regenerator='funnel')), "
+        "image_order='Ordinary Funnel Plot', sections=list(list(id='small-study.funnel.1', "
+        "kind='image', order=0L, title='Ordinary Funnel Plot', "
+        "source_key='small-study.funnel.1', value_key='Ordinary Funnel Plot')))"
+    )
+    parsed_semantic_image = r_bridge.parse_out_results(semantic_image_result)
+    assert parsed_semantic_image.images["small-study.funnel.1"] == "plot.png"
+    assert parsed_semantic_image.image_order == ("small-study.funnel.1",)
+    assert parsed_semantic_image.sections[0].title == "Ordinary Funnel Plot"
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
