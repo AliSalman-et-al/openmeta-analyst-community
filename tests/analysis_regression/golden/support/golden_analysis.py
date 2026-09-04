@@ -15,6 +15,7 @@ import zipfile
 from tests.analysis_regression.golden.support import headless_analysis
 from rc_metastudio import meta_globals
 from rc_metastudio import r_bridge
+from rc_metastudio.analysis_results import AnalysisResult
 from rc_metastudio.plot_defaults import FOREST_ARM_LABELS
 
 
@@ -521,9 +522,9 @@ def curated_golden_bundles(root_dir=None):
     ]
 
 
-def parsed_numeric_sections(result):
+def parsed_numeric_sections(result: AnalysisResult):
     parsed = {}
-    for name, text in result.get("texts", {}).items():
+    for name, text in result.texts.items():
         values = _parse_summary(text)
         values.update(_parse_result_table(text))
         values.update(_parse_weights(text))
@@ -532,7 +533,7 @@ def parsed_numeric_sections(result):
     return parsed
 
 
-def compare_bundle(bundle, result):
+def compare_bundle(bundle, result: AnalysisResult):
     actual = parsed_numeric_sections(result)
     comparisons = []
     for section, expected_values in bundle["expected"].items():
@@ -542,10 +543,10 @@ def compare_bundle(bundle, result):
                     "section": section,
                     "metric": "text_present",
                     "expected": True,
-                    "observed": section in result.get("texts", {}),
+                    "observed": section in result.texts,
                     "tolerance": None,
                     "drift": None,
-                    "passed": section in result.get("texts", {}),
+                    "passed": section in result.texts,
                 }
             )
         for metric, expected in expected_values.items():
@@ -567,9 +568,9 @@ def compare_bundle(bundle, result):
     return comparisons
 
 
-def _compare_artifacts(bundle, result):
+def _compare_artifacts(bundle, result: AnalysisResult):
     comparisons = []
-    images = result.get("images", {})
+    images = result.images
     for label in sorted(bundle.get("artifacts", {})):
         image_label = _matching_key(images, label)
         path = images.get(image_label) if image_label is not None else None
@@ -598,21 +599,15 @@ def _matching_key(mapping, expected):
     return None
 
 
-def _artifact_source_key(result, label, images):
-    for section in result.get("sections", ()):
+def _artifact_source_key(result: AnalysisResult, label, images):
+    for section in result.sections:
         if (
-            _section_value(section, "kind") == "image"
-            and _section_value(section, "title") == label
-            and _section_value(section, "source_key") in images
+            section.kind == "image"
+            and section.title == label
+            and section.source_key in images
         ):
-            return _section_value(section, "source_key")
+            return section.source_key
     return _matching_key(images, label)
-
-
-def _section_value(section, name):
-    if isinstance(section, dict):
-        return section.get(name)
-    return getattr(section, name, None)
 
 
 def run_curated_golden_set(report_path=None):
@@ -628,7 +623,7 @@ def run_curated_golden_set(report_path=None):
                 "metric": bundle["metric"],
                 "parameters": bundle["parameters"],
                 "tolerances": bundle["tolerances"],
-                "artifacts": result.get("images", {}),
+                "artifacts": result.images,
                 "comparisons": compare_bundle(bundle, result),
             }
         )
@@ -694,7 +689,7 @@ def capture_bundle(
             {
                 "status": "success",
                 "outputs": parsed_numeric_sections(result),
-                "texts": result.get("texts", {}),
+                "texts": result.texts,
                 "artifacts": _capture_artifacts(bundle, result),
                 "plot_descriptors": _capture_plot_descriptors(bundle, result),
             }
@@ -773,8 +768,8 @@ def capture_comprehensive_golden_baseline(
     return manifest
 
 
-def _capture_artifacts(bundle, result):
-    images = result.get("images", {})
+def _capture_artifacts(bundle, result: AnalysisResult):
+    images = result.images
     artifacts = []
     for label, expected_path in sorted(bundle.get("artifacts", {}).items()):
         path = images.get(label, expected_path)
@@ -788,12 +783,12 @@ def _capture_artifacts(bundle, result):
     return artifacts
 
 
-def _capture_plot_descriptors(bundle, result):
-    displays = result.get("display_images", {})
-    capabilities = result.get("plot_capabilities", {})
+def _capture_plot_descriptors(bundle, result: AnalysisResult):
+    displays = result.display_images
+    capabilities = result.plot_capabilities
     descriptors = []
     for label in sorted(bundle.get("artifacts", {})):
-        image_key = _artifact_source_key(result, label, result.get("images", {}))
+        image_key = _artifact_source_key(result, label, result.images)
         display_label = (
             image_key if image_key in displays else _matching_key(displays, label)
         )
@@ -804,9 +799,9 @@ def _capture_plot_descriptors(bundle, result):
             image_key if image_key in capabilities else _matching_key(capabilities, label)
         )
         capability = (
-            capabilities.get(capability_label, {})
+            capabilities.get(capability_label)
             if capability_label is not None
-            else {}
+            else None
         )
         descriptors.append(
             {
@@ -826,11 +821,11 @@ def _capture_plot_descriptors(bundle, result):
                     ),
                 },
                 "capability": {
-                    "kind": capability.get("plot_kind"),
-                    "editable": capability.get("editable"),
-                    "styleable": capability.get("styleable"),
-                    "composition": capability.get("composition"),
-                    "regeneration": capability.get("regenerator"),
+                    "kind": capability.plot_kind if capability else None,
+                    "editable": capability.editable if capability else None,
+                    "styleable": capability.styleable if capability else None,
+                    "composition": capability.composition if capability else None,
+                    "regeneration": capability.regenerator if capability else None,
                 },
             }
         )

@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 ROOT = Path(__file__).resolve().parents[3]
 
+from rc_metastudio.analysis_results import parse_analysis_result
 from tests.analysis_regression.golden.support.analysis_regression_compare import (  # noqa: E402
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
@@ -48,6 +49,27 @@ def _text_result(title, text):
             }
         ],
     }
+
+
+def _typed_result(
+    texts=None,
+    images=None,
+    display_images=None,
+    capabilities=None,
+    image_params_paths=None,
+    sections=None,
+):
+    return parse_analysis_result(
+        {
+            "version": 1,
+            "texts": texts or {},
+            "images": images or {},
+            "display_images": display_images or {},
+            "plot_capabilities": capabilities or {},
+            "image_params_paths": image_params_paths or {},
+            "sections": sections or [],
+        }
+    )
 
 
 def _empty_result():
@@ -474,7 +496,9 @@ def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
 
     current = json.loads(json.dumps(reference))
     current["curated_golden_set"][0]["outputs"] = (
-        verify_golden_compatibility.golden_analysis.parsed_numeric_sections({})
+        verify_golden_compatibility.golden_analysis.parsed_numeric_sections(
+            _typed_result()
+        )
     )
     rows = compare_golden_baseline(reference, current)["rows"]
     assert any(row["classification"] == MISSING_OUTPUT for row in rows)
@@ -606,10 +630,10 @@ def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path)
 def test_golden_capture_uses_public_title_for_semantic_image_descriptor(tmp_path):
     display_path = tmp_path / "forest.display.svg"
     display_path.write_text("<svg />", encoding="utf-8")
-    result = {
-        "images": {"diagnostic.DOR.forest": str(tmp_path / "forest.png")},
-        "display_images": {"diagnostic.DOR.forest": str(display_path)},
-        "plot_capabilities": {
+    result = _typed_result(
+        images={"diagnostic.DOR.forest": str(tmp_path / "forest.png")},
+        display_images={"diagnostic.DOR.forest": str(display_path)},
+        capabilities={
             "diagnostic.DOR.forest": {
                 "plot_kind": "forest",
                 "editable": True,
@@ -618,14 +642,17 @@ def test_golden_capture_uses_public_title_for_semantic_image_descriptor(tmp_path
                 "regenerator": "forest",
             }
         },
-        "sections": [
+        image_params_paths={"diagnostic.DOR.forest": "plot-data"},
+        sections=[
             {
+                "id": "test.diagnostic-dor-forest",
                 "kind": "image",
+                "order": 0,
                 "title": "Odds Ratio Forest Plot",
                 "source_key": "diagnostic.DOR.forest",
             }
         ],
-    }
+    )
 
     descriptor = verify_golden_compatibility.golden_analysis._capture_plot_descriptors(
         {"artifacts": {"Odds Ratio Forest Plot": "forest.png"}}, result
@@ -890,16 +917,45 @@ def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
             "tolerances": {},
         }
 
+        def result_with_image(path):
+            return _typed_result(
+                texts={"Summary": "ok"},
+                images={"forest plot": str(path)},
+                capabilities={
+                    "forest plot": {
+                        "plot_kind": "forest",
+                        "editable": True,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
+                image_params_paths={"forest plot": "plot-data"},
+                sections=[
+                    {
+                        "id": "test.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "test.forest",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "forest plot",
+                    },
+                ],
+            )
+
         comparisons = golden_analysis.compare_bundle(
             bundle,
-            {"texts": {"Summary": "ok"}, "images": {"forest plot": str(plot)}},
+            result_with_image(plot),
         )
         missing = golden_analysis.compare_bundle(
             bundle,
-            {
-                "texts": {"Summary": "ok"},
-                "images": {"Forest Plot": str(tmp_path / "missing.png")},
-            },
+            result_with_image(tmp_path / "missing.png"),
         )
 
     assert {
@@ -1242,12 +1298,38 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
         def runner(case):
             if case == "failing-case":
                 raise RuntimeError("RC MetaStudio baseline capture failed")
-            return {
-                "texts": {
+            return _typed_result(
+                texts={
                     "Summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5 0.02"
                 },
-                "images": {"Forest Plot": str(plot)},
-            }
+                images={"Forest Plot": str(plot)},
+                capabilities={
+                    "Forest Plot": {
+                        "plot_kind": "forest",
+                        "editable": True,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
+                image_params_paths={"Forest Plot": "plot-data"},
+                sections=[
+                    {
+                        "id": "test.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "test.forest",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "Forest Plot",
+                    },
+                ],
+            )
 
         report = golden_analysis.capture_comprehensive_golden_baseline(
             output_dir=str(tmp_path / "artifacts" / "golden-baseline"),
