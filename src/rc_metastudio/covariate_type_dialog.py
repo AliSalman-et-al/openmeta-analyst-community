@@ -223,7 +223,7 @@ class CovariateTypeModel(QAbstractTableModel):
                             return self.reject_edit(
                                 "Covariate values for continuous covariates need to be numeric."
                             )
-                study.covariate_values[covariate_name] = new_value
+                study.set_covariate_value(self.new_covariate, new_value)
                 self.refresh_covariate_values()
                 return True
         return self.reject_edit("Cannot edit that cell.")

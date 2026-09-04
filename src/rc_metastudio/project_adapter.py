@@ -11,7 +11,6 @@ from typing import Protocol
 
 from rc_metastudio import analysis_dataset
 from rc_metastudio import analysis_unit
-from rc_metastudio import two_way_dict
 from rc_metastudio.project_domain import validate_project_semantics
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
@@ -274,32 +273,25 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             stable_id=f"outcome:{index}",
         )
         dataset.outcomes_by_id[outcomes[outcome_name].stable_id] = outcomes[outcome_name]
-    dataset.follow_ups_by_outcome = {}
-    dataset.follow_up_stable_ids_by_outcome = {}
     for item in outcome_items:
         outcome_name = _text(item["name"], "outcome name")
-        mapping = two_way_dict.TwoWayDict()
-        for index, follow_up in enumerate(
-            _array(item["follow_ups"], "outcome follow-ups")
-        ):
-            mapping[index] = _optional_text(follow_up, "follow-up")
-        dataset.follow_ups_by_outcome[outcome_name] = mapping
+        follow_up_labels = [
+            _optional_text(follow_up, "follow-up")
+            for follow_up in _array(item["follow_ups"], "outcome follow-ups")
+        ]
         outcome_id = outcomes[outcome_name].stable_id
         follow_up_ids = [
-            f"{outcome_id}:follow-up:{index}" for index in range(len(mapping))
+            f"{outcome_id}:follow-up:{index}"
+            for index in range(len(follow_up_labels))
         ]
-        dataset.follow_up_stable_ids_by_outcome[outcome_name] = {
+        follow_up_ids_by_label = {
             follow_up: stable_id
-            for follow_up, stable_id in zip(
-                mapping.values(), follow_up_ids, strict=True
-            )
+            for follow_up, stable_id in zip(follow_up_labels, follow_up_ids, strict=True)
             if follow_up is not None and stable_id is not None
         }
         dataset.follow_ups_by_outcome_id[outcomes[outcome_name].stable_id] = {
             stable_id: analysis_dataset.FollowUp(stable_id, follow_up)
-            for follow_up, stable_id in dataset.follow_up_stable_ids_by_outcome[
-                outcome_name
-            ].items()
+            for follow_up, stable_id in follow_up_ids_by_label.items()
         }
 
     covariate_items = [
@@ -334,14 +326,9 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
         study.manually_excluded = _boolean(
             item["manually_excluded"], "manual exclusion"
         )
-        study.covariate_values = copy.deepcopy(
-            _object(item["covariates"], "study covariates")
-        )
-        study.covariate_values_by_id = {
-            covariate.stable_id: study.covariate_values.get(covariate.name)
-            for covariate in dataset.covariates
-        }
-        study.outcomes = [outcomes[name] for name in outcomes]
+        study_covariates = _object(item["covariates"], "study covariates")
+        for covariate in dataset.covariates:
+            study.register_covariate(covariate, study_covariates[covariate.name])
         for unit_value in _array(item["analysis_units"], "analysis units"):
             unit_data = _object(unit_value, "analysis unit")
             outcome_name = _text(unit_data["outcome"], "analysis unit outcome")
@@ -390,9 +377,7 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                         )
                     values = _object(values_value, "effect values")
                     unit.effects[metric][comparison].update(copy.deepcopy(values))
-            study.analysis_units_by_outcome.setdefault(outcome_name, {})[follow_up] = unit
-            study.analysis_units_by_id[unit.stable_id] = unit
-            study.analysis_units.append(unit)
+            study.add_analysis_unit(unit)
         dataset.studies.append(study)
     return dataset
 

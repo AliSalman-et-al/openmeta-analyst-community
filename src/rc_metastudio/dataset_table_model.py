@@ -827,8 +827,7 @@ class DatasetTableModel(QAbstractTableModel):
                     "Covariate values for continuous covariates need to be numeric."
                 )
                 return False
-        study.covariate_values[cov.name] = new_value
-        study.covariate_values_by_id[cov.stable_id] = new_value
+        study.set_covariate_value(cov, new_value)
         return True
 
     def _edit_outcome(

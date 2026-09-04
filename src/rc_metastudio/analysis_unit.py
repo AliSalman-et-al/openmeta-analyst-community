@@ -60,8 +60,7 @@ class AnalysisUnit:
             group_names = ["test 1"]
 
         # Group IDs keep effect entries stable when users rename groups.
-        self.groups = {}
-        self.groups_by_id = {}
+        self._groups_by_id = {}
 
         self.raw_data_length = 0
         if outcome.data_type == BINARY:
@@ -103,6 +102,14 @@ class AnalysisUnit:
             self.add_group(group, stable_id=identities[i])
             self.groups[group].raw_data = raw_data[i]
 
+    @property
+    def groups_by_id(self):
+        return self._groups_by_id
+
+    @property
+    def groups(self):
+        return {group.name: group for group in self._groups_by_id.values()}
+
     def adopt_calculated_state(self, candidate: "AnalysisUnit") -> None:
         """Publish a validated candidate while preserving this unit's identity.
 
@@ -115,9 +122,14 @@ class AnalysisUnit:
         self.outcome = candidate.outcome
         self.stable_id = candidate.stable_id
         self.raw_data_length = candidate.raw_data_length
-        existing_groups = self.groups
+        existing_groups = self._groups_by_id
         for name, candidate_group in candidate.groups.items():
-            group = existing_groups.get(name)
+            group = existing_groups.get(candidate_group.stable_id)
+            if group is None:
+                group = next(
+                    (item for item in existing_groups.values() if item.name == name),
+                    None,
+                )
             if group is None:
                 group = copy.deepcopy(candidate_group)
             else:
@@ -125,12 +137,10 @@ class AnalysisUnit:
                 group.name = candidate_group.name
                 group.stable_id = candidate_group.stable_id
                 group.raw_data[:] = copy.deepcopy(candidate_group.raw_data)
-            existing_groups[name] = group
-            self.groups_by_id[group.stable_id] = group
-        for name in tuple(existing_groups):
-            if name not in candidate.groups:
-                removed = existing_groups.pop(name)
-                self.groups_by_id.pop(removed.stable_id, None)
+            existing_groups[group.stable_id] = group
+        for identity, group in tuple(existing_groups.items()):
+            if group.name not in candidate.groups:
+                existing_groups.pop(identity)
         self.effects = copy.deepcopy(candidate.effects)
         self.entered_effects = self.effects
         self.derived_effect_previews = copy.deepcopy(candidate.derived_effect_previews)
@@ -442,27 +452,26 @@ class AnalysisUnit:
         if not self.groups:
             group_id = 0
         else:
-            group_id = max(group.id for group in self.groups.values()) + 1
+            group_id = max(group.id for group in self._groups_by_id.values()) + 1
         if raw_data is None:
             raw_data = [""] * self.raw_data_length
         self._add_effect_entries_for_group(name)
         group = Group(group_id, name, raw_data, stable_id=stable_id)
-        self.groups[name] = group
-        self.groups_by_id[group.stable_id] = group
+        self._groups_by_id[group.stable_id] = group
 
     def remove_group(self, name):
-        group = self.groups.pop(name)
-        self.groups_by_id.pop(group.stable_id, None)
+        group = self.groups[name]
+        self._groups_by_id.pop(group.stable_id, None)
 
     def rename_group(self, old_name, new_name):
         if old_name == new_name:
             return
 
         original_group_names = list(self.groups)
-        group = self.groups.pop(old_name)
+        group = self.groups[old_name]
         group.name = new_name
-        self.groups[new_name] = group
-        self.groups_by_id[group.stable_id] = group
+        self._groups_by_id.pop(group.stable_id)
+        self._groups_by_id[group.stable_id] = group
 
         # Effect keys are persisted as either one group name or an ordered
         # ``left-right`` pair. Build the known keys from the group collection;
@@ -509,7 +518,7 @@ class AnalysisUnit:
             self.set_raw_data_for_group(group, raw_data_list[i])
 
     def get_group_names(self):
-        return list(self.groups.keys())
+        return [group.name for group in self._groups_by_id.values()]
 
 
 class Group:
