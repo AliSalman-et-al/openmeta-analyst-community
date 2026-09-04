@@ -36,6 +36,114 @@ def load_adapter() -> ModuleType:
     return module
 
 
+def _fixture(work: Path) -> tuple[Path, Path]:
+    framework = work / "source/R.framework"
+    resources = framework / "Versions/4.6-arm64/Resources"
+    (resources / "lib").mkdir(parents=True)
+    (resources / "bin").mkdir()
+    (resources / "lib/libR.dylib").write_bytes(b"fixture-libR\n")
+    launcher = resources / "bin/R"
+    launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    launcher.chmod(0o755)
+    for relative, target in ALIASES.items():
+        link = framework / relative
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(
+            target,
+            target_is_directory=relative in {"Versions/Current", "Resources"},
+        )
+    toc_path = work / "toc.json"
+    toc_path.write_text(
+        json.dumps({"entries": load_adapter().explicit_toc(framework)}),
+        encoding="utf-8",
+    )
+    entry = work / "entry.py"
+    entry.write_text("print('fixture')\n", encoding="utf-8")
+    spec = work / "fixture.spec"
+    spec.write_text(
+        "\n".join(
+            (
+                "# -*- mode: python ; coding: utf-8 -*-",
+                "import json, os",
+                "from pathlib import Path",
+                "entries=json.loads(Path(os.environ['RCMS_FIXTURE_TOC']).read_text())['entries']",
+                f"a=Analysis([{str(entry)!r}], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], hooksconfig={{}}, runtime_hooks=[], excludes=[], noarchive=False, optimize=0)",
+                "a.datas.extend((e['destination'], e['source'], e['type']) for e in entries)",
+                "pyz=PYZ(a.pure)",
+                "exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Fixture',console=True,target_arch='arm64',codesign_identity=None,entitlements_file=None)",
+                "coll=COLLECT(exe,a.binaries,a.datas,name='Fixture')",
+                "app=BUNDLE(coll,name='Fixture.app',bundle_identifier='org.rcms.fixture',target_arch='arm64',codesign_identity=None,entitlements_file=None)",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return spec, toc_path
+
+
+def _run_fixture(work: Path, spec: Path, toc_path: Path) -> Path:
+    environment = {**os.environ, "RCMS_FIXTURE_TOC": str(toc_path)}
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "PyInstaller",
+            "--clean",
+            "--noconfirm",
+            "--distpath",
+            str(work / "dist"),
+            "--workpath",
+            str(work / "build"),
+            str(spec),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+    )
+    return work / "dist/Fixture.app/Contents/Frameworks/R.framework"
+
+
+def _validate_fixture(work: Path, bundled: Path) -> None:
+    observed = {relative: os.readlink(bundled / relative) for relative in ALIASES}
+    if observed != ALIASES:
+        raise RuntimeError(f"PyInstaller changed CRAN R aliases: {observed}")
+    for relative in ALIASES:
+        (bundled / relative).resolve(strict=True).relative_to(bundled.resolve())
+    lib_r = list((work / "dist/Fixture.app").rglob("libR.dylib"))
+    expected = bundled / "Versions/4.6-arm64/Resources/lib/libR.dylib"
+    if len(lib_r) != 1 or lib_r[0] != expected:
+        raise RuntimeError(
+            f"PyInstaller produced a duplicate/cross-topology libR: {lib_r}"
+        )
+
+
+def _write_evidence(output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_commit": subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip(),
+                "pyinstaller_version": metadata.version("PyInstaller"),
+                "system": platform.system(),
+                "machine": platform.machine(),
+                "aliases": ALIASES,
+                "passed": True,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
@@ -45,102 +153,10 @@ def main() -> int:
         return 0
     with tempfile.TemporaryDirectory(prefix="rcms-r-toc-") as raw:
         work = Path(raw)
-        framework = work / "source/R.framework"
-        resources = framework / "Versions/4.6-arm64/Resources"
-        (resources / "lib").mkdir(parents=True)
-        (resources / "bin").mkdir()
-        (resources / "lib/libR.dylib").write_bytes(b"fixture-libR\n")
-        launcher = resources / "bin/R"
-        launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-        launcher.chmod(0o755)
-        for relative, target in ALIASES.items():
-            link = framework / relative
-            link.parent.mkdir(parents=True, exist_ok=True)
-            link.symlink_to(
-                target,
-                target_is_directory=relative in {"Versions/Current", "Resources"},
-            )
-        toc_path = work / "toc.json"
-        toc_path.write_text(
-            json.dumps({"entries": load_adapter().explicit_toc(framework)}),
-            encoding="utf-8",
-        )
-        entry = work / "entry.py"
-        entry.write_text("print('fixture')\n", encoding="utf-8")
-        spec = work / "fixture.spec"
-        spec.write_text(
-            "\n".join(
-                (
-                    "# -*- mode: python ; coding: utf-8 -*-",
-                    "import json, os",
-                    "from pathlib import Path",
-                    "entries=json.loads(Path(os.environ['RCMS_FIXTURE_TOC']).read_text())['entries']",
-                    f"a=Analysis([{str(entry)!r}], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], hooksconfig={{}}, runtime_hooks=[], excludes=[], noarchive=False, optimize=0)",
-                    "a.datas.extend((e['destination'], e['source'], e['type']) for e in entries)",
-                    "pyz=PYZ(a.pure)",
-                    "exe=EXE(pyz,a.scripts,[],exclude_binaries=True,name='Fixture',console=True,target_arch='arm64',codesign_identity=None,entitlements_file=None)",
-                    "coll=COLLECT(exe,a.binaries,a.datas,name='Fixture')",
-                    "app=BUNDLE(coll,name='Fixture.app',bundle_identifier='org.rcms.fixture',target_arch='arm64',codesign_identity=None,entitlements_file=None)",
-                )
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        environment = {**os.environ, "RCMS_FIXTURE_TOC": str(toc_path)}
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "PyInstaller",
-                "--clean",
-                "--noconfirm",
-                "--distpath",
-                str(work / "dist"),
-                "--workpath",
-                str(work / "build"),
-                str(spec),
-            ],
-            cwd=ROOT,
-            env=environment,
-            check=True,
-        )
-        bundled = work / "dist/Fixture.app/Contents/Frameworks/R.framework"
-        observed = {relative: os.readlink(bundled / relative) for relative in ALIASES}
-        if observed != ALIASES:
-            raise RuntimeError(f"PyInstaller changed CRAN R aliases: {observed}")
-        for relative in ALIASES:
-            (bundled / relative).resolve(strict=True).relative_to(bundled.resolve())
-        lib_r = list((work / "dist/Fixture.app").rglob("libR.dylib"))
-        expected = bundled / "Versions/4.6-arm64/Resources/lib/libR.dylib"
-        if len(lib_r) != 1 or lib_r[0] != expected:
-            raise RuntimeError(
-                f"PyInstaller produced a duplicate/cross-topology libR: {lib_r}"
-            )
+        spec, toc_path = _fixture(work)
+        _validate_fixture(work, _run_fixture(work, spec, toc_path))
     if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "source_commit": subprocess.run(
-                        ["git", "rev-parse", "HEAD"],
-                        cwd=ROOT,
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    ).stdout.strip(),
-                    "pyinstaller_version": metadata.version("PyInstaller"),
-                    "system": platform.system(),
-                    "machine": platform.machine(),
-                    "aliases": ALIASES,
-                    "passed": True,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        _write_evidence(args.output)
     print("macOS PyInstaller explicit R.framework TOC preflight passed")
     return 0
 
