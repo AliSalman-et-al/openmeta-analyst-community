@@ -1486,13 +1486,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 self.current_effect in CONTINUOUS_ONE_ARM_METRICS
                 and metric in CONTINUOUS_ONE_ARM_METRICS
             ):
-                self.analysis_unit.set_effect_and_ci(
-                    metric,
-                    self.group_comparison,
-                    None,
-                    None,
-                    None,
-                    confidence_multiplier=self.confidence_multiplier,
+                self.analysis_unit.set_effect_for_source(
+                    "entered", metric, self.group_comparison, None, None, None
                 )
         # clear line edits
         self.set_current_effect()

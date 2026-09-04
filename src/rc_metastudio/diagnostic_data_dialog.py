@@ -867,13 +867,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         self._update_analysis_unit()
 
         for metric in DIAGNOSTIC_METRICS:
-            self.analysis_unit.set_effect_and_ci(
-                metric,
-                self.group_comparison,
-                None,
-                None,
-                None,
-                confidence_multiplier=self.confidence_multiplier,
+            self.analysis_unit.set_effect_for_source(
+                "entered", metric, self.group_comparison, None, None, None
             )
 
         # clear line edits

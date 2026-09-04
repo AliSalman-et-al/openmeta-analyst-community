@@ -43,6 +43,18 @@ class FakeContinuousAnalysisUnit:
         metric = _args[0]
         return self.effects.get(metric, (None, None, None))
 
+    def get_effect_and_ci_for_source(
+        self, _source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
+    def set_effect_for_source(
+        self, _source, metric, group_comparison, est, low=None, high=None, **kwargs
+    ):
+        self.set_effect_and_ci(
+            metric, group_comparison, est, low, high, **kwargs
+        )
+
     def set_effect_and_ci(self, metric, _group, est, low, high, **_kwargs):
         self.effects[metric] = (est, low, high)
 

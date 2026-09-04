@@ -275,6 +275,12 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     observed = []
+    warnings = []
+    monkeypatch.setattr(
+        binary_data_dialog.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
 
     def back_calculate(data):
         observed.append(dict(data))
@@ -295,6 +301,12 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
     )
     try:
         dialog.clear_form()
+        assert dialog.analysis_unit.get_effect_and_ci_for_source(
+            "entered",
+            dialog.current_effect,
+            dialog.group_comparison,
+            dialog.confidence_multiplier,
+        ) == (None, None, None)
         for row in (0, 1):
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
@@ -338,6 +350,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.text() == "100"
             assert not total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
+        assert warnings == []
     finally:
         _close(app, window, dialog)
 
