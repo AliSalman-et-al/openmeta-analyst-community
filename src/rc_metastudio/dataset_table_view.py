@@ -818,7 +818,10 @@ class DatasetTableView(QtWidgets.QTableView):
         before = _workspace_snapshot(model)
         after = _workspace_snapshot(candidate)
         if self.main_gui is not None and before is not None and after is not None:
-            self._main_gui().commit_workspace_change(before, after)
+            model.dataset = candidate.dataset
+            model.set_state(candidate.get_state())
+            model.reset_model()
+            self._main_gui().record_workspace_change(before, after)
         else:
             model.dataset = candidate.dataset
             model.set_state(candidate.get_state())

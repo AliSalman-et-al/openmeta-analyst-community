@@ -760,16 +760,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.workspace.replace(after_document)
         self.workspace_is_dirty = self.workspace.is_dirty
 
-    def commit_workspace_change(self, before, after):
-        """Commit a validated document, then rebuild the Qt adapter from it."""
-        after_document = (
-            after
-            if isinstance(after, project_format.ProjectDocument)
-            else project_format.ProjectDocument(1, *after)
-        )
-        self.record_workspace_change(before, after_document)
-        self._install_workspace_document(after_document)
-
     def _commit_model_operation(self, operation):
         """Run one already validated UI operation as one workspace change."""
         try:
@@ -782,9 +772,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         except project_adapter.ProjectAdapterError:
             after = None
         if before is not None and after is not None:
-            if before == after and self.workspace.document == after:
-                self.workspace.replace(after)
-            else:
+            if self.workspace.document != after:
                 self.record_workspace_change(before, after)
         self.workspace_is_dirty = self.workspace.is_dirty
 

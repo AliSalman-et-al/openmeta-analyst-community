@@ -1655,12 +1655,11 @@ def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch):
+def test_edit_empty_dataset_acceptance_preserves_state_without_empty_undo(monkeypatch):
     from rc_metastudio import edit_dialog
 
     app, window = automation.start_automation()
     try:
-        original_history = window.workspace.document
         monkeypatch.setattr(
             edit_dialog.EditDialog,
             "exec",
@@ -1671,7 +1670,7 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
 
         assert window.model.dataset.get_outcome_names() == []
         assert window.model.current_outcome_name is None
-        assert window.workspace.can_undo
+        assert not window.workspace.can_undo
     finally:
         _close_without_prompt(app, window)
 
