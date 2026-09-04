@@ -13,10 +13,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6 import QtGui
 from PyQt6.QtGui import QAction, QKeySequence, QPalette
-
-QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -168,7 +165,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
         self.setup_clear_button_palettes()  # Color for clear_button_pallette
         self.initialize_form()  # initialize cells to empty items
-        self.undoStack = QtHistoryAdapter(self)
+        self._field_history = calc_fncs.TransientEditHistory()
 
         self.update_raw_data()
         self._populate_effect_data()
@@ -626,7 +623,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -778,7 +775,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -836,8 +833,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        vars(self.analysis_unit).clear()
-        vars(self.analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
+        self.analysis_unit = copy.deepcopy(old_analysis_unit)
 
         self.initialize_form()  # clear form first
         self.update_raw_data()
@@ -1052,7 +1048,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             new_correlation = self._get_correlation_str()
 
             calc_fncs.push_field_edit(
-                self.undoStack,
+                self._field_history,
                 owner=self,
                 restore_state=self.restore_analysis_unit_and_tables,
                 old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -1173,7 +1169,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             )
             self.set_current_effect()
 
-    def _capture_back_calculation_state(self):
+    def _capture_dialog_state(self):
         return {
             "analysis_unit": copy.deepcopy(self.analysis_unit),
             "tables": self.save_tables_data(),
@@ -1188,10 +1184,9 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             },
         }
 
-    def _restore_back_calculation_state(self, state):
+    def _restore_dialog_state(self, state):
         """Restore directly without invoking R, imputation, or calculator setters."""
-        vars(self.analysis_unit).clear()
-        vars(self.analysis_unit).update(copy.deepcopy(vars(state["analysis_unit"])))
+        self.analysis_unit = copy.deepcopy(state["analysis_unit"])
         for table, rows in zip(self.tables, state["tables"]):
             blocked = table.blockSignals(True)
             try:
@@ -1222,124 +1217,19 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         finally:
             self.back_calculate_button.blockSignals(blocked)
 
-    def _restore_back_calculation_undo_state(self, count, index, clean, commands):
-        if self.undoStack.index() != index:
-            self.undoStack.setIndex(index)
-        if self.undoStack.count() != count:
-            if count == 0:
-                self.undoStack.clear()
-            else:
-                raise RuntimeError(
-                    "Back-calculation could not restore the prior undo history"
-                )
-        if any(
-            self.undoStack.command(command_index) is not command
-            for command_index, command in enumerate(commands)
-        ):
-            raise RuntimeError(
-                "Back-calculation changed the identity of prior undo commands"
-            )
-        if clean:
-            self.undoStack.setClean()
-        elif self.undoStack.isClean():
-            self.undoStack.resetClean()
-
-    def _rollback_back_calculation_transaction(self, state, undo_state):
-        errors = []
-        try:
-            self._restore_back_calculation_undo_state(*undo_state)
-        except BaseException as error:
-            errors.append(error)
-        try:
-            self._restore_back_calculation_state(state)
-        except BaseException as error:
-            errors.append(error)
-        return errors
-
-    def _back_calculation_state_matches(self, expected):
-        try:
-            current = self._capture_back_calculation_state()
-            return (
-                current["tables"] == expected["tables"]
-                and current["correlation"] == expected["correlation"]
-                and current["metric_parameter"] == expected["metric_parameter"]
-                and current["button"] == expected["button"]
-                and vars(current["analysis_unit"])
-                == vars(expected["analysis_unit"])
-            )
-        except BaseException:
-            return False
-
-    def _back_calculation_command_is_committed(
-        self, command, token, committed_state, prior_index
-    ):
-        expected_index = prior_index + 1
-        if (
-            self.undoStack.index() != expected_index
-            or self.undoStack.count() != expected_index
-            or self.undoStack.isClean()
-        ):
-            return False
-        published = self.undoStack.command(prior_index)
-        identity_matches = published is command or (
-            getattr(published, "_back_calculation_commit_token", None) is token
-        )
-        return identity_matches and self._back_calculation_state_matches(
-            committed_state
-        )
-
-    def _publish_back_calculation_command(self, command, committed_state, prior_index):
-        token = object()
-        command._back_calculation_commit_token = token
-        try:
-            self.undoStack.push(command)
-        except BaseException:
-            if self._back_calculation_command_is_committed(
-                command, token, committed_state, prior_index
-            ):
-                return
-            raise
-
     def update_back_calculation_button(self, engage=False):
         if not engage:
             return self._update_back_calculation_button(engage=False)
-
-        state = self._capture_back_calculation_state()
-        undo_state = (
-            self.undoStack.count(),
-            self.undoStack.index(),
-            self.undoStack.isClean(),
-            tuple(
-                self.undoStack.command(command_index)
-                for command_index in range(self.undoStack.count())
-            ),
-        )
+        state = self._capture_dialog_state()
         try:
             return self._update_back_calculation_button(
                 engage=True, transaction_state=state
             )
         except _BackCalculationCancelled:
-            rollback_errors = self._rollback_back_calculation_transaction(
-                state, undo_state
-            )
-            if rollback_errors:
-                raise RuntimeError(
-                    "Back-calculation cancellation rollback failed"
-                ) from (rollback_errors[0])
+            self._restore_dialog_state(state)
             return None
-        except BaseException as error:
-            rollback_errors = self._rollback_back_calculation_transaction(
-                state, undo_state
-            )
-            if rollback_errors:
-                # Qt does not expose removal of one arbitrary command. If a
-                # push changed an existing branch but cannot be proven to have
-                # committed this transaction, discard the compromised history
-                # so no ghost redo command can reapply it later.
-                self.undoStack.clear()
-                self.undoStack.resetClean()
-            for rollback_error in rollback_errors:
-                error.add_note("Rollback error: %s" % rollback_error)
+        except Exception:
+            self._restore_dialog_state(state)
             raise
 
     def _update_back_calculation_button(self, engage=False, transaction_state=None):
@@ -1558,19 +1448,17 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         # The committed result has filled every value exposed by this
         # back-calculation, so no second R probe is needed to refresh the button.
         self.back_calculate_button.setEnabled(False)
-        new_state = self._capture_back_calculation_state()
+        new_state = self._capture_dialog_state()
 
         command = calc_fncs.make_field_edit_command(
             owner=self,
-            restore_state=self._restore_back_calculation_state,
+            restore_state=self._restore_dialog_state,
             old_state=(transaction_state,),
             new_state=(new_state,),
             description="Apply continuous back-calculation",
             refresh_on_initial_redo=False,
         )
-        self._publish_back_calculation_command(
-            command, new_state, self.undoStack.index()
-        )
+        self._field_history.push(command)
 
     def clear_form(self):
         # For undo/redo
@@ -1627,7 +1515,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -1656,10 +1544,10 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         return group_comparison
 
     def undo(self):
-        self.undoStack.undo()
+        self._field_history.undo()
 
     def redo(self):
-        self.undoStack.redo()
+        self._field_history.redo()
 
 
 class ContinuousBackCalculationDialog(

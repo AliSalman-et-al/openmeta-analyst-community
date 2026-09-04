@@ -785,19 +785,24 @@ class DatasetTableModel(QAbstractTableModel):
             adjust_by += 3
             group_name = self.current_groups[1]
 
-        analysis_unit = self.get_current_analysis_unit_for_study(index.row())
-        old_analysis_unit = copy.deepcopy(analysis_unit)
+        live_analysis_unit = self.get_current_analysis_unit_for_study(index.row())
+        analysis_unit = copy.deepcopy(live_analysis_unit)
         old_include = study.include
         old_manually_excluded = study.manually_excluded
         double_value, converted_ok = _to_double(normalized_value)
         analysis_unit.groups[group_name].raw_data[column - adjust_by] = (
             double_value if converted_ok else ""
         )
+        follow_up = self.get_current_follow_up_name()
+        study.analysis_units_by_outcome[self.current_outcome_name][follow_up] = (
+            analysis_unit
+        )
         try:
             self.update_outcome_if_possible(index.row())
         except Exception as exc:
-            vars(analysis_unit).clear()
-            vars(analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
+            study.analysis_units_by_outcome[self.current_outcome_name][
+                follow_up
+            ] = live_analysis_unit
             study.include = old_include
             study.manually_excluded = old_manually_excluded
             self._reject_edit(

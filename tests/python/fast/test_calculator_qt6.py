@@ -517,9 +517,9 @@ def test_field_edit_command_replays_captured_states_once(qapp):
     def restore_state(*state):
         restored.append(state)
 
-    stack = QtGui.QUndoStack()
+    history = calc_fncs.TransientEditHistory()
     calc_fncs.push_field_edit(
-        stack,
+        history,
         owner=Owner(),
         restore_state=restore_state,
         old_state=("old", 1),
@@ -528,9 +528,9 @@ def test_field_edit_command_replays_captured_states_once(qapp):
 
     assert restored == []
     assert refreshes == [False]
-    stack.undo()
+    history.undo()
     assert restored == [("old", 1)]
-    stack.redo()
+    history.redo()
     assert restored == [("old", 1), ("new", 2)]
 
 

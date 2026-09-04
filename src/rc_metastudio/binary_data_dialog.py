@@ -8,10 +8,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6 import QtGui
 from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette
-
-QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -105,7 +102,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
         self.initialize_form()  # initialize all cell to empty items
         self.setup_back_calculation_feedback()
-        self.undoStack = QtHistoryAdapter(self)
+        self._field_history = calc_fncs.TransientEditHistory()
 
         self._update_raw_data()  # analysis_unit --> table
         self._populate_effect_data()  # make combo boxes for effects
@@ -369,7 +366,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -694,7 +691,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -746,8 +743,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        vars(self.analysis_unit).clear()
-        vars(self.analysis_unit).update(copy.deepcopy(vars(old_analysis_unit)))
+        self.analysis_unit = copy.deepcopy(old_analysis_unit)
 
         self.initialize_form()  # clear form first
         self._update_raw_data()
@@ -848,7 +844,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -1041,7 +1037,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -1057,10 +1053,10 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         return group_comparison
 
     def undo(self):
-        self.undoStack.undo()
+        self._field_history.undo()
 
     def redo(self):
-        self.undoStack.redo()
+        self._field_history.redo()
 
 
 class BinaryBackCalculationDialog(

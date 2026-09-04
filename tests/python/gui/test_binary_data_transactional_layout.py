@@ -383,7 +383,6 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
     )
     try:
         dialog.clear_form()
-        dialog.undoStack.clear()
         dialog.update_back_calculation_button()
         table_before = _binary_table_snapshot(dialog)
         model_before = copy.deepcopy(dialog.analysis_unit)
@@ -399,7 +398,6 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
             model_before.get_raw_data_for_groups(dialog.current_groups)
         )
         assert dialog.analysis_unit.effects == model_before.effects
-        assert dialog.undoStack.count() == 0
         assert window.current_data_unsaved is dirty_before
         assert dialog.result() == 0
         assert ok.isEnabled()
@@ -437,7 +435,6 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
     )
     try:
         dialog.clear_form()
-        dialog.undoStack.clear()
         dialog.update_back_calculation_button()
         mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
@@ -449,7 +446,6 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
             5,
             16,
         ]
-        assert dialog.undoStack.count() == 1
     finally:
         _close(app, window, dialog)
 

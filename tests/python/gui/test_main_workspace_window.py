@@ -170,15 +170,15 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
     window = main_window.MainWindow()
     try:
         command = window._make_add_covariate_command("Age", "continuous")
-        window.tableView.undoStack.push(command)
+        window._commit_model_operation(command.redo)
         column = window.model.columnCount() - 1
         identity_before = window.model.headerData(
             column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         window.tableView.setColumnWidth(column, 277)
 
-        window.tableView.undoStack.undo()
-        window.tableView.undoStack.redo()
+        window.undo()
+        window.redo()
         qapp.processEvents()
 
         identity_after = window.model.headerData(
@@ -209,7 +209,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.delete_covariate(covariate)
         assert window.model.dataset.get_covariate("Age") is None
 
-        window.tableView.undoStack.undo()
+        window.undo()
         qapp.processEvents()
         identity_after_undo = window.model.headerData(
             column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
@@ -217,9 +217,9 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         assert identity_after_undo == identity_before
         assert window.tableView.columnWidth(column) == 263
 
-        window.tableView.undoStack.redo()
+        window.redo()
         assert window.model.dataset.get_covariate("Age") is None
-        window.tableView.undoStack.undo()
+        window.undo()
         qapp.processEvents()
         assert (
             window.model.headerData(

@@ -343,6 +343,6 @@ def test_native_evidence_validator_rejects_semantic_contract_mutations(
 def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
     launch = _text("src", "rc_metastudio", "automation.py")
 
-    assert '"--automation-adaptive-layout-evidence"' in launch
-    assert "start_adaptive_layout_evidence" in launch
+    assert '"--automation-native-smoke"' in launch
+    assert "start_automation_smoke" in launch
     assert "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG" in launch

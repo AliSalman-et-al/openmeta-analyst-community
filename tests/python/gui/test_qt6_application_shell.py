@@ -14,6 +14,7 @@ import zipfile
 
 import pytest
 from rc_metastudio import automation
+from tests.python.gui.support import automation_scenarios
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 pytestmark = pytest.mark.qsettings
@@ -523,7 +524,7 @@ def test_packaged_sample_evidence_covers_the_authoritative_manifest(qapp):
 
     app, window = automation.start_automation()
     try:
-        evidence = automation._exercise_all_packaged_samples(
+        evidence = automation_scenarios._exercise_all_packaged_samples(
             window, ROOT / "sample_projects" / "BCG.rcms"
         )
         manifest = json.loads(

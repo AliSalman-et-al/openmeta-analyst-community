@@ -555,7 +555,7 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
 
 
 def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
-    automation = read_repo_text("src", "rc_metastudio", "automation.py")
+    automation = read_repo_text("tests", "python", "gui", "support", "automation_scenarios.py")
     probe = automation.split("def start_package_runtime_probe", 1)[1].split(
         "def _exercise_packaged_project_workflow", 1
     )[0]
@@ -784,7 +784,7 @@ def test_frozen_windows_bootstrap_indexes_all_private_native_directories(tmp_pat
 def test_frozen_direct_runtime_probe_validates_private_r_without_a_kit(
     monkeypatch, tmp_path
 ):
-    from rc_metastudio import automation
+    from tests.python.gui.support import automation_scenarios as automation
 
     app = tmp_path / "RCMetaStudio"
     executable = app / "RCMetaStudio.exe"

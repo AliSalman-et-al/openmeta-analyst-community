@@ -76,7 +76,7 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
 
 def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
-    automation_source = (ROOT / "src/rc_metastudio/automation.py").read_text(
+    automation_source = (ROOT / "tests/python/gui/support/automation_scenarios.py").read_text(
         encoding="utf-8"
     )
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(

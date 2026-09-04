@@ -11,9 +11,6 @@ from collections.abc import Callable, Sequence
 from typing import TypeVar, overload
 
 from PyQt6.QtGui import QColor
-from PyQt6 import QtGui
-
-QtEditCommand = getattr(QtGui, "QUndo" + "Command")
 
 APPLICATION_NAME = "RCMetaStudio"
 APPLICATION_DISPLAY_NAME = "RC MetaStudio"
@@ -296,7 +293,7 @@ def is_nan(value: object) -> bool:
     return value != value
 
 
-class CallbackCommand(QtEditCommand):
+class CallbackCommand:
     """Execute paired redo and undo callbacks."""
 
     def __init__(
@@ -305,7 +302,6 @@ class CallbackCommand(QtEditCommand):
         undo_f: Callable[[], None],
         description: str = "",
     ) -> None:
-        super().__init__(description)
         self.redo_f = redo_f
         self.undo_f = undo_f
 

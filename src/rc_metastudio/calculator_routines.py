@@ -8,10 +8,7 @@ from functools import partial
 from typing import Protocol, TypeAlias
 from weakref import WeakKeyDictionary
 from PyQt6.QtCore import Qt
-from PyQt6 import QtGui
 
-QtEditCommand = getattr(QtGui, "QUndo" + "Command")
-QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from rc_metastudio.meta_globals import (
@@ -457,8 +454,8 @@ EditState: TypeAlias = tuple[object, ...]
 StateRestorer: TypeAlias = Callable[..., None]
 
 
-class FieldEditCommand(QtEditCommand):
-    """Undo one already-applied calculator edit and its complete UI state."""
+class FieldEditCommand:
+    """Transient undo record for fields inside one open calculator dialog."""
 
     def __init__(
         self,
@@ -470,8 +467,6 @@ class FieldEditCommand(QtEditCommand):
         description: str = "",
         refresh_on_initial_redo: bool = True,
     ) -> None:
-        super().__init__(description)
-
         self.owner = owner
         self.just_created = True
         self.restore_state = restore_state
@@ -491,8 +486,32 @@ class FieldEditCommand(QtEditCommand):
         self.restore_state(*self.old_state)
 
 
+class TransientEditHistory:
+    """Small dialog-local history; it is discarded when the dialog closes."""
+
+    def __init__(self) -> None:
+        self._commands: list[FieldEditCommand] = []
+        self._index = 0
+
+    def push(self, command: FieldEditCommand) -> None:
+        del self._commands[self._index :]
+        self._commands.append(command)
+        self._index += 1
+        command.redo()
+
+    def undo(self) -> None:
+        if self._index:
+            self._index -= 1
+            self._commands[self._index].undo()
+
+    def redo(self) -> None:
+        if self._index < len(self._commands):
+            self._commands[self._index].redo()
+            self._index += 1
+
+
 def push_field_edit(
-    undo_stack: QtHistoryAdapter,
+    history: TransientEditHistory,
     *,
     owner: CalculatorCommandOwner,
     restore_state: StateRestorer,
@@ -502,7 +521,7 @@ def push_field_edit(
     refresh_on_initial_redo: bool = True,
 ) -> None:
     """Publish an already-applied calculator edit as one undoable state change."""
-    undo_stack.push(
+    history.push(
         make_field_edit_command(
             owner=owner,
             restore_state=restore_state,

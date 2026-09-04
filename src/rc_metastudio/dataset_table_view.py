@@ -14,11 +14,8 @@ from PyQt6.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt6 import QtGui
 from PyQt6.QtGui import QAction, QKeyEvent
 
-QtEditCommand = getattr(QtGui, "QUndo" + "Command")
-QtHistoryAdapter = getattr(QtGui, "QUndo" + "Stack")
 from PyQt6.QtWidgets import (
     QApplication,
     QItemDelegate,
@@ -73,6 +70,8 @@ class MainWindowProtocol(Protocol):
     def enable_menu_options_that_require_dataset(self) -> None: ...
     def disable_menu_options_that_require_dataset(self) -> None: ...
     def set_model(self, dataset, state_dict=None) -> None: ...
+    def undo(self) -> None: ...
+    def redo(self) -> None: ...
 
 
 def _workspace_snapshot(model):
@@ -137,11 +136,6 @@ class DatasetTableView(QtWidgets.QTableView):
         # user interface/form. it is assumed that this
         # is set elsewhere.
         self.main_gui: MainWindowProtocol | None = None
-
-        # None maps to the special, no outcome/no follow up
-        # undo stack
-        self.undo_stack_dict = {None: QtHistoryAdapter(self)}
-        self.undoStack = QtHistoryAdapter(self)
 
         header = required(self.horizontalHeader(), "workspace column header")
         header.sectionClicked.connect(
@@ -397,9 +391,9 @@ class DatasetTableView(QtWidgets.QTableView):
             return
         if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             if event.key() == QtCore.Qt.Key.Key_Z:
-                self.undoStack.undo()
+                self._main_gui().undo()
             elif event.key() == QtCore.Qt.Key.Key_Y:
-                self.undoStack.redo()
+                self._main_gui().redo()
             elif event.key() == QtCore.Qt.Key.Key_C:
                 # ctrl + c = copy
                 self.copy()
@@ -612,11 +606,9 @@ class DatasetTableView(QtWidgets.QTableView):
         new_val = edit.new_value
         study_added = edit.added_study_id
         # Only make a cell edit if the old values and new values are different
-        if not self._new_eq_old(old_val, new_val):
-            cell_edit = CellEditCommand(
-                self, index, old_val, new_val, added_study=study_added
-            )
-            self.undoStack.push(cell_edit)
+        # DatasetTableModel has already applied the edit.  The owning window's
+        # data-dirtied boundary snapshots it into WorkspaceSession, which is
+        # the only durable history.
         self._enable_analysis_menus_if_appropriate()
 
         # make analysis menus change even when checkbox is (un)checked
@@ -687,11 +679,12 @@ class DatasetTableView(QtWidgets.QTableView):
         # current table view; rebuild it when covariate columns move or vanish.
         if column not in self.reverse_column_sorts:
             self.reverse_column_sorts[column] = False
-        sort_command = SortCommand(
-            self.model(), column, self.reverse_column_sorts[column]
-        )
-        self.undoStack.push(sort_command)
+        before = _workspace_snapshot(self.model())
+        self.model().sort_studies(column, self.reverse_column_sorts[column])
+        self.model().reset_model()
         self.reverse_column_sorts[column] = not self.reverse_column_sorts[column]
+        self.dataDirtied.emit()
+        _publish_workspace_snapshot(self, before, self._main_gui())
 
     def _normalize_newlines(self, qstr_text):
         if isinstance(qstr_text, str):
@@ -731,18 +724,14 @@ class DatasetTableView(QtWidgets.QTableView):
             )
         )
 
-        paste_command = PasteCommand(
-            self,
-            new_content,
-            old_content,
-            upper_left_index,
-            studies_pre_paste,
-            self.column_widths(),
-            "paste %s" % new_content,
-        )
+        before = _workspace_snapshot(self.model())
+        self._add_studies_if_necessary(upper_left_index, new_content)
+        if not self.paste_contents(upper_left_index, new_content):
+            return False
         self._last_paste_committed = True
-        self.undoStack.push(paste_command)
-        return self._last_paste_committed
+        self.dataDirtied.emit()
+        _publish_workspace_snapshot(self, before, self._main_gui())
+        return True
 
     def _preflight_paste(self, upper_left_index, content):
         model = self.model()
@@ -1009,7 +998,7 @@ class DatasetTableView(QtWidgets.QTableView):
         self.model().reset_model()
 
 
-class CellEditCommand(QtEditCommand):
+class CellEditCommand:
     """Here we make use of QT's undo/redo framework. This is an UndoCommand for individual
     cell edits (as opposed to paste actions, which are represented by PasteCommand objects,
     defined below).
@@ -1024,7 +1013,6 @@ class CellEditCommand(QtEditCommand):
         added_study=None,
         description="",
     ):
-        super(CellEditCommand, self).__init__(description)
         self.first_call = True
         if original_content is None:
             self.original_content = ""
@@ -1113,7 +1101,7 @@ class CellEditCommand(QtEditCommand):
         )
 
 
-class PasteCommand(QtEditCommand):
+class PasteCommand:
     """Apply or reverse one table paste operation."""
 
     def __init__(
@@ -1126,7 +1114,6 @@ class PasteCommand(QtEditCommand):
         old_col_widths,
         description,
     ):
-        super(PasteCommand, self).__init__(description)
         self.new_content, self.old_content = new_content, old_content
         self.upper_left_coord = upper_left_coord
         self.old_column_widths = old_col_widths
@@ -1192,7 +1179,6 @@ class PasteCommand(QtEditCommand):
         )
         self.dataset_table_view.main_gui.workspace_is_dirty = self.original_unsaved
         self.dataset_table_view._last_paste_committed = False
-        self.setObsolete(True)
         self._restore_selection()
         if message is not None:
             self.dataset_table_view._report_model_data_error(message)
@@ -1223,7 +1209,7 @@ class PasteCommand(QtEditCommand):
         )
 
 
-class EditAnalysisUnitCommand(QtEditCommand):
+class EditAnalysisUnitCommand:
     def __init__(
         self,
         table_view,
@@ -1232,7 +1218,6 @@ class EditAnalysisUnitCommand(QtEditCommand):
         old_analysis_unit,
         description="Analysis unit edit",
     ):
-        super().__init__(description)
         self.model = table_view.model()
         self.old_analysis_unit = old_analysis_unit
         self.new_analysis_unit = new_analysis_unit
@@ -1259,9 +1244,8 @@ class EditAnalysisUnitCommand(QtEditCommand):
         self.dataset_table_view.dataDirtied.emit()
 
 
-class SortCommand(QtEditCommand):
+class SortCommand:
     def __init__(self, dataset_table_model, col, reverse_order, description="Sort"):
-        super(SortCommand, self).__init__(description)
         self.model = dataset_table_model
         self.col = col
         self.reverse = reverse_order

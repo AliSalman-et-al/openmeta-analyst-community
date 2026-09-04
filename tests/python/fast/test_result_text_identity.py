@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
+from tests.python.gui.support import automation_scenarios
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -51,7 +52,7 @@ def test_packaged_summary_identity_ignores_display_only_confidence_labels():
 def test_packaged_summary_hash_contract_is_shared_and_pinned():
     maps = {
         "automation": _constant_from_source(
-            ROOT / "src/rc_metastudio/automation.py",
+            ROOT / "tests/python/gui/support/automation_scenarios.py",
             "PACKAGED_SUMMARY_SHA256_BY_SAMPLE",
         ),
         "macos": _constant_from_source(
@@ -75,7 +76,5 @@ def test_packaged_summary_hash_contract_is_shared_and_pinned():
 
 
 def test_packaged_summary_identity_rejects_unknown_sample():
-    from rc_metastudio import automation
-
     with pytest.raises(SystemExit, match="Unsupported packaged smoke sample"):
-        automation._expected_packaged_summary_sha256("unknown.rcms")
+        automation_scenarios._expected_packaged_summary_sha256("unknown.rcms")

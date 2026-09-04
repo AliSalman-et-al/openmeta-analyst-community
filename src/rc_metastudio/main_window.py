@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from functools import cmp_to_key
 from typing import TYPE_CHECKING, cast
-from PyQt6 import QtCore, QtWidgets, QtGui
+from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import (
     QAction,
@@ -17,7 +17,6 @@ from PyQt6.QtGui import (
     QResizeEvent,
     QTextDocument,
 )
-QtEditCommand = getattr(QtGui, "QUndo" + "Command")
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -321,7 +320,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
-        self.tableView.undoStack.cleanChanged.connect(self._undo_clean_changed)
         self._configure_standard_shortcuts()
         self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
@@ -646,7 +644,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                     return self.set_model(data_model)
 
                 edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-                self.tableView.undoStack.push(edit_command)
+                self._commit_model_operation(edit_command.redo)
             else:  # CSV import manages its own undo boundary.
                 self.set_model(data_model)
         else:
@@ -758,7 +756,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             change_cl_command = ChangeConfidenceLevelCommand(
                 previous_confidence_level, new_confidence_level, mainform=self
             )
-            self.tableView.undoStack.push(change_cl_command)
+            self._commit_model_operation(change_cl_command.redo)
 
     def _import_csv(self):
         """Import data from csv file"""
@@ -909,6 +907,21 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.workspace.replace(after_document)
         self.workspace_is_dirty = self.workspace.is_dirty
 
+    def _commit_model_operation(self, operation):
+        """Run one already validated UI operation as one workspace change."""
+        try:
+            before = _document_from_model(self.model)
+        except project_adapter.ProjectAdapterError:
+            before = None
+        operation()
+        try:
+            after = _document_from_model(self.model)
+        except project_adapter.ProjectAdapterError:
+            after = None
+        if before is not None and after is not None and before != after:
+            self.workspace.replace(after)
+        self.workspace_is_dirty = self.workspace.is_dirty
+
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
         self.workspace_is_dirty = not bool(is_clean)
@@ -1019,22 +1032,16 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         QMessageBox.critical(self, "Could Not Prepare Analysis", message)
 
     def undo(self):
-        if self.workspace.can_undo:
-            if self.workspace.undo():
-                document = self.workspace.document
-                if document is not None:
-                    self._install_workspace_document(document)
-            return
-        self.tableView.undoStack.undo()
+        if self.workspace.undo():
+            document = self.workspace.document
+            if document is not None:
+                self._install_workspace_document(document)
 
     def redo(self):
-        if self.workspace.can_redo:
-            if self.workspace.redo():
-                document = self.workspace.document
-                if document is not None:
-                    self._install_workspace_document(document)
-            return
-        self.tableView.undoStack.redo()
+        if self.workspace.redo():
+            document = self.workspace.document
+            if document is not None:
+                self._install_workspace_document(document)
 
     def _install_workspace_document(self, document):
         current = self.tableView.currentIndex()
@@ -1109,7 +1116,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.set_model(original_dataset, old_state_dict)
 
             edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(edit_command)
+            self._commit_model_operation(edit_command.redo)
 
     def populate_metrics_menu(self, metric_to_check=None):
         """Populates the `metric` sub-menu with available metrics for the
@@ -1268,7 +1275,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.model.rename_group(new_group_name, orig_group_name)
 
             rename_group_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(rename_group_command)
+            self._commit_model_operation(rename_group_command.redo)
 
     def add_covariate(self):
         form = add_new_dialogs.AddCovariateDialog(self)
@@ -1285,8 +1292,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
             # Covariate names must remain unique.
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
-            self.tableView.undoStack.push(
-                self._make_add_covariate_command(new_covariate_name, new_covariate_type)
+            self._commit_model_operation(
+                self._make_add_covariate_command(new_covariate_name, new_covariate_type).redo
             )
 
     def _make_add_covariate_command(self, covariate_name, covariate_type):
@@ -1410,7 +1417,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             next_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(next_command)
+            self._commit_model_operation(next_command.redo)
 
     def _add_new_group(self, new_group_name):
         self.model.add_new_group(new_group_name)
@@ -1489,7 +1496,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             next_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(next_command)
+            self._commit_model_operation(next_command.redo)
 
     def previous(self):
         redo_f, undo_f = None, None
@@ -1523,7 +1530,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             prev_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(prev_command)
+            self._commit_model_operation(prev_command.redo)
 
     def next_dimension(self):
         """In keeping with the dimensions metaphor, wherein the various
@@ -1673,7 +1680,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
         self.out_path = file_path
-        self.tableView.undoStack.clear()
         self.workspace.new(_document_from_model(self.model), path=file_path)
         self.workspace_is_dirty = self.workspace.is_dirty
         self._update_recent_project_nonfatal(file_path, "opened")
@@ -1688,7 +1694,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             return self._remove_study(study)
 
         delete_command = meta_globals.CallbackCommand(redo_f, undo_f)
-        self.tableView.undoStack.push(delete_command)
+        self._commit_model_operation(delete_command.redo)
 
     def change_covariate_type(self, covariate):
         current_dataset = copy.deepcopy(self.model.dataset)
@@ -1726,7 +1732,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.set_model(original_dataset, old_state_dict)
 
             edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(edit_command)
+            self._commit_model_operation(edit_command.redo)
 
     def rename_covariate(self, covariate):
         orig_cov_name = copy.copy(covariate.name)
@@ -1758,7 +1764,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.model.rename_covariate(new_cov, orig_cov_name)
 
             rename_cov_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(rename_cov_command)
+            self._commit_model_operation(rename_cov_command.redo)
 
     def delete_covariate(self, covariate):
         covariate_values_by_study = self.model.dataset.get_covariate_values(
@@ -1780,7 +1786,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self._refresh_advanced_analysis_actions()
 
         delete_command = meta_globals.CallbackCommand(redo_f, undo_f)
-        self.tableView.undoStack.push(delete_command)
+        self._commit_model_operation(delete_command.redo)
 
     def _refresh_advanced_analysis_actions(self):
         self._enable_action_meta_regression()
@@ -1953,7 +1959,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
-        self.tableView.undoStack.setClean()
         self.workspace.replace(_document_from_model(self.model), path=destination, record_history=False)
         self.workspace.mark_saved()
         self.workspace_is_dirty = self.workspace.is_dirty
@@ -2016,10 +2021,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 covariate_names=covariate_names,
                 covariate_types=covariate_types,
             )
-            self.tableView.undoStack.push(importcsv_command)
+            self._commit_model_operation(importcsv_command.redo)
 
 
-class ImportCsvCommand(QtEditCommand):
+class ImportCsvCommand:
     def __init__(
         self,
         original_dataset=None,
@@ -2032,7 +2037,6 @@ class ImportCsvCommand(QtEditCommand):
         covariate_types=None,
         description="Import a CSV file",
     ):
-        super(ImportCsvCommand, self).__init__(description)
         if main_form is None:
             raise ValueError("CSV import requires a main form")
         self.imported_data = csv_import.normalize_import_rows(imported_data or [])
@@ -2096,7 +2100,7 @@ class ImportCsvCommand(QtEditCommand):
             progress_dialog.hide_once(import_progress)
 
 
-class ChangeConfidenceLevelCommand(QtEditCommand):
+class ChangeConfidenceLevelCommand:
     """Undo a confidence-level change."""
 
     def __init__(
@@ -2106,7 +2110,6 @@ class ChangeConfidenceLevelCommand(QtEditCommand):
         mainform,
         description="Change confidence level",
     ):
-        super(ChangeConfidenceLevelCommand, self).__init__(description)
 
         self.old_cl = old_conf_lvl
         self.new_cl = new_conf_lvl
