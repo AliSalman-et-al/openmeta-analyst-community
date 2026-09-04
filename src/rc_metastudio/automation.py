@@ -98,53 +98,13 @@ def start_automation_smoke(
 
 def start_package_operation(output_path: str, sample_path: str, operation: str, locale_name: str = "en_US") -> int:
     """Perform one ordinary packaged-project operation for developer tooling."""
-    from PyQt6 import QtCore
-    from rc_metastudio import main_window, qt_text
-
     app, window = start_automation()
     try:
         if not window.open(os.path.abspath(sample_path), raise_on_error=True):
             raise RuntimeError("packaged workflow observation could not open project")
-        model = window.tableView.model()
-        if operation == "edit":
-            observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
-        elif operation in {"analysis", "locale"}:
-            raw_index = model.index(0, model.RAW_DATA[0])
-            locale = QtCore.QLocale(locale_name)
-            QtCore.QLocale.setDefault(locale)
-            observed_locale = QtCore.QLocale()
-            raw_value, valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-            if not valid:
-                raise RuntimeError("packaged locale operation could not parse the product value")
-            numeric_text = observed_locale.toString(raw_value, "f", 1)
-            observed = bool(model.setData(raw_index, numeric_text))
-            canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-            observed = observed and canonical_valid and canonical_value == raw_value
-            result = _run_binary_analysis(window, main_window)
-            if result is None:
-                raise RuntimeError("packaged analysis operation produced no result")
-            observed = observed and bool(result.texts.get("Summary"))
-        elif operation in {"save-reopen", "save-reopen-analysis"}:
-            observed = bool(model.setData(model.index(0, model.NAME), "Packaged Smoke – München"))
-            handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
-            os.close(handle)
-            destination = Path(raw_destination)
-            destination.unlink()
-            window.out_path = str(destination)
-            observed = observed and window.save() is True and window.open(str(destination), raise_on_error=True)
-            if operation == "save-reopen-analysis" and observed:
-                result = _run_binary_analysis(window, main_window)
-                observed = result is not None and bool(result.texts.get("Summary"))
-            destination.unlink(missing_ok=True)
-        else:
-            raise ValueError(f"unknown packaged operation: {operation}")
+        observation = _package_operation_observation(window, operation, locale_name)
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        observation = {"operation": operation, "observed": observed}
-        if operation in {"analysis", "locale"}:
-            observation.update({"locale": observed_locale.name(), "decimal_point": observed_locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)})
-        if operation == "save-reopen-analysis":
-            observation.update({"analysis_after_reopen_observed": observed, "summary": result.texts.get("Summary", "") if result else "", "svg_paths": dict(result.display_images) if result else {}})
         destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return 0
     finally:
@@ -153,6 +113,58 @@ def start_package_operation(output_path: str, sample_path: str, operation: str, 
         app.processEvents()
         _dispose_qobjects(app, (window,))
         app.quit()
+
+
+def _package_operation_observation(window, operation: str, locale_name: str) -> dict:
+    if operation == "edit":
+        model = window.tableView.model()
+        observed = model.setData(model.index(0, model.NAME), "Packaged Smoke – München")
+        return {"operation": operation, "observed": bool(observed)}
+    if operation in {"analysis", "locale"}:
+        return _observe_locale_analysis(window, operation, locale_name)
+    if operation in {"save-reopen", "save-reopen-analysis"}:
+        return _observe_save_reopen(window, operation)
+    raise ValueError(f"unknown packaged operation: {operation}")
+
+
+def _observe_locale_analysis(window, operation: str, locale_name: str) -> dict:
+    from PyQt6 import QtCore
+    from rc_metastudio import main_window, qt_text
+
+    model = window.tableView.model()
+    raw_index = model.index(0, model.RAW_DATA[0])
+    QtCore.QLocale.setDefault(QtCore.QLocale(locale_name))
+    locale = QtCore.QLocale()
+    raw_value, valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
+    if not valid:
+        raise RuntimeError("packaged locale operation could not parse the product value")
+    numeric_text = locale.toString(raw_value, "f", 1)
+    edited = model.setData(raw_index, numeric_text)
+    canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
+    result = _run_binary_analysis(window, main_window)
+    if result is None:
+        raise RuntimeError("packaged analysis operation produced no result")
+    observed = edited and canonical_valid and canonical_value == raw_value and bool(result.texts.get("Summary"))
+    return {"operation": operation, "observed": bool(observed), "locale": locale.name(), "decimal_point": locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
+
+
+def _observe_save_reopen(window, operation: str) -> dict:
+    from rc_metastudio import main_window
+
+    model = window.tableView.model()
+    edited = model.setData(model.index(0, model.NAME), "Packaged Smoke – München")
+    handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
+    os.close(handle)
+    destination = Path(raw_destination)
+    destination.unlink()
+    try:
+        window.out_path = str(destination)
+        reopened = edited and window.save() is True and window.open(str(destination), raise_on_error=True)
+        result = _run_binary_analysis(window, main_window) if reopened and operation == "save-reopen-analysis" else None
+        observed = reopened and (operation == "save-reopen" or result is not None and bool(result.texts.get("Summary")))
+        return {"operation": operation, "observed": bool(observed), "analysis_after_reopen_observed": bool(observed and operation == "save-reopen-analysis"), "summary": result.texts.get("Summary", "") if result else "", "svg_paths": dict(result.display_images) if result else {}}
+    finally:
+        destination.unlink(missing_ok=True)
 
 
 def _run_binary_analysis(window, main_window):
@@ -249,17 +261,39 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     """Observe one scale's native Qt surfaces and write only that record."""
     from PyQt6 import QtCore, QtGui, QtNetwork, QtWidgets
 
-    configured_locale = os.environ.get("RCMS_PACKAGE_LOCALE")
-    if configured_locale:
-        QtCore.QLocale.setDefault(QtCore.QLocale(configured_locale))
+    _configure_surface_locale(QtCore)
     app = app_error_handler.get_or_create_application(sys.argv)
     _configure_application(app)
     qt6_resources.ensure_application_resources()
     platform_name = app.platformName().lower()
-    if sys.platform == "win32" and platform_name != "windows":
-        raise SystemExit("Package surface smoke did not load qwindows.")
-    if sys.platform == "darwin" and platform_name != "cocoa":
-        raise SystemExit("Package surface smoke did not load Cocoa.")
+    _require_surface_platform(platform_name)
+    primary = _verify_surface_basics(app, QtGui)
+    window, menu_bar, menu, control = _build_surface_window(QtWidgets)
+    focus_before, focus_after = _observe_surface_focus(app, window, control)
+    record = _surface_record(
+        QtCore, QtGui, QtNetwork, QtWidgets, platform_name, expected_scale,
+        primary, window, menu_bar, menu, control, focus_before, focus_after,
+    )
+    _write_json(evidence_path, record)
+    _log("packaged-surface:scale-%s-passed" % expected_scale)
+    window.close()
+    app.quit()
+    return 0
+
+
+def _configure_surface_locale(QtCore) -> None:
+    configured_locale = os.environ.get("RCMS_PACKAGE_LOCALE")
+    if configured_locale:
+        QtCore.QLocale.setDefault(QtCore.QLocale(configured_locale))
+
+
+def _require_surface_platform(platform_name: str) -> None:
+    expected = {"win32": "windows", "darwin": "cocoa"}.get(sys.platform)
+    if expected is not None and platform_name != expected:
+        raise SystemExit("Package surface smoke loaded the wrong Qt platform plugin.")
+
+
+def _verify_surface_basics(app, QtGui):
     clipboard_text = "RC MetaStudio clipboard – München – 1,25"
     app.clipboard().setText(clipboard_text)
     if app.clipboard().text() != clipboard_text:
@@ -269,6 +303,10 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     primary = app.primaryScreen()
     if primary is None:
         raise SystemExit("Package surface smoke found no primary screen.")
+    return primary
+
+
+def _build_surface_window(QtWidgets):
     window = QtWidgets.QMainWindow()
     menu_bar = window.menuBar()
     menu = menu_bar.addMenu("Package smoke")
@@ -286,44 +324,47 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     window.setCentralWidget(body)
     window.setTabOrder(control, target)
     window.show()
+    return window, menu_bar, menu, control
+
+
+def _observe_surface_focus(app, window, control):
     app.processEvents()
     control.setFocus()
     app.processEvents()
     focus_before = app.focusWidget()
     app.focusNextPrevChild(True)
-    focus_after = app.focusWidget()
-    record = {
+    return focus_before, app.focusWidget()
+
+
+def _surface_record(QtCore, QtGui, QtNetwork, QtWidgets, platform_name, expected_scale, primary, window, menu_bar, menu, control, focus_before, focus_after):
+    actual_locale = QtCore.QLocale()
+    accessibility = {"focus_before": focus_before.objectName() if focus_before else None, "focus_after_tab": focus_after.objectName() if focus_after else None, "accessible_name": control.accessibleName(), "accessible_description": control.accessibleDescription(), "native": {}}
+    if sys.platform == "darwin":
+        accessibility["native"] = _observe_cocoa_accessibility(control)
+    baseline = float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", primary.devicePixelRatio()))
+    return {
         "requested": expected_scale,
         "qt_scale_factor": os.environ.get("QT_SCALE_FACTOR"),
         "device_pixel_ratio": float(primary.devicePixelRatio()),
-        "baseline_device_pixel_ratio": float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", primary.devicePixelRatio())),
-        "expected_device_pixel_ratio": float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", primary.devicePixelRatio())) * float(expected_scale),
+        "baseline_device_pixel_ratio": baseline,
+        "expected_device_pixel_ratio": baseline * float(expected_scale),
         "dpr_tolerance": 0.05,
         "logical_dpi": float(primary.logicalDotsPerInch()),
         "clipboard": True,
         "binary_resources": True,
         "native_menu": {"is_native": bool(menu_bar.isNativeMenuBar()), "menu_count": len(menu_bar.actions()), "action_count": len(menu.actions())},
-        "accessibility": {"focus_before": focus_before.objectName() if focus_before else None, "focus_after_tab": focus_after.objectName() if focus_after else None, "accessible_name": control.accessibleName(), "accessible_description": control.accessibleDescription(), "native": {}},
+        "accessibility": accessibility,
         "tls_backends": list(QtNetwork.QSslSocket.availableBackends()),
         "active_style": window.style().objectName(),
         "available_styles": list(QtWidgets.QStyleFactory.keys()),
         "image_formats": sorted(value.data().decode("ascii").lower() for value in QtGui.QImageReader.supportedImageFormats()),
         "platform_plugin": platform_name,
+        "locale": actual_locale.name(),
+        "decimal_point": actual_locale.decimalPoint(),
+        "native_file_dialog": _observe_native_file_dialog(window),
+        "critical_dialog": _observe_critical_dialog(window),
+        "cleanup": {"close_accepted": bool(window.close()), "window_visible": window.isVisible()},
     }
-    # Keep these bounded observations local to the packaged process; policy and
-    # pass/fail comparison remain in the developer deployment inspectors.
-    if sys.platform == "darwin":
-        record["accessibility"]["native"] = _observe_cocoa_accessibility(control)
-    actual_locale = QtCore.QLocale()
-    record["locale"] = actual_locale.name()
-    record["decimal_point"] = actual_locale.decimalPoint()
-    record["native_file_dialog"] = _observe_native_file_dialog(window)
-    record["critical_dialog"] = _observe_critical_dialog(window)
-    record["cleanup"] = {"close_accepted": bool(window.close()), "window_visible": window.isVisible()}
-    _write_json(evidence_path, record)
-    _log("packaged-surface:scale-%s-passed" % expected_scale)
-    app.quit()
-    return 0
 
 
 def _observe_native_file_dialog(parent):
