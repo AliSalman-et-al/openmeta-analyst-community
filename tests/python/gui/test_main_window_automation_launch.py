@@ -2058,6 +2058,7 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
                 ("subgroup", window, outcome_type),
             ]
         finally:
+            _mark_workspace_saved(window)
             window.close()
             app.processEvents()
             os.chdir(REPO_ROOT)
