@@ -886,6 +886,8 @@ def generate_small_study_effects_funnel(file_path, params_name="params"):
 
 
 def _r_param_value(param):
+    if isinstance(param, ro.ListVector):
+        return param
     if param is None:
         return rpy2.rinterface.NULL
     if isinstance(param, bool):
