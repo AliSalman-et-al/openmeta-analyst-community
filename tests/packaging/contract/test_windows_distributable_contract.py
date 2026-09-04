@@ -690,14 +690,14 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     )
 
 
-def test_windows_packager_authenticates_probe_after_smoke_observations():
+def test_windows_packager_authenticates_neutral_probe_before_smoke():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
     build = script.split("Assert-AppLayout -Root $appDir", 1)[1]
 
     assert relative_order(
         build,
-        "Invoke-PackagedAppSmokeTest -Root $appDir",
         "scripts\\inspect_windows_deployment.py inspect",
+        "Invoke-PackagedAppSmokeTest -Root $appDir",
         "Compress-AppDirectory -SourceDirectory $appDir",
     )
 

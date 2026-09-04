@@ -25,9 +25,12 @@ def capture_atomic_observations(
     executable: Path, *, runtime_probe: Path, surface_directory: Path
 ) -> list[Path]:
     """Run the shipped atomic probes; all orchestration stays in this script."""
+    probe_environment = os.environ.copy()
+    probe_environment.pop("QT_SCALE_FACTOR", None)
     subprocess.run(
         [str(executable), "--automation-package-runtime-probe", str(runtime_probe)],
         check=True,
+        env=probe_environment,
     )
     surface_directory.mkdir(parents=True, exist_ok=True)
     records = []

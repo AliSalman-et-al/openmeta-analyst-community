@@ -260,6 +260,38 @@ def test_assembler_runs_surface_probes_with_requested_scale_and_locale():
     assert 'environment["RCMS_PACKAGE_LOCALE"] = "de_DE"' in source
 
 
+def test_assembler_runtime_probe_is_neutral_under_scale_smoke(monkeypatch, tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    runtime_probe = tmp_path / "runtime-probe.json"
+    surface_directory = tmp_path / "surface-records"
+    calls = []
+
+    def fake_run(command, *, check, env=None):
+        calls.append((command, env))
+        if command[1] == "--automation-package-runtime-probe":
+            runtime_probe.write_text(
+                json.dumps({"qt": {"baseline_device_pixel_ratio": 1.0}}),
+                encoding="utf-8",
+            )
+        else:
+            Path(command[2]).write_text(
+                json.dumps({"requested": command[3]}), encoding="utf-8"
+            )
+
+    monkeypatch.setenv("QT_SCALE_FACTOR", "1.75")
+    monkeypatch.setattr(assembler.subprocess, "run", fake_run)
+
+    assembler.capture_atomic_observations(
+        tmp_path / "RCMetaStudio.exe",
+        runtime_probe=runtime_probe,
+        surface_directory=surface_directory,
+    )
+
+    assert calls[0][1] is not None
+    assert "QT_SCALE_FACTOR" not in calls[0][1]
+
+
 def test_assembler_rejects_unobserved_reopen_analysis(tmp_path):
     from scripts import assemble_packaged_smoke_evidence as assembler
 
