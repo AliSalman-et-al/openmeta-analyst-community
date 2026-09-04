@@ -86,7 +86,13 @@ COUNT_BASED_DIAGNOSTIC_METHODS = {
     "diagnostic.reitsma",
 }
 
-SHARED_DIAGNOSTIC_PARAMS = ("conf.level", "digits", "adjust", "correction.policy", "estimator")
+SHARED_DIAGNOSTIC_PARAMS = (
+    "conf.level",
+    "digits",
+    "adjust",
+    "correction.policy",
+    "estimator",
+)
 
 ParameterKind = Literal["enum", "float", "int", "string"]
 
@@ -139,9 +145,7 @@ def _present_values(names, source):
 
 def _plot_parameter_values(values):
     return {
-        name: value
-        for name, value in values.items()
-        if name.startswith(("fp_", "bp_"))
+        name: value for name, value in values.items() if name.startswith(("fp_", "bp_"))
     }
 
 
@@ -661,9 +665,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
 
     def run_ma(self):
         self._run_analysis(
-            lambda: self.analysis_service.execute(
-                self.model, self.analysis_requests()
-            ),
+            lambda: self.analysis_service.execute(self.model, self.analysis_requests()),
             "Sorry, this analysis could not be completed:\n\n%s",
         )
 
@@ -800,7 +802,9 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         }
         if self.analysis_type is not None:
             method_query["workflow"] = self.analysis_type
-        self.available_method_d = self.analysis_service.available_methods(**method_query)
+        self.available_method_d = self.analysis_service.available_methods(
+            **method_query
+        )
         self.available_method_d = normalize_available_method_labels(
             self.available_method_d
         )
@@ -824,21 +828,33 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         method_names = list(self.available_method_d.keys())
         reitsma_name = "Reitsma bivariate model"
         if self.data_type == "diagnostic" and not self.is_meta_regression:
-            if self._hide_reitsma(metric) and reitsma_name in method_names:
-                method_names.remove(reitsma_name)
-            if all(metric in self.diagnostic_metrics for metric in ("lr", "dor")):
-                peto_method = "Diagnostic Fixed-Effect Peto"
-                if peto_method in method_names:
-                    method_names.remove(peto_method)
+            self._remove_unavailable_diagnostic_methods(
+                method_names, metric, reitsma_name
+            )
         method_names.sort(reverse=True)
-        if (
-            self.data_type == "diagnostic"
-            and not self.is_meta_regression
-            and reitsma_name in method_names
-        ):
+        if self._reitsma_is_available(method_names, reitsma_name):
             method_names.remove(reitsma_name)
             method_names.insert(0, reitsma_name)
         return method_names
+
+    def _remove_unavailable_diagnostic_methods(
+        self, method_names, metric, reitsma_name
+    ):
+        if self._hide_reitsma(metric) and reitsma_name in method_names:
+            method_names.remove(reitsma_name)
+        peto_method = "Diagnostic Fixed-Effect Peto"
+        has_required_metrics = all(
+            name in self.diagnostic_metrics for name in ("lr", "dor")
+        )
+        if has_required_metrics and peto_method in method_names:
+            method_names.remove(peto_method)
+
+    def _reitsma_is_available(self, method_names, reitsma_name):
+        return (
+            self.data_type == "diagnostic"
+            and not self.is_meta_regression
+            and reitsma_name in method_names
+        )
 
     def _hide_reitsma(self, metric):
         if metric != "Sens" or self.analysis_type is not None:
@@ -929,9 +945,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         label = QLabel(parameter_display_label(spec.name, spec.metadata))
         description = parameter_description(spec.name, spec.metadata)
         if spec.name == "estimator" and description == "No description provided.":
-            description = (
-                "REML: restricted maximum likelihood; ML: maximum likelihood."
-            )
+            description = "REML: restricted maximum likelihood; ML: maximum likelihood."
         label.setToolTip(description)
         return label
 
@@ -970,9 +984,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
                 value = (
                     validate_analysis_digits(spec.default)
                     if spec.name == "digits"
-                    else (
-                        _coerce_integer_default(spec.name, spec.default)
-                    )
+                    else (_coerce_integer_default(spec.name, spec.default))
                 )
                 control.setValue(value)
                 target[spec.name] = value
@@ -1417,12 +1429,21 @@ def _diagnostic_analysis_requests(specs_form):
     if "Sens" in configured and "Spec" in configured:
         sens_details = specs_form.diagnostic_analysis_details["Sens"]
         spec_details = specs_form.diagnostic_analysis_details["Spec"]
-        if sens_details and spec_details and sens_details[0] == spec_details[0] == "diagnostic.reitsma":
+        if (
+            sens_details
+            and spec_details
+            and sens_details[0] == spec_details[0] == "diagnostic.reitsma"
+        ):
             joint = (sens_details[0], sens_details[1])
-            configured = [metric for metric in configured if metric not in ("Sens", "Spec")]
+            configured = [
+                metric for metric in configured if metric not in ("Sens", "Spec")
+            ]
 
     pending = [("Sens", joint)] if joint is not None else []
-    pending.extend((metric, specs_form.diagnostic_analysis_details[metric]) for metric in configured)
+    pending.extend(
+        (metric, specs_form.diagnostic_analysis_details[metric])
+        for metric in configured
+    )
     for diagnostic_metric, details in pending:
         if details is None:
             missing_metrics.append(diagnostic_metric)

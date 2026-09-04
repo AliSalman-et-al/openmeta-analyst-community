@@ -323,6 +323,25 @@ QT_DIRECTORY_ALIASES = {
 }
 
 
+def _record_identity(record: dict[str, Any]) -> tuple[str, tuple[str, ...]]:
+    return (
+        cast(str, record["sha256"]),
+        tuple(cast(list[str], record["architectures"])),
+    )
+
+
+def _is_authoritative_qt_file(path: str, record: dict[str, Any]) -> bool:
+    return path.startswith(AUTHORITATIVE_QT_ROOT) and record["kind"] == "file"
+
+
+def _is_qt_core_binding(path: str, record: dict[str, Any]) -> bool:
+    return (
+        path.startswith(AUTHORITATIVE_BINDING_ROOT)
+        and path.lower().endswith("/qtcore.abi3.so")
+        and record["kind"] == "file"
+    )
+
+
 def _validate_qt_directory_aliases(
     records: dict[str, dict[str, Any]], resolved_links: dict[str, str]
 ) -> None:
@@ -345,7 +364,7 @@ def _authoritative_qt_files(
     authoritative_files = {
         path: record
         for path, record in records.items()
-        if path.startswith(AUTHORITATIVE_QT_ROOT) and record["kind"] == "file"
+        if _is_authoritative_qt_file(path, record)
     }
     if not authoritative_files:
         _fail("deployment inventory is missing the authoritative PyQt6 Qt root")
@@ -354,12 +373,7 @@ def _authoritative_qt_files(
             AUTHORITATIVE_QT_ROOT
         ) and not _is_allowed_authoritative_qt_path(path):
             _fail(f"unrecognized payload inside the authoritative Qt root: {path}")
-    if not any(
-        path.startswith(AUTHORITATIVE_BINDING_ROOT)
-        and path.lower().endswith("/qtcore.abi3.so")
-        and record["kind"] == "file"
-        for path, record in records.items()
-    ):
+    if not any(_is_qt_core_binding(path, record) for path, record in records.items()):
         _fail("deployment inventory is missing the PyQt6 QtCore extension")
     return authoritative_files
 
@@ -370,11 +384,7 @@ def _validate_required_r_payload(
     if not any("rinterface" in path for path in lowered):
         _fail("deployment inventory is missing the packaged rpy2 native bridge")
     private_lib_r = "Contents/Frameworks/R.framework/Resources/lib/libR.dylib"
-    lib_r_paths = [
-        path
-        for path, record in records.items()
-        if Path(path).name == "libR.dylib" and record["kind"] == "file"
-    ]
+    lib_r_paths = [path for path, record in records.items() if _is_lib_r(path, record)]
     if lib_r_paths != [private_lib_r]:
         _fail("deployment inventory must contain one private framework-owned libR")
     for required_r_member in (
@@ -387,18 +397,24 @@ def _validate_required_r_payload(
         r"^Contents/Frameworks/lib(?:gfortran|quadmath|gcc_s)[^.]*[.]dylib$",
         re.IGNORECASE,
     )
-    if any(flattened_compiler_runtime.match(path) for path in records):
+    if any(flattened_compiler_runtime.match(path) is not None for path in records):
         _fail("deployment inventory contains a flattened R compiler runtime")
+
+
+def _is_lib_r(path: str, record: dict[str, Any]) -> bool:
+    return Path(path).name == "libR.dylib" and record["kind"] == "file"
 
 
 def _validate_cocoa_payload(records: dict[str, dict[str, Any]]) -> None:
     cocoa_paths = [
-        path
-        for path, record in records.items()
-        if path.endswith("libqcocoa.dylib") and record["kind"] == "file"
+        path for path, record in records.items() if _is_cocoa_plugin(path, record)
     ]
     if cocoa_paths != [AUTHORITATIVE_COCOA]:
         _fail("deployment inventory must contain exactly one Cocoa platform plugin")
+
+
+def _is_cocoa_plugin(path: str, record: dict[str, Any]) -> bool:
+    return path.endswith("libqcocoa.dylib") and record["kind"] == "file"
 
 
 def _validate_required_deployment_payloads(
@@ -415,16 +431,22 @@ def _validate_deployment_file_record(record: dict[str, Any], path: str) -> None:
         _fail("deployment inventory file contains missing or unknown fields")
     digest = record.get("sha256")
     architectures = record.get("architectures")
-    if (
-        not isinstance(digest, str)
-        or len(digest) != 64
-        or any(character not in "0123456789abcdef" for character in digest)
-    ):
+    if not _valid_sha256(digest):
         _fail(f"deployment inventory has an invalid digest for {path}")
-    if not isinstance(architectures, list) or not all(
-        architecture == "arm64" for architecture in architectures
-    ):
+    if not _only_arm64(architectures):
         _fail(f"deployment inventory has invalid architectures for {path}")
+
+
+def _valid_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _only_arm64(value: object) -> bool:
+    return isinstance(value, list) and all(item == "arm64" for item in value)
 
 
 def _validate_deployment_symlink_record(record: dict[str, Any], path: str) -> None:
@@ -474,8 +496,9 @@ def _deployment_inventory(value: object) -> tuple[dict[str, dict[str, Any]], int
     if set(inventory) != {"schema_version", "file_count", "total_bytes", "files"}:
         _fail("deployment inventory contains missing or unknown fields")
     files = inventory.get("files")
-    if inventory.get("schema_version") != 2 or not isinstance(files, list):
+    if not _valid_deployment_file_list(inventory, files):
         _fail("deployment inventory has an unsupported schema")
+    files = cast(list[object], files)
     if not files or len(files) > MAX_DEPLOYMENT_FILES:
         _fail("deployment inventory file count is empty or exceeds its bound")
     records, total = _deployment_records(files)
@@ -487,6 +510,10 @@ def _deployment_inventory(value: object) -> tuple[dict[str, dict[str, Any]], int
     if total > MAX_DEPLOYMENT_BYTES:
         _fail("deployment inventory exceeds the bounded feasibility deployment size")
     return records, total
+
+
+def _valid_deployment_file_list(inventory: dict[str, Any], files: object) -> bool:
+    return inventory.get("schema_version") == 2 and isinstance(files, list)
 
 
 def _canonical_qt_frameworks(
@@ -501,25 +528,27 @@ def _canonical_qt_frameworks(
     for path, record in authoritative_files.items():
         match = framework_pattern.fullmatch(path)
         if match:
-            identities[match.group(1)] = (
-                cast(str, record["sha256"]),
-                tuple(cast(list[str], record["architectures"])),
-            )
+            identities[match.group(1)] = _record_identity(record)
             paths[match.group(1)] = path
     if "QtCore" not in identities:
         _fail("deployment inventory is missing authoritative QtCore")
     for path, record in authoritative_files.items():
         name = Path(path).name
-        if name not in identities or framework_pattern.fullmatch(path):
+        if _is_canonical_framework_path(path, name, identities, framework_pattern):
             continue
-        identity = (
-            cast(str, record["sha256"]),
-            tuple(cast(list[str], record["architectures"])),
-        )
         expected_alias = f"Contents/Frameworks/PyQt6/Qt6/lib/{name}.framework/{name}"
-        if path != expected_alias or identity != identities[name]:
+        if path != expected_alias or _record_identity(record) != identities[name]:
             _fail(f"incoherent authoritative Qt framework alias: {path}")
     return identities, paths
+
+
+def _is_canonical_framework_path(
+    path: str,
+    name: str,
+    identities: dict[str, tuple[str, tuple[str, ...]]],
+    pattern: re.Pattern[str],
+) -> bool:
+    return name not in identities or pattern.fullmatch(path) is not None
 
 
 def _is_binding_extension(path: str, record: dict[str, Any]) -> bool:
@@ -536,10 +565,7 @@ def _binding_extensions(
     records: dict[str, dict[str, Any]],
 ) -> tuple[dict[str, tuple[str, tuple[str, ...]]], dict[str, str]]:
     identities = {
-        Path(path).name: (
-            cast(str, record["sha256"]),
-            tuple(cast(list[str], record["architectures"])),
-        )
+        Path(path).name: _record_identity(record)
         for path, record in records.items()
         if _is_binding_extension(path, record)
     }
@@ -549,13 +575,17 @@ def _binding_extensions(
         if _is_binding_extension(path, record)
     }
     for path in records:
-        if (
-            path.startswith(AUTHORITATIVE_BINDING_ROOT)
-            and not path.startswith(AUTHORITATIVE_QT_ROOT)
-            and path not in paths.values()
-        ):
+        if _is_unrecognized_binding_path(path, paths):
             _fail(f"unrecognized payload inside the authoritative PyQt6 root: {path}")
     return identities, paths
+
+
+def _is_unrecognized_binding_path(path: str, paths: dict[str, str]) -> bool:
+    return (
+        path.startswith(AUTHORITATIVE_BINDING_ROOT)
+        and not path.startswith(AUTHORITATIVE_QT_ROOT)
+        and path not in paths.values()
+    )
 
 
 def _validate_qt_symlink(
@@ -581,22 +611,60 @@ def _validate_qt_symlink(
         path,
     )
     if match:
-        canonical_path = canonical_framework_paths.get(match.group(1))
-        if canonical_path is None:
-            _fail(f"framework alias has no canonical component: {path}")
-        canonical_root = posixpath.dirname(canonical_path)
-        expected = (
-            canonical_root
-            if match.group(2) == "Versions/Current"
-            else canonical_root + "/Resources"
-        )
-        if resolved != expected:
-            _fail(f"framework alias {path} targets the wrong component")
+        _validate_framework_symlink(path, resolved, match, canonical_framework_paths)
         return
-    if _classify_macos_qt_payload(path) is not None or any(
-        token in path.lower() for token in ("pyqt", "pyside")
-    ):
+    if _is_qt_related_path(path):
         _fail(f"unrecognized Qt deployment symlink: {path}")
+
+
+def _validate_framework_symlink(
+    path: str,
+    resolved: str,
+    match: re.Match[str],
+    canonical_framework_paths: dict[str, str],
+) -> None:
+    canonical_path = canonical_framework_paths.get(match.group(1))
+    if canonical_path is None:
+        _fail(f"framework alias has no canonical component: {path}")
+    canonical_root = posixpath.dirname(canonical_path)
+    expected = (
+        canonical_root
+        if match.group(2) == "Versions/Current"
+        else canonical_root + "/Resources"
+    )
+    if resolved != expected:
+        _fail(f"framework alias {path} targets the wrong component")
+
+
+def _is_qt_related_path(path: str) -> bool:
+    lowered = path.lower()
+    return _classify_macos_qt_payload(path) is not None or any(
+        token in lowered for token in ("pyqt", "pyside")
+    )
+
+
+def _validate_framework_file_alias(
+    path: str,
+    name: str,
+    identity: tuple[str, tuple[str, ...]],
+    canonical_frameworks: dict[str, tuple[str, tuple[str, ...]]],
+) -> None:
+    aliases = {f"Contents/Frameworks/{name}", f"Contents/Resources/{name}"}
+    if path not in aliases or identity != canonical_frameworks[name]:
+        _fail(f"incoherent Qt framework alias: {path}")
+
+
+def _validate_binding_file_alias(
+    path: str,
+    name: str,
+    identity: tuple[str, tuple[str, ...]],
+    binding_extensions: dict[str, tuple[str, tuple[str, ...]]],
+) -> bool:
+    if name not in binding_extensions or path != f"Contents/Resources/PyQt6/{name}":
+        return False
+    if identity != binding_extensions[name]:
+        _fail(f"incoherent PyQt6 extension alias: {path}")
+    return True
 
 
 def _validate_qt_file_alias(
@@ -612,22 +680,17 @@ def _validate_qt_file_alias(
     ):
         return
     name = Path(path).name
-    identity = (
-        cast(str, record["sha256"]),
-        tuple(cast(list[str], record["architectures"])),
-    )
+    identity = _record_identity(record)
     if name in canonical_frameworks:
-        aliases = {f"Contents/Frameworks/{name}", f"Contents/Resources/{name}"}
-        if path not in aliases or identity != canonical_frameworks[name]:
-            _fail(f"incoherent Qt framework alias: {path}")
-    elif name in binding_extensions and path == f"Contents/Resources/PyQt6/{name}":
-        if identity != binding_extensions[name]:
-            _fail(f"incoherent PyQt6 extension alias: {path}")
-    elif re.fullmatch(r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path):
+        _validate_framework_file_alias(path, name, identity, canonical_frameworks)
         return
-    elif path.startswith("Contents/Resources/PyQt6/"):
+    if _validate_binding_file_alias(path, name, identity, binding_extensions):
+        return
+    if re.fullmatch(r"Contents/Resources/PyQt6/Qt6/translations/[^/]+\.qm", path):
+        return
+    if path.startswith("Contents/Resources/PyQt6/"):
         _fail(f"unrecognized PyQt6 resource alias: {path}")
-    elif (
+    if (
         path.startswith(("Contents/Frameworks/", "Contents/Resources/"))
         and re.fullmatch(r"Qt[A-Za-z0-9]+", name)
     ) or _classify_macos_qt_payload(path) is not None:
@@ -777,14 +840,10 @@ def _validate_runner(value: object, expected_machine: str) -> None:
     if runner.get("system") != "Darwin":
         _fail("runner system must be Darwin")
     release = runner.get("release")
-    if not isinstance(release, str) or not re.fullmatch(
-        r"[0-9]+(?:\.[0-9]+){1,3}", release
-    ):
+    if not _valid_runner_release(release):
         _fail("runner release is missing or malformed")
     platform_identity = runner.get("platform")
-    if not isinstance(platform_identity, str) or not platform_identity.startswith(
-        "macOS-"
-    ):
+    if not _valid_runner_platform(platform_identity):
         _fail("runner platform is not a recognized macOS identity")
     if runner.get("machine") != expected_machine:
         _fail(f"runner architecture must be {expected_machine}")
@@ -792,16 +851,33 @@ def _validate_runner(value: object, expected_machine: str) -> None:
         _fail(f"Python architecture must be {expected_machine}")
     if runner.get("rosetta_translated") is not False:
         _fail("Rosetta translation is forbidden")
-    if (
-        runner.get("github_runner_os") != "macOS"
-        or runner.get("github_runner_arch") != "ARM64"
-    ):
+    if not _valid_github_runner(runner):
         _fail("GitHub runner OS or architecture identity is inconsistent")
     runner_image = runner.get("runner_image")
-    if not isinstance(runner_image, str) or not re.fullmatch(
-        r"macos-[0-9]+", runner_image
-    ):
+    if not _valid_runner_image(runner_image):
         _fail("runner image identity is missing or malformed")
+
+
+def _valid_runner_release(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", value) is not None
+    )
+
+
+def _valid_runner_platform(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("macOS-")
+
+
+def _valid_github_runner(runner: dict[str, Any]) -> bool:
+    return (
+        runner.get("github_runner_os") == "macOS"
+        and runner.get("github_runner_arch") == "ARM64"
+    )
+
+
+def _valid_runner_image(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"macos-[0-9]+", value) is not None
 
 
 def _validate_dependencies(value: object) -> None:
@@ -846,9 +922,7 @@ def _validate_package_smoke(
         _fail(f"packaged target architecture must be {expected_machine}")
     if package.get("qt_dependency_collector") != "PyInstaller":
         _fail("PyInstaller must be the sole Qt dependency collector")
-    if package.get("qpa") != "cocoa" or not str(
-        package.get("cocoa_plugin", "")
-    ).endswith("libqcocoa.dylib"):
+    if not _valid_packaged_cocoa(package):
         _fail("packaged smoke did not load its Cocoa platform plugin")
     expected_dependencies = {
         key: EXPECTED_VERSIONS[key] for key in ("pyqt6", "qt", "r", "rpy2")
@@ -859,9 +933,7 @@ def _validate_package_smoke(
         _fail("packaged smoke did not report its private framework-owned R_HOME")
     if package.get("rpy2_mode") != "API":
         _fail("packaged smoke did not prove the rpy2 API mode")
-    for key in ("visible", "resource_registered", "svg_rendered", "clean_exit"):
-        if package.get(key) is not True:
-            _fail(f"packaged smoke did not prove {key}")
+    _validate_smoke_flags(package, "packaged")
     if package.get("r_result") != 7.5:
         _fail("packaged R result did not match the representative call")
     executable = _mapping(package.get("executable"), "package.executable")
@@ -873,6 +945,18 @@ def _validate_package_smoke(
     if expected_machine not in cocoa_plugin.get("architectures", []):
         _fail("packaged Cocoa plugin has no native architecture slice")
     return package, executable, cocoa_plugin
+
+
+def _valid_packaged_cocoa(package: dict[str, Any]) -> bool:
+    return package.get("qpa") == "cocoa" and str(
+        package.get("cocoa_plugin", "")
+    ).endswith("libqcocoa.dylib")
+
+
+def _validate_smoke_flags(record: dict[str, Any], label: str) -> None:
+    for key in ("visible", "resource_registered", "svg_rendered", "clean_exit"):
+        if record.get(key) is not True:
+            _fail(f"{label} smoke did not prove {key}")
 
 
 def _validate_package_artifacts(
@@ -918,22 +1002,24 @@ def _validate_diagnostics(value: object, evidence_dir: Path | None) -> None:
     if set(diagnostics) != DIAGNOSTIC_KEYS:
         _fail("diagnostic inventory is incomplete or contains unknown records")
     for name, raw_record in diagnostics.items():
-        record = _mapping(raw_record, f"diagnostics.{name}")
-        digest = record.get("sha256")
-        if not isinstance(record.get("path"), str) or not isinstance(digest, str):
-            _fail(f"diagnostic {name} has no path or digest")
-        if len(digest) != 64 or any(
-            character not in "0123456789abcdef" for character in digest
-        ):
-            _fail(f"diagnostic {name} has an invalid SHA-256 digest")
-        if evidence_dir is None:
-            continue
-        relative = Path(record["path"])
-        if relative.is_absolute() or ".." in relative.parts:
-            _fail(f"diagnostic {name} path must remain within the evidence directory")
-        diagnostic_path = evidence_dir / relative
-        if not diagnostic_path.is_file() or _sha256(diagnostic_path) != digest:
-            _fail(f"diagnostic {name} digest does not match retained bytes")
+        _validate_diagnostic(name, raw_record, evidence_dir)
+
+
+def _validate_diagnostic(name: str, value: object, evidence_dir: Path | None) -> None:
+    record = _mapping(value, f"diagnostics.{name}")
+    digest = record.get("sha256")
+    if not isinstance(record.get("path"), str) or not isinstance(digest, str):
+        _fail(f"diagnostic {name} has no path or digest")
+    if not _valid_sha256(digest):
+        _fail(f"diagnostic {name} has an invalid SHA-256 digest")
+    if evidence_dir is None:
+        return
+    relative = Path(record["path"])
+    if relative.is_absolute() or ".." in relative.parts:
+        _fail(f"diagnostic {name} path must remain within the evidence directory")
+    diagnostic_path = evidence_dir / relative
+    if not diagnostic_path.is_file() or _sha256(diagnostic_path) != digest:
+        _fail(f"diagnostic {name} digest does not match retained bytes")
 
 
 def _validate_native_components(
@@ -946,26 +1032,38 @@ def _validate_native_components(
     if set(components) != NATIVE_COMPONENT_KEYS:
         _fail("native component inventory is incomplete or contains unknown records")
     for name, raw_record in components.items():
-        record = _mapping(raw_record, f"native_components.{name}")
-        retained = record.get("retained")
-        source_paths = record.get("source_paths")
-        if (
-            not isinstance(retained, list)
-            or not retained
-            or not isinstance(source_paths, list)
-            or len(source_paths) != len(retained)
-        ):
-            _fail(f"native component {name} has an incomplete retained inventory")
-        for item in retained:
-            item_record = _mapping(item, f"native_components.{name}.retained")
-            if expected_machine not in item_record.get("architectures", []):
-                _fail(f"native component {name} has no {expected_machine} slice")
-            _validate_retained_file_record(
-                item_record,
-                f"native component {name}",
-                evidence_dir,
-                architecture_reader=architecture_reader,
-            )
+        _validate_native_component(
+            name, raw_record, expected_machine, evidence_dir, architecture_reader
+        )
+
+
+def _validate_native_component(
+    name: str,
+    value: object,
+    expected_machine: str,
+    evidence_dir: Path | None,
+    architecture_reader: Callable[[Path], list[str]],
+) -> None:
+    record = _mapping(value, f"native_components.{name}")
+    retained = record.get("retained")
+    source_paths = record.get("source_paths")
+    if (
+        not isinstance(retained, list)
+        or not retained
+        or not isinstance(source_paths, list)
+        or len(source_paths) != len(retained)
+    ):
+        _fail(f"native component {name} has an incomplete retained inventory")
+    for item in retained:
+        item_record = _mapping(item, f"native_components.{name}.retained")
+        if expected_machine not in item_record.get("architectures", []):
+            _fail(f"native component {name} has no {expected_machine} slice")
+        _validate_retained_file_record(
+            item_record,
+            f"native component {name}",
+            evidence_dir,
+            architecture_reader=architecture_reader,
+        )
 
 
 def validate_evidence(

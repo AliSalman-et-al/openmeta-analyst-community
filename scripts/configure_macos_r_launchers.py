@@ -159,20 +159,19 @@ def _rewrite_rscript(root):
 def _install_real_rscript(rscript, real_rscript):
     if real_rscript.exists():
         _safe_file(real_rscript)
-        if not real_rscript.is_file() or (
-            os.name != "nt" and not (real_rscript.stat().st_mode & 0o111)
-        ):
-            raise RuntimeError("existing Rscript.real is not a regular executable")
+        _require_regular_executable(real_rscript, "existing Rscript.real")
         real_rscript.chmod(0o755)
         return
     if not rscript.is_file():
         raise RuntimeError("official Rscript is missing")
     rscript.rename(real_rscript)
-    if not real_rscript.is_file() or (
-        os.name != "nt" and not (real_rscript.stat().st_mode & 0o111)
-    ):
-        raise RuntimeError("official Rscript is not a regular executable")
+    _require_regular_executable(real_rscript, "official Rscript")
     real_rscript.chmod(0o755)
+
+
+def _require_regular_executable(path, label):
+    if not path.is_file() or (os.name != "nt" and not (path.stat().st_mode & 0o111)):
+        raise RuntimeError(f"{label} is not a regular executable")
 
 
 def _write_rscript_wrapper(rscript):

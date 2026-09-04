@@ -692,30 +692,63 @@ def _macos_native_record(
         "minimum_macos": minimum_os,
         "signing_identity": signing_identity,
         "_imports": [
-            line.strip().split(" (", 1)[0]
-            for line in completed.stdout.splitlines()[1:]
+            line.strip().split(" (", 1)[0] for line in completed.stdout.splitlines()[1:]
         ],
     }
 
 
-def _native_records(
-    root: Path, target: str, architecture: str
-) -> list[dict[str, Any]]:
+def _native_records(root: Path, target: str, architecture: str) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
-    for path in sorted(
-        item for item in root.rglob("*") if item.is_file() and not item.is_symlink()
-    ):
+    for path in _native_paths(root):
         relative = path.relative_to(root).as_posix()
         if relative.startswith("python/uv-cache/"):
             continue
-        if target.startswith("windows-"):
-            if path.suffix.lower() in {".exe", ".dll", ".pyd"}:
-                records.append(_windows_native_record(path, relative))
+        record = _native_record(path, relative, target, architecture)
+        if record is None:
             continue
-        record = _macos_native_record(path, relative, target, architecture)
-        if record is not None:
-            records.append(record)
+        records.append(record)
     return records
+
+
+def _native_paths(root: Path) -> list[Path]:
+    return sorted(
+        item for item in root.rglob("*") if item.is_file() and not item.is_symlink()
+    )
+
+
+def _native_record(
+    path: Path, relative: str, target: str, architecture: str
+) -> dict[str, Any] | None:
+    if target.startswith("windows-"):
+        if path.suffix.lower() not in {".exe", ".dll", ".pyd"}:
+            return None
+        return _windows_native_record(path, relative)
+    return _macos_native_record(path, relative, target, architecture)
+
+
+def _validate_windows_inventory(records: list[dict[str, Any]]) -> None:
+    _resolve_windows_closure(records)
+    r_dlls = [
+        record for record in records if Path(record["path"]).name.casefold() == "r.dll"
+    ]
+    if len(r_dlls) != 1:
+        raise KitError("kit must contain exactly one canonical R.dll")
+
+
+def _validate_macos_inventory(root: Path, records: list[dict[str, Any]]) -> None:
+    _resolve_macos_closure(records, root)
+    shared_r = [
+        record
+        for record in records
+        if record["path"].endswith("/lib/libR.dylib")
+        or (
+            "/Versions/" in record["path"]
+            and "/Resources/" not in record["path"]
+            and record["path"].endswith("/R")
+        )
+    ]
+    if len({record["sha256"] for record in shared_r}) != 1:
+        raise KitError("kit must contain one canonical macOS libR identity")
 
 
 def native_dependency_inventory(
@@ -723,30 +756,9 @@ def native_dependency_inventory(
 ) -> list[dict[str, Any]]:
     records = _native_records(root, target, architecture)
     if target.startswith("windows-"):
-        _resolve_windows_closure(records)
-        r_dlls = [
-            record
-            for record in records
-            if Path(record["path"]).name.casefold() == "r.dll"
-        ]
-        if len(r_dlls) != 1:
-            raise KitError("kit must contain exactly one canonical R.dll")
+        _validate_windows_inventory(records)
     else:
-        _resolve_macos_closure(records, root)
-        shared_r = [
-            record
-            for record in records
-            if (
-                record["path"].endswith("/lib/libR.dylib")
-                or (
-                    "/Versions/" in record["path"]
-                    and "/Resources/" not in record["path"]
-                    and record["path"].endswith("/R")
-                )
-            )
-        ]
-        if len({record["sha256"] for record in shared_r}) != 1:
-            raise KitError("kit must contain one canonical macOS libR identity")
+        _validate_macos_inventory(root, records)
     return records
 
 

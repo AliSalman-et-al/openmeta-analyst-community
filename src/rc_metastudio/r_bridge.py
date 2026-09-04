@@ -2041,31 +2041,27 @@ def _format_result_text(text):
 
 
 def _clean_console_text(text):
-    # ``capture.output(print(...))`` is occasionally the only representation
-    # available for a legacy R object.  Remove console framing while retaining
-    # the actual text.  Structured values are rendered by the helpers above,
-    # so this is intentionally conservative for arbitrary user prose.
     cleaned_lines = []
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith(('attr(,"', "[[")):
-            if stripped.startswith(('attr(,"', "[[")):
-                continue
+        if not stripped:
             cleaned_lines.append("")
             continue
-        if stripped == "NULL":
+        if stripped == "NULL" or stripped.startswith(('attr(,"', "[[", "$")):
             continue
-        match = re.match(r"^\[\d+\]\s+(.*)$", stripped)
-        if match:
-            payload = match.group(1)
-            quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
-            if quoted and " ".join(quoted) == payload.replace('"', "").strip():
-                payload = ", ".join(quoted)
-            line = payload
-        if stripped.startswith("$"):
-            continue
-        cleaned_lines.append(line)
+        cleaned_lines.append(_console_payload(line, stripped))
     return "\n".join(cleaned_lines).strip()
+
+
+def _console_payload(line, stripped):
+    match = re.match(r"^\[\d+\]\s+(.*)$", stripped)
+    if match is None:
+        return line
+    payload = match.group(1)
+    quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
+    if quoted and " ".join(quoted) == payload.replace('"', "").strip():
+        return ", ".join(quoted)
+    return payload
 
 
 def _replace_result_labels(text):
@@ -2121,9 +2117,7 @@ def _format_weight(value):
     if scalar is None or str(scalar) == "NA":
         return "NA"
     try:
-        return "{0:.{digits}f}%".format(
-            float(scalar), digits=PERCENTAGE_DISPLAY_DIGITS
-        )
+        return "{0:.{digits}f}%".format(float(scalar), digits=PERCENTAGE_DISPLAY_DIGITS)
     except (TypeError, ValueError):
         return _format_r_table_cell(scalar)
 
