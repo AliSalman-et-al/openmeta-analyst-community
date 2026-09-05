@@ -934,6 +934,12 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
         def show(self):
             pass
 
+        def hide(self):
+            pass
+
+        def deleteLater(self):
+            pass
+
         def open(self, project_path):
             assert self.workspace.saved
             opened.append(project_path)
@@ -998,15 +1004,13 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
         "dispatch",
         lambda *_: pytest.fail("startup project smoke must not dispatch"),
     )
-    monkeypatch.setattr(automation, "_force_table_paint", lambda app, meta: None)
-
     assert launch.start() == 0
     assert opened == [sample_project]
     assert started == []
     assert closed == [True]
     assert startup_events == [
-        "r-backend-ready",
         "main-window-import",
+        "r-backend-ready",
         "workspace-marked-saved",
         "workspace-marked-saved",
     ]

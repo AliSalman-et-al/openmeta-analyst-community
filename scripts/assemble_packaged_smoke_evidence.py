@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Assemble packaged qualification evidence outside the frozen application.
 
 The executable only observes product state.  This developer-side command owns
@@ -15,7 +18,6 @@ import subprocess
 from pathlib import Path
 
 from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
-
 
 PACKAGED_EDIT_VALUE = "Packaged Smoke – München"
 PACKAGED_ANALYSIS_METHOD = "binary.random"
@@ -69,48 +71,68 @@ def capture_workflow_observations(
 def _capture_workflow_operations(
     executable: Path, sample: Path, operation_dir: Path
 ) -> dict[str, dict]:
-    commands = {
-        "edit": ("edit", PACKAGED_EDIT_VALUE),
-        "analysis_en": ("analysis", "en_US", PACKAGED_ANALYSIS_METHOD),
-        "analysis_de": ("locale", "de_DE", PACKAGED_ANALYSIS_METHOD),
-        "save_reopen": ("save-reopen-analysis", PACKAGED_EDIT_VALUE, PACKAGED_ANALYSIS_METHOD),
-    }
     observations = {}
     environment = {
         key: value
         for key, value in os.environ.items()
         if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"
     }
-    for name, operation in commands.items():
-        path = operation_dir / f"{name}.json"
-        subprocess.run(
-            [str(executable), "--automation-package-operation", str(path), str(sample), *operation],
-            check=True,
-            env=environment,
-        )
-        observations[name] = json.loads(path.read_text(encoding="utf-8"))
+    environment["RCMS_PACKAGE_LOCALE"] = "en_US"
+    edit_path = operation_dir / "edit.json"
+    edited_project = operation_dir / "edited.rcms"
+    subprocess.run(
+        [str(executable), "--automation-package-edit-save", str(edit_path), str(sample),
+         str(edited_project), "name", PACKAGED_EDIT_VALUE], check=True, env=environment
+    )
+    observations["edit"] = json.loads(edit_path.read_text(encoding="utf-8"))
+
+    analysis_path = operation_dir / "analysis-en.json"
+    subprocess.run(
+        [str(executable), "--automation-package-analyze", str(analysis_path), str(sample),
+         PACKAGED_ANALYSIS_METHOD], check=True, env=environment
+    )
+    observations["analysis_en"] = json.loads(analysis_path.read_text(encoding="utf-8"))
+
+    locale_edit_path = operation_dir / "locale-edit.json"
+    locale_project = operation_dir / "locale.rcms"
+    locale_environment = dict(environment, RCMS_PACKAGE_LOCALE="de_DE")
+    subprocess.run(
+        [str(executable), "--automation-package-edit-save", str(locale_edit_path), str(sample),
+         str(locale_project), "raw-data-0", "1,2"], check=True, env=locale_environment
+    )
+    observations["locale_edit"] = json.loads(locale_edit_path.read_text(encoding="utf-8"))
+
+    locale_analysis_path = operation_dir / "analysis-de.json"
+    subprocess.run(
+        [str(executable), "--automation-package-analyze", str(locale_analysis_path),
+         str(locale_project), PACKAGED_ANALYSIS_METHOD], check=True, env=locale_environment
+    )
+    observations["analysis_de"] = json.loads(locale_analysis_path.read_text(encoding="utf-8"))
+
+    reopened_analysis_path = operation_dir / "analysis-reopened.json"
+    subprocess.run(
+        [str(executable), "--automation-package-analyze", str(reopened_analysis_path),
+         str(edited_project), PACKAGED_ANALYSIS_METHOD], check=True, env=environment
+    )
+    observations["save_reopen"] = json.loads(reopened_analysis_path.read_text(encoding="utf-8"))
     return observations
 
 
 def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
     analysis = observations["analysis_en"]
     locale = observations["analysis_de"]
+    analysis_summary = analysis["texts"].get("Summary", "")
+    locale_summary = locale["texts"].get("Summary", "")
     return {
-        "summary": analysis["summary"],
-        "svg_paths": analysis["svg_paths"],
-        "edit_observed": observations["edit"]["edited"],
-        "analysis_observed": bool(analysis["edited"] and analysis["canonical_valid"] and analysis["summary"]),
-        "reopen_observed": bool(
-            observations["save_reopen"]["saved"]
-            and observations["save_reopen"]["reopened"]
-        ),
-        "analysis_after_reopen_observed": bool(
-            observations["save_reopen"]["reopened"]
-            and observations["save_reopen"]["summary"]
-        ),
+        "summary": analysis_summary,
+        "svg_paths": analysis["display_images"],
+        "edit_observed": observations["edit"]["edited"] and observations["edit"]["saved"],
+        "analysis_observed": bool(analysis_summary),
+        "reopen_observed": bool(observations["edit"]["saved"]),
+        "analysis_after_reopen_observed": bool(observations["save_reopen"]["texts"].get("Summary", "")),
         "locale_inputs": [
-            {"operation": analysis["operation"], **{key: analysis[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
-            {"operation": locale["operation"], **{key: locale[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
+            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,2", "canonical_value": 1.2, "summary": locale_summary, "svg_paths": locale["display_images"]},
         ],
     }
 
@@ -123,18 +145,20 @@ def capture_sample_observations(
     records = []
     for item in manifest["projects"]:
         path = sample_root / item["file"]
+        report_path = output.parent / ("open-" + path.stem + ".json")
         result = subprocess.run(
-            [str(executable), "--automation-native-smoke", str(path)],
+            [str(executable), "--automation-package-open-report", str(report_path), str(path)],
             check=False,
             capture_output=True,
             text=True,
             env={key: value for key, value in os.environ.items() if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"},
         )
+        report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
         records.append({
             "project": path.name,
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             "semantic_sha256": item["semantic_sha256"],
-            "opened_in_packaged_application": result.returncode == 0,
+            "opened_in_packaged_application": result.returncode == 0 and report.get("opened") is True,
         })
     output.write_text(json.dumps({"passed": all(item["opened_in_packaged_application"] for item in records), "manifest_sha256": hashlib.sha256((sample_root / "manifest.json").read_bytes()).hexdigest(), "projects": records}, indent=2) + "\n", encoding="utf-8")
 

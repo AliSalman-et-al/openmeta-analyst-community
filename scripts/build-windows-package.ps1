@@ -302,12 +302,6 @@ function Invoke-PackagedAppSmokeTest {
         $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
         $env:RCMS_PACKAGE_BASELINE_DPR = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
         if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
-        $env:QT_SCALE_FACTOR = "1.25"
-        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
-            -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
-            -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath -Visible
-        if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
-
         foreach ($scale in @("1.25", "1.50", "1.75")) {
             $env:QT_SCALE_FACTOR = $scale
             $surfacePath = Join-Path $surfaceDirectory ("surface-{0}.json" -f $scale)

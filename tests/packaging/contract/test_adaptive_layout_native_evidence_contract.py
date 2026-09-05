@@ -293,10 +293,10 @@ def test_native_evidence_validator_rejects_semantic_contract_mutations(
         validator.validate_evidence(tmp_path, "windows", "1.0")
 
 
-def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
+def test_launch_exposes_native_evidence_through_the_raw_open_report_mode():
     launch = _text("src", "rc_metastudio", "automation.py")
 
-    assert '"--automation-native-smoke"' in launch
-    assert "start_automation_smoke" in launch
+    assert '"--automation-package-open-report"' in launch
+    assert "start_package_open_report" in launch
     assert "adaptive_layout" not in launch
 

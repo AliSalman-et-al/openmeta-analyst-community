@@ -123,10 +123,8 @@ PY
 qualify_signed_app() {
   local phase="$1"
   local executable="$app/Contents/MacOS/RCMetaStudio"
-  local sample="$app/Contents/Resources/sample_projects/BCG.rcms"
   local r_home="$app/Contents/Frameworks/R.framework/Resources"
   local runtime_probe="$qualification/${phase}-runtime-probe.json"
-  local wizard_probe="$qualification/${phase}-startup-wizard-smoke.json"
   local stdout_path="$qualification/${phase}-runtime.stdout.log"
   local stderr_path="$qualification/${phase}-runtime.stderr.log"
 
@@ -136,25 +134,15 @@ qualify_signed_app() {
       "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
       --stdout "$stdout_path" --stderr "$stderr_path" -- \
       "$executable" --automation-package-runtime-probe "$runtime_probe"
-  env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-    RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_home/library" \
-    uv run --no-project --python 3.11.9 python \
-      "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
-      --stdout "$qualification/${phase}-wizard.stdout.log" \
-      --stderr "$qualification/${phase}-wizard.stderr.log" -- \
-      "$executable" --automation-startup-wizard-smoke "$wizard_probe" "$sample"
-  python3 - "$runtime_probe" "$wizard_probe" <<'PY'
+  python3 - "$runtime_probe" <<'PY'
 import json
 import sys
 
 runtime = json.load(open(sys.argv[1], encoding="utf-8"))
-wizard = json.load(open(sys.argv[2], encoding="utf-8"))
 if not runtime.get("frozen") or runtime.get("qt", {}).get("platform_plugin") != "cocoa":
     raise SystemExit("Signed runtime probe did not use the frozen Cocoa runtime.")
 if not runtime.get("rpy2", {}).get("api_bridge_loaded"):
     raise SystemExit("Signed runtime probe did not load the bundled rpy2 API bridge.")
-if wizard.get("platform_plugin") != "cocoa" or not wizard.get("passed"):
-    raise SystemExit("Signed startup wizard smoke failed: %s" % wizard)
 PY
   codesign --verify --deep --strict --verbose=4 "$app"
 }

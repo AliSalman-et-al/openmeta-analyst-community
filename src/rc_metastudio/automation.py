@@ -6,27 +6,10 @@ import json
 import os
 import platform
 import sys
-import tempfile
 from pathlib import Path
 
 from rc_metastudio import app_error_handler
 from rc_metastudio.launch import dispose_qobjects
-
-
-AUTOMATION_SMOKE_LOG_ENV = "RCMS_AUTOMATION_SMOKE_LOG"
-
-
-def _force_table_paint(app, window) -> None:
-    """Allow packaged qualification to flush the ordinary Qt table path."""
-    del window
-    app.processEvents()
-
-
-def _log(message: str) -> None:
-    path = os.environ.get(AUTOMATION_SMOKE_LOG_ENV)
-    if path:
-        with open(path, "a", encoding="utf-8") as output:
-            output.write(message + "\n")
 
 
 def _mark_workspace_saved(window) -> None:
@@ -42,150 +25,92 @@ def start_automation(phase_callback=None):
     return compose_automation_application(phase_callback=phase_callback)
 
 
-def start_automation_smoke(
-    sample_path: str, *, require_native_window: bool = False
-) -> int:
-    """Run one ordinary open/paint/close path used by shipped qualification."""
+def _close_automation_window(app, window) -> None:
+    _mark_workspace_saved(window)
+    window.close()
+    app.processEvents()
+    dispose_qobjects(app, (window,))
+    app.quit()
+
+
+def start_package_open_report(output_path: str, project_path: str) -> int:
+    """Open one explicit project and report only resulting window facts."""
     app, window = start_automation()
     try:
-        if require_native_window:
-            assert_native_window_smoke(app, window)
-        if not window.open(os.path.abspath(sample_path), raise_on_error=True):
-            raise RuntimeError("packaged smoke could not open the project")
+        opened = window.open(os.path.abspath(project_path), raise_on_error=True)
         app.processEvents()
-        _log("packaged-workflow:shell-created")
-        _log("packaged-workflow:project-open:start")
-        _log("packaged-workflow:project-open:return")
-        _force_table_paint(app, window)
-        _log("packaged-workflow:paint:complete")
-        return 0
-    finally:
-        _mark_workspace_saved(window)
-        window.close()
-        app.processEvents()
-        dispose_qobjects(app, (window,))
-        app.quit()
-        _log("packaged-workflow:post-close")
-
-
-def start_package_operation(
-    output_path: str,
-    sample_path: str,
-    operation: str,
-    locale_name: str,
-    edit_value: str,
-    analysis_method: str | None = None,
-) -> int:
-    """Perform one ordinary packaged-project operation for developer tooling."""
-    app, window = start_automation()
-    try:
-        if not window.open(os.path.abspath(sample_path), raise_on_error=True):
-            raise RuntimeError("packaged workflow observation could not open project")
-        observation = _package_operation_observation(
-            window, operation, locale_name, edit_value, analysis_method
-        )
-        destination = Path(output_path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        return 0
-    finally:
-        _mark_workspace_saved(window)
-        window.close()
-        app.processEvents()
-        dispose_qobjects(app, (window,))
-        app.quit()
-
-
-def _package_operation_observation(
-    window, operation: str, locale_name: str, edit_value: str, analysis_method: str | None
-) -> dict:
-    if operation == "edit":
         model = window.tableView.model()
-        edited = model.setData(model.index(0, model.NAME), edit_value)
-        return {"operation": operation, "edited": bool(edited)}
-    if operation in {"analysis", "locale"}:
-        if not analysis_method:
-            raise ValueError("analysis operation requires an analysis method")
-        return _observe_locale_analysis(window, operation, locale_name, analysis_method)
-    if operation in {"save-reopen", "save-reopen-analysis"}:
-        if operation == "save-reopen-analysis" and not analysis_method:
-            raise ValueError("save-reopen-analysis requires an analysis method")
-        return _observe_save_reopen(window, operation, edit_value, analysis_method)
-    raise ValueError(f"unknown packaged operation: {operation}")
-
-
-def _observe_locale_analysis(
-    window, operation: str, locale_name: str, analysis_method: str
-) -> dict:
-    from PyQt6 import QtCore
-    from rc_metastudio import main_window, qt_text
-
-    model = window.tableView.model()
-    raw_index = model.index(0, model.RAW_DATA[0])
-    QtCore.QLocale.setDefault(QtCore.QLocale(locale_name))
-    locale = QtCore.QLocale()
-    raw_value, valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-    if not valid:
-        raise RuntimeError("packaged locale operation could not parse the product value")
-    numeric_text = format(raw_value, ".1f").replace(".", locale.decimalPoint())
-    edited = model.setData(raw_index, numeric_text)
-    canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-    result = _run_analysis(window, main_window, analysis_method)
-    if result is None:
-        raise RuntimeError("packaged analysis operation produced no result")
-    return {"operation": operation, "edited": bool(edited), "canonical_valid": bool(canonical_valid), "locale": locale.name(), "decimal_point": locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
-
-
-def _observe_save_reopen(
-    window, operation: str, edit_value: str, analysis_method: str | None
-) -> dict:
-    from rc_metastudio import main_window
-
-    model = window.tableView.model()
-    edited = model.setData(model.index(0, model.NAME), edit_value)
-    handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
-    os.close(handle)
-    destination = Path(raw_destination)
-    destination.unlink()
-    try:
-        window.out_path = str(destination)
-        saved, reopened = _save_and_reopen(window, destination, edited)
-        result = _analysis_after_reopen(
-            window, operation, reopened, main_window, analysis_method
-        )
-        return {
-            "operation": operation,
-            "edited": bool(edited),
-            "saved": saved,
-            "reopened": reopened,
-            **_analysis_artifacts(result),
-        }
+        _write_json(output_path, {
+            "project": os.path.abspath(project_path), "opened": bool(opened),
+            "rows": model.rowCount(), "visible": window.isVisible(),
+            "exposed": bool(window.windowHandle() and window.windowHandle().isExposed()),
+            "platform_plugin": app.platformName().lower(),
+        })
+        return 0
     finally:
-        destination.unlink(missing_ok=True)
+        _close_automation_window(app, window)
 
 
-def _save_and_reopen(window, destination: Path, edited: bool) -> tuple[bool, bool]:
-    if not edited:
-        return False, False
-    saved = window.save() is True
-    reopened = saved and window.open(str(destination), raise_on_error=True)
-    return saved, bool(reopened)
+def _model_column(model, column: str) -> int:
+    if column == "name":
+        return model.NAME
+    if column.startswith("raw-data-"):
+        return model.RAW_DATA[int(column.removeprefix("raw-data-"))]
+    raise ValueError("edit column must be name or raw-data-N")
 
 
-def _analysis_after_reopen(
-    window, operation: str, reopened: bool, main_window, analysis_method: str | None
-):
-    if not reopened or operation != "save-reopen-analysis":
-        return None
-    if not analysis_method:
-        raise ValueError("save-reopen-analysis requires an analysis method")
-    return _run_analysis(window, main_window, analysis_method)
+def start_package_edit_save(
+    output_path: str, project_path: str, destination_path: str, column: str, value: str
+) -> int:
+    """Edit one explicit cell and save to one explicit destination."""
+    _configure_package_locale()
+    app, window = start_automation()
+    try:
+        window.open(os.path.abspath(project_path), raise_on_error=True)
+        model = window.tableView.model()
+        index = model.index(0, _model_column(model, column))
+        edited = model.setData(index, value)
+        destination = Path(destination_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        window.out_path = str(destination)
+        saved = bool(edited and window.save() is True)
+        _write_json(output_path, {
+            "project": os.path.abspath(project_path), "destination": str(destination),
+            "column": column, "value": value,
+            "display_value": str(model.data(index)),
+            "edited": bool(edited), "saved": saved,
+        })
+        return 0
+    finally:
+        _close_automation_window(app, window)
 
 
-def _analysis_artifacts(result) -> dict:
-    if result is None:
-        return {"summary": "", "svg_paths": {}}
-    return {"summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
+def start_package_analyze(output_path: str, project_path: str, analysis_method: str) -> int:
+    """Open one explicit project and run one explicit analysis method."""
+    _configure_package_locale()
+    app, window = start_automation()
+    try:
+        window.open(os.path.abspath(project_path), raise_on_error=True)
+        from rc_metastudio import main_window
+
+        result = _run_analysis(window, main_window, analysis_method)
+        if result is None:
+            raise RuntimeError("analysis produced no result")
+        _write_json(output_path, {
+            "project": os.path.abspath(project_path), "analysis_method": analysis_method,
+            "texts": dict(result.texts), "display_images": dict(result.display_images),
+        })
+        return 0
+    finally:
+        _close_automation_window(app, window)
+
+
+def _configure_package_locale() -> None:
+    from PyQt6 import QtCore
+
+    configured_locale = os.environ.get("RCMS_PACKAGE_LOCALE")
+    if configured_locale:
+        QtCore.QLocale.setDefault(QtCore.QLocale(configured_locale))
 
 
 def _run_analysis(window, main_window, analysis_method: str):
@@ -205,14 +130,6 @@ def _run_analysis(window, main_window, analysis_method: str):
     return captured.get("result")
 
 
-def _run_automation_smoke(callback):
-    try:
-        return callback()
-    except BaseException as exc:
-        _log("%s: %s" % (type(exc).__name__, exc))
-        raise
-
-
 def _write_json(path: str, value: dict) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -222,6 +139,7 @@ def _write_json(path: str, value: dict) -> None:
 def start_package_runtime_probe(output_path: str) -> int:
     """Observe the concrete runtime loaded by the packaged executable."""
     from PyQt6 import QtCore, sip
+
     from rc_metastudio import project_format, r_bridge, r_runtime
 
     for member in ("manifest.json", "project.json", "state.json"):
@@ -364,66 +282,8 @@ def _surface_display_facts(QtGui, QtNetwork, QtWidgets, window):
     }
 
 
-def start_startup_wizard_smoke(evidence_path: str, sample_path: str) -> int:
-    """Open a project through the startup-project boundary and record evidence."""
-    app, window = start_automation()
-    try:
-        opened = bool(window.open(os.path.abspath(sample_path), raise_on_error=True))
-        app.processEvents()
-        frame = window.frameGeometry()
-        handle = window.windowHandle()
-        evidence = {
-            "schema_version": 1,
-            "platform_plugin": app.platformName().lower(),
-            "project": Path(sample_path).name,
-            "opened": opened,
-            "visible": window.isVisible(),
-            "active": window.isActiveWindow(),
-            "minimized": window.isMinimized(),
-            "exposed": bool(handle and handle.isExposed()),
-            "frame": [frame.x(), frame.y(), frame.width(), frame.height()],
-            "rows": window.tableView.model().rowCount(),
-        }
-        _write_json(evidence_path, evidence)
-        return 0
-    finally:
-        _mark_workspace_saved(window)
-        window.close()
-        app.processEvents()
-        app.quit()
-
-
-def assert_native_window_smoke(app, window) -> None:
-    expected = "windows" if sys.platform == "win32" else "cocoa"
-    if app.platformName().lower() != expected:
-        raise SystemExit(
-            "Native smoke loaded Qt platform %s, expected %s."
-            % (app.platformName().lower(), expected)
-        )
-    app.processEvents()
-    handle = window.windowHandle()
-    if not window.isVisible() or (handle is not None and not handle.isExposed()):
-        raise SystemExit("Native smoke main window was not exposed.")
-
-
-def assert_opened_project_for_startup_smoke(
-    app, window, project_path, opened, *, completion_marker=None
-) -> int:
-    """Hidden packaged hook for the normal startup-project path."""
-    if not opened or window.tableView.model().rowCount() < 1:
-        raise SystemExit("startup project did not open: %s" % project_path)
-    if completion_marker:
-        with open(completion_marker, "w", encoding="utf-8") as marker:
-            json.dump({"project": os.path.basename(project_path)}, marker)
-    _mark_workspace_saved(window)
-    window.close()
-    app.processEvents()
-    app.quit()
-    return 0
-
-
 def dispatch(startup_argv: list[str]) -> int:
-    """Dispatch only the hidden packaged open/close qualification hook."""
+    """Dispatch only narrow, raw qualification observations."""
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-smoke":
         print("Application shell smoke passed with Qt platform offscreen.")
         return 0
@@ -431,60 +291,24 @@ def dispatch(startup_argv: list[str]) -> int:
         stage = startup_argv[2] if len(startup_argv) > 2 else "unknown"
         print("Application shell failure teardown passed at %s." % stage)
         return 0
-    if len(startup_argv) > 1 and startup_argv[1] in {
-        "--automation-smoke",
-        "--automation-native-smoke",
-    }:
-        sample = startup_argv[2] if len(startup_argv) > 2 else "sample_projects/amino.rcms"
-        return start_automation_smoke(
-            sample, require_native_window=startup_argv[1] == "--automation-native-smoke"
-        )
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
         if len(startup_argv) != 3:
             raise SystemExit("--automation-package-runtime-probe requires an output path.")
-        return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-operation":
-        if len(startup_argv) < 6:
-            raise SystemExit(
-                "--automation-package-operation requires output, project, operation, and operation parameters."
-            )
-        operation_args = startup_argv[5:]
-        if startup_argv[4] in {"analysis", "locale"} and len(operation_args) != 2:
-            raise SystemExit(
-                "analysis package operations require locale and analysis method."
-            )
-        if startup_argv[4] == "save-reopen-analysis" and len(operation_args) != 2:
-            raise SystemExit(
-                "save-reopen-analysis requires an edit value and analysis method."
-            )
-        if startup_argv[4] in {"edit", "save-reopen"} and len(operation_args) != 1:
-            raise SystemExit(
-                "edit and save-reopen operations require an edit value."
-            )
-        locale, edit_value, analysis_method = "en_US", operation_args[0], None
-        if startup_argv[4] in {"analysis", "locale"}:
-            locale, analysis_method = operation_args
-            edit_value = ""
-        elif startup_argv[4] == "save-reopen-analysis":
-            edit_value, analysis_method = operation_args
-        return _run_automation_smoke(
-            lambda: start_package_operation(
-                startup_argv[2], startup_argv[3], startup_argv[4],
-                locale, edit_value, analysis_method
-            )
-        )
+        return start_package_runtime_probe(startup_argv[2])
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-open-report":
+        if len(startup_argv) != 4:
+            raise SystemExit("--automation-package-open-report requires an output and project path.")
+        return start_package_open_report(startup_argv[2], startup_argv[3])
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-edit-save":
+        if len(startup_argv) != 7:
+            raise SystemExit("--automation-package-edit-save requires output, project, destination, column, and value.")
+        return start_package_edit_save(*startup_argv[2:])
+    if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-analyze":
+        if len(startup_argv) != 5:
+            raise SystemExit("--automation-package-analyze requires output, project, and method.")
+        return start_package_analyze(*startup_argv[2:])
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
         if len(startup_argv) != 4:
             raise SystemExit("--automation-package-surface-smoke requires an evidence path and scale.")
-        return _run_automation_smoke(
-            lambda: start_package_surface_smoke(startup_argv[2], startup_argv[3])
-        )
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-startup-wizard-smoke":
-        if len(startup_argv) != 4:
-            raise SystemExit(
-                "--automation-startup-wizard-smoke requires an evidence path and project path."
-            )
-        return _run_automation_smoke(
-            lambda: start_startup_wizard_smoke(startup_argv[2], startup_argv[3])
-        )
+        return start_package_surface_smoke(startup_argv[2], startup_argv[3])
     raise SystemExit("Unknown packaged qualification command: %s" % startup_argv[1])

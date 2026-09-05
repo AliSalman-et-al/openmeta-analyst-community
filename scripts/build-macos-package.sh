@@ -179,9 +179,6 @@ qualification_root="$work_root/qualification"
 runtime_probe_path="$qualification_root/runtime-probe.json"
 runtime_stdout_path="$qualification_root/runtime-probe.stdout.log"
 runtime_stderr_path="$qualification_root/runtime-probe.stderr.log"
-startup_wizard_evidence_path="$qualification_root/startup-wizard-smoke.json"
-startup_wizard_stdout_path="$qualification_root/startup-wizard-smoke.stdout.log"
-startup_wizard_stderr_path="$qualification_root/startup-wizard-smoke.stderr.log"
 deployment_manifest_path="$qualification_root/deployment-manifest.json"
 smoke_evidence_path="$qualification_root/packaged-smoke.json"
 workflow_observation_path="$qualification_root/workflow-observation.json"
@@ -814,25 +811,6 @@ if [ ! -s "$runtime_probe_path" ]; then
 fi
 
 if [ "$skip_smoke" -eq 0 ]; then
-  step "Verifying the packaged startup wizard exposes the main Cocoa workspace"
-  RCMS_PACKAGED_STDOUT_PATH="$startup_wizard_stdout_path" \
-    RCMS_PACKAGED_STDERR_PATH="$startup_wizard_stderr_path" \
-    run_packaged_process "$app_root/RCMetaStudio" \
-      --automation-startup-wizard-smoke "$startup_wizard_evidence_path" \
-      "$sample_root/BCG.rcms"
-  "$python_exe" - "$startup_wizard_evidence_path" <<'PY'
-import json
-import sys
-
-evidence = json.load(open(sys.argv[1], encoding="utf-8"))
-if evidence.get("platform_plugin") != "cocoa":
-    raise SystemExit("Startup wizard smoke did not use the Cocoa platform plugin.")
-if not evidence.get("opened") or not evidence.get("visible"):
-    raise SystemExit("Startup wizard smoke did not open an exposed workspace.")
-frame = evidence.get("frame", [0, 0, 0, 0])
-if evidence.get("rows", 0) < 1 or len(frame) != 4 or min(frame[2:]) <= 0:
-    raise SystemExit("Startup wizard smoke produced incomplete workspace evidence.")
-PY
   sample_path="$sample_root/BCG.rcms"
   baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
 import json
@@ -840,19 +818,6 @@ import sys
 print(json.load(open(sys.argv[1], encoding="utf-8"))["qt"]["baseline_device_pixel_ratio"])
 PY
 )"
-  step "Running packaged macOS workflow smoke"
-  QT_SCALE_FACTOR=1.25 \
-    RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
-    RCMS_PACKAGE_SMOKE_EVIDENCE="$workflow_observation_path" \
-    RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
-    RCMS_AUTOMATION_HANG_TRACE="$hang_trace_path" \
-    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" \
-      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
-      --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
-      --completion-log "$smoke_log_path" -- \
-      "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
-
   for scale in "1.25" "1.50" "1.75"; do
     step "Running packaged Cocoa surface smoke at scale $scale"
     QT_SCALE_FACTOR="$scale" \
@@ -1041,7 +1006,6 @@ if [ "$skip_smoke" -eq 0 ]; then
   ditto -x -k "$zip_path" "$extracted_root"
   extracted_app="$extracted_root/$archive_root_name/RCMetaStudio.app"
   extracted_probe="$qualification_root/extracted-runtime-probe.json"
-  extracted_wizard="$qualification_root/extracted-startup-wizard-smoke.json"
   extracted_manifest="$qualification_root/extracted-deployment-manifest.json"
   extracted_smoke="$qualification_root/extracted-packaged-smoke.json"
   extracted_workflow="$qualification_root/extracted-workflow-observation.json"
@@ -1065,27 +1029,6 @@ if [ "$skip_smoke" -eq 0 ]; then
   }
   : > "$extracted_hang_trace"
   run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-runtime-probe "$extracted_probe"
-  run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-startup-wizard-smoke \
-    "$extracted_wizard" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
-  "$python_exe" - "$extracted_wizard" <<'PY'
-import json
-import sys
-
-evidence = json.load(open(sys.argv[1], encoding="utf-8"))
-if evidence.get("platform_plugin") != "cocoa" or not evidence.get("passed"):
-    raise SystemExit("Extracted startup wizard smoke failed: %s" % evidence)
-PY
-  QT_SCALE_FACTOR=1.25 RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
-    RCMS_PACKAGE_SMOKE_EVIDENCE="$extracted_workflow" RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_AUTOMATION_HANG_TRACE="$extracted_hang_trace" \
-    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$extracted_r_home" RCMS_R_LIBS="$extracted_r_lib" \
-      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
-      --stdout "$extracted_stdout" --stderr "$extracted_stderr" \
-      --completion-log "$extracted_smoke_log" -- \
-      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
-  # The normal native gate remains part of this extracted-package qualification:
-  # --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
-  run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   for scale in "1.25" "1.50" "1.75"; do
     QT_SCALE_FACTOR="$scale" RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
       RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \

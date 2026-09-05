@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -108,8 +109,6 @@ def _startup_project_path(argv):
     index = 1
     while index < len(args):
         arg = args[index]
-        if arg in ("--automation-smoke", "--automation-native-smoke"):
-            return None
         if arg in {
             "--automation-startup-completion-marker",
             "--automation-pid-file",
@@ -215,9 +214,7 @@ def _open_startup_project(app, meta, project_path, startup_argv):
     if not smoke_requested:
         return False, None
 
-    from rc_metastudio.automation import assert_opened_project_for_startup_smoke
-
-    return True, assert_opened_project_for_startup_smoke(
+    return True, _finish_startup_project(
         app,
         meta,
         project_path,
@@ -226,6 +223,27 @@ def _open_startup_project(app, meta, project_path, startup_argv):
             startup_argv, "--automation-startup-completion-marker"
         ),
     )
+
+
+def _finish_startup_project(app, window, project_path, opened, *, completion_marker=None):
+    """Finish the positional startup path and optionally write its marker."""
+    if not opened or window.tableView.model().rowCount() < 1:
+        raise SystemExit("startup project did not open: %s" % project_path)
+    if completion_marker:
+        Path(completion_marker).write_text(
+            json.dumps({"project": Path(project_path).name}) + "\n", encoding="utf-8"
+        )
+    _mark_startup_workspace_saved(window)
+    window.close()
+    app.processEvents()
+    app.quit()
+    return 0
+
+
+def _mark_startup_workspace_saved(window):
+    workspace = getattr(window, "workspace", None)
+    if workspace is not None and workspace.document is not None:
+        workspace.mark_saved()
 
 
 def start():
@@ -239,11 +257,10 @@ def start():
         return automation.dispatch(startup_argv)
     startup_project_path = _startup_project_path(startup_argv)
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    configure_application(app)
     baseline_ids = _top_level_ids(app)
+    meta = None
     try:
-        settings.setup_directories()
-        meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
+        app, meta = compose_application(app=app, interactive=True)
         if startup_project_path:
             # The initial blank workspace exists only to compose the shell.  A
             # startup project replaces it directly, so it must not trigger the
@@ -262,53 +279,71 @@ def start():
             meta.start()
         return app.exec()
     finally:
-        _dispose_new_top_levels(app, baseline_ids)
+        if app is not None:
+            _dispose_new_top_levels(app, baseline_ids, (meta,) if meta is not None else ())
 
 
 def compose_automation_application(phase_callback=None):
     """Compose the ordinary main window for a hidden qualification hook."""
+    return compose_application(phase_callback=phase_callback)
+
+
+def compose_application(
+    *, app=None, phase_callback=None, interactive=False,
+    main_window_loader=None, r_loader=None
+):
+    """Compose the application shell used by startup and qualification hooks."""
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
-    main_window = _import_main_window()
-    app = app_error_handler.get_or_create_application(sys.argv)
+    main_window = main_window_loader or _import_main_window()
+    if app is None:
+        app = app_error_handler.get_or_create_application(sys.argv)
     configure_application(app)
     _emit_automation_phase(phase_callback, "application:configured")
     baseline_ids = _top_level_ids(app)
+    splash = None
     try:
         settings.setup_directories()
-        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
-            load_R_libraries(app, None, phase_callback=phase_callback)
+        if interactive:
+            splash = create_startup_splash()
+            splash.show()
+            splash_starttime = time.time()
+            if phase_callback is None:
+                (r_loader or load_R_libraries)(app, splash)
+            else:
+                (r_loader or load_R_libraries)(
+                    app, splash, phase_callback=phase_callback
+                )
+            time_elapsed = time.time() - splash_starttime
+            if time_elapsed < SPLASH_DISPLAY_TIME:
+                QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
+        elif os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            (r_loader or load_R_libraries)(
+                app, None, phase_callback=phase_callback
+            )
         meta = main_window.MainWindow()
-        meta.workspace.mark_saved()
+        if splash is not None:
+            splash.finish(meta)
+        if not interactive:
+            meta.workspace.mark_saved()
         _show_main_window(meta)
+        if splash is not None:
+            dispose_qobjects(app, (splash,))
         return app, meta
     except BaseException:
-        _dispose_new_top_levels(app, baseline_ids)
+        _dispose_new_top_levels(app, baseline_ids, (splash,))
         raise
 
 
 def _create_interactive_shell(app, main_window_loader, r_loader):
-    """Load the R backend before importing and constructing the main window."""
-    baseline_ids = _top_level_ids(app)
-    splash = None
-    try:
-        splash = create_startup_splash()
-        splash.show()
-        splash_starttime = time.time()
-        r_loader(app, splash)
-
-        time_elapsed = time.time() - splash_starttime
-        if time_elapsed < SPLASH_DISPLAY_TIME:
-            QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
-
-        meta = main_window_loader().MainWindow()
-        splash.finish(meta)
-        _show_main_window(meta)
-        dispose_qobjects(app, (splash,))
-        return meta
-    except BaseException:
-        _dispose_new_top_levels(app, baseline_ids, (splash,))
-        raise
+    """Compatibility seam for test scenarios using explicit loaders."""
+    _app, window = compose_application(
+        app=app,
+        interactive=True,
+        main_window_loader=main_window_loader(),
+        r_loader=r_loader,
+    )
+    return window
 
 
 def _top_level_ids(app):

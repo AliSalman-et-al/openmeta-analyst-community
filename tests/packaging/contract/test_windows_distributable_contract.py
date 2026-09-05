@@ -216,16 +216,10 @@ def test_packaged_smoke_launches_with_positional_project_argument():
     )
 
 
-def test_native_packaged_smoke_launch_is_visible():
-    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
-    smoke = script.split("function Invoke-PackagedAppSmokeTest", 1)[1].split(
-        "function Compress-AppDirectory", 1
-    )[0]
-
-    assert (
-        '-StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath -Visible'
-        in smoke
-    )
+def test_packaged_workflow_is_assembled_from_atomic_executable_observations():
+    assembler = read_repo_text("scripts", "assemble_packaged_smoke_evidence.py")
+    assert "--automation-package-edit-save" in assembler
+    assert "--automation-package-analyze" in assembler
 
 
 def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import json
@@ -21,14 +24,19 @@ import pytest
             ("smoke.json", "1.25"),
         ),
         (
-            ["RCMetaStudio", "--automation-startup-wizard-smoke", "wizard.json", "sample.rcms"],
-            "start_startup_wizard_smoke",
-            ("wizard.json", "sample.rcms"),
+            ["RCMetaStudio", "--automation-package-open-report", "open.json", "sample.rcms"],
+            "start_package_open_report",
+            ("open.json", "sample.rcms"),
         ),
         (
-            ["RCMetaStudio", "--automation-package-operation", "operation.json", "sample.rcms", "analysis", "de_DE", "binary.random"],
-            "start_package_operation",
-            ("operation.json", "sample.rcms", "analysis", "de_DE", "", "binary.random"),
+            ["RCMetaStudio", "--automation-package-edit-save", "edit.json", "sample.rcms", "dest.rcms", "name", "Edited"],
+            "start_package_edit_save",
+            ("edit.json", "sample.rcms", "dest.rcms", "name", "Edited"),
+        ),
+        (
+            ["RCMetaStudio", "--automation-package-analyze", "analysis.json", "sample.rcms", "binary.random"],
+            "start_package_analyze",
+            ("analysis.json", "sample.rcms", "binary.random"),
         ),
     ],
 )
@@ -55,10 +63,12 @@ def test_packaged_qualification_commands_validate_their_arguments():
         automation.dispatch(["RCMetaStudio", "--automation-package-runtime-probe"])
     with pytest.raises(SystemExit, match="surface-smoke requires"):
         automation.dispatch(["RCMetaStudio", "--automation-package-surface-smoke"])
-    with pytest.raises(SystemExit, match="startup-wizard-smoke requires"):
-        automation.dispatch(["RCMetaStudio", "--automation-startup-wizard-smoke"])
-    with pytest.raises(SystemExit, match="package-operation requires"):
-        automation.dispatch(["RCMetaStudio", "--automation-package-operation"])
+    with pytest.raises(SystemExit, match="open-report requires"):
+        automation.dispatch(["RCMetaStudio", "--automation-package-open-report"])
+    with pytest.raises(SystemExit, match="edit-save requires"):
+        automation.dispatch(["RCMetaStudio", "--automation-package-edit-save"])
+    with pytest.raises(SystemExit, match="analyze requires"):
+        automation.dispatch(["RCMetaStudio", "--automation-package-analyze"])
 
 
 def test_surface_hook_observes_and_closes_the_composed_main_window(monkeypatch):

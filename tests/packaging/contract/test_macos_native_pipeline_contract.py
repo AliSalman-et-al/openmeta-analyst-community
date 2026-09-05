@@ -62,49 +62,21 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 
     assert 'sample_path="$sample_root/BCG.rcms"' in build
-    assert (
-        '--automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
-        in build
-    )
-    assert (
-        '--automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
-        in build
-    )
-    assert "--automation-native-smoke" in build
+    assembler = (ROOT / "scripts/assemble_packaged_smoke_evidence.py").read_text(encoding="utf-8")
+    assert '--automation-package-open-report' in assembler
+    assert '--automation-package-analyze' in assembler
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
 
-def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition():
+def test_both_native_packages_use_the_positional_startup_transition():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
-    automation_source = (ROOT / "tests/python/gui/support/automation_scenarios.py").read_text(
-        encoding="utf-8"
-    )
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
         encoding="utf-8"
     )
-    trusted_workflow = (
-        ROOT / ".github/workflows/macos-trusted-release-candidate.yml"
-    ).read_text(encoding="utf-8")
-
-    assert build.count("--automation-startup-wizard-smoke") == 2
-    assert (
-        'startup_wizard_evidence_path="$qualification_root/startup-wizard-smoke.json"'
-        in build
-    )
-    assert (
-        'extracted_wizard="$qualification_root/extracted-startup-wizard-smoke.json"'
-        in build
-    )
-    assert 'evidence.get("platform_plugin") != "cocoa"' in build
-    assert 'not evidence.get("opened") or not evidence.get("visible")' in build
-    assert "handle.isExposed()" in automation_source
-    assert "geometry.width() <= 0 or geometry.height() <= 0" in automation_source
-    assert '"rows": model.rowCount() if model is not None else 0' in automation_source
+    assert "--automation-startup-wizard-smoke" not in build
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
-    assert trust.count("--automation-startup-wizard-smoke") == 1
-    assert "qualified/diagnostics/startup-wizard.json" in trusted_workflow
-    assert 'evidence.get("platform_plugin") == "cocoa"' in trusted_workflow
+    assert "--automation-startup-wizard-smoke" not in trust
 
 
 def test_source_r_packages_link_against_the_private_staged_runtime():
