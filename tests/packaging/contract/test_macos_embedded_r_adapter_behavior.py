@@ -87,6 +87,32 @@ def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
     assert Path(runtime_entry["source"]) == Path("../../R")
 
 
+def test_pyinstaller_filter_leaves_the_explicit_framework_toc_in_charge(tmp_path):
+    adapter = load_embedded_r_adapter()
+    framework = _framework(tmp_path)
+    staged_library = framework / "Resources/lib"
+    compiler_runtime = staged_library / "libgcc_s.1.1.dylib"
+    compiler_runtime.write_bytes(b"gcc")
+    unrelated = tmp_path / "libunrelated.dylib"
+    unrelated.write_bytes(b"unrelated")
+
+    retained = adapter.filter_pyinstaller_r_binaries(
+        [
+            ("libunrelated.dylib", str(unrelated), "BINARY"),
+            ("libR.dylib", str(staged_library / "libR.dylib"), "BINARY"),
+            ("libgcc_s.1.1.dylib", "/temporary/libgcc_s.1.1.dylib", "BINARY"),
+        ],
+        framework,
+    )
+
+    assert retained == [("libunrelated.dylib", str(unrelated), "BINARY")]
+    with pytest.raises(adapter.AdapterError, match="outside the staged framework"):
+        adapter.filter_pyinstaller_r_binaries(
+            [("R.framework/R", "/Library/Frameworks/R.framework/R", "BINARY")],
+            framework,
+        )
+
+
 def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypatch):
     adapter = load_embedded_r_adapter()
     app = tmp_path / "RCMetaStudio.app"
