@@ -236,7 +236,9 @@ class WorkspaceEditingService:
         result = self._apply_analysis_edit(
             dataset, study, target, context, value, import_csv, recalculate
         )
-        self._update_inclusion(dataset, study, target, context, result)
+        self._update_inclusion(
+            dataset, study, target, context, result, import_csv=import_csv
+        )
         return result
 
     def _apply_analysis_edit(
@@ -262,13 +264,21 @@ class WorkspaceEditingService:
         return AppliedWorkspaceEdit()
 
     def _update_inclusion(
-        self, dataset, study, target, context, result: AppliedWorkspaceEdit
+        self,
+        dataset,
+        study,
+        target,
+        context,
+        result: AppliedWorkspaceEdit,
+        *,
+        import_csv: bool = False,
     ) -> None:
         if (
             not result.applied
             or context.outcome_name is None
             or context.data_type == DIAGNOSTIC
             or target.column == context.include_column
+            or import_csv
         ):
             return
         unit = self._analysis_unit(dataset, study, context)
@@ -666,7 +676,12 @@ class WorkspaceEditingService:
             return None, False
 
     def update_outcome_if_possible(
-        self, dataset: Dataset, study_index: int, context: WorkspaceEditingContext
+        self,
+        dataset: Dataset,
+        study_index: int,
+        context: WorkspaceEditingContext,
+        *,
+        update_inclusion: bool = True,
     ) -> None:
         if context.outcome_name is None or context.follow_up_name is None:
             return
@@ -674,10 +689,12 @@ class WorkspaceEditingService:
         unit = self._analysis_unit(dataset, study, context)
         raw_data = self._raw_data(dataset, study, context)
         complete = self._raw_data_is_complete_for_context(raw_data, context)
-        if self._should_clear_inclusion(unit, context):
+        if update_inclusion and self._should_clear_inclusion(unit, context):
             study.include = False
         if complete:
-            self._calculate_complete_outcome(study, unit, raw_data, context)
+            self._calculate_complete_outcome(
+                study, unit, raw_data, context, update_inclusion=update_inclusion
+            )
         elif not raw_data_is_empty(raw_data):
             self._clear_incomplete_outcome(unit, context)
 
@@ -691,8 +708,10 @@ class WorkspaceEditingService:
     def _should_clear_inclusion(self, unit: AnalysisUnit, context) -> bool:
         return context.data_type == DIAGNOSTIC or not self._has_point_estimate(unit, context)
 
-    def _calculate_complete_outcome(self, study, unit, raw_data, context) -> None:
-        if not study.manually_excluded:
+    def _calculate_complete_outcome(
+        self, study, unit, raw_data, context, *, update_inclusion=True
+    ) -> None:
+        if update_inclusion and not study.manually_excluded:
             study.include = True
         calculated = self.preview_raw_effects(
             context.data_type, context.current_effect, raw_data, context.confidence_level

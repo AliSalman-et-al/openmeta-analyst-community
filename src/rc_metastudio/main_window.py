@@ -1015,7 +1015,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 action.blockSignals(False)
 
         self.tableView.model().set_current_metric(metric_name)
-        self.model.try_to_update_outcomes()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
@@ -1342,7 +1342,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def display_groups(self, groups):
         self.model.set_current_groups(groups)
-        self.model.try_to_update_outcomes()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
@@ -1388,12 +1388,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.current_follow_up_label.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
     def display_follow_up(self, time_point):
         self.model.current_follow_up_index = time_point
         self.update_follow_up_label()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
@@ -1465,7 +1467,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 runtime.model_state,
                 check_for_appropriate_metric=not runtime.restored_selection,
                 preserve_state_selection=runtime.restored_selection,
-                recalculate_outcomes=False,
+                recalculate_outcomes=True,
             )
         except Exception:
             self._restore_failed_open(previous_model, current_cell, selected_cells)
@@ -1686,12 +1688,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.model.update_current_outcome()
             self.model.update_current_time_points()
 
-        if (
-            recalculate_outcomes
-            and self.model.current_outcome_name is not None
-            and not self.model.is_diagnostic()
-        ):
-            self.model.try_to_update_outcomes()
+        if recalculate_outcomes and self.model.current_outcome_name is not None:
+            self.model.hydrate_derived_previews()
 
         # The retired model remains connected to its slots, so reconnect the
         # view but not menu actions, which would otherwise accumulate handlers.

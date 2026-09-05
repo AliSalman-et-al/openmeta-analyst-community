@@ -385,15 +385,14 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
     monkeypatch,
 ):
     from rc_metastudio import dataset_table_model
-    from rc_metastudio import project_adapter
-    from rc_metastudio import project_format
+    from rc_metastudio import project_adapter, project_format
 
     app, window = automation.start_automation()
-    recalculations = []
+    hydrations = []
     monkeypatch.setattr(
         dataset_table_model.DatasetTableModel,
-        "try_to_update_outcomes",
-        lambda model: recalculations.append(model),
+        "hydrate_derived_previews",
+        lambda model: hydrations.append(model),
     )
     main_window = sys.modules["rc_metastudio.main_window"]
     critical_messages = []
@@ -436,13 +435,117 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
         assert window.isMaximized()
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 20
-        assert recalculations == []
+        assert hydrations == [window.model]
         observed_dataset = project_adapter.dataset_to_project(window.model.dataset)[
             "dataset"
         ]
         assert observed_dataset == expected_dataset
     finally:
         # This test owns window identity, not the interactive save prompt.
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+@pytest.mark.parametrize(
+    "project_name", ["amino.rcms", "continuous.rcms", "lymph.rcms"]
+)
+def test_open_project_hydrates_raw_effects_without_dirtying_or_rewriting_inclusion(
+    project_name,
+):
+    from rc_metastudio import project_adapter
+    from rc_metastudio import project_format
+
+    app, window = automation.start_automation()
+    try:
+        project = project_format.load_project(
+            _sample_project_path(project_name)
+        ).project
+        expected_dataset = project_adapter.project_to_dataset(project)
+        expected_inclusion = [study.include for study in expected_dataset.studies]
+        assert window.open(_sample_project_path(project_name)) is True
+        model = window.model
+        row = next(
+            index
+            for index in range(len(model.dataset.studies))
+            if model.raw_data_is_complete_for_study(index)
+        )
+
+        assert all(_cell_text(model, row, column) != "" for column in model.OUTCOMES)
+        assert [study.include for study in model.dataset.studies] == expected_inclusion
+        assert window.workspace.is_dirty is False
+
+        incomplete_study = model.dataset.studies[row]
+        incomplete_unit = model.get_current_analysis_unit_for_study(row)
+        incomplete_study.include = False
+        incomplete_unit.groups[model.current_groups[0]].raw_data[-1] = ""
+        model.hydrate_derived_previews()
+        assert incomplete_study.include is False
+        assert all(_cell_text(model, row, column) == "" for column in model.OUTCOMES)
+
+        # Hydration must leave entered-only effects available when no raw data
+        # exists for the active analysis unit.
+        if project_name == "amino.rcms":
+            unit = model.get_analysis_unit(
+                study_index=0,
+                outcome=model.current_outcome_name,
+                follow_up=model.get_current_follow_up_name(),
+                groups=model.current_groups,
+            )
+            for group in unit.groups.values():
+                group.raw_data[:] = [""] * len(group.raw_data)
+            comparison = model.get_current_group_comparison()
+            unit.set_effect_for_source("entered", "OR", comparison, 1.25, 0.8, 2.0)
+            for setter, value in (
+                (unit.set_display_effect_for_source, 1.25),
+                (unit.set_display_lower_for_source, 0.8),
+                (unit.set_display_upper_for_source, 2.0),
+            ):
+                setter("entered", "OR", comparison, value)
+            model.hydrate_derived_previews()
+            model.reset_model()
+            assert _cell_text(model, 0, model.OUTCOMES[0]) == "1.25"
+            entered_effect = unit.get_effect_for_source("entered", "OR", comparison)
+            assert entered_effect.estimate == 1.25
+    finally:
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_csv_raw_rows_remain_included_when_derived_columns_are_blank():
+    from rc_metastudio import main_window
+
+    app, window = automation.start_automation()
+    try:
+        window._handle_wizard_results(
+            {
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "two",
+                    "data_type": "binary",
+                    "sub_type": "proportions",
+                    "effect": "OR",
+                    "metric_choices": [],
+                    "name": "Mortality",
+                },
+                "csv_data": None,
+                "selected_dataset": None,
+            }
+        )
+        csv_row = ["Alpha", "2020", "6", "27", "9", "27", "", "", ""]
+        main_window.ImportCsvCommand(
+            imported_data=[csv_row], main_form=window
+        ).redo()
+
+        assert window.model.dataset.studies[0].include is True
+        assert all(
+            _cell_text(window.model, 0, column) != ""
+            for column in window.model.OUTCOMES
+        )
+    finally:
         _mark_workspace_saved(window)
         window.close()
         app.processEvents()
@@ -924,6 +1027,29 @@ def test_composition_configures_r_before_importing_main_window(monkeypatch, qapp
     assert app is qapp
     assert main_window is not None
     assert events == ["r-runtime", "main-window"]
+
+
+def test_interactive_composition_starts_clean_and_real_edit_becomes_dirty(qapp):
+    from rc_metastudio import launch
+
+    app, window = launch.compose_application(
+        app=qapp,
+        interactive=True,
+        r_loader=lambda _app, _splash: None,
+    )
+    try:
+        assert window.workspace.is_dirty is False
+        assert window.open(_sample_project_path("amino.rcms")) is True
+        assert window.workspace.is_dirty is False
+
+        index = window.model.index(0, window.model.NAME)
+        window.tableView.set_data_in_model(index, "Edited study")
+
+        assert window.workspace.is_dirty is True
+    finally:
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
 
 
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_path):

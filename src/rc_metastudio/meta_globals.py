@@ -27,7 +27,7 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.3.1"
+VERSION = "0.4.0"
 
 DEFAULT_DATASET_NAME = "untitled_dataset"
 

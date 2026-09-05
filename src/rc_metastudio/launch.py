@@ -267,10 +267,6 @@ def start():
     try:
         app, meta = compose_application(app=app, interactive=True)
         if startup_project_path:
-            # The initial blank workspace exists only to compose the shell.  A
-            # startup project replaces it directly, so it must not trigger the
-            # ordinary unsaved-change prompt before the open boundary.
-            meta.workspace.mark_saved()
             handled, result = _open_startup_project(
                 app, meta, startup_project_path, startup_argv
             )
@@ -307,9 +303,7 @@ def compose_application(
             phase_callback=phase_callback,
             r_loader=r_loader,
         )
-        meta = _finish_composition(
-            app, main_window, splash=splash, interactive=interactive
-        )
+        meta = _finish_composition(app, main_window, splash=splash)
         return app, meta
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids, (splash,))
@@ -351,12 +345,11 @@ def _invoke_r_loader(loader, app, splash, phase_callback):
         loader(app, splash, phase_callback=phase_callback)
 
 
-def _finish_composition(app, main_window, *, splash, interactive):
+def _finish_composition(app, main_window, *, splash):
     meta = main_window.MainWindow()
     if splash is not None:
         splash.finish(meta)
-    if not interactive:
-        meta.workspace.mark_saved()
+    meta.workspace.mark_saved()
     _show_main_window(meta)
     if splash is not None:
         dispose_qobjects(app, (splash,))

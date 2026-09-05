@@ -1514,6 +1514,19 @@ class DatasetTableModel(QAbstractTableModel):
         for study_index in range(len(self.dataset.studies)):
             self.update_outcome_if_possible(study_index)
 
+    def hydrate_derived_previews(self):
+        """Populate transient raw-data results without changing inclusion."""
+        if (
+            self.current_outcome_name is None
+            or self.get_current_follow_up_name() is None
+        ):
+            return
+        context = self._editing_context()
+        for study_index in range(len(self.dataset.studies)):
+            self.editing_service.update_outcome_if_possible(
+                self.dataset, study_index, context, update_inclusion=False
+            )
+
     def blank_all_studies(self, include_them):
         # Keep the auto-added blank row excluded from include-all changes.
         for study in self.dataset.studies:
