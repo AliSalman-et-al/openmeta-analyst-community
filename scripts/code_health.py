@@ -81,6 +81,18 @@ class HealthConfig(TypedDict):
 TypingCounts = dict[str, int]
 
 
+class ComparisonMetric(TypedDict, total=False):
+    baseline: object
+    current: object
+    delta: object
+
+
+class BaselineComparison(TypedDict):
+    path: str
+    baseline_head: object
+    metrics: dict[str, ComparisonMetric]
+
+
 def _relative_artifact_path(root: Path, path: Path) -> str:
     """Return a stable repository-relative path when the artifact is inside it."""
     try:
@@ -1055,15 +1067,15 @@ def _comparison_metrics(evidence: dict[str, object]) -> dict[str, object]:
 
 def compare_to_baseline(
     evidence: dict[str, object], baseline: dict[str, object], baseline_path: str
-) -> dict[str, object]:
+) -> BaselineComparison:
     """Compare deterministic measurements with the recorded baseline artifact."""
     current_metrics = _comparison_metrics(evidence)
     baseline_metrics = _comparison_metrics(baseline)
-    metrics: dict[str, dict[str, object]] = {}
+    metrics: dict[str, ComparisonMetric] = {}
     for name in sorted(current_metrics):
         current = current_metrics[name]
         recorded = baseline_metrics.get(name)
-        item: dict[str, object] = {"baseline": recorded, "current": current}
+        item: ComparisonMetric = {"baseline": recorded, "current": current}
         if (
             isinstance(recorded, (int, float))
             and not isinstance(recorded, bool)
