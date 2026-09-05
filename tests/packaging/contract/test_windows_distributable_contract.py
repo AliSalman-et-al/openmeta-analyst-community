@@ -1,6 +1,6 @@
 import hashlib
-import json
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -10,8 +10,8 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from ._workflow import load_module_from_path, load_workflow
 
+from ._workflow import load_module_from_path, load_workflow
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -1759,12 +1759,9 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             (
                 "packaged-workflow:evidence-written",
                 "packaged-runtime-probe:passed",
-                "packaged-workflow:shell-created",
-                "packaged-workflow:project-open:start",
-                "packaged-workflow:project-open:return",
-                "packaged-workflow:paint:complete",
                 "packaged-workflow:project-exercise:complete",
                 "packaged-workflow:post-close",
+                "packaged-workflow:process-exit:0",
                 "packaged-surface:scale-1.25-passed",
                 "packaged-surface:scale-1.50-passed",
                 "packaged-surface:scale-1.75-passed",

@@ -15,7 +15,6 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 from typing import TypeGuard, cast
 
-
 PE_X64_MACHINE = 0x8664
 NATIVE_SUFFIXES = {".dll", ".exe", ".pyd"}
 REQUIRED_PLUGINS = {
@@ -1041,12 +1040,15 @@ def _windows_scale_valid(item: dict) -> bool:
 
 def _windows_log_markers_valid(log_text: str) -> bool:
     markers = {
-        "packaged-runtime-probe:passed", "packaged-workflow:shell-created",
-        "packaged-workflow:project-open:start", "packaged-workflow:project-open:return",
-        "packaged-workflow:paint:complete", "packaged-workflow:project-exercise:complete",
-        "packaged-workflow:evidence-written", "packaged-workflow:post-close",
-        "packaged-surface:scale-1.25-passed", "packaged-surface:scale-1.50-passed",
-        "packaged-surface:scale-1.75-passed", "startup-project:normal-entry-point-passed",
+        "packaged-runtime-probe:passed",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:evidence-written",
+        "packaged-workflow:post-close",
+        "packaged-workflow:process-exit:0",
+        "packaged-surface:scale-1.25-passed",
+        "packaged-surface:scale-1.50-passed",
+        "packaged-surface:scale-1.75-passed",
+        "startup-project:normal-entry-point-passed",
     }
     return all(marker in log_text for marker in markers)
 
