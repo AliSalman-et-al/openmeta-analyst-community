@@ -1,14 +1,14 @@
-import json
 import builtins
 import hashlib
 import importlib.util
+import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import types
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -35,19 +35,19 @@ def load_inspector():
 
 def _framework(root: Path) -> Path:
     framework = root / "R.framework"
-    resources = framework / "Versions/4.6-x86_64/Resources"
+    resources = framework / "Versions/4.6-arm64/Resources"
     (resources / "lib").mkdir(parents=True)
     (resources / "bin").mkdir()
     (resources / "lib/libR.dylib").write_bytes(b"libR")
     (resources / "bin/R").write_text("#!/bin/sh\n", encoding="utf-8")
     (framework / "Versions/Current").symlink_to(
-        Path("4.6-x86_64"), target_is_directory=True
+        Path("4.6-arm64"), target_is_directory=True
     )
     (framework / "Resources").symlink_to(
         Path("Versions/Current/Resources"), target_is_directory=True
     )
     (framework / "R").symlink_to(Path("Versions/Current/R"))
-    (framework / "Versions/4.6-x86_64/R").symlink_to(Path("Resources/lib/libR.dylib"))
+    (framework / "Versions/4.6-arm64/R").symlink_to(Path("Resources/lib/libR.dylib"))
     (resources / "R").symlink_to(Path("bin/R"))
     available = resources / "fontconfig/fonts/conf.avail"
     active = resources / "fontconfig/fonts/conf.d"
@@ -65,7 +65,7 @@ def _framework(root: Path) -> Path:
 def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
     adapter = load_embedded_r_adapter()
     framework = _framework(tmp_path)
-    version_root = framework / "Versions/4.6-x86_64"
+    version_root = framework / "Versions/4.6-arm64"
     executable = version_root / "R"
     runtime_library = version_root / "Resources/lib/libR.dylib"
 
@@ -76,13 +76,13 @@ def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
 
     links = adapter.audit_symlinks(framework)
     assert any(
-        record["path"] == "Versions/4.6-x86_64/Resources/lib/libR.dylib"
+        record["path"] == "Versions/4.6-arm64/Resources/lib/libR.dylib"
         and Path(record["target"]) == Path("../../R")
         for record in links
     )
     toc = {entry["destination"]: entry for entry in adapter.explicit_toc(framework)}
-    assert toc["R.framework/Versions/4.6-x86_64/R"]["type"] == "DATA"
-    runtime_entry = toc["R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"]
+    assert toc["R.framework/Versions/4.6-arm64/R"]["type"] == "DATA"
+    runtime_entry = toc["R.framework/Versions/4.6-arm64/Resources/lib/libR.dylib"]
     assert runtime_entry["type"] == "SYMLINK"
     assert Path(runtime_entry["source"]) == Path("../../R")
 
@@ -96,7 +96,7 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
     bridge.write_bytes(b"bridge")
     dependency = ["/Library/Frameworks/R.framework/Resources/lib/libR.dylib"]
     monkeypatch.setattr(adapter, "is_macho_candidate", lambda path: path.is_file())
-    monkeypatch.setattr(adapter, "architectures", lambda _path: ["x86_64"])
+    monkeypatch.setattr(adapter, "architectures", lambda _path: ["arm64"])
     monkeypatch.setattr(adapter, "dependencies", lambda _path: list(dependency))
 
     def run(*args, **_kwargs):
@@ -106,11 +106,11 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
 
     monkeypatch.setattr(adapter, "_run", run)
     output = tmp_path / "bridge.json"
-    adapter.relocate_bridge(framework, bridge, "x86_64", output)
+    adapter.relocate_bridge(framework, bridge, "arm64", output)
     assert json.loads(output.read_text(encoding="utf-8"))["r_dependency"].startswith(
         "@loader_path/"
     )
-    version_root = framework / "Versions/4.6-x86_64"
+    version_root = framework / "Versions/4.6-arm64"
     executable = version_root / "R"
     runtime_library = version_root / "Resources/lib/libR.dylib"
     executable.unlink()
@@ -123,42 +123,15 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
         lambda *_: [{"path": "libR", "install_id": None, "dependencies": []}],
     )
     monkeypatch.setattr(adapter, "validate_relocated_inventory", lambda *_: None)
-    adapter.post_app_gate(app, "x86_64", tmp_path / "post.json")
+    adapter.post_app_gate(app, "arm64", tmp_path / "post.json")
     displaced = app / "Contents/Frameworks/displaced/libR.dylib"
     displaced.parent.mkdir()
     displaced.symlink_to(framework / "Resources/lib/libR.dylib")
     with pytest.raises(adapter.AdapterError, match="duplicate or displaced"):
-        adapter.post_app_gate(app, "x86_64", tmp_path / "post-bad.json")
+        adapter.post_app_gate(app, "arm64", tmp_path / "post-bad.json")
 
 
-def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch):
-    adapter = load_embedded_r_adapter()
-    retained = adapter.filter_pyinstaller_r_binaries(
-        [
-            ("keep", str(tmp_path / "keep.dylib"), "BINARY"),
-            ("R", "/Library/Frameworks/R.framework/R", "BINARY"),
-        ],
-        {},
-    )
-    assert [item[0] for item in retained] == ["keep"]
-    staged = tmp_path / "R.framework"
-    staged_member = staged / "Resources/lib/libRblas.dylib"
-    staged_member.parent.mkdir(parents=True)
-    staged_member.write_bytes(b"blas")
-    retained = adapter.filter_pyinstaller_r_binaries(
-        [
-            ("PyQt6", "PyQt6", "DATA"),
-            ("libRblas.dylib", str(staged_member), "DATA"),
-            ("libRblas.dylib", "libRblas.0.dylib", "SYMLINK"),
-        ],
-        staged,
-    )
-    assert retained == [("PyQt6", "PyQt6", "DATA")]
-    with pytest.raises(adapter.AdapterError, match="unmapped /opt/R"):
-        adapter.filter_pyinstaller_r_binaries(
-            [("bad", "/opt/R/x86_64/lib/bad.dylib", "BINARY")], {}
-        )
-
+def test_unsigned_graph_fails_closed(tmp_path, monkeypatch):
     inspector = load_inspector()
     app = tmp_path / "Graph.app"
     executable = app / "Contents/MacOS/RCMetaStudio"
@@ -180,7 +153,7 @@ def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch
     ):
         inspector.inspect_unsigned_native_graph(app)
     monkeypatch.setattr(
-        inspector, "require_macho_architecture", lambda _path, _arch: ["x86_64"]
+        inspector, "require_macho_architecture", lambda _path, _arch: ["arm64"]
     )
     monkeypatch.setattr(
         inspector,
@@ -337,7 +310,7 @@ def test_pkgutil_signature_parser_handles_certificate_chain_and_rejectable_team(
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     payload = module.parse_pkgutil_signature(
-        "Package: R-4.6.1-x86_64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
+        "Package: R-4.6.1-arm64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
         "",
         0,
     )

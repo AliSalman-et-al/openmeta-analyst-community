@@ -345,9 +345,9 @@ def test_assembler_runs_surface_probes_with_requested_scale_and_locale():
     assert 'environment["QT_SCALE_FACTOR"] = scale' in source
     assert 'environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline' in source
     assert 'environment["RCMS_PACKAGE_LOCALE"] = "de_DE"' in source
-    assert '"raw-data-0", "1,0"' in source
-    assert '"input": "1.0", "canonical_value": 1.0' in source
-    assert '"input": "1,0", "canonical_value": 1.0' in source
+    assert '"raw-data-0", "6,0"' in source
+    assert '"input": "6.0", "canonical_value": 6.0' in source
+    assert '"input": "6,0", "canonical_value": 6.0' in source
     assert source.count("subprocess.run(") == 1
     assert "timeout=PACKAGED_PROCESS_TIMEOUT_SECONDS" in source
 

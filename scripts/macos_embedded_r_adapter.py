@@ -7,13 +7,12 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
+from pathlib import Path, PurePosixPath
 from typing import TypedDict
 
 from rc_metastudio.macos_macho import is_macho_candidate
-
 
 SYSTEM_ROOTS = ("/usr/lib/", "/System/Library/")
 FORBIDDEN_ROOTS = (
@@ -34,70 +33,6 @@ OFFICIAL_ALIASES = (
 
 class AdapterError(RuntimeError):
     """Raised when the narrow embedded-R boundary cannot be proven closed."""
-
-
-def filter_pyinstaller_r_binaries(
-    binaries: list[tuple[str, str, str]], staged_framework: Path | dict[str, str]
-) -> list[tuple[str, str, str]]:
-    if isinstance(staged_framework, dict):
-        # Compatibility for the unit-level policy seam. Production passes the
-        # actual staged framework below, so filtering is membership based.
-        retained = []
-        for destination, source, typecode in binaries:
-            source_text = str(source).replace("\\", "/")
-            if source_text.startswith("/Library/Frameworks/R.framework/"):
-                continue
-            if source_text.startswith("/opt/R/"):
-                raise AdapterError(
-                    f"unmapped /opt/R binary discovered by PyInstaller: {source_text}"
-                )
-            retained.append((destination, source, typecode))
-        return retained
-    staged_root = staged_framework.resolve(strict=True)
-    staged_library = staged_root / "Resources/lib"
-    staged_library_names = {
-        path.name
-        for path in staged_library.iterdir()
-        if path.is_file() or path.is_symlink()
-    }
-    retained = []
-    excluded = []
-    for destination, source, typecode in binaries:
-        destination_path = Path(str(destination).replace("\\", "/"))
-        if (
-            destination_path.parent == Path(".")
-            and destination_path.name in staged_library_names
-        ):
-            excluded.append((destination, source, typecode))
-            continue
-        try:
-            Path(source).resolve(strict=True).relative_to(staged_root)
-        except (OSError, ValueError):
-            source_text = str(source).replace("\\", "/")
-            destination_text = str(destination).replace("\\", "/")
-            if (
-                "/R.framework/" in source_text
-                or Path(source_text).name in {"R", "libR.dylib"}
-                or destination_text.startswith("R.framework/")
-                or Path(destination_text).name in {"R", "libR.dylib"}
-            ):
-                raise AdapterError(
-                    f"R-like PyInstaller binary is outside exact staged membership: {source_text}"
-                )
-        else:
-            # The explicit framework TOC is authoritative.  Exclude exactly
-            # its members from PyInstaller's dependency walk rather than
-            # recognizing a few host-path prefixes.
-            excluded.append((destination, source, typecode))
-            continue
-        retained.append((destination, source, typecode))
-    if excluded:
-        destinations = ", ".join(sorted(str(item[0]) for item in excluded))
-        print(
-            f"[RCMS-PYINSTALLER-FILTER] excluded {len(excluded)} staged-R "
-            f"entries: {destinations}"
-        )
-    return retained
 
 
 def _absolute_link_target(value: str) -> bool:

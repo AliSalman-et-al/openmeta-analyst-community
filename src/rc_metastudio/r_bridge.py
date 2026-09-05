@@ -159,23 +159,10 @@ def _first_dynamic(value: object) -> object:
 
 
 def _r_is_null(r_object):
-    """True if an rpy2 object is R's NULL.
-
-    rpy2 >= 3.x represents NULL as a ``NULLType`` singleton whose ``str()`` is
-    an object repr (e.g. ``<rpy2...NULLType object at 0x...>``), not the literal
-    ``"NULL"`` emitted by older rpy2 builds. Code that detected NULL via
-    ``str(x) == "NULL"`` therefore silently misfires (e.g. treating a list with
-    NULL names as if it had names). Prefer identity/type checks and keep the
-    string fallback for older rpy2 compatibility.
-    """
-    try:
-        if r_object is rpy2.rinterface.NULL:
-            return True
-        if isinstance(r_object, type(rpy2.rinterface.NULL)):
-            return True
-    except Exception:
-        pass
-    return str(r_object) == "NULL"
+    """Return whether an rpy2 object represents R's NULL value."""
+    return r_object is rpy2.rinterface.NULL or isinstance(
+        r_object, type(rpy2.rinterface.NULL)
+    )
 
 
 @serialized_r_call

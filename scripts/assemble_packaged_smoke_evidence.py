@@ -137,7 +137,7 @@ def _capture_workflow_operations(
     _run_packaged(
         executable,
         ["--automation-package-edit-save", str(locale_edit_path), str(sample),
-         str(locale_project), "raw-data-0", "1,0"],
+         str(locale_project), "raw-data-0", "6,0"],
         environment=locale_environment,
     )
     observations["locale_edit"] = json.loads(locale_edit_path.read_text(encoding="utf-8"))
@@ -175,8 +175,8 @@ def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
         "reopen_observed": bool(observations["save_reopen"].get("opened")),
         "analysis_after_reopen_observed": bool(observations["save_reopen"]["texts"].get("Summary", "")),
         "locale_inputs": [
-            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.0", "canonical_value": 1.0, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
-            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,0", "canonical_value": 1.0, "summary": locale_summary, "svg_paths": locale["display_images"]},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "6.0", "canonical_value": 6.0, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
+            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "6,0", "canonical_value": 6.0, "summary": locale_summary, "svg_paths": locale["display_images"]},
         ],
     }
 

@@ -69,8 +69,8 @@ def configure_machos(
         "bin/Rscript": [],
         "lib/libR.dylib": [],
         "library/tcltk/libs/tcltk.so": [
-            "/opt/R/x86_64/lib/libtcl8.6.dylib",
-            "/opt/R/x86_64/lib/libtk8.6.dylib",
+            "/opt/R/arm64/lib/libtcl8.6.dylib",
+            "/opt/R/arm64/lib/libtk8.6.dylib",
             "/opt/X11/lib/libX11.6.dylib",
             "/opt/X11/lib/libXss.1.dylib",
             "/opt/X11/lib/libXext.6.dylib",
@@ -98,7 +98,7 @@ def configure_machos(
         extra.parent.mkdir(parents=True, exist_ok=True)
         extra.write_bytes(b"extra")
         records["library/extra/libs/extra.so"] = [
-            "/opt/R/x86_64/lib/libgfortran.5.dylib"
+            "/opt/R/arm64/lib/libgfortran.5.dylib"
         ]
     monkeypatch.setattr(
         profile, "is_macho", lambda path: path.relative_to(root).as_posix() in records
@@ -109,7 +109,7 @@ def configure_machos(
         lambda path, _: {
             "relative_path": path.relative_to(root).as_posix(),
             "sha256": "a" * 64,
-            "architectures": ["x86_64"],
+            "architectures": ["arm64"],
             "install_id": None,
             "load_commands": records[path.relative_to(root).as_posix()],
         },
@@ -139,7 +139,7 @@ def configure_official_launcher(
             {
                 "relative_path": "bin/R",
                 "sha256": "c" * 64,
-                "architectures": ["x86_64"],
+                "architectures": ["arm64"],
                 "install_id": None,
                 "load_commands": [],
             }
@@ -154,7 +154,7 @@ def test_profile_removes_exact_surfaces_and_records_evidence(monkeypatch, tmp_pa
     root = fixture_runtime(tmp_path)
     evidence = tmp_path / "profile.json"
     configure_machos(monkeypatch, profile, root)
-    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "x86_64")
+    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "arm64")
     data = json.loads(evidence.read_text())
     assert data["post_profile_exclusions"] == [
         "library/grDevices/libs/cairo.so",
@@ -173,11 +173,11 @@ def test_two_phase_profile_round_trips_through_its_schema_owner(monkeypatch, tmp
     quarantine = tmp_path / "quarantine.json"
     evidence = tmp_path / "profile.json"
 
-    profile.quarantine(root, quarantine, "4.6.1", "x86_64")
+    profile.quarantine(root, quarantine, "4.6.1", "arm64")
     profile.finalize(root, evidence, tmp_path / "manifest.json", quarantine)
     payload = json.loads(evidence.read_text(encoding="utf-8"))
     profile.validate_profile_evidence(
-        payload, expected_r_version="4.6.1", expected_architecture="x86_64"
+        payload, expected_r_version="4.6.1", expected_architecture="arm64"
     )
 
     assert payload["policy"] == profile.PROFILE_POLICY
@@ -198,7 +198,7 @@ def test_profile_rejects_unexpected_x11_owner(monkeypatch, tmp_path):
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
 
@@ -207,7 +207,7 @@ def test_profile_allows_non_tcl_opt_r_for_relocation(monkeypatch, tmp_path):
     root = fixture_runtime(tmp_path)
     evidence = tmp_path / "profile.json"
     configure_machos(monkeypatch, profile, root, non_tcl_opt_r=True)
-    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "x86_64")
+    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "arm64")
     assert (
         "library/extra/libs/extra.so"
         in json.loads(evidence.read_text())["allowed_non_tcl_opt_r_dependencies"]
@@ -252,7 +252,7 @@ def test_profile_rejects_changed_exclusion_dependency_family(
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
 
@@ -284,19 +284,19 @@ def test_profile_rejects_non_thin_excluded_macho(monkeypatch, tmp_path):
         lambda path, parent: {
             **original(path, parent),
             "architectures": (
-                ["x86_64", "arm64"]
+                ["arm64", "x86_64"]
                 if path.name == "R_de.so"
                 else original(path, parent)["architectures"]
             ),
         },
     )
-    with pytest.raises(profile.ProfileError, match="not x86_64-only"):
+    with pytest.raises(profile.ProfileError, match="not arm64-only"):
         run_profile(profile,
             root,
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
 
@@ -307,14 +307,14 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(
     root = fixture_runtime(tmp_path)
     configure_machos(monkeypatch, profile, root)
     evidence = tmp_path / "profile.json"
-    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "x86_64")
+    run_profile(profile, root, evidence, tmp_path / "manifest.json", "4.6.1", "arm64")
     source = json.loads(evidence.read_text())["source_framework"]
     assert source["canonical_macho"]["relative_path"] == "lib/libR.dylib"
-    assert source["canonical_macho"]["architectures"] == ["x86_64"]
+    assert source["canonical_macho"]["architectures"] == ["arm64"]
     assert source["executable_macho"]["relative_path"] == "bin/exec/R"
-    assert source["executable_macho"]["architectures"] == ["x86_64"]
+    assert source["executable_macho"]["architectures"] == ["arm64"]
     assert source["rscript_macho"]["relative_path"] == "bin/Rscript"
-    assert source["rscript_macho"]["architectures"] == ["x86_64"]
+    assert source["rscript_macho"]["architectures"] == ["arm64"]
     assert source["launcher"]["relative_path"] == "bin/R"
     assert source["launcher"]["kind"] == "script"
 
@@ -327,7 +327,7 @@ def test_profile_classifies_launcher_separately_from_canonical_lib_r(
         official_evidence,
         tmp_path / "manifest.json",
         "4.6.1",
-        "x86_64",
+        "arm64",
         official_framework_layout=True,
     )
     official_launcher = json.loads(official_evidence.read_text())["source_framework"][
@@ -352,7 +352,7 @@ def test_profile_rejects_official_layout_without_canonical_lib_r(monkeypatch, tm
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
 
@@ -401,7 +401,7 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
     official_root = fixture_runtime(tmp_path / "official-non-macho")
@@ -416,7 +416,7 @@ def test_profile_rejects_reversed_launcher_and_executable_classification(
             tmp_path / "official-profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
             official_framework_layout=True,
         )
 
@@ -442,7 +442,7 @@ def test_profile_does_not_send_java_classfiles_to_otool(monkeypatch, tmp_path):
             tmp_path / "wrong-alias-profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
             official_framework_layout=True,
         )
 
@@ -458,21 +458,21 @@ def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
         lambda path, parent: {
             **original(path, parent),
             "architectures": (
-                ["arm64"]
+                ["x86_64"]
                 if path == root / "bin/exec/R"
                 else original(path, parent)["architectures"]
             ),
         },
     )
     with pytest.raises(
-        profile.ProfileError, match="bin/exec/R executable must be x86_64-only"
+        profile.ProfileError, match="bin/exec/R executable must be arm64-only"
     ):
         run_profile(profile,
             root,
             tmp_path / "profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
         )
 
     official_root = fixture_runtime(tmp_path / "official-wrong-arch")
@@ -485,20 +485,20 @@ def test_profile_rejects_wrong_architecture_r_executable(monkeypatch, tmp_path):
         lambda path, parent: {
             **original(path, parent),
             "architectures": (
-                ["arm64"]
+                ["x86_64"]
                 if path == official_root / "bin/Rscript"
                 else original(path, parent)["architectures"]
             ),
         },
     )
     with pytest.raises(
-        profile.ProfileError, match="bin/Rscript executable must be x86_64-only"
+        profile.ProfileError, match="bin/Rscript executable must be arm64-only"
     ):
         run_profile(profile,
             official_root,
             tmp_path / "official-profile.json",
             tmp_path / "manifest.json",
             "4.6.1",
-            "x86_64",
+            "arm64",
             official_framework_layout=True,
         )
