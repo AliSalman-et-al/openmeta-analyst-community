@@ -351,20 +351,26 @@ def _validate_windows_payload_layout(
     app_root: Path, all_files: list[Path]
 ) -> dict[str, str]:
     relative_files = [_relative(path, app_root) for path in all_files]
-    forbidden_binding = [
-        name
-        for name in relative_files
+    _validate_forbidden_windows_files(relative_files)
+    _validate_generated_windows_files(relative_files)
+    return _windows_project_schemas(app_root)
+
+
+def _validate_forbidden_windows_files(relative_files: list[str]) -> None:
+    forbidden = [
+        name for name in relative_files
         if any(binding in name.lower() for binding in FORBIDDEN_BINDINGS)
         or "qt5" in Path(name).name.lower()
     ]
-    if forbidden_binding:
+    if forbidden:
         raise DeploymentInspectionError(
-            "mixed or legacy Qt binding payload is forbidden: "
-            + ", ".join(forbidden_binding)
+            "mixed or legacy Qt binding payload is forbidden: " + ", ".join(forbidden)
         )
-    generated_sources = [
-        name
-        for name in relative_files
+
+
+def _validate_generated_windows_files(relative_files: list[str]) -> None:
+    generated = [
+        name for name in relative_files
         if Path(name).suffix.lower() in FORBIDDEN_GENERATED_SOURCE_SUFFIXES
         and (
             "/forms/ui_" in f"/{name.lower()}"
@@ -372,11 +378,13 @@ def _validate_windows_payload_layout(
             or name.lower().endswith("icons_rc.pyc")
         )
     ]
-    if generated_sources:
+    if generated:
         raise DeploymentInspectionError(
-            "development-only generated sources are forbidden: "
-            + ", ".join(generated_sources)
+            "development-only generated sources are forbidden: " + ", ".join(generated)
         )
+
+
+def _windows_project_schemas(app_root: Path) -> dict[str, str]:
     project_schema_root = app_root / "_internal" / "rc_metastudio" / "project_schemas" / "v1"
     project_schemas = {
         path.name: sha256_file(path)
@@ -395,20 +403,7 @@ def _inspect_windows_plugins(
     app_root: Path, qt_root: Path, locked_qt_root: Path, all_files: list[Path]
 ) -> tuple[dict[str, list[str]], list[Path], dict[str, str]]:
     plugins_root = qt_root / "plugins"
-    plugin_manifest: dict[str, list[str]] = {}
-    for family, required_names in REQUIRED_PLUGINS.items():
-        family_root = plugins_root / family
-        found = {
-            path.name.lower()
-            for path in family_root.iterdir()
-            if family_root.is_dir() and path.is_file()
-        } if family_root.is_dir() else set()
-        missing = sorted(required_names - found)
-        if missing:
-            raise DeploymentInspectionError(
-                f"missing required Qt {family} plugins: {', '.join(missing)}"
-            )
-        plugin_manifest[family] = sorted(found)
+    plugin_manifest = _windows_plugin_manifest(plugins_root)
     packaged_plugins = sorted(
         path for path in plugins_root.rglob("*")
         if path.is_file() and path.suffix.lower() == ".dll"
@@ -421,6 +416,34 @@ def _inspect_windows_plugins(
     _validate_windows_plugin_locations(
         app_root, qt_root, plugins_root, all_files, packaged_plugins, locked_plugins
     )
+    hashes = _windows_plugin_hashes(
+        app_root, plugins_root, packaged_plugins, locked_plugins, locked_plugins_root
+    )
+    return plugin_manifest, packaged_plugins, hashes
+
+
+def _windows_plugin_manifest(plugins_root: Path) -> dict[str, list[str]]:
+    manifest: dict[str, list[str]] = {}
+    for family, required_names in REQUIRED_PLUGINS.items():
+        family_root = plugins_root / family
+        found = {
+            path.name.lower()
+            for path in family_root.iterdir()
+            if family_root.is_dir() and path.is_file()
+        } if family_root.is_dir() else set()
+        missing = sorted(required_names - found)
+        if missing:
+            raise DeploymentInspectionError(
+                f"missing required Qt {family} plugins: {', '.join(missing)}"
+            )
+        manifest[family] = sorted(found)
+    return manifest
+
+
+def _windows_plugin_hashes(
+    app_root: Path, plugins_root: Path, packaged_plugins: list[Path],
+    locked_plugins: list[Path], locked_plugins_root: Path,
+) -> dict[str, str]:
     locked_by_relative = {
         _relative(path, locked_plugins_root).casefold(): path
         for path in locked_plugins
@@ -434,10 +457,20 @@ def _inspect_windows_plugins(
                 "Qt plugin identity differs from the locked wheel: " + relative_plugin
             )
         hashes[_relative(packaged_plugin, app_root)] = sha256_file(packaged_plugin)
-    return plugin_manifest, packaged_plugins, hashes
+    return hashes
 
 
 def _validate_windows_plugin_locations(
+    app_root: Path, qt_root: Path, plugins_root: Path, all_files: list[Path],
+    packaged_plugins: list[Path], locked_plugins: list[Path],
+) -> None:
+    _validate_windows_duplicate_plugins(
+        app_root, qt_root, plugins_root, all_files, packaged_plugins, locked_plugins
+    )
+    _validate_windows_external_plugins(app_root, plugins_root, all_files)
+
+
+def _validate_windows_duplicate_plugins(
     app_root: Path, qt_root: Path, plugins_root: Path, all_files: list[Path],
     packaged_plugins: list[Path], locked_plugins: list[Path],
 ) -> None:
@@ -457,6 +490,11 @@ def _validate_windows_plugin_locations(
             "Qt plugins must occur exactly once under the authoritative plugin root: "
             + json.dumps(duplicates, sort_keys=True)
         )
+
+
+def _validate_windows_external_plugins(
+    app_root: Path, plugins_root: Path, all_files: list[Path]
+) -> None:
     outside = [
         path for path in all_files
         if path.suffix.lower() == ".dll"
@@ -500,6 +538,15 @@ def _validate_windows_qt_libraries(
     app_root: Path, qt_root: Path, locked_qt_root: Path,
     qt_libraries: dict[str, list[str]],
 ) -> dict[str, str]:
+    _validate_windows_qt_library_layout(app_root, qt_root, qt_libraries)
+    return _windows_qt_library_hashes(
+        app_root, locked_qt_root, qt_libraries
+    )
+
+
+def _validate_windows_qt_library_layout(
+    app_root: Path, qt_root: Path, qt_libraries: dict[str, list[str]]
+) -> None:
     duplicates = {
         name: paths for name, paths in qt_libraries.items() if len(paths) != 1
     }
@@ -521,13 +568,13 @@ def _validate_windows_qt_libraries(
             "Qt6 libraries exist outside the authoritative runtime: "
             + ", ".join(misplaced)
         )
+
+
+def _windows_qt_library_hashes(
+    app_root: Path, locked_qt_root: Path, qt_libraries: dict[str, list[str]]
+) -> dict[str, str]:
     locked_qt_bin = locked_qt_root / "bin"
-    locked = {
-        path.name.casefold(): path
-        for path in locked_qt_bin.iterdir()
-        if locked_qt_bin.is_dir() and path.is_file()
-        and path.name.lower().startswith("qt6") and path.suffix.lower() == ".dll"
-    } if locked_qt_bin.is_dir() else {}
+    locked = _locked_windows_qt_libraries(locked_qt_bin)
     hashes = {}
     for name, paths in sorted(qt_libraries.items()):
         packaged = app_root / paths[0]
@@ -540,14 +587,34 @@ def _validate_windows_qt_libraries(
     return hashes
 
 
+def _locked_windows_qt_libraries(locked_qt_bin: Path) -> dict[str, Path]:
+    if not locked_qt_bin.is_dir():
+        return {}
+    return {
+        path.name.casefold(): path
+        for path in locked_qt_bin.iterdir()
+        if path.is_file()
+        and path.name.lower().startswith("qt6")
+        and path.suffix.lower() == ".dll"
+    }
+
+
 def _validate_windows_stack(
     app_root: Path, qt_root: Path, all_files: list[Path], versions: dict[str, str],
     source_commit: str, source_provenance: dict | None, runtime_probe: dict,
 ) -> None:
-    required_stack = {"python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"}
-    if set(versions) != required_stack or any(not value for value in versions.values()):
+    _validate_windows_versions(versions, source_commit)
+    _validate_windows_rpy2_payload(all_files)
+    _validate_runtime_probe(runtime_probe, app_root=app_root, qt_root=qt_root)
+    if not _valid_source_provenance(source_provenance, source_commit):
+        raise DeploymentInspectionError("source provenance is invalid")
+
+
+def _validate_windows_versions(versions: dict[str, str], source_commit: str) -> None:
+    required = {"python", "pyqt6", "qt", "sip", "sip_runtime", "r", "rpy2", "pyinstaller"}
+    if set(versions) != required or any(not value for value in versions.values()):
         raise DeploymentInspectionError(
-            "version evidence must contain exactly: " + ", ".join(sorted(required_stack))
+            "version evidence must contain exactly: " + ", ".join(sorted(required))
         )
     if versions != EXPECTED_VERSIONS:
         raise DeploymentInspectionError(
@@ -556,15 +623,15 @@ def _validate_windows_stack(
         )
     if len(source_commit) != 40 or any(character not in "0123456789abcdef" for character in source_commit.lower()):
         raise DeploymentInspectionError("source commit must be a full Git SHA")
+
+
+def _validate_windows_rpy2_payload(all_files: list[Path]) -> None:
     rpy2_api = [path for path in all_files if "_rinterface_cffi_api" in path.name.lower()]
     rpy2_abi = [path for path in all_files if "_rinterface_cffi_abi" in path.name.lower()]
     if len(rpy2_api) != 1 or rpy2_api[0].suffix.lower() != ".pyd" or rpy2_abi:
         raise DeploymentInspectionError(
             "deployment must contain exactly one rpy2 API bridge and no ABI fallback"
         )
-    _validate_runtime_probe(runtime_probe, app_root=app_root, qt_root=qt_root)
-    if not _valid_source_provenance(source_provenance, source_commit):
-        raise DeploymentInspectionError("source provenance is invalid")
 
 
 def _runtime_probe_api_bridge(runtime_probe: dict) -> PurePosixPath:
@@ -640,18 +707,19 @@ def _validate_windows_probe_python(python: dict, probe_path) -> None:
 def _validate_windows_probe_qt(qt: dict, probe_path) -> None:
     plugins_root = PurePosixPath("_internal/PyQt6/Qt6/plugins")
     library_paths = {probe_path(value) for value in qt.get("library_paths", [])}
-    if (
-        qt.get("pyqt_version") != EXPECTED_VERSIONS["pyqt6"]
-        or qt.get("compiled_qt_version") != "6.11.0"
-        or qt.get("runtime_qt_version") != EXPECTED_VERSIONS["qt"]
-        or qt.get("sip_runtime_version") != EXPECTED_VERSIONS["sip_runtime"]
-        or qt.get("platform_plugin") != "windows"
-        or probe_path(qt.get("plugins_path")) != plugins_root
-        or plugins_root not in library_paths
-        or qt.get("scale_factor_environment") is not None
-        or float(qt.get("baseline_device_pixel_ratio", 0)) <= 0
-        or float(qt.get("baseline_logical_dpi", 0)) <= 0
-    ):
+    valid = all((
+        qt.get("pyqt_version") == EXPECTED_VERSIONS["pyqt6"],
+        qt.get("compiled_qt_version") == "6.11.0",
+        qt.get("runtime_qt_version") == EXPECTED_VERSIONS["qt"],
+        qt.get("sip_runtime_version") == EXPECTED_VERSIONS["sip_runtime"],
+        qt.get("platform_plugin") == "windows",
+        probe_path(qt.get("plugins_path")) == plugins_root,
+        plugins_root in library_paths,
+        qt.get("scale_factor_environment") is None,
+        float(qt.get("baseline_device_pixel_ratio", 0)) > 0,
+        float(qt.get("baseline_logical_dpi", 0)) > 0,
+    ))
+    if not valid:
         raise DeploymentInspectionError(
             "frozen Qt runtime probe does not match the assembled artifact"
         )
@@ -701,16 +769,17 @@ def _validate_windows_probe_r(r: dict, probe_path, app_root: Path) -> None:
     expected_r_home = PurePosixPath("R")
     expected_r_library = PurePosixPath("R/library")
     r_libraries = {probe_path(value) for value in r.get("library_paths", [])}
-    if (
-        r.get("version") != EXPECTED_VERSIONS["r"]
-        or probe_path(r.get("home")) != expected_r_home
-        or probe_path(r.get("configured_home")) != expected_r_home
-        or probe_path(r.get("configured_library")) != expected_r_library
-        or expected_r_library not in r_libraries
-        or r.get("lc_numeric") != "C"
-        or probe_path(r.get("shared_library_path")) != PurePosixPath("R/bin/x64/R.dll")
-        or not (app_root / "R/bin/x64/R.dll").is_file()
-    ):
+    valid = all((
+        r.get("version") == EXPECTED_VERSIONS["r"],
+        probe_path(r.get("home")) == expected_r_home,
+        probe_path(r.get("configured_home")) == expected_r_home,
+        probe_path(r.get("configured_library")) == expected_r_library,
+        expected_r_library in r_libraries,
+        r.get("lc_numeric") == "C",
+        probe_path(r.get("shared_library_path")) == PurePosixPath("R/bin/x64/R.dll"),
+        (app_root / "R/bin/x64/R.dll").is_file(),
+    ))
+    if not valid:
         raise DeploymentInspectionError(
             "frozen R runtime probe does not use the bundled R runtime/library"
         )
@@ -897,48 +966,48 @@ def _windows_workflow_valid(
         "automation_entry_point", "representative_edit", "real_r_analysis",
         "result_text", "save_reopen", "analysis_after_reopen",
     }
-    return (
-        smoke.get("passed") is True
-        and required <= set(workflows)
-        and all(workflows[name] is True for name in true_flags)
-        and workflows.get("converted_sample") == "amino.rcms"
-        and expected_summary is not None
-        and workflows.get("expected_normalized_summary_sha256") == expected_summary
-        and workflows.get("normalized_summary_sha256") == expected_summary
-        and _valid_sha256(workflows.get("raw_summary_sha256"))
-        and _valid_sha256_map(workflows.get("svg_sha256"))
-        and _valid_locale_variants(
+    return all((
+        smoke.get("passed") is True,
+        required <= set(workflows),
+        all(workflows[name] is True for name in true_flags),
+        workflows.get("converted_sample") == "amino.rcms",
+        expected_summary is not None,
+        workflows.get("expected_normalized_summary_sha256") == expected_summary,
+        workflows.get("normalized_summary_sha256") == expected_summary,
+        _valid_sha256(workflows.get("raw_summary_sha256")),
+        _valid_sha256_map(workflows.get("svg_sha256")),
+        _valid_locale_variants(
             workflows.get("locale_variants"), workflows, expected_summary
-        )
-        and _valid_sample_projects(workflows.get("sample_projects"))
-        and smoke.get("execution") == {
+        ),
+        _valid_sample_projects(workflows.get("sample_projects")),
+        smoke.get("execution") == {
             "automation_exit_code": 0,
             "positional_user_entry_exit_code": 0,
             "scale_exit_codes": {"1.25": 0, "1.50": 0, "1.75": 0},
             "post_close_marker": True,
             "clean_exit": True,
-        }
-    )
+        },
+    ))
 
 
 def _windows_scale_valid(item: dict) -> bool:
-    return (
-        item.get("binary_resources") is True
-        and item.get("locale") == "de_DE"
-        and item.get("platform_plugin") == "windows"
-        and _valid_windows_accessibility(item.get("accessibility"))
-        and "schannel" in [str(value).lower() for value in item.get("tls_backends", [])]
-        and bool(item.get("active_style"))
-        and bool(item.get("available_styles"))
-        and {"ico", "jpeg", "svg"} <= set(item.get("image_formats", []))
-        and abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))) <= 1e-9
-        and float(item.get("baseline_device_pixel_ratio", 0)) > 0
-        and abs(
+    return all((
+        item.get("binary_resources") is True,
+        item.get("locale") == "de_DE",
+        item.get("platform_plugin") == "windows",
+        _valid_windows_accessibility(item.get("accessibility")),
+        "schannel" in [str(value).lower() for value in item.get("tls_backends", [])],
+        bool(item.get("active_style")),
+        bool(item.get("available_styles")),
+        {"ico", "jpeg", "svg"} <= set(item.get("image_formats", [])),
+        abs(float(item.get("qt_scale_factor", 0)) - float(item.get("requested", -1))) <= 1e-9,
+        float(item.get("baseline_device_pixel_ratio", 0)) > 0,
+        abs(
             float(item.get("device_pixel_ratio", 0))
             - float(item.get("baseline_device_pixel_ratio", -1))
             * float(item.get("requested", -1))
-        ) <= 0.05
-    )
+        ) <= 0.05,
+    ))
 
 
 def _windows_log_markers_valid(log_text: str) -> bool:
