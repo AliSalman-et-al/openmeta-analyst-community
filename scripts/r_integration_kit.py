@@ -897,7 +897,7 @@ def _windows_native_record(path: Path, relative: str) -> dict[str, object]:
 def _macos_native_record(
     path: Path, relative: str, target: str, architecture: str
 ) -> dict[str, object] | None:
-    from scripts.qt6_macos_feasibility_impl import is_macho_candidate
+    from rc_metastudio.macos_macho import is_macho_candidate
 
     if not is_macho_candidate(path):
         return None

@@ -17,18 +17,13 @@ import subprocess
 import sys
 from typing import Callable, cast
 
-from rc_metastudio.macos_macho import (
-    is_macho_candidate as _is_macho_candidate,
-    is_valid_java_class as _is_valid_java_class,
-)
 from scripts.macos_evidence import (
     EXPECTED_VERSIONS,
-    EvidenceError,  # noqa: F401 - preserved public import for callers
+    _archs as _evidence_archs,
     MAX_DEPLOYMENT_BYTES,
     MAX_DEPLOYMENT_FILES,
     MAX_RETAINED_NATIVE_BYTES,
     TARGET_MACHINES,
-    _archs as _evidence_archs,
     _sha256,
     validate_evidence as _validate_evidence,
 )
@@ -47,33 +42,6 @@ RUNNER_KEYS = {
     "github_runner_arch",
     "runner_image",
 }
-
-
-def is_valid_java_class(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Java ClassFile discriminator."""
-    return _is_valid_java_class(path)
-
-
-def is_macho_candidate(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Mach-O discriminator."""
-    return _is_macho_candidate(path)
-
-
-def _archs(path: Path) -> list[str]:
-    """Compatibility wrapper preserving the feasibility error contract."""
-    return _evidence_archs(path)
-
-
-def validate_evidence(
-    evidence: object, target: str, *, evidence_dir: Path | None = None
-) -> None:
-    """Validate evidence through the pure contract with runner-local seams."""
-    _validate_evidence(
-        evidence,
-        target,
-        evidence_dir=evidence_dir,
-        architecture_reader=_archs,
-    )
 
 
 def _run(
@@ -337,7 +305,7 @@ def _retain_native_components(evidence_dir: Path) -> dict[str, dict[str, object]
                     "retained_path": destination.relative_to(evidence_dir).as_posix(),
                     "size": destination.stat().st_size,
                     "sha256": _sha256(destination),
-                    "architectures": _archs(destination),
+                    "architectures": _evidence_archs(destination),
                 }
             )
         inventory[name] = {
@@ -449,7 +417,7 @@ def _retained_record(
         "retained_path": path.relative_to(evidence_dir).as_posix(),
         "size": path.stat().st_size,
         "sha256": _sha256(path),
-        **({"architectures": _archs(path)} if architectures else {}),
+        **({"architectures": _evidence_archs(path)} if architectures else {}),
     }
 
 
@@ -863,7 +831,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, object]:
             "path": path.name,
             "sha256": _sha256(path),
         }
-    validate_evidence(evidence, target, evidence_dir=evidence_dir)
+    _validate_evidence(evidence, target, evidence_dir=evidence_dir)
     output = evidence_dir / "evidence.json"
     output.write_text(
         json.dumps(evidence, indent=2, sort_keys=True) + "\n",
@@ -903,7 +871,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(json.dumps(record, sort_keys=True))
         return 0
     evidence = json.loads(options.evidence.read_text(encoding="utf-8"))
-    validate_evidence(evidence, options.target, evidence_dir=options.evidence.parent)
+    _validate_evidence(evidence, options.target, evidence_dir=options.evidence.parent)
     return 0
 
 

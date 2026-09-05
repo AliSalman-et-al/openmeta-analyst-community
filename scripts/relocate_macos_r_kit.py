@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from scripts.qt6_macos_feasibility_impl import is_macho_candidate
+from rc_metastudio.macos_macho import is_macho_candidate
 
 
 def dependencies(path: Path) -> list[str]:

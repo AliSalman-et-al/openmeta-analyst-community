@@ -16,12 +16,7 @@ import posixpath
 import re
 from typing import Callable, NoReturn, cast
 
-from rc_metastudio.macos_macho import (
-    MachOError,
-    architectures as _macho_architectures,
-    is_macho_candidate as _is_macho_candidate,
-    is_valid_java_class as _is_valid_java_class,
-)
+from rc_metastudio.macos_macho import MachOError, architectures as _macho_architectures
 
 EXPECTED_VERSIONS = {
     "python": "3.11.9",
@@ -69,16 +64,6 @@ MAX_RETAINED_NATIVE_BYTES = 100_000_000
 
 class EvidenceError(RuntimeError):
     """Raised when native evidence cannot substantiate the locked contract."""
-
-
-def is_valid_java_class(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Java ClassFile discriminator."""
-    return _is_valid_java_class(path)
-
-
-def is_macho_candidate(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Mach-O discriminator."""
-    return _is_macho_candidate(path)
 
 
 def _fail(message: str) -> NoReturn:

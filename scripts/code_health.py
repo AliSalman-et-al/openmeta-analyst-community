@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Emit deterministic Python and R code-health metrics and changed-code gates.
 
 The command uses the locked development analyzers for Python and a deterministic

@@ -483,29 +483,6 @@ def finalize(
     )
 
 
-def profile(
-    resources: Path,
-    evidence: Path,
-    manifest_path: Path,
-    r_version: str,
-    architecture: str,
-    source_resources: Path | None = None,
-    *,
-    official_framework_layout: bool = False,
-) -> None:
-    """Backward-compatible one-shot profile for existing fixtures."""
-    quarantine_path = evidence.with_suffix(evidence.suffix + ".quarantine")
-    quarantine(
-        resources,
-        quarantine_path,
-        r_version,
-        architecture,
-        source_resources,
-        official_framework_layout=official_framework_layout,
-    )
-    finalize(resources, evidence, manifest_path, quarantine_path)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("phase", choices=("quarantine", "finalize"))

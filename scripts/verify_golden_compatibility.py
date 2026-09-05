@@ -16,7 +16,7 @@ from pathlib import PurePosixPath
 import shutil
 import stat
 import sys
-from typing import Any, TypeAlias, TypedDict, cast
+from typing import TypeAlias, TypedDict, cast
 import zipfile
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -112,6 +112,27 @@ class CaptureManifest(TypedDict, total=False):
 
 class ExceptionManifest(TypedDict, total=False):
     exceptions: list[JsonObject]
+
+
+class GoldenCapture(TypedDict):
+    curated_golden_set: list[JsonObject]
+    passed: bool
+
+
+class ComparisonReport(TypedDict):
+    rows: list[JsonObject]
+    passed: bool
+
+
+class CompatibilityReport(TypedDict):
+    baseline: str
+    case_count: int
+    comparison_count: int
+    capture_passed: bool
+    comparison: ComparisonReport
+    numeric_contract: JsonObject
+    rpy2_identities: dict[str, str]
+    passed: bool
 
 
 def _load_json(path: Path) -> JsonValue:
@@ -339,13 +360,12 @@ def _prepare_output_root(root: Path, requested: Path) -> Path:
     return output_root
 
 
-def _validate_internal_manifest(reference: object) -> FrozenGoldenReference:
+def _validate_internal_manifest(reference: JsonValue) -> FrozenGoldenReference:
     if not isinstance(reference, dict):
         raise ValueError("frozen internal manifest has the wrong schema")
-    record = cast(dict[str, object], reference)
-    if record.get("baseline") != "comprehensive-golden":
+    if reference.get("baseline") != "comprehensive-golden":
         raise ValueError("frozen internal manifest has the wrong schema")
-    rows = record.get("curated_golden_set")
+    rows = reference.get("curated_golden_set")
     if not isinstance(rows, list) or len(rows) != 11:
         raise ValueError("frozen internal manifest must contain exactly 11 cases")
     ids = []
@@ -353,7 +373,6 @@ def _validate_internal_manifest(reference: object) -> FrozenGoldenReference:
     for raw_row in rows:
         if not isinstance(raw_row, dict):
             raise ValueError("frozen case is malformed or unsuccessful")
-        raw_row = cast(JsonObject, raw_row)
         status = raw_row.get("status")
         if status != "success":
             raise ValueError("frozen case is malformed or unsuccessful")
@@ -551,10 +570,16 @@ def _load_plot_descriptor_contract(
     return contract
 
 
-def _canonical_json_bytes(value: Any) -> bytes:
+def _canonical_json_bytes(value: object) -> bytes:
     return (
         json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     ).encode("utf-8")
+
+
+def _copy_json_object(value: JsonValue) -> JsonObject:
+    if not isinstance(value, dict):
+        raise ValueError("expected a JSON object")
+    return copy.deepcopy(value)
 
 
 def _load_numeric_contract(
@@ -683,8 +708,10 @@ def _reference_with_numeric_contract(
     expected = copy.deepcopy(reference)
     by_id = {case["id"]: case for case in contract["cases"]}
     for row in expected["curated_golden_set"]:
-        row["outputs"] = cast(JsonObject, copy.deepcopy(by_id[row["id"]]["sections"]))
-        row["numeric_tolerance_policy"] = copy.deepcopy(contract["tolerance_policy"])
+        row["outputs"] = _copy_json_object(by_id[row["id"]]["sections"])
+        row["numeric_tolerance_policy"] = _copy_json_object(
+            contract["tolerance_policy"]
+        )
     return expected
 
 
@@ -715,26 +742,40 @@ def _validate_rpy2_identities(root: Path) -> dict[str, str]:
 
 
 def _compare_plot_descriptors(
-    contract: PlotDescriptorContract, current: dict[str, Any]
-) -> list[dict[str, Any]]:
+    contract: PlotDescriptorContract, current: GoldenCapture
+) -> list[JsonObject]:
     rows = []
-    current_by_id = {row["id"]: row for row in current["curated_golden_set"]}
+    current_by_id: dict[str, JsonObject] = {}
+    for row in current["curated_golden_set"]:
+        case_id = row.get("id")
+        if isinstance(case_id, str):
+            current_by_id[case_id] = row
     for expected in contract["rows"]:
-        case_id = expected["id"]
-        actual_descriptors = current_by_id.get(case_id, {}).get("plot_descriptors", [])
+        case_id = expected.get("id")
+        if not isinstance(case_id, str):
+            raise ValueError("plot descriptor contract case id is malformed")
+        current_case = current_by_id.get(case_id, {})
+        actual_descriptors = current_case.get("plot_descriptors", [])
+        if not isinstance(actual_descriptors, list):
+            actual_descriptors = []
         actual_by_label = {
-            descriptor.get("artifact_label"): descriptor
+            descriptor["artifact_label"]: descriptor
             for descriptor in actual_descriptors
             if isinstance(descriptor, dict)
+            and isinstance(descriptor.get("artifact_label"), str)
         }
-        expected_label = expected["artifact_label"]
+        expected_label = expected.get("artifact_label")
+        if not isinstance(expected_label, str):
+            raise ValueError("plot descriptor contract artifact label is malformed")
         actual = actual_by_label.get(expected_label)
         passed = actual is not None
         detail = "Plot descriptor matched the committed oracle-bound contract."
         if actual is None:
             detail = "Required plot descriptor is missing."
         else:
-            display = actual.get("display", {})
+            display = actual.get("display")
+            if not isinstance(display, dict):
+                display = {}
             projected_display = {
                 "content_required": bool(display.get("sha256")),
                 "identity": display.get("identity"),
@@ -743,8 +784,8 @@ def _compare_plot_descriptors(
             }
             sha256 = display.get("sha256")
             passed = (
-                projected_display == expected["display"]
-                and actual.get("capability") == expected["capability"]
+                projected_display == expected.get("display")
+                and actual.get("capability") == expected.get("capability")
                 and isinstance(sha256, str)
                 and len(sha256) == 64
                 and all(character in "0123456789abcdef" for character in sha256)
@@ -759,18 +800,18 @@ def _compare_plot_descriptors(
         rows.append(
             {
                 "classification": "pass" if passed else "text_artifact_drift",
-                "dataset": current_by_id.get(case_id, {}).get("dataset"),
+                "dataset": current_case.get("dataset"),
                 "detail": detail,
                 "id": case_id,
-                "method": current_by_id.get(case_id, {}).get("method"),
-                "metric": current_by_id.get(case_id, {}).get("metric"),
+                "method": current_case.get("method"),
+                "metric": current_case.get("metric"),
             }
         )
     return rows
 
 
 def _validate_current_rpy2_identities(
-    current: dict[str, Any], expected: dict[str, str]
+    current: GoldenCapture, expected: dict[str, str]
 ) -> None:
     for case in current.get("curated_golden_set", []):
         case_id = case.get("id", "<unknown>")
@@ -778,9 +819,15 @@ def _validate_current_rpy2_identities(
             identities = case.get(field)
             if not isinstance(identities, dict):
                 raise ValueError("%s is missing %s" % (case_id, field))
-            observed = {
-                distribution: identities.get(distribution) for distribution in expected
-            }
+            observed = {}
+            for distribution in expected:
+                value = identities.get(distribution)
+                if not isinstance(value, str):
+                    raise ValueError(
+                        "%s %s rpy2 identities contain a non-string value"
+                        % (case_id, field)
+                    )
+                observed[distribution] = value
             if observed != expected:
                 raise ValueError(
                     "%s %s rpy2 identities do not match the locked runtime"
@@ -789,7 +836,7 @@ def _validate_current_rpy2_identities(
 
 
 def _validate_case_contract(
-    reference: FrozenGoldenReference, current: dict[str, Any], root: Path
+    reference: FrozenGoldenReference, current: GoldenCapture, root: Path
 ) -> None:
     committed = _load_capture_manifest(
         root / "tests/analysis_regression/baseline/capture-manifest.json"
@@ -820,7 +867,35 @@ def _numeric_metric_count(contract: NumericContract) -> int:
     return count
 
 
-def verify(root: Path, output_root: Path) -> dict[str, Any]:
+def _validate_capture(value: object) -> GoldenCapture:
+    record = _json_object(_narrow_json(value), "Golden capture must contain an object")
+    cases = record.get("curated_golden_set")
+    passed = record.get("passed")
+    if not isinstance(cases, list) or not isinstance(passed, bool):
+        raise ValueError("Golden capture has an invalid shape")
+    case_records: list[JsonObject] = []
+    for case in cases:
+        if not isinstance(case, dict) or not isinstance(case.get("id"), str):
+            raise ValueError("Golden capture cases must contain string ids")
+        case_records.append(case)
+    return {"curated_golden_set": case_records, "passed": passed}
+
+
+def _validate_comparison(value: object) -> ComparisonReport:
+    record = _json_object(_narrow_json(value), "Golden comparison must contain an object")
+    rows = record.get("rows")
+    passed = record.get("passed")
+    if not isinstance(rows, list) or not isinstance(passed, bool):
+        raise ValueError("Golden comparison has an invalid shape")
+    row_records: list[JsonObject] = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("classification"), str):
+            raise ValueError("Golden comparison rows must contain classifications")
+        row_records.append(row)
+    return {"rows": row_records, "passed": passed}
+
+
+def verify(root: Path, output_root: Path) -> CompatibilityReport:
     root = root.resolve(strict=True)
     archive_path, reference = _load_frozen_reference(root)
     plot_contract = _load_plot_descriptor_contract(root, archive_path, reference)
@@ -828,12 +903,12 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
     comparison_reference = _reference_with_numeric_contract(reference, numeric_contract)
     rpy2_identities = _validate_rpy2_identities(root)
     output_root = _prepare_output_root(root, output_root)
-    current = golden_analysis.capture_comprehensive_golden_baseline(
+    current = _validate_capture(golden_analysis.capture_comprehensive_golden_baseline(
         output_dir=str(output_root), capture_mode="local-debug", root_dir=str(root)
-    )
+    ))
     _validate_current_rpy2_identities(current, rpy2_identities)
     _validate_case_contract(reference, current, root)
-    comparison = compare_golden_baseline(
+    comparison = _validate_comparison(compare_golden_baseline(
         comparison_reference,
         current,
         exceptions=_load_exception_manifest(
@@ -842,13 +917,13 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
         manifest=_load_capture_manifest(
             root / "tests/analysis_regression/baseline/capture-manifest.json"
         ),
-    )
+    ))
     comparison["rows"].extend(_compare_plot_descriptors(plot_contract, current))
     comparison["passed"] = all(
         row["classification"] in {"pass", "accepted_exception"}
         for row in comparison["rows"]
     )
-    report = {
+    report: CompatibilityReport = {
         "baseline": str(archive_path.relative_to(root)).replace("\\", "/"),
         "case_count": len(current["curated_golden_set"]),
         "comparison_count": len(comparison["rows"]),
