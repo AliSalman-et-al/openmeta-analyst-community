@@ -118,6 +118,10 @@ def _load_json(path: Path) -> JsonValue:
     return _narrow_json(json.loads(path.read_text(encoding="utf-8")))
 
 
+def _parse_json_bytes(payload: bytes) -> JsonValue:
+    return _narrow_json(json.loads(payload.decode("utf-8")))
+
+
 def _narrow_json(value: object) -> JsonValue:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
@@ -441,7 +445,7 @@ def _read_validated_zip(archive_path: Path) -> FrozenGoldenReference:
         if "manifest.json" not in names:
             raise ValueError("frozen ZIP has no internal manifest")
         reference = _validate_internal_manifest(
-            json.loads(archive.read("manifest.json").decode("utf-8"))
+            _parse_json_bytes(archive.read("manifest.json"))
         )
         expected_members = {"manifest.json"}
         for row in reference["curated_golden_set"]:
@@ -449,7 +453,7 @@ def _read_validated_zip(archive_path: Path) -> FrozenGoldenReference:
             expected_members.add(capture_member)
             if capture_member not in names:
                 raise ValueError("frozen case capture is missing")
-            if json.loads(archive.read(capture_member).decode("utf-8")) != row:
+            if _parse_json_bytes(archive.read(capture_member)) != row:
                 raise ValueError("frozen internal manifest and case capture disagree")
             for artifact in row["artifacts"]:
                 basename = Path(
