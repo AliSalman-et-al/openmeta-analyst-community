@@ -904,6 +904,28 @@ def test_frozen_startup_argv_keeps_existing_project_argument():
     assert launch._startup_project_path(argv) == sample_project
 
 
+def test_composition_configures_r_before_importing_main_window(monkeypatch, qapp):
+    from rc_metastudio import launch
+
+    events = []
+    monkeypatch.setattr(
+        launch.r_backend,
+        "install_r_backend",
+        lambda: events.append("r-runtime"),
+    )
+    monkeypatch.setattr(
+        launch,
+        "_import_main_window",
+        lambda: events.append("main-window") or object(),
+    )
+
+    app, main_window = launch._prepare_composition(qapp, None)
+
+    assert app is qapp
+    assert main_window is not None
+    assert events == ["r-runtime", "main-window"]
+
+
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_path):
     from rc_metastudio import automation
     from rc_metastudio import launch
@@ -990,6 +1012,11 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
         lambda: startup_events.append("main-window-import")
         or type("MainWindowModule", (), {"MainWindow": Window}),
     )
+    monkeypatch.setattr(
+        launch.r_backend,
+        "install_r_backend",
+        lambda: startup_events.append("r-runtime-ready"),
+    )
     monkeypatch.setattr(launch.QtWidgets, "QApplication", lambda argv: app)
     monkeypatch.setattr(launch, "QPixmap", lambda path: object())
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
@@ -1009,6 +1036,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert started == []
     assert closed == [True]
     assert startup_events == [
+        "r-runtime-ready",
         "main-window-import",
         "r-backend-ready",
         "workspace-marked-saved",

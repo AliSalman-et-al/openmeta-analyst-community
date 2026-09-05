@@ -235,6 +235,10 @@ def test_frozen_hook_contains_no_scenario_or_result_comparison_logic():
     assert "importlib.import_module" not in source
     assert "from rpy2" not in source
     assert "packaged_runtime_observation" in source
+    runtime_probe = source.split("def start_package_runtime_probe", 1)[1]
+    assert runtime_probe.index("configured = r_runtime.configure_bundled_r_environment()") < runtime_probe.index(
+        "from rc_metastudio import r_bridge"
+    )
 
 
 def test_package_pipelines_assemble_atomic_observations_before_validation():

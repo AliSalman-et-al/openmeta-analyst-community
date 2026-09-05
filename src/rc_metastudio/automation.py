@@ -154,11 +154,12 @@ def start_package_runtime_probe(output_path: str) -> int:
     """Observe the concrete runtime loaded by the packaged executable."""
     from PyQt6 import QtCore, sip
 
-    from rc_metastudio import project_format, r_bridge, r_runtime
+    from rc_metastudio import project_format, r_runtime
 
     for member in ("manifest.json", "project.json", "state.json"):
         project_format._schema(1, member)
     configured = r_runtime.configure_bundled_r_environment()
+    from rc_metastudio import r_bridge
 
     app = app_error_handler.get_or_create_application(sys.argv)
     from rc_metastudio.launch import configure_application

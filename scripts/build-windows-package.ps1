@@ -284,6 +284,11 @@ function Invoke-PackagedAppSmokeTest {
     $quotedSmokeEvidencePath = '"{0}"' -f $smokeEvidencePath
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $smokeEvidencePath) | Out-Null
     $previousEnv = @{
+        R_HOME = $env:R_HOME
+        R_LIBS = $env:R_LIBS
+        R_LIBS_USER = $env:R_LIBS_USER
+        RCMS_R_HOME = $env:RCMS_R_HOME
+        RCMS_R_LIBS = $env:RCMS_R_LIBS
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_STARTUP_PROJECT_SMOKE = $env:RCMS_STARTUP_PROJECT_SMOKE
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
@@ -294,6 +299,7 @@ function Invoke-PackagedAppSmokeTest {
         RCMS_PACKAGE_BASELINE_DPR = $env:RCMS_PACKAGE_BASELINE_DPR
     }
     try {
+        Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS -ErrorAction SilentlyContinue
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "API"
         $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $workflowObservationPath
@@ -481,12 +487,18 @@ function Invoke-PackagedRuntimeProbe {
     $probeStderrPath = Join-Path $Root "qualification\runtime-probe.stderr.log"
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $probePath) | Out-Null
     $previousEnv = @{
+        R_HOME = $env:R_HOME
+        R_LIBS = $env:R_LIBS
+        R_LIBS_USER = $env:R_LIBS_USER
+        RCMS_R_HOME = $env:RCMS_R_HOME
+        RCMS_R_LIBS = $env:RCMS_R_LIBS
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
         QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
     }
     try {
+        Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS -ErrorAction SilentlyContinue
         Remove-Item "Env:\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue
         $env:RPY2_CFFI_MODE = "API"
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"

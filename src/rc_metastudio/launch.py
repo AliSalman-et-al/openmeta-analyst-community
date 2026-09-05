@@ -317,6 +317,7 @@ def compose_application(
 
 
 def _prepare_composition(app, main_window_loader):
+    r_backend.install_r_backend()
     main_window = main_window_loader or _import_main_window()
     if app is None:
         app = app_error_handler.get_or_create_application(sys.argv)

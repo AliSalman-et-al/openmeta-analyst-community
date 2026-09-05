@@ -551,6 +551,12 @@ def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
 def test_windows_packager_restores_smoke_environment():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
 
+    for name in ("R_HOME", "R_LIBS", "R_LIBS_USER", "RCMS_R_HOME", "RCMS_R_LIBS"):
+        assert f"{name} = $env:{name}" in script
+    assert (
+        "Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS"
+        in script
+    )
     assert relative_order(
         script,
         "$previousEnv = @{",
