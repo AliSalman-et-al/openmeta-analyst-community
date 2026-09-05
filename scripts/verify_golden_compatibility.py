@@ -932,25 +932,36 @@ def _plot_observation(
     actual = actual_by_label.get(expected_label)
     if actual is None:
         return False, "Required plot descriptor is missing."
+    passed = _plot_display_matches(expected, actual)
+    detail = "Plot descriptor matched the committed oracle-bound contract."
+    if not passed:
+        detail = "Display identity/content or plot capability metadata drifted."
+    return passed, detail
+
+
+def _plot_display_matches(expected: JsonObject, actual: JsonObject) -> bool:
     display = actual.get("display")
-    display = display if isinstance(display, dict) else {}
+    if not isinstance(display, dict):
+        display = {}
     projected_display = {
         "content_required": bool(display.get("sha256")),
         "identity": display.get("identity"),
         "name": display.get("name"),
         "type": display.get("type"),
     }
-    sha256 = display.get("sha256")
-    valid_hash = (
-        isinstance(sha256, str)
-        and len(sha256) == 64
-        and all(character in "0123456789abcdef" for character in sha256)
+    return (
+        projected_display == expected.get("display")
+        and actual.get("capability") == expected.get("capability")
+        and _valid_plot_hash(display.get("sha256"))
     )
-    passed = projected_display == expected.get("display") and actual.get("capability") == expected.get("capability") and valid_hash
-    detail = "Plot descriptor matched the committed oracle-bound contract."
-    if not passed:
-        detail = "Display identity/content or plot capability metadata drifted."
-    return passed, detail
+
+
+def _valid_plot_hash(value: JsonValue | None) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 def _validate_current_rpy2_identities(
