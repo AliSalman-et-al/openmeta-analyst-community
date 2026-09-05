@@ -21,6 +21,40 @@ from rc_metastudio.result_text_identity import normalize_packaged_summary_identi
 
 PACKAGED_EDIT_VALUE = "Packaged Smoke – München"
 PACKAGED_ANALYSIS_METHOD = "binary.random"
+PACKAGED_PROCESS_TIMEOUT_SECONDS = 300
+
+
+def _run_packaged(
+    executable: Path,
+    arguments: list[str],
+    *,
+    environment: dict[str, str],
+    check: bool = True,
+    capture_output: bool = False,
+    text: bool = False,
+):
+    command = [str(executable), *arguments]
+    try:
+        return subprocess.run(
+            command,
+            check=check,
+            env=environment,
+            timeout=PACKAGED_PROCESS_TIMEOUT_SECONDS,
+            capture_output=capture_output,
+            text=text,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "packaged command timed out after "
+            f"{PACKAGED_PROCESS_TIMEOUT_SECONDS}s: {' '.join(command)}"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        detail = str(exc.stderr or exc.stdout or "").strip()
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(
+            f"packaged command failed with exit code {exc.returncode}: "
+            f"{' '.join(command)}{suffix}"
+        ) from exc
 
 
 def _sha256(value: str) -> str:
@@ -33,10 +67,10 @@ def capture_atomic_observations(
     """Run the shipped atomic probes; all orchestration stays in this script."""
     probe_environment = os.environ.copy()
     probe_environment.pop("QT_SCALE_FACTOR", None)
-    subprocess.run(
-        [str(executable), "--automation-package-runtime-probe", str(runtime_probe)],
-        check=True,
-        env=probe_environment,
+    _run_packaged(
+        executable,
+        ["--automation-package-runtime-probe", str(runtime_probe)],
+        environment=probe_environment,
     )
     surface_directory.mkdir(parents=True, exist_ok=True)
     records = []
@@ -48,10 +82,10 @@ def capture_atomic_observations(
         environment["QT_SCALE_FACTOR"] = scale
         environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline
         environment["RCMS_PACKAGE_LOCALE"] = "de_DE"
-        subprocess.run(
-            [str(executable), "--automation-package-surface-smoke", str(record), scale],
-            check=True,
-            env=environment,
+        _run_packaged(
+            executable,
+            ["--automation-package-surface-smoke", str(record), scale],
+            environment=environment,
         )
         records.append(record)
     return records
@@ -80,39 +114,49 @@ def _capture_workflow_operations(
     environment["RCMS_PACKAGE_LOCALE"] = "en_US"
     edit_path = operation_dir / "edit.json"
     edited_project = operation_dir / "edited.rcms"
-    subprocess.run(
-        [str(executable), "--automation-package-edit-save", str(edit_path), str(sample),
-         str(edited_project), "name", PACKAGED_EDIT_VALUE], check=True, env=environment
+    _run_packaged(
+        executable,
+        ["--automation-package-edit-save", str(edit_path), str(sample),
+         str(edited_project), "name", PACKAGED_EDIT_VALUE],
+        environment=environment,
     )
     observations["edit"] = json.loads(edit_path.read_text(encoding="utf-8"))
 
     analysis_path = operation_dir / "analysis-en.json"
-    subprocess.run(
-        [str(executable), "--automation-package-analyze", str(analysis_path), str(sample),
-         PACKAGED_ANALYSIS_METHOD], check=True, env=environment
+    _run_packaged(
+        executable,
+        ["--automation-package-analyze", str(analysis_path), str(sample),
+         PACKAGED_ANALYSIS_METHOD],
+        environment=environment,
     )
     observations["analysis_en"] = json.loads(analysis_path.read_text(encoding="utf-8"))
 
     locale_edit_path = operation_dir / "locale-edit.json"
     locale_project = operation_dir / "locale.rcms"
     locale_environment = dict(environment, RCMS_PACKAGE_LOCALE="de_DE")
-    subprocess.run(
-        [str(executable), "--automation-package-edit-save", str(locale_edit_path), str(sample),
-         str(locale_project), "raw-data-0", "1,2"], check=True, env=locale_environment
+    _run_packaged(
+        executable,
+        ["--automation-package-edit-save", str(locale_edit_path), str(sample),
+         str(locale_project), "raw-data-0", "1,0"],
+        environment=locale_environment,
     )
     observations["locale_edit"] = json.loads(locale_edit_path.read_text(encoding="utf-8"))
 
     locale_analysis_path = operation_dir / "analysis-de.json"
-    subprocess.run(
-        [str(executable), "--automation-package-analyze", str(locale_analysis_path),
-         str(locale_project), PACKAGED_ANALYSIS_METHOD], check=True, env=locale_environment
+    _run_packaged(
+        executable,
+        ["--automation-package-analyze", str(locale_analysis_path),
+         str(locale_project), PACKAGED_ANALYSIS_METHOD],
+        environment=locale_environment,
     )
     observations["analysis_de"] = json.loads(locale_analysis_path.read_text(encoding="utf-8"))
 
     reopened_analysis_path = operation_dir / "analysis-reopened.json"
-    subprocess.run(
-        [str(executable), "--automation-package-analyze", str(reopened_analysis_path),
-         str(edited_project), PACKAGED_ANALYSIS_METHOD], check=True, env=environment
+    _run_packaged(
+        executable,
+        ["--automation-package-analyze", str(reopened_analysis_path),
+         str(edited_project), PACKAGED_ANALYSIS_METHOD],
+        environment=environment,
     )
     observations["save_reopen"] = json.loads(reopened_analysis_path.read_text(encoding="utf-8"))
     return observations
@@ -131,8 +175,8 @@ def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
         "reopen_observed": bool(observations["save_reopen"].get("opened")),
         "analysis_after_reopen_observed": bool(observations["save_reopen"]["texts"].get("Summary", "")),
         "locale_inputs": [
-            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
-            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,2", "canonical_value": 1.2, "summary": locale_summary, "svg_paths": locale["display_images"]},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.0", "canonical_value": 1.0, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
+            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,0", "canonical_value": 1.0, "summary": locale_summary, "svg_paths": locale["display_images"]},
         ],
     }
 
@@ -146,12 +190,13 @@ def capture_sample_observations(
     for item in manifest["projects"]:
         path = sample_root / item["file"]
         report_path = output.parent / ("open-" + path.stem + ".json")
-        result = subprocess.run(
-            [str(executable), "--automation-package-open-report", str(report_path), str(path)],
+        result = _run_packaged(
+            executable,
+            ["--automation-package-open-report", str(report_path), str(path)],
             check=False,
             capture_output=True,
             text=True,
-            env={key: value for key, value in os.environ.items() if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"},
+            environment={key: value for key, value in os.environ.items() if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"},
         )
         report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
         records.append({

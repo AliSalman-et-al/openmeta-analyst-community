@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -344,6 +345,11 @@ def test_assembler_runs_surface_probes_with_requested_scale_and_locale():
     assert 'environment["QT_SCALE_FACTOR"] = scale' in source
     assert 'environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline' in source
     assert 'environment["RCMS_PACKAGE_LOCALE"] = "de_DE"' in source
+    assert '"raw-data-0", "1,0"' in source
+    assert '"input": "1.0", "canonical_value": 1.0' in source
+    assert '"input": "1,0", "canonical_value": 1.0' in source
+    assert source.count("subprocess.run(") == 1
+    assert "timeout=PACKAGED_PROCESS_TIMEOUT_SECONDS" in source
 
 
 def test_assembler_runtime_probe_is_neutral_under_scale_smoke(monkeypatch, tmp_path):
@@ -353,8 +359,8 @@ def test_assembler_runtime_probe_is_neutral_under_scale_smoke(monkeypatch, tmp_p
     surface_directory = tmp_path / "surface-records"
     calls = []
 
-    def fake_run(command, *, check, env=None):
-        calls.append((command, env))
+    def fake_run(command, *, check, env=None, timeout=None, **_kwargs):
+        calls.append((command, env, timeout))
         if command[1] == "--automation-package-runtime-probe":
             runtime_probe.write_text(
                 json.dumps({"qt": {"baseline_device_pixel_ratio": 1.0}}),
@@ -376,6 +382,22 @@ def test_assembler_runtime_probe_is_neutral_under_scale_smoke(monkeypatch, tmp_p
 
     assert calls[0][1] is not None
     assert "QT_SCALE_FACTOR" not in calls[0][1]
+    assert all(call[2] == assembler.PACKAGED_PROCESS_TIMEOUT_SECONDS for call in calls)
+
+
+def test_packaged_runner_reports_timeout_with_command(monkeypatch, tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    def fake_run(command, **_kwargs):
+        raise subprocess.TimeoutExpired(command, assembler.PACKAGED_PROCESS_TIMEOUT_SECONDS)
+
+    monkeypatch.setattr(assembler.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="packaged command timed out.*RCMetaStudio.exe"):
+        assembler._run_packaged(
+            tmp_path / "RCMetaStudio.exe",
+            ["--automation-package-analyze", "analysis.json"],
+            environment={},
+        )
 
 
 def test_assembler_rejects_unobserved_reopen_analysis(tmp_path):
