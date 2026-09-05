@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import json
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
+
 from ._workflow import load_workflow
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -84,6 +85,16 @@ def test_evidence_assembler_uses_the_packaged_runtime_contract():
         assert "RPY2_CFFI_MODE=API" in invocation
         assert r_home in invocation
         assert r_libs in invocation
+
+
+def test_initial_smoke_evidence_preserves_direct_provenance_inputs():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+    start = build.index('step "Assembling packaged qualification evidence outside the application"')
+    end = build.index('step "Opening the converted sample through the normal LaunchServices app entry point"')
+    invocation = build[start:end]
+
+    assert ': > "$hang_trace_path"' in invocation
+    assert '> "$smoke_stdout_path" 2> "$smoke_stderr_path"' in invocation
 
 
 def test_both_native_packages_use_the_positional_startup_transition():
