@@ -4,6 +4,22 @@ RC MetaStudio supports evidence synthesis and the interpretation of meta-analysi
 
 ## Language
 
+**Stable domain identity**:
+The enduring identity of a study, outcome, follow-up, group, or covariate, independent of its editable name.
+_Avoid_: Name key, display identity
+
+**Entered effect estimate**:
+An effect estimate and uncertainty supplied by the user when compatible raw study data are unavailable.
+_Avoid_: Derived effect, calculated effect
+
+**Derived effect preview**:
+A transient effect estimate shown while compatible raw study data are being edited; it is not the value used as statistical authority for an analysis.
+_Avoid_: Stored effect, analysis effect estimate
+
+**Analysis effect estimate**:
+The effect estimate reconstructed from compatible raw study data at the analysis boundary, or the entered effect estimate when raw data are unavailable.
+_Avoid_: Display effect, cached effect
+
 **Small-study effects analysis**:
 A guided analysis of associations between study size or precision and observed effects. Its results can suggest several causes and do not establish that publication bias exists.
 _Avoid_: Publication bias analysis, publication-bias test

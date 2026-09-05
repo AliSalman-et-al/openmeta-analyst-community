@@ -1,7 +1,7 @@
 import pytest
 
 from rc_metastudio import plot_capabilities
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import PlotCapability, parse_analysis_result
 
 
 def descriptor(**overrides):
@@ -71,14 +71,19 @@ def test_validate_result_returns_normalized_descriptors():
         }
     )
 
-    assert capabilities["Regression Plot"] == descriptor(
-        plot_kind="regression", regenerator="regression"
+    assert capabilities["Regression Plot"] == PlotCapability(
+        plot_kind="regression",
+        editable=True,
+        styleable=True,
+        composition="single",
+        regenerator="regression",
     )
 
 
 def test_analysis_result_parser_validates_all_boundary_fields():
     parsed = parse_analysis_result(
         {
+            "version": 1,
             "texts": {"Summary": "ok"},
             "images": {},
             "display_images": {},
@@ -86,18 +91,58 @@ def test_analysis_result_parser_validates_all_boundary_fields():
             "image_params_paths": {},
             "image_order": [],
             "plot_capabilities": {},
+            "sections": [
+                {
+                    "id": "result.summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                }
+            ],
         }
     )
 
-    assert parsed["texts"] == {"Summary": "ok"}
-    assert parsed["image_order"] == []
+    assert parsed.texts == {"Summary": "ok"}
+    assert parsed.image_order == ()
 
     with pytest.raises(ValueError, match="texts keys and values must be text"):
-        parse_analysis_result({"texts": {"Summary": 42}})
+        parse_analysis_result({"version": 1, "texts": {"Summary": 42}, "sections": []})
     with pytest.raises(ValueError, match="image_order must be a list of text"):
-        parse_analysis_result({"image_order": ["Forest Plot", 42]})
+        parse_analysis_result(
+            {"version": 1, "image_order": ["Forest Plot", 42], "sections": []}
+        )
     with pytest.raises(ValueError, match="Display artifacts have no matching"):
-        parse_analysis_result({"display_images": {"Forest Plot": "display.svg"}})
+        parse_analysis_result(
+            {
+                "version": 1,
+                "display_images": {"Forest Plot": "display.svg"},
+                "sections": [],
+            }
+        )
+
+
+def test_analysis_result_parser_returns_immutable_values():
+    parsed = parse_analysis_result(
+        {
+            "version": 1,
+            "texts": {"Summary": "ok"},
+            "sections": [
+                {
+                    "id": "result.summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(TypeError):
+        from typing import cast
+
+        cast(dict[str, str], parsed.texts)["Summary"] = "changed"
 
 
 def test_option_groups_are_keyed_by_explicit_plot_kind():
@@ -144,4 +189,4 @@ def test_trimfill_funnel_has_an_explicit_editable_capability():
             },
         }
     )
-    assert capabilities["Trim-and-fill left"]["plot_kind"] == "trimfill_funnel"
+    assert capabilities["Trim-and-fill left"].plot_kind == "trimfill_funnel"

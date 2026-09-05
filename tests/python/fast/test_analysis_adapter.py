@@ -33,6 +33,24 @@ def _request_kwargs() -> RequestKwargs:
     }
 
 
+def _raw_result(texts: dict[str, str], prefix: str) -> dict[str, object]:
+    return {
+        "version": 1,
+        "texts": texts,
+        "images": {},
+        "sections": [
+            {
+                "id": f"{prefix}.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(texts)
+        ],
+    }
+
+
 @pytest.mark.parametrize("data_type", ["", "unknown", "Binary"])
 def test_analysis_request_rejects_unknown_family(data_type: str) -> None:
     values = _request_kwargs()
@@ -62,6 +80,24 @@ def test_analysis_request_rejects_cross_family_metric() -> None:
         make_analysis_request(**values)
 
 
+def test_analysis_request_is_versioned_and_semantically_identified() -> None:
+    first = make_analysis_request(**_request_kwargs())
+    second = make_analysis_request(**_request_kwargs())
+
+    assert first.version == 1
+    assert first.semantic_id == second.semantic_id
+    assert first.to_mapping() == {
+        "version": 1,
+        "data_type": "binary",
+        "workflow": "standard",
+        "method": "random",
+        "metric": "OR",
+        "params": {"measure": "OR"},
+    }
+    with pytest.raises(ValueError, match="unsupported analysis request version"):
+        type(first)(first.data_type, first.workflow, first.method, first.metric, (), 2)
+
+
 def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
     monkeypatch,
 ):
@@ -72,18 +108,18 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
         if metric == "Sens":
             raise DiagnosticExecutionError("Sens conversion failed")
 
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "dataset_to_simple_diagnostic_r_object",
-        convert_metric,
-    )
+    class FakeDiagnosticBridge:
+        @staticmethod
+        def dataset_to_simple_diagnostic_r_object(_model, metric):
+            return convert_metric(_model, metric)
+
+    monkeypatch.setattr(analysis_adapter, "r_bridge", FakeDiagnosticBridge())
     monkeypatch.setattr(
         analysis_adapter,
         "_run_diagnostic_backend",
-        lambda _workflow, _methods, parameter_values: {
-            "texts": {"Spec Summary": parameter_values[0]["measure"]},
-            "images": {},
-        },
+        lambda _workflow, _methods, parameter_values: _raw_result(
+            {"Spec Summary": parameter_values[0]["measure"]}, "diagnostic.spec"
+        ),
     )
     requests = tuple(
         make_analysis_request(
@@ -106,7 +142,7 @@ def test_diagnostic_metric_conversion_failure_does_not_discard_other_metrics(
 
     result = analysis_adapter.execute_analysis_requests(model, requests)
 
-    assert result["texts"] == {
+    assert result.texts == {
         "Sens Error": "Sens conversion failed",
         "Spec Summary": "Spec",
     }
@@ -135,13 +171,14 @@ def test_diagnostic_fallback_merges_references_in_stable_order():
             if request.metric == "Sens"
             else "1. Shared method reference\n2. DOR reference\n"
         )
-        return {"texts": {"Summary": request.metric, "References": references}}
+        return _raw_result(
+            {f"{request.metric} Summary": request.metric, "References": references},
+            f"diagnostic.{request.metric.lower()}",
+        )
 
     result = analysis_adapter._run_diagnostic_methods_per_metric(requests, run_metric)
 
-    assert result["texts"]["Spec Error"] == "specificity backend failed"
-    assert result["texts"]["References"] == (
-        "1. Shared method reference\n"
-        "2. Sensitivity reference\n"
-        "3. DOR reference\n"
+    assert result.texts["Spec Error"] == "specificity backend failed"
+    assert result.texts["References"] == (
+        "1. Shared method reference\n2. Sensitivity reference\n3. DOR reference\n"
     )

@@ -74,7 +74,7 @@ test_that("meta-regression stores a self-contained metafor bubble plot bundle", 
 
   result <- rcmetar.run.analysis(
     fixture$data,
-    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+    list(version=1, method= "meta.regression", params = fixture$params, workflow = "meta-regression")
   )
   plot.path <- unname(result$plot_params_paths[["Regression Plot"]])
   bundle <- bubble_load_saved_plot_data(plot.path)
@@ -157,7 +157,7 @@ test_that("metafor bubble plot renderer supports Default, RevMan, and BMJ styles
 
     result <- rcmetar.run.analysis(
       fixture$data,
-      list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+      list(version=1, method= "meta.regression", params = fixture$params, workflow = "meta-regression")
     )
     bundle <- bubble_load_saved_plot_data(unname(result$plot_params_paths[["Regression Plot"]]))
 
@@ -181,7 +181,7 @@ test_that("editable bubble options survive bundle regeneration", {
   fixture <- bubble_binary_fixture("default")
   result <- rcmetar.run.analysis(
     fixture$data,
-    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+    list(version=1, method= "meta.regression", params = fixture$params, workflow = "meta-regression")
   )
   params <- fixture$params
   params$bp_style <- "bmj"
@@ -208,7 +208,7 @@ test_that("Bubble Plot moderator ticks adapt to observed values and honor overri
   fixture <- bubble_binary_fixture("default")
   result <- rcmetar.run.analysis(
     fixture$data,
-    list(method = "meta.regression", params = fixture$params, workflow = "meta-regression")
+    list(version=1, method= "meta.regression", params = fixture$params, workflow = "meta-regression")
   )
   bundle <- rcmetar.regenerate.regression.plot.data(fixture$data, result$res, fixture$params)
   limits <- rcmetar.bubble.xlim(bundle)

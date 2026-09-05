@@ -14,7 +14,8 @@ import pytest
 sys.path.insert(0, os.path.abspath("src"))
 ROOT = Path(__file__).resolve().parents[3]
 
-from rc_metastudio.analysis_regression_compare import (  # noqa: E402 - legacy module path bootstrap
+from rc_metastudio.analysis_results import parse_analysis_result
+from tests.analysis_regression.golden.support.analysis_regression_compare import (  # noqa: E402
     ACCEPTED_EXCEPTION,
     CAPTURE_ERROR,
     MISSING_OUTPUT,
@@ -32,6 +33,47 @@ from rc_metastudio.analysis_regression_compare import (  # noqa: E402 - legacy m
 sys.path.insert(0, os.path.abspath("scripts"))
 import verify_golden_compatibility  # noqa: E402 - scripts path bootstrap
 import verify_rcmetar_r_stack  # noqa: E402 - scripts path bootstrap
+
+
+def _text_result(title, text):
+    return {
+        "version": 1,
+        "texts": {title: text},
+        "sections": [
+            {
+                "id": "test.%s" % title.lower(),
+                "kind": "text",
+                "order": 0,
+                "title": title,
+                "source_key": title,
+            }
+        ],
+    }
+
+
+def _typed_result(
+    texts=None,
+    images=None,
+    display_images=None,
+    capabilities=None,
+    image_params_paths=None,
+    sections=None,
+):
+    return parse_analysis_result(
+        {
+            "version": 1,
+            "texts": texts or {},
+            "images": images or {},
+            "display_images": display_images or {},
+            "plot_capabilities": capabilities or {},
+            "image_params_paths": image_params_paths or {},
+            "sections": sections or [],
+        }
+    )
+
+
+def _empty_result():
+    return {"version": 1, "texts": {}, "images": {}, "sections": []}
 
 
 def test_analysis_regression_comparison_classifies_compatible_capture_as_pass():
@@ -454,7 +496,9 @@ def test_numeric_oracle_is_independent_from_runtime_parser(monkeypatch):
 
     current = json.loads(json.dumps(reference))
     current["curated_golden_set"][0]["outputs"] = (
-        verify_golden_compatibility.golden_analysis.parsed_numeric_sections({})
+        verify_golden_compatibility.golden_analysis.parsed_numeric_sections(
+            _typed_result()
+        )
     )
     rows = compare_golden_baseline(reference, current)["rows"]
     assert any(row["classification"] == MISSING_OUTPUT for row in rows)
@@ -581,6 +625,107 @@ def test_plot_descriptor_contract_rejects_outer_and_semantic_tampering(tmp_path)
         and row["detail"] == "Unexpected plot descriptors were produced."
         for row in rows
     )
+
+
+def test_golden_capture_uses_public_title_for_semantic_image_descriptor(tmp_path):
+    display_path = tmp_path / "forest.display.svg"
+    display_path.write_text("<svg />", encoding="utf-8")
+    result = _typed_result(
+        images={"diagnostic.DOR.forest": str(tmp_path / "forest.png")},
+        display_images={"diagnostic.DOR.forest": str(display_path)},
+        capabilities={
+            "diagnostic.DOR.forest": {
+                "plot_kind": "forest",
+                "editable": True,
+                "styleable": True,
+                "composition": "single",
+                "regenerator": "forest",
+            }
+        },
+        image_params_paths={"diagnostic.DOR.forest": "plot-data"},
+        sections=[
+            {
+                "id": "test.diagnostic-dor-forest",
+                "kind": "image",
+                "order": 0,
+                "title": "Odds Ratio Forest Plot",
+                "source_key": "diagnostic.DOR.forest",
+            }
+        ],
+    )
+
+    descriptor = verify_golden_compatibility.golden_analysis._capture_plot_descriptors(
+        {"artifacts": {"Odds Ratio Forest Plot": "forest.png"}}, result
+    )[0]
+
+    assert descriptor["artifact_label"] == "Odds Ratio Forest Plot"
+    assert descriptor["display"]["identity"] == "Odds Ratio Forest Plot"
+    assert descriptor["display"]["name"] == "forest.display.svg"
+    assert descriptor["capability"]["kind"] == "forest"
+
+
+def test_golden_capture_maps_case_only_artifact_title_drift_to_typed_metadata(
+    tmp_path,
+):
+    image_path = tmp_path / "loo.png"
+    image_path.write_bytes(b"png")
+    display_path = tmp_path / "loo.display.svg"
+    display_path.write_text("<svg />", encoding="utf-8")
+    result = _typed_result(
+        images={"analysis.leave-one-out.loo.1": str(image_path)},
+        display_images={"analysis.leave-one-out.loo.1": str(display_path)},
+        capabilities={
+            "analysis.leave-one-out.loo.1": {
+                "plot_kind": "leave_one_out_forest",
+                "editable": True,
+                "styleable": True,
+                "composition": "single",
+                "regenerator": "forest",
+            }
+        },
+        image_params_paths={"analysis.leave-one-out.loo.1": "loo.params"},
+        sections=[
+            {
+                "id": "analysis.leave-one-out.loo.1",
+                "kind": "image",
+                "order": 0,
+                "title": "Leave-one-out Forest Plot",
+                "source_key": "analysis.leave-one-out.loo.1",
+            }
+        ],
+    )
+
+    descriptor = verify_golden_compatibility.golden_analysis._capture_plot_descriptors(
+        {"artifacts": {"Leave-one-out Forest plot": str(image_path)}}, result
+    )[0]
+
+    assert descriptor["display"]["identity"] == "Leave-one-out Forest Plot"
+    assert descriptor["display"]["name"] == "loo.display.svg"
+    assert descriptor["capability"]["kind"] == "leave_one_out_forest"
+
+
+def test_golden_comparison_uses_public_text_title_for_stable_source_key():
+    result = _typed_result(
+        texts={"diagnostic.DOR.summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5"},
+        sections=[
+            {
+                "id": "diagnostic.DOR.summary",
+                "kind": "text",
+                "order": 0,
+                "title": "Odds Ratio Summary",
+                "source_key": "diagnostic.DOR.summary",
+            }
+        ],
+    )
+
+    assert verify_golden_compatibility.golden_analysis._public_texts(result) == {
+        "Odds Ratio Summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5"
+    }
+    comparisons = verify_golden_compatibility.golden_analysis.compare_bundle(
+        {"expected": {"Odds Ratio Summary": {}}, "artifacts": {}, "tolerances": {}},
+        result,
+    )
+    assert comparisons[0]["passed"] is True
 
 
 def test_current_golden_manifest_requires_exact_rpy2_identities():
@@ -836,16 +981,45 @@ def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
             "tolerances": {},
         }
 
+        def result_with_image(path):
+            return _typed_result(
+                texts={"Summary": "ok"},
+                images={"forest plot": str(path)},
+                capabilities={
+                    "forest plot": {
+                        "plot_kind": "forest",
+                        "editable": True,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
+                image_params_paths={"forest plot": "plot-data"},
+                sections=[
+                    {
+                        "id": "test.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "test.forest",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "forest plot",
+                    },
+                ],
+            )
+
         comparisons = golden_analysis.compare_bundle(
             bundle,
-            {"texts": {"Summary": "ok"}, "images": {"forest plot": str(plot)}},
+            result_with_image(plot),
         )
         missing = golden_analysis.compare_bundle(
             bundle,
-            {
-                "texts": {"Summary": "ok"},
-                "images": {"Forest Plot": str(tmp_path / "missing.png")},
-            },
+            result_with_image(tmp_path / "missing.png"),
         )
 
     assert {
@@ -866,7 +1040,6 @@ def test_compare_bundle_requires_expected_plot_artifacts(tmp_path):
 def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -897,10 +1070,10 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_workflow_analysis",
-            lambda workflow, method, params: {
-                "texts": {"Summary": "%s:%s" % (workflow, method)}
-            },
+            "run_versioned_analysis_request",
+            lambda request: _text_result(
+                "Summary", "%s:%s" % (request["workflow"], request["method"])
+            ),
             raising=False,
         )
 
@@ -920,11 +1093,11 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
         )
 
         assert (
-            headless_analysis.run_headless_analysis(binary)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(binary).texts["Summary"]
             == "cumulative:binary.random"
         )
         assert (
-            headless_analysis.run_headless_analysis(continuous)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(continuous).texts["Summary"]
             == "leave-one-out:continuous.random"
         )
         assert [call for call in calls if call[0] == "metric"] == [
@@ -936,7 +1109,6 @@ def test_headless_analysis_dispatches_sequential_binary_and_continuous_workflows
 def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -959,8 +1131,8 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_binary_analysis",
-            lambda method, params: {"texts": {"Summary": params["measure"]}},
+            "run_versioned_analysis_request",
+            lambda request: _text_result("Summary", request["params"]["measure"]),
             raising=False,
         )
 
@@ -972,7 +1144,7 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
             data_type=meta_globals.BINARY,
         )
         assert (
-            headless_analysis.run_headless_analysis(explicit_case)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(explicit_case).texts["Summary"]
             == "RR"
         )
         assert explicit_case.parameters == {"measure": "OR"}
@@ -985,7 +1157,7 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
             data_type=meta_globals.BINARY,
         )
         assert (
-            headless_analysis.run_headless_analysis(restored_case)["texts"]["Summary"]
+            headless_analysis.run_headless_analysis(restored_case).texts["Summary"]
             == "OR"
         )
 
@@ -997,7 +1169,6 @@ def test_headless_analysis_uses_restored_metric_or_reports_missing_metric(
 def test_headless_diagnostic_metric_overrides_stale_method_parameters(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
@@ -1024,9 +1195,11 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
             def convert(self, model, **kwargs):
                 self.conversions.append((model, kwargs))
 
-            def run(self, method_names, parameter_values):
+            def run(self, requests):
+                method_names = [request["method"] for request in requests]
+                parameter_values = [request["params"] for request in requests]
                 self.runs.append((method_names, parameter_values))
-                return {"texts": {}, "images": {}}
+                return _empty_result()
 
         model = DiagnosticModel()
         backend = DiagnosticBackend()
@@ -1043,7 +1216,7 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             backend.run,
             raising=False,
         )
@@ -1080,11 +1253,11 @@ def test_headless_diagnostic_metric_overrides_stale_method_parameters(
 def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
     monkeypatch, tmp_path
 ):
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     with _import_legacy_golden_modules() as (_, headless_analysis, meta_globals):
         from rc_metastudio import analysis_adapter
 
         calls = []
+        backend_requests = []
 
         class DataSet(object):
             def get_covariate_values(self, covariate, ids_for_keys=False):
@@ -1130,10 +1303,9 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         )
         monkeypatch.setattr(
             analysis_adapter.r_bridge,
-            "run_meta_regression",
-            lambda dataset, studies, covs, metric, confidence_level=None, params=None, **kwargs: {
-                "texts": {"Summary": metric}
-            },
+            "run_versioned_analysis_request",
+            lambda request: backend_requests.append(request)
+            or _text_result("Summary", request["metric"]),
             raising=False,
         )
 
@@ -1147,11 +1319,15 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
             covariates=covariates,
         )
 
-        assert headless_analysis.run_headless_analysis(case)["texts"]["Summary"] == "OR"
+        assert headless_analysis.run_headless_analysis(case).texts["Summary"] == "OR"
         data_call = next(call for call in calls if call[0] == "data")
-        assert data_call[1]["include_raw_data"] is False
+        assert "include_raw_data" not in data_call[1]
         assert data_call[1]["studies"] == model.studies
         assert data_call[1]["covs_to_include"][0].name == "golden_year"
+        added_covariate = next(call[1] for call in calls if call[0] == "covariate")
+        assert data_call[1]["covs_to_include"][0] is added_covariate
+        assert backend_requests[0]["params"]["to"] == "only0"
+        assert backend_requests[0]["params"]["adjust"] == 0.5
 
 
 def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
@@ -1192,12 +1368,38 @@ def test_comprehensive_golden_baseline_capture_writes_reproducible_bundle(
         def runner(case):
             if case == "failing-case":
                 raise RuntimeError("RC MetaStudio baseline capture failed")
-            return {
-                "texts": {
+            return _typed_result(
+                texts={
                     "Summary": "Estimate Lower bound Upper bound\n 1.0 0.5 1.5 0.02"
                 },
-                "images": {"Forest Plot": str(plot)},
-            }
+                images={"Forest Plot": str(plot)},
+                capabilities={
+                    "Forest Plot": {
+                        "plot_kind": "forest",
+                        "editable": True,
+                        "styleable": True,
+                        "composition": "single",
+                        "regenerator": "forest",
+                    }
+                },
+                image_params_paths={"Forest Plot": "plot-data"},
+                sections=[
+                    {
+                        "id": "test.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "test.forest",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "Forest Plot",
+                    },
+                ],
+            )
 
         report = golden_analysis.capture_comprehensive_golden_baseline(
             output_dir=str(tmp_path / "artifacts" / "golden-baseline"),
@@ -1259,10 +1461,31 @@ def _import_legacy_golden_modules():
         sys.modules["meta_globals"] = globals_module
         r_boundary = ModuleType("r_bridge")
         setattr(r_boundary, "RLibraryLoader", lambda: None)
+        setattr(r_boundary, "run_workflow_analysis", lambda *args, **kwargs: {})
+        def run_versioned(request):
+            params = request.get("params", {})
+            if request.get("workflow", "standard") == "standard":
+                runner = getattr(r_boundary, "run_binary_analysis", None)
+                if runner is None:
+                    runner = r_boundary.run_continuous_analysis
+                return runner(request["method"], params)
+            return r_boundary.run_workflow_analysis(
+                request["workflow"], request["method"], params
+            )
+
+        setattr(r_boundary, "run_versioned_analysis_request", run_versioned)
+        setattr(
+            r_boundary,
+            "run_versioned_analysis_requests",
+            lambda requests: {},
+        )
         sys.modules["rc_metastudio.r_bridge"] = r_boundary
-        from rc_metastudio import golden_analysis
-        from rc_metastudio import headless_analysis
+        from tests.analysis_regression.golden.support import golden_analysis
+        from tests.analysis_regression.golden.support import headless_analysis
         from rc_metastudio import meta_globals
+        import rc_metastudio.analysis_adapter as analysis_adapter
+
+        setattr(analysis_adapter, "r_bridge", r_boundary)
 
         yield golden_analysis, headless_analysis, meta_globals
     finally:

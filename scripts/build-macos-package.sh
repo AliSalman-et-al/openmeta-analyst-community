@@ -10,7 +10,6 @@ bundle_identifier="org.researchconsultancy.rc-metastudio"
 skip_dependency_install=0
 skip_clean=0
 skip_smoke=0
-capture_adaptive_layout_evidence=0
 stop_after_r_substrate=0
 
 while [ "$#" -gt 0 ]; do
@@ -49,10 +48,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-smoke)
       skip_smoke=1
-      shift
-      ;;
-    --capture-adaptive-layout-evidence)
-      capture_adaptive_layout_evidence=1
       shift
       ;;
     --stop-after-r-substrate)
@@ -152,9 +147,9 @@ fi
 
 host_machine="$(uname -m)"
 if [ -z "$architecture" ]; then
-  [ "$host_machine" = "arm64" ] && architecture="arm64" || architecture="x64"
+  architecture="arm64"
 fi
-case "$architecture" in x64|arm64) ;; *) echo "--architecture must be x64 or arm64." >&2; exit 1 ;; esac
+case "$architecture" in arm64) ;; *) echo "--architecture arm64 is required." >&2; exit 1 ;; esac
 target_python="$(command -v python3 || true)"
 [ -n "$target_python" ] || { echo "macOS packaging requires python3 to resolve its target manifest." >&2; exit 1; }
 eval "$("$target_python" "$repo_root/scripts/resolve_macos_package_target.py" "$architecture" --format shell)"
@@ -184,11 +179,11 @@ qualification_root="$work_root/qualification"
 runtime_probe_path="$qualification_root/runtime-probe.json"
 runtime_stdout_path="$qualification_root/runtime-probe.stdout.log"
 runtime_stderr_path="$qualification_root/runtime-probe.stderr.log"
-startup_wizard_evidence_path="$qualification_root/startup-wizard-smoke.json"
-startup_wizard_stdout_path="$qualification_root/startup-wizard-smoke.stdout.log"
-startup_wizard_stderr_path="$qualification_root/startup-wizard-smoke.stderr.log"
 deployment_manifest_path="$qualification_root/deployment-manifest.json"
 smoke_evidence_path="$qualification_root/packaged-smoke.json"
+workflow_observation_path="$qualification_root/workflow-observation.json"
+surface_records_path="$qualification_root/surface-records"
+sample_observations_path="$qualification_root/sample-observations.json"
 smoke_log_path="$qualification_root/packaged-smoke.log"
 smoke_stdout_path="$qualification_root/packaged-smoke.stdout.log"
 smoke_stderr_path="$qualification_root/packaged-smoke.stderr.log"
@@ -449,7 +444,7 @@ run_strict_r_dependency_policy() {
 test_bundled_r_packages() {
   local library="$1"
   [ -d "$library" ] || return 1
-  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)" >/dev/null 2>&1
+  R_HOME="$r_home" R_LIBS="$library" R_LIBS_USER="$library" "$rscript" -e "lib <- normalizePath('$library', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)" >/dev/null 2>&1
 }
 
 install_local_r_packages() {
@@ -474,7 +469,7 @@ run_strict_r_dependency_policy "$r_lib"
 
 step "Installing local RCMetaR package"
 install_local_r_packages
-R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+R_HOME="$r_home" R_LIBS="$r_lib" R_LIBS_USER="$r_lib" "$rscript" -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
 
 if ! test_bundled_r_packages "$r_lib"; then
   echo "Bundled R package verification failed after local RCMetaR install." >&2
@@ -734,11 +729,11 @@ Path(sys.argv[1]).write_text(json.dumps({
     "system": "Darwin",
     "machine": __import__("platform").machine(),
     "aliases": {
-        "Versions/Current": "4.6-x86_64",
+        "Versions/Current": "4.6-arm64",
         "Resources": "Versions/Current/Resources",
         "R": "Versions/Current/R",
-        "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-        "Versions/4.6-x86_64/Resources/R": "bin/R",
+        "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+        "Versions/4.6-arm64/Resources/R": "bin/R",
     },
     "passed": True,
 }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -778,35 +773,6 @@ do
   fi
 done
 
-run_adaptive_layout_evidence() {
-  local evidence_root="$repo_root/build/macos-package/$architecture/adaptive-layout-evidence/macos-$architecture"
-  local sample_path="$sample_root/amino.rcms"
-  rm -rf "$evidence_root"
-  mkdir -p "$evidence_root"
-  for scale in "1.0" "1.5"; do
-    local scale_label
-    case "$scale" in
-      1.0) scale_label="100" ;;
-      1.5) scale_label="150" ;;
-      *) echo "Unsupported adaptive-layout evidence scale: $scale" >&2; exit 2 ;;
-    esac
-    local output_dir="$evidence_root/scale-$scale_label"
-    local log_path="$output_dir/automation-adaptive-layout-evidence.log"
-    mkdir -p "$output_dir"
-    env -u QT_QPA_PLATFORM \
-      QT_SCALE_FACTOR="$scale" \
-      RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
-      RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG="$log_path" \
-      RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$r_home" \
-      RCMS_R_LIBS="$r_lib" \
-      "$app_root/RCMetaStudio" \
-        --automation-adaptive-layout-evidence "$output_dir" "$sample_path"
-    "$python_exe" "$repo_root/scripts/validate_adaptive_layout_evidence.py" \
-      --root "$output_dir" --platform-plugin cocoa --scale-factor "$scale"
-  done
-}
-
 run_packaged_process() {
   local timeout_seconds="${RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS:-900}"
   local stdout_path="${RCMS_PACKAGED_STDOUT_PATH:-$smoke_stdout_path}"
@@ -845,25 +811,6 @@ if [ ! -s "$runtime_probe_path" ]; then
 fi
 
 if [ "$skip_smoke" -eq 0 ]; then
-  step "Verifying the packaged startup wizard exposes the main Cocoa workspace"
-  RCMS_PACKAGED_STDOUT_PATH="$startup_wizard_stdout_path" \
-    RCMS_PACKAGED_STDERR_PATH="$startup_wizard_stderr_path" \
-    run_packaged_process "$app_root/RCMetaStudio" \
-      --automation-startup-wizard-smoke "$startup_wizard_evidence_path" \
-      "$sample_root/BCG.rcms"
-  "$python_exe" - "$startup_wizard_evidence_path" <<'PY'
-import json
-import sys
-
-evidence = json.load(open(sys.argv[1], encoding="utf-8"))
-if evidence.get("platform_plugin") != "cocoa":
-    raise SystemExit("Startup wizard smoke did not use the Cocoa platform plugin.")
-if not evidence.get("passed"):
-    raise SystemExit("Startup wizard smoke failed: %s" % evidence.get("failures"))
-frame = evidence.get("frame", [0, 0, 0, 0])
-if evidence.get("rows", 0) < 1 or len(frame) != 4 or min(frame[2:]) <= 0:
-    raise SystemExit("Startup wizard smoke produced incomplete workspace evidence.")
-PY
   sample_path="$sample_root/BCG.rcms"
   baseline_dpr="$("$python_exe" - "$runtime_probe_path" <<'PY'
 import json
@@ -871,19 +818,6 @@ import sys
 print(json.load(open(sys.argv[1], encoding="utf-8"))["qt"]["baseline_device_pixel_ratio"])
 PY
 )"
-  step "Running packaged macOS workflow smoke"
-  QT_SCALE_FACTOR=1.25 \
-    RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
-    RCMS_PACKAGE_SMOKE_EVIDENCE="$smoke_evidence_path" \
-    RCMS_AUTOMATION_SMOKE_LOG="$smoke_log_path" \
-    RCMS_AUTOMATION_HANG_TRACE="$hang_trace_path" \
-    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$r_home" RCMS_R_LIBS="$r_lib" \
-      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
-      --stdout "$smoke_stdout_path" --stderr "$smoke_stderr_path" \
-      --completion-log "$smoke_log_path" -- \
-      "$app_root/RCMetaStudio" --automation-native-smoke "$sample_path"
-
   for scale in "1.25" "1.50" "1.75"; do
     step "Running packaged Cocoa surface smoke at scale $scale"
     QT_SCALE_FACTOR="$scale" \
@@ -893,8 +827,20 @@ PY
       RCMS_PACKAGED_STDOUT_PATH="$qualification_root/packaged-surface-${scale/./}.stdout.log" \
       RCMS_PACKAGED_STDERR_PATH="$qualification_root/packaged-surface-${scale/./}.stderr.log" \
       run_packaged_process "$app_root/RCMetaStudio" \
-        --automation-package-surface-smoke "$smoke_evidence_path" "$scale"
+        --automation-package-surface-smoke "$surface_records_path/surface-$scale.json" "$scale"
   done
+
+  step "Assembling packaged qualification evidence outside the application"
+  mkdir -p "$surface_records_path"
+  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+    --workflow-observation "$workflow_observation_path" \
+    --surface-records "$surface_records_path" \
+    --sample-observations "$sample_observations_path" \
+    --sample BCG.rcms --sample-root "$sample_root" \
+    --sample-path "$sample_path" \
+    --executable "$app_root/RCMetaStudio" --runtime-probe "$runtime_probe_path" \
+    --surface-directory "$surface_records_path" --log-path "$smoke_log_path" \
+    --output "$smoke_evidence_path"
 
   step "Opening the converted sample through the normal LaunchServices app entry point"
   rm -f "$launchservices_marker_path" "$launchservices_pid_path"
@@ -922,15 +868,6 @@ PY
     --launchservices-marker "$launchservices_marker_path"
   rm -f "$launchservices_pid_path"
 fi
-if [ "$capture_adaptive_layout_evidence" -eq 1 ]; then
-  if [ "$architecture" != "x64" ]; then
-    echo "Controlled adaptive-layout evidence is supported only for macOS Intel." >&2
-    exit 2
-  fi
-  step "Capturing controlled native macOS adaptive-layout evidence"
-  run_adaptive_layout_evidence
-fi
-
 source_commit="$(git rev-parse HEAD)"
 python_version="$("$python_exe" -c 'import platform; print(platform.python_version())')"
 pyqt6_version="$("$python_exe" -c 'import importlib.metadata as m; print(m.version("PyQt6"))')"
@@ -1069,9 +1006,11 @@ if [ "$skip_smoke" -eq 0 ]; then
   ditto -x -k "$zip_path" "$extracted_root"
   extracted_app="$extracted_root/$archive_root_name/RCMetaStudio.app"
   extracted_probe="$qualification_root/extracted-runtime-probe.json"
-  extracted_wizard="$qualification_root/extracted-startup-wizard-smoke.json"
   extracted_manifest="$qualification_root/extracted-deployment-manifest.json"
   extracted_smoke="$qualification_root/extracted-packaged-smoke.json"
+  extracted_workflow="$qualification_root/extracted-workflow-observation.json"
+  extracted_surfaces="$qualification_root/extracted-surface-records"
+  extracted_samples="$qualification_root/extracted-sample-observations.json"
   extracted_smoke_log="$qualification_root/extracted-packaged-smoke.log"
   extracted_stdout="$qualification_root/extracted-packaged-smoke.stdout.log"
   extracted_stderr="$qualification_root/extracted-packaged-smoke.stderr.log"
@@ -1090,29 +1029,22 @@ if [ "$skip_smoke" -eq 0 ]; then
   }
   : > "$extracted_hang_trace"
   run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-runtime-probe "$extracted_probe"
-  run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-startup-wizard-smoke \
-    "$extracted_wizard" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
-  "$python_exe" - "$extracted_wizard" <<'PY'
-import json
-import sys
-
-evidence = json.load(open(sys.argv[1], encoding="utf-8"))
-if evidence.get("platform_plugin") != "cocoa" or not evidence.get("passed"):
-    raise SystemExit("Extracted startup wizard smoke failed: %s" % evidence)
-PY
-  QT_SCALE_FACTOR=1.25 RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
-    RCMS_PACKAGE_SMOKE_EVIDENCE="$extracted_smoke" RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_AUTOMATION_HANG_TRACE="$extracted_hang_trace" \
-    env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-      RCMS_R_HOME="$extracted_r_home" RCMS_R_LIBS="$extracted_r_lib" \
-      "$python_exe" "$repo_root/scripts/run_bounded_process.py" --timeout-seconds 900 \
-      --stdout "$extracted_stdout" --stderr "$extracted_stderr" \
-      --completion-log "$extracted_smoke_log" -- \
-      "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   for scale in "1.25" "1.50" "1.75"; do
     QT_SCALE_FACTOR="$scale" RCMS_PACKAGE_BASELINE_DPR="$("$python_exe" -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$extracted_probe")" \
       RCMS_AUTOMATION_SMOKE_LOG="$extracted_smoke_log" RCMS_PACKAGED_PROCESS_TIMEOUT_SECONDS=60 \
-      run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-surface-smoke "$extracted_smoke" "$scale"
+      run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-surface-smoke "$extracted_surfaces/surface-$scale.json" "$scale"
   done
+  mkdir -p "$extracted_surfaces"
+  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+    --workflow-observation "$extracted_workflow" \
+    --surface-records "$extracted_surfaces" \
+    --sample-observations "$extracted_samples" \
+    --sample BCG.rcms --sample-root "$extracted_app/Contents/Resources/sample_projects" \
+    --sample-path "$extracted_app/Contents/Resources/sample_projects/BCG.rcms" \
+    --executable "$extracted_app/Contents/MacOS/RCMetaStudio" \
+    --runtime-probe "$extracted_probe" --surface-directory "$extracted_surfaces" \
+    --log-path "$extracted_smoke_log" \
+    --output "$extracted_smoke"
   rm -f "$extracted_marker" "$extracted_pid"
   env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
     RCMS_R_HOME="$extracted_r_home" RCMS_R_LIBS="$extracted_r_lib" RCMS_STARTUP_PROJECT_SMOKE=1 \

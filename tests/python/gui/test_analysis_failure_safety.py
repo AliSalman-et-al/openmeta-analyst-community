@@ -10,7 +10,6 @@ from PyQt6 import QtCore, QtWidgets, sip
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
 
 REPO_ROOT = os.getcwd()
@@ -51,7 +50,7 @@ def test_result_owner_exception_still_deletes_real_specs_and_progress(
         def analysis(self, _result):
             raise RuntimeError("owner callback failed")
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     monkeypatch.setattr(
         backend, "get_available_methods", lambda **_kwargs: {"Random": "binary.random"}
     )
@@ -72,8 +71,21 @@ def test_result_owner_exception_still_deletes_real_specs_and_progress(
     )
     monkeypatch.setattr(
         backend,
-        "run_binary_analysis",
-        lambda *_args, **_kwargs: {"texts": {"Summary": "ok"}, "images": {}},
+        "run_versioned_analysis_request",
+        lambda *_args, **_kwargs: {
+            "version": 1,
+            "texts": {"Summary": "ok"},
+            "images": {},
+            "sections": [
+                {
+                    "id": "result.summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                }
+            ],
+        },
     )
     owner = Owner()
     form = analysis_setup_dialog.AnalysisSetupDialog(
@@ -113,7 +125,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
     from rc_metastudio import analysis_setup_dialog
 
     app, window = automation.start_automation()
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -121,7 +133,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
             "get_params",
             "get_method_description",
             "dataset_to_simple_binary_r_object",
-            "run_binary_analysis",
+            "run_versioned_analysis_request",
             "reset_r_working_directory",
         )
     }
@@ -157,7 +169,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         _set_backend(
             monkeypatch,
             backend,
-            "run_binary_analysis",
+            "run_versioned_analysis_request",
             lambda *args, **kwargs: (_ for _ in ()).throw(
                 RuntimeError("simulated R failure")
             ),
@@ -167,7 +179,7 @@ def test_binary_analysis_failure_shows_dialog_and_does_not_open_results(monkeypa
         monkeypatch.setattr(
             analysis_setup_dialog.QMessageBox,
             "critical",
-            lambda *args, **kwargs: shown.append(args),
+                lambda *args, **kwargs: shown.append(args),
         )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
@@ -192,7 +204,7 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
     from rc_metastudio import analysis_setup_dialog
 
     app, window = automation.start_automation()
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -200,7 +212,7 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
             "get_params",
             "get_method_description",
             "dataset_to_simple_continuous_r_object",
-            "run_workflow_analysis",
+            "run_versioned_analysis_request",
             "reset_r_working_directory",
         )
     }
@@ -250,7 +262,7 @@ def test_continuous_workflow_failure_shows_dialog_and_does_not_open_results(
         _set_backend(
             monkeypatch,
             backend,
-            "run_workflow_analysis",
+            "run_versioned_analysis_request",
             lambda *args, **kwargs: (_ for _ in ()).throw(
                 RuntimeError("simulated recompute failure")
             ),
@@ -283,7 +295,7 @@ def test_diagnostic_progress_dialog_closes_when_run_setup_raises(monkeypatch):
     from rc_metastudio import analysis_setup_dialog
 
     app, window = automation.start_automation()
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -410,7 +422,7 @@ def test_method_parameters_backend_unavailable_keeps_backend_error(monkeypatch):
         monkeypatch.setattr(
             main_window.QMessageBox,
             "critical",
-            lambda *args, **kwargs: shown.append(args),
+                lambda *args, **kwargs: shown.append(args),
         )
 
         form = window._build_analysis_specs_dialog(
@@ -432,7 +444,9 @@ def test_results_window_adds_no_results_message_to_valid_empty_payload():
     from rc_metastudio import results_window
 
     app = QApplication.instance() or QApplication([])
-    window = results_window.ResultsWindow(parse_analysis_result({"texts": {}}))
+    window = results_window.ResultsWindow(
+        parse_analysis_result({"version": 1, "texts": {}, "sections": []})
+    )
     try:
         assert window.texts == {"No Results": results_window.NO_RESULTS_MESSAGE}
         assert window.images == {}
@@ -458,7 +472,23 @@ def test_results_window_build_failure_reports_display_error(monkeypatch):
             lambda *args, **kwargs: shown.append(args),
         )
 
-        window.analysis(parse_analysis_result({"texts": {"Summary": "ok"}}))
+        window.analysis(
+            parse_analysis_result(
+                {
+                    "version": 1,
+                    "texts": {"Summary": "ok"},
+                    "sections": [
+                        {
+                            "id": "result.summary",
+                            "kind": "text",
+                            "order": 0,
+                            "title": "Summary",
+                            "source_key": "Summary",
+                        }
+                    ],
+                }
+            )
+        )
 
         assert shown
         assert shown[0][1] == "Could Not Display Analysis Results"
@@ -505,7 +535,6 @@ def test_opening_non_project_payload_reports_invalid_project(monkeypatch, tmp_pa
     app, window = automation.start_automation()
     shown = []
     try:
-        window.current_data_unsaved = False
         monkeypatch.setattr(
             main_window.QMessageBox,
             "critical",
@@ -808,7 +837,8 @@ def test_context_menu_popup_failure_clears_active_guard(monkeypatch):
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    if window.workspace.document is not None:
+        window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

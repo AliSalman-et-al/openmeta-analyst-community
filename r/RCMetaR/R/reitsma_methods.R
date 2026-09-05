@@ -92,6 +92,15 @@ rcmetar.reitsma.interval.to.specificity <- function(interval) {
     out
 }
 
+# Keep the FPR-to-specificity ordering in one place.  Both the operating
+# point and marginal prediction intervals are reported as estimate/lower/upper
+# on the clinical specificity scale.
+rcmetar.reitsma.fpr.interval.to.specificity <- function(fpr) {
+    if (is.null(fpr)) return(NULL)
+    c(lower=1 - fpr[["upper"]], estimate=1 - fpr[["estimate"]],
+      upper=1 - fpr[["lower"]])
+}
+
 rcmetar.reitsma.covariance.to.specificity <- function(covariance) {
     if (is.null(covariance)) return(NULL)
     covariance <- as.matrix(covariance)
@@ -119,8 +128,7 @@ rcmetar.reitsma.marginal.prediction <- function(fit, level) {
     }
     fpr <- interval(2L, fit$alphafpr)
     list(sensitivity=interval(1L, fit$alphasens),
-         specificity=c(lower=1 - fpr[["upper"]], estimate=1 - fpr[["estimate"]],
-                       upper=1 - fpr[["lower"]]),
+         specificity=rcmetar.reitsma.fpr.interval.to.specificity(fpr),
          false.positive.rate=fpr,
          covariance=fit$Psi + covariance)
 }
@@ -145,7 +153,7 @@ rcmetar.reitsma.summary.point <- function(fit, level) {
     fpr <- to.proportion("tfpr", fit$alphafpr)
     list(
         sensitivity=sens,
-        specificity=c(estimate=1-fpr[["estimate"]], lower=1-fpr[["upper"]], upper=1-fpr[["lower"]]),
+        specificity=rcmetar.reitsma.fpr.interval.to.specificity(fpr),
         false.positive.rate=fpr
     )
 }
@@ -477,9 +485,7 @@ rcmetar.reitsma.draw <- function(plot.data, outpath) {
     }
     axis.ticks <- function(value, limits) {
         if (is.null(value) || !length(value) || identical(as.character(value[[1L]]), "[default]")) return(pretty(limits))
-        parsed <- if (is.numeric(value)) as.numeric(value) else tryCatch(
-            eval(parse(text=paste0("c(", paste(as.character(value), collapse=","), ")"))),
-            error=function(e) numeric(0))
+        parsed <- rcmetar.numeric.values(value)
         parsed <- as.numeric(parsed)
         parsed[is.finite(parsed) & parsed >= limits[[1L]] & parsed <= limits[[2L]]]
     }
@@ -521,6 +527,31 @@ rcmetar.reitsma.draw <- function(plot.data, outpath) {
     invisible(outpath)
 }
 
+rcmetar.reitsma.apply.saved.style <- function(plot.data, params) {
+    # Re-rendering is deliberately geometry-preserving: mutable presentation
+    # controls are overlaid onto the captured SROC bundle, never re-extracted
+    # from the fitted model.
+    style <- plot.data$style %||% list()
+    fields <- c(curve.color="fp_curve_color", confidence.color="fp_confidence_color",
+        prediction.color="fp_prediction_color", accent.color="fp_accent_color",
+        point.size.multiplier="fp_point_size_multiplier", show.confidence="fp_show_confidence",
+        show.prediction="fp_show_prediction", show.summary="fp_show_summary", show.auc="fp_show_auc",
+        point.area.by.sample.size="fp_point_area_by_sample_size", show.legend="fp_show_legend",
+        show.marker.legend="fp_show_marker_legend", marker.area="fp_marker_area", xlabel="fp_xlabel",
+        ylabel="fp_ylabel", plot.lb="fp_plot_lb", plot.ub="fp_plot_ub", xticks="fp_xticks",
+        y.plot.lb="fp_sroc_plot_lb", y.plot.ub="fp_sroc_plot_ub", yticks="fp_sroc_yticks",
+        curve.lty="fp_curve_lty", confidence.lty="fp_confidence_lty", prediction.lty="fp_prediction_lty",
+        text.cex="fp_text_cex", point.pch="fp_point_pch", show.labels="fp_show_labels")
+    for (field in names(fields)) {
+        value <- params[[fields[[field]]]]
+        if (!is.null(value) && length(value)) style[[field]] <- value
+    }
+    plot.data$style <- style
+    plot.data$display.path <- rcmetar.plot.scalar_path(params$fp_display_path %||% plot.data$display.path)
+    plot.data$legend <- NULL
+    plot.data
+}
+
 rcmetar.reitsma.coefficient.bundle <- function(coefficients, scale, params=list()) {
     if (is.null(coefficients) || !nrow(coefficients)) stop(sprintf("No %s moderator coefficients were returned by mada.", scale), call.=FALSE)
     list(kind="forest", render_engine="reitsma.coefficient", fp_style="default",
@@ -551,10 +582,7 @@ rcmetar.draw.reitsma.coefficient <- function(plot.data, outpath) {
         if (is.null(value) || !length(value) || identical(as.character(value[[1L]]), "[default]")) {
             return(pretty(limits))
         }
-        parsed <- if (is.numeric(value)) as.numeric(value) else tryCatch(
-            eval(parse(text=paste0("c(", paste(as.character(value), collapse=","), ")"))),
-            error=function(e) numeric(0)
-        )
+        parsed <- rcmetar.numeric.values(value)
         parsed <- as.numeric(parsed)
         parsed[is.finite(parsed) & parsed >= limits[[1L]] & parsed <= limits[[2L]]]
     }
@@ -588,9 +616,7 @@ rcmetar.draw.reitsma.coefficient <- function(plot.data, outpath) {
     invisible(outpath)
 }
 
-diagnostic.reitsma <- function(diagnostic.data, params) {
-    if (!requireNamespace("mada", quietly=TRUE)) stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
-    if (as.character(packageVersion("mada")) != "0.5.12") stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
+rcmetar.reitsma.prepare <- function(diagnostic.data, params) {
     params <- .rcmetar.as.params.list(params)
     level <- as.numeric(params$conf.level %||% 95) / 100
     validate.conf.level(level * 100)
@@ -602,22 +628,62 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     policy <- as.character(params$correction.policy %||% "All studies if any zero exists")
     control <- rcmetar.reitsma.correction.control(policy)
     counts <- rcmetar.reitsma.validate.counts(diagnostic.data)
-    if (control == "none" && any(counts$TP == 0 | counts$FN == 0 | counts$FP == 0 | counts$TN == 0)) {
+    if (control == "none" && any(counts$TP == 0 | counts$FN == 0 | counts$FP == 0 | counts$TN == 0))
         stop("Correction policy None cannot fit boundary proportions; choose a correction factor and policy.", call.=FALSE)
-    }
+    list(data=diagnostic.data, params=params, level=level, digits=digits,
+         method=method, adjust=adjust, policy=policy, control=control, counts=counts)
+}
+
+rcmetar.reitsma.fit <- function(prepared) {
     fit.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
-        data=data.frame(TP=counts$TP, FN=counts$FN, FP=counts$FP, TN=counts$TN),
-        correction=adjust, correction.control=control, method=method))
-    fit.warnings <- rcmetar.reitsma.warning.messages(fit.capture, "Reitsma fit: ")
+        data=data.frame(TP=prepared$counts$TP, FN=prepared$counts$FN,
+                        FP=prepared$counts$FP, TN=prepared$counts$TN),
+        correction=prepared$adjust, correction.control=prepared$control,
+        method=prepared$method))
     fit <- rcmetar.reitsma.require.value(fit.capture, "Reitsma fit")
     rcmetar.reitsma.validate.fit(fit)
+    list(fit=fit, warnings=rcmetar.reitsma.warning.messages(fit.capture, "Reitsma fit: "),
+         capture=fit.capture)
+}
+
+rcmetar.reitsma.render.standard <- function(plot.data, diagnostic.data, fit, params) {
+    empty <- list(images=character(), paths=character(), capabilities=list(),
+                  sections=list(), warnings=character())
+    if (!isTRUE(params$create.plot %||% TRUE) || is.null(plot.data)) return(empty)
+    path <- as.character(params$fp_outpath %||% params$roc_outpath %||% params$sroc_outpath %||% "./r_tmp/reitsma_sroc.svg")
+    capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.draw(plot.data, path))
+    warnings <- rcmetar.reitsma.operation.messages(capture, "SROC plot")
+    if (is.null(capture$value)) {
+        empty$warnings <- warnings
+        return(empty)
+    }
+    params$fp_outpath <- path
+    params$reitsma.sroc.geometry <- plot.data
+    saved <- save.data(diagnostic.data, fit, params, plot.data)
+    list(images=c(SROC=path), paths=c(SROC=saved),
+         capabilities=list(SROC=.rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)),
+         sections=list(list(
+             id="diagnostic.reitsma.sroc", kind="image", order=1L,
+             title="SROC", source_key="SROC"
+         )),
+         warnings=warnings)
+}
+
+rcmetar.reitsma.extract.standard.components <- function(prepared, fitted) {
+    diagnostic.data <- prepared$data
+    params <- prepared$params
+    level <- prepared$level
+    fit <- fitted$fit
     section.warnings <- character()
     summary.capture <- rcmetar.reitsma.capture.warnings(summary(fit, level=level))
-    sm <- rcmetar.reitsma.require.value(summary.capture, "mada Reitsma summary")
+    # A converged fit remains authoritative when an optional extractor fails.
+    # Keep every independently available result instead of replacing it with
+    # an estimator fallback or failing the entire report.
+    sm <- summary.capture$value
     summary.warnings <- rcmetar.reitsma.warning.messages(summary.capture, "mada summary: ")
     if (!is.null(summary.capture$error)) section.warnings <- c(section.warnings, paste("mada summary unavailable:", summary.capture$error))
     point.capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.summary.point(fit, level))
-    point <- rcmetar.reitsma.require.value(point.capture, "Summary operating point")
+    point <- point.capture$value
     section.warnings <- c(section.warnings,
         rcmetar.reitsma.operation.messages(point.capture, "Summary operating point"))
     # Keep mada's sampling-based ratios reproducible without exposing an RNG
@@ -643,23 +709,6 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
     section.warnings <- c(section.warnings,
         rcmetar.reitsma.operation.messages(plot.capture, "SROC-derived geometry"))
     if (!is.null(plot.data$warnings)) section.warnings <- c(section.warnings, plot.data$warnings)
-    images <- character()
-    plot.paths <- character()
-    capabilities <- list()
-    if (isTRUE(params$create.plot %||% TRUE) && !is.null(plot.data)) {
-        path <- as.character(params$fp_outpath %||% params$roc_outpath %||% params$sroc_outpath %||% "./r_tmp/reitsma_sroc.svg")
-        draw.capture <- rcmetar.reitsma.capture.warnings(rcmetar.reitsma.draw(plot.data, path))
-        section.warnings <- c(section.warnings,
-            rcmetar.reitsma.operation.messages(draw.capture, "SROC plot"))
-        if (is.null(draw.capture$value)) plot.data <- NULL
-    }
-    if (isTRUE(params$create.plot %||% TRUE) && !is.null(plot.data)) {
-        params$fp_outpath <- path
-        plot.params.path <- save.data(diagnostic.data, fit, params, plot.data)
-        images[["SROC"]] <- path
-        plot.paths[["SROC"]] <- plot.params.path
-        capabilities[["SROC"]] <- .rcmetar.plot.descriptor.for.kind("sroc", has.params=TRUE)
-    }
     # mada's full AUC uses .01 through .99, while its normalized partial AUC
     # uses the observed FPR range clipped to those same endpoints.
     observed.fpr <- fit$freqdata$FP / (fit$freqdata$FP + fit$freqdata$TN)
@@ -685,8 +734,29 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
         `Sensitivity-specificity correlation`=if (is.null(clinical.correlation)) NULL else clinical.correlation[1, 2],
         Interpretation="SDs and covariance are on the model logit scale; correlation is unitless."
     )
-    clinical.interpretation <- if (!is.null(point)) paste0(
-        "Across ", length(diagnostic.data@study.names), " studies, summary sensitivity was ",
+    aic.capture <- rcmetar.reitsma.capture.warnings(stats::AIC(fit))
+    bic.capture <- rcmetar.reitsma.capture.warnings(stats::BIC(fit))
+    section.warnings <- c(section.warnings,
+        rcmetar.reitsma.operation.messages(aic.capture, "AIC"),
+        rcmetar.reitsma.operation.messages(bic.capture, "BIC"))
+    list(
+        summary=sm, point=point, ratios=ratios, auc=auc, plot.data=plot.data,
+        prediction=prediction.summary, heterogeneity=heterogeneity, i2=i2,
+        partial.auc.bounds=pauc.bounds, summary.seed=summary.seed,
+        summary.iterations=summary.iterations,
+        summary.warnings=unique(summary.warnings), section.warnings=section.warnings,
+        AIC=aic.capture$value, BIC=bic.capture$value
+    )
+}
+
+rcmetar.reitsma.clinical.interpretation <- function(point, studies, level, digits) {
+    if (is.null(point)) return(paste0(
+        "Across ", studies,
+        " studies, the summary operating point could not be calculated. ",
+        "Other valid model outputs are shown below."
+    ))
+    paste0(
+        "Across ", studies, " studies, summary sensitivity was ",
         rcmetar.reitsma.display.percent(point$sensitivity[["estimate"]], digits), " (", sprintf("%g%%", level * 100), " confidence interval ",
         rcmetar.reitsma.display.percent(point$sensitivity[["lower"]], digits), " to ", rcmetar.reitsma.display.percent(point$sensitivity[["upper"]], digits),
         ") and summary specificity was ", rcmetar.reitsma.display.percent(point$specificity[["estimate"]], digits), " (",
@@ -695,34 +765,36 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
         "These are average operating characteristics across the included study thresholds. ",
         "The Reitsma bivariate and HSROC formulations are equivalent parameterizations of this model; that equivalence does not assume a common threshold. ",
         "Use the prediction intervals to assess how performance may vary in a new setting."
-    ) else paste0(
-        "Across ", length(diagnostic.data@study.names),
-        " studies, the summary operating point could not be calculated. " ,
-        "Other valid model outputs are shown below."
     )
-    aic.capture <- rcmetar.reitsma.capture.warnings(stats::AIC(fit))
-    bic.capture <- rcmetar.reitsma.capture.warnings(stats::BIC(fit))
-    section.warnings <- c(section.warnings,
-        rcmetar.reitsma.operation.messages(aic.capture, "AIC"),
-        rcmetar.reitsma.operation.messages(bic.capture, "BIC"))
-    summary.warnings <- unique(summary.warnings)
+}
+
+rcmetar.reitsma.report.standard <- function(prepared, fitted, extracted, rendered) {
+    diagnostic.data <- prepared$data
+    level <- prepared$level
+    digits <- prepared$digits
+    fit <- fitted$fit
+    point <- extracted$point
+    summary.warnings <- extracted$summary.warnings
     summary.warnings <- summary.warnings[!is.na(summary.warnings) & nzchar(trimws(summary.warnings))]
-    all.warnings <- unique(c(fit.warnings, summary.warnings, section.warnings))
+    all.warnings <- unique(c(fitted$warnings, summary.warnings,
+                             extracted$section.warnings, rendered$warnings))
     all.warnings <- all.warnings[!is.na(all.warnings) & nzchar(trimws(all.warnings))]
+    clinical.interpretation <- rcmetar.reitsma.clinical.interpretation(
+        point, length(diagnostic.data@study.names), level, digits
+    )
     if (length(all.warnings)) clinical.interpretation <- paste(
         clinical.interpretation,
         paste(c("Analysis warnings:", paste0("- ", all.warnings)), collapse="\n"),
         sep="\n\n"
     )
-    i2.summary <- rcmetar.reitsma.display.i2.summary(i2, digits)
     model.info <- list(
-        estimator=toupper(method), studies.used=length(diagnostic.data@study.names),
-        correction.factor=adjust, correction.policy=policy,
+        estimator=toupper(prepared$method), studies.used=length(diagnostic.data@study.names),
+        correction.factor=prepared$adjust, correction.policy=prepared$policy,
         converged=fit$converged, logLik=as.numeric(fit$logLik),
-        summary.seed=summary.seed, summary.iterations=summary.iterations,
+        summary.seed=extracted$summary.seed, summary.iterations=extracted$summary.iterations,
         summary.warnings=summary.warnings, warnings=all.warnings,
-        AIC=if (is.null(aic.capture$value)) NULL else as.numeric(aic.capture$value),
-        BIC=if (is.null(bic.capture$value)) NULL else as.numeric(bic.capture$value),
+        AIC=if (is.null(extracted$AIC)) NULL else as.numeric(extracted$AIC),
+        BIC=if (is.null(extracted$BIC)) NULL else as.numeric(extracted$BIC),
         formula="cbind(tsens, tfpr) ~ 1",
         package.version=as.character(packageVersion("mada"))
     )
@@ -731,43 +803,75 @@ diagnostic.reitsma <- function(diagnostic.data, params) {
         `Summary specificity`=rcmetar.reitsma.display.interval(point$specificity, level, "CI", digits),
         `False-positive rate`=rcmetar.reitsma.display.interval(point$false.positive.rate, level, "CI", digits)
     )
-    prediction.display <- if (is.null(prediction.summary)) NULL else list(
+    prediction.display <- if (is.null(extracted$prediction)) NULL else list(
         description="Underlying new-study operating characteristics",
-        intervals=lapply(prediction.summary, rcmetar.reitsma.display.interval, level=level, kind="PI", digits=digits)
+        intervals=lapply(extracted$prediction, rcmetar.reitsma.display.interval,
+                         level=level, kind="PI", digits=digits)
     )
-    if (!is.null(prediction.display)) {
+    if (!is.null(prediction.display))
         names(prediction.display$intervals) <- c("Sensitivity", "Specificity", "False-positive rate")
-    }
     summary <- list(
         "Clinical interpretation"=clinical.interpretation,
         "Summary operating point"=summary.point.display,
-        "Sampling-based summary ratios"=rcmetar.reitsma.display.ratios(ratios, level, digits),
+        "Sampling-based summary ratios"=rcmetar.reitsma.display.ratios(extracted$ratios, level, digits),
         "Marginal prediction"=prediction.display,
-        "Between-study heterogeneity"=heterogeneity,
+        "Between-study heterogeneity"=extracted$heterogeneity,
         "Diagnostic I-squared"=list(
-            `I-squared summary`=i2.summary,
-            `I-squared estimates`=rcmetar.reitsma.display.i2(i2, digits),
+            `I-squared summary`=rcmetar.reitsma.display.i2.summary(extracted$i2, digits),
+            `I-squared estimates`=rcmetar.reitsma.display.i2(extracted$i2, digits),
             Interpretation="I-squared is shown as percent unexplained heterogeneity; Zhou-Dendukuri and Holling are distinct estimators."
         ),
         "Model information"=model.info
     )
-    if (!is.null(auc)) summary[["SROC AUC"]] <- list(
-        AUC=auc[["AUC"]] %||% NULL, normalized.partial.AUC=auc[["pAUC"]] %||% NULL,
-        full.FPR.bounds=c(0.01, 0.99), partial.FPR.bounds=pauc.bounds,
+    if (!is.null(extracted$auc)) summary[["SROC AUC"]] <- list(
+        AUC=extracted$auc[["AUC"]] %||% NULL,
+        normalized.partial.AUC=extracted$auc[["pAUC"]] %||% NULL,
+        full.FPR.bounds=c(0.01, 0.99), partial.FPR.bounds=extracted$partial.auc.bounds,
         note="The Reitsma bivariate and HSROC models are equivalent parameterizations of the same threshold-aware diagnostic model; this does not imply a common threshold.",
-        `AUC confidence interval`="Not provided by mada::AUC(); no invented AUC CI.")
-    # Keep the most useful sections first while ensuring optional AUC remains
-    # near the other SROC outputs when it is available.
-    if (!is.null(auc)) {
+        `AUC confidence interval`="Not provided by mada::AUC(); no invented AUC CI."
+    )
+    if (!is.null(extracted$auc)) {
         desired.order <- c("Clinical interpretation", "Summary operating point",
             "Sampling-based summary ratios", "SROC AUC", "Marginal prediction",
             "Between-study heterogeneity", "Diagnostic I-squared", "Model information")
         summary <- summary[intersect(desired.order, names(summary))]
     }
-    plot.names <- if (length(images)) setNames("sroc", names(images)) else character()
-    list(images=images, image_order=names(images), plot_names=plot.names, plot_params_paths=plot.paths,
-         plot_capabilities=capabilities, Summary=summary,
+    plot.names <- if (length(rendered$images)) setNames("sroc", names(rendered$images)) else character()
+    sections <- list(list(
+        id="diagnostic.reitsma.summary", kind="text", order=0L,
+        title="Summary", source_key="Summary"
+    ))
+    if (length(rendered$sections)) sections <- c(sections, rendered$sections)
+    list(images=rendered$images, image_order=names(rendered$images), plot_names=plot.names,
+         plot_params_paths=rendered$paths, plot_capabilities=rendered$capabilities,
+         sections=sections,
+         Summary=summary,
          References=rcmetar.unique.references(c(rcmetar.method.references("reitsma"), rcmetar.method.references("rutter.gatsonis"))))
+}
+
+rcmetar.reitsma.extract.standard <- function(prepared, fitted) {
+    extracted <- rcmetar.reitsma.extract.standard.components(prepared, fitted)
+    rendered <- rcmetar.reitsma.render.standard(
+        extracted$plot.data, prepared$data, fitted$fit, prepared$params
+    )
+    rcmetar.reitsma.report.standard(prepared, fitted, extracted, rendered)
+}
+
+rcmetar.reitsma.require.package <- function() {
+    if (!requireNamespace("mada", quietly=TRUE)) {
+        stop("Reitsma requires mada 0.5.12. Install the pinned package before running this analysis.", call.=FALSE)
+    }
+    if (as.character(packageVersion("mada")) != "0.5.12") {
+        stop(sprintf("Reitsma requires mada 0.5.12; loaded %s.", packageVersion("mada")), call.=FALSE)
+    }
+    invisible(TRUE)
+}
+
+diagnostic.reitsma <- function(diagnostic.data, params) {
+    rcmetar.reitsma.require.package()
+    prepared <- rcmetar.reitsma.prepare(diagnostic.data, params)
+    fitted <- rcmetar.reitsma.fit(prepared)
+    rcmetar.reitsma.extract.standard(prepared, fitted)
 }
 
 diagnostic.reitsma.parameters <- function() {
@@ -794,69 +898,201 @@ diagnostic.reitsma.is.feasible <- function(diagnostic.data, metric) {
         length(diagnostic.data@TP) == length(diagnostic.data@TN)
 }
 
+.rcmetar.reitsma.moderator <- function(cov, study.count) {
+    name <- as.character(cov@cov.name)
+    values <- cov@cov.vals
+    if (length(values) != study.count || any(is.na(values) | values == ""))
+        stop(sprintf("Missing moderator values for '%s'. Confirm exclusions before fitting.", name), call.=FALSE)
+    if (!identical(cov@cov.type, "factor")) {
+        values <- suppressWarnings(as.numeric(values))
+        if (any(!is.finite(values)))
+            stop(sprintf("Moderator '%s' must contain finite numeric values.", name), call.=FALSE)
+        return(list(name=name, values=values,
+                    coding=list(type="continuous", range=range(values))))
+    }
+    levels <- sort(unique(as.character(values)))
+    if (length(levels) < 2L) {
+        observed <- if (length(levels))
+            sprintf("only observed level '%s'", levels[[1L]]) else "no observed levels"
+        stop(sprintf(
+            "Categorical moderator '%s' has fewer than two observed levels after missing-value exclusions (%s). Restore eligible studies or remove this moderator before fitting.",
+            name, observed), call.=FALSE)
+    }
+    reference <- as.character(cov@ref.var)
+    if (!(reference %in% levels))
+        stop(sprintf("Reference level '%s' for moderator '%s' is absent.", reference, name), call.=FALSE)
+    levels <- c(reference, setdiff(levels, reference))
+    values <- factor(as.character(values), levels=levels)
+    contrasts(values) <- stats::contr.treatment(length(levels), base=1L)
+    list(name=name, values=values,
+         coding=list(type="factor", levels=levels, reference=reference))
+}
+
+.rcmetar.reitsma.prepare.meta.regression <- function(reg.data) {
+    covariates <- reg.data@covariates
+    if (length(covariates) < 1L)
+        stop("Reitsma meta-regression requires at least one selected moderator.", call.=FALSE)
+    counts <- rcmetar.reitsma.validate.counts(reg.data, min.studies=1L)
+    data <- data.frame(TP=counts$TP, FN=counts$FN, FP=counts$FP, TN=counts$TN,
+                       stringsAsFactors=FALSE)
+    moderators <- lapply(covariates, .rcmetar.reitsma.moderator, nrow(data))
+    terms <- vapply(moderators, `[[`, character(1), "name")
+    model.terms <- make.names(terms, unique=TRUE)
+    coding <- stats::setNames(lapply(moderators, `[[`, "coding"), terms)
+    for (index in seq_along(terms)) {
+        data[[model.terms[[index]]]] <- moderators[[index]]$values
+        coding[[terms[[index]]]]$model.name <- model.terms[[index]]
+    }
+    formula <- rcmetar.reitsma.formula(model.terms)
+    design <- stats::model.matrix(formula, data=cbind(data, tsens=0, tfpr=0))
+    columns <- ncol(design)
+    if (qr(design)$rank < columns)
+        stop("Reitsma moderator design matrix is rank deficient; remove redundant moderators or levels.", call.=FALSE)
+    minimum <- max(5L, columns + 2L)
+    if (nrow(data) < minimum) stop(sprintf(
+        "Reitsma meta-regression requires at least %d eligible studies for %d model-matrix columns; %d supplied.",
+        minimum, columns, nrow(data)), call.=FALSE)
+    list(data=data, counts=counts, terms=terms, model.terms=model.terms,
+         coding=coding, formula=formula)
+}
+
+.rcmetar.reitsma.meta.regression.settings <- function(params, counts) {
+    adjust <- as.numeric(params$adjust %||% .5)
+    if (!is.finite(adjust) || adjust < 0)
+        stop("Reitsma correction factor must be finite and non-negative.", call.=FALSE)
+    policy <- as.character(params$correction.policy %||% "All studies if any zero exists")
+    control <- rcmetar.reitsma.correction.control(policy)
+    if (control == "none" && any(unlist(counts) == 0))
+        stop("Correction policy None cannot fit boundary proportions.", call.=FALSE)
+    level <- as.numeric(params$conf.level %||% 95) / 100
+    validate.conf.level(level * 100)
+    digits <- suppressWarnings(as.integer(params$digits %||% 3L))
+    if (length(digits) != 1L || is.na(digits) || digits < 0L || digits > 15L)
+        digits <- 3L
+    list(method=rcmetar.reitsma.estimator(params), adjust=adjust, policy=policy,
+         control=control, level=level, digits=digits)
+}
+
+.rcmetar.reitsma.likelihood.ratio <- function(full, reduced, label) {
+    degrees <- attr(full$logLik, "df") - attr(reduced$logLik, "df")
+    statistic <- max(0, 2 * (as.numeric(full$logLik) - as.numeric(reduced$logLik)))
+    list(moderator=label, statistic=statistic, df=degrees,
+         p.value=stats::pchisq(statistic, df=degrees, lower.tail=FALSE))
+}
+
+.rcmetar.reitsma.ml.fit <- function(data, formula, adjust, control, label, prefix) {
+    captured <- rcmetar.reitsma.capture.warnings(mada::reitsma(
+        data=data, formula=formula, correction=adjust,
+        correction.control=control, method="ml"))
+    fit <- rcmetar.reitsma.require.value(captured, label)
+    rcmetar.reitsma.validate.fit(fit, label)
+    list(fit=fit, warnings=rcmetar.reitsma.warning.messages(captured, prefix))
+}
+
+.rcmetar.reitsma.block.test <- function(index, data, terms, model.terms,
+                                         adjust, control, full, intercept.formula) {
+    term <- terms[[index]]
+    remaining <- model.terms[-index]
+    formula <- if (length(remaining))
+        rcmetar.reitsma.formula(remaining) else intercept.formula
+    reduced <- .rcmetar.reitsma.ml.fit(
+        data, formula, adjust, control,
+        paste0("Reitsma reduced model for moderator '", term, "'"),
+        paste0("Reduced model for moderator '", term, "': "))
+    list(test=.rcmetar.reitsma.likelihood.ratio(full, reduced$fit, term),
+         warnings=reduced$warnings)
+}
+
+.rcmetar.reitsma.likelihood.tests <- function(data, formula, terms, model.terms,
+                                              adjust, control) {
+    intercept <- stats::reformulate(
+        termlabels=character(0), response="cbind(tsens, tfpr)")
+    full <- .rcmetar.reitsma.ml.fit(
+        data, formula, adjust, control,
+        "Reitsma full ML likelihood-ratio fit", "Full ML likelihood-ratio fit: ")
+    reduced <- .rcmetar.reitsma.ml.fit(
+        data, intercept, adjust, control,
+        "Reitsma intercept-only likelihood-ratio fit",
+        "Intercept-only likelihood-ratio fit: ")
+    blocks <- lapply(
+        seq_along(terms), .rcmetar.reitsma.block.test, data, terms, model.terms,
+        adjust, control, full$fit, intercept)
+    list(
+        full=full$fit, reduced=reduced$fit,
+        overall=.rcmetar.reitsma.likelihood.ratio(
+            full$fit, reduced$fit, "All moderators"),
+        blocks=stats::setNames(lapply(blocks, `[[`, "test"), terms),
+        warnings=c(full$warnings, reduced$warnings,
+                   unlist(lapply(blocks, `[[`, "warnings"), use.names=FALSE)))
+}
+
+.rcmetar.reitsma.coefficient.plot <- function(scale, spec, output, reg.data,
+                                              fit, params, coding) {
+    extension <- tools::file_ext(output)
+    if (!nzchar(extension)) extension <- "svg"
+    path <- paste0(tools::file_path_sans_ext(output), "_", spec$suffix, ".", extension)
+    plot.params <- params
+    plot.params$reitsma.coefficient.scale <- scale
+    plot.params$reitsma.moderator.coding <- coding
+    bundle <- rcmetar.reitsma.coefficient.bundle(spec$data, scale, plot.params)
+    plot.params$reitsma.coefficient.geometry <- bundle
+    rcmetar.draw.reitsma.coefficient(bundle, path)
+    list(title=paste(scale, "Moderator Coefficients"), path=path,
+         params.path=save.data(reg.data, fit, plot.params, bundle))
+}
+
+.rcmetar.reitsma.meta.regression.plots <- function(reg.data, fit, params, coding,
+                                                   sensitivity, specificity) {
+    if (identical(params$create.plot, FALSE)) return(list(
+        images=character(), image.order=character(), plot_names=character(),
+        plot_params_paths=character(), plot_capabilities=list(), sections=list()))
+    output <- as.character(
+        params$fp_outpath %||% rcmetar.scratch.path("reitsma_coefficients.svg"))
+    specifications <- list(
+        Sensitivity=list(data=sensitivity, suffix="sensitivity"),
+        Specificity=list(data=specificity, suffix="specificity"))
+    plots <- Map(
+        function(scale, spec) .rcmetar.reitsma.coefficient.plot(
+            scale, spec, output, reg.data, fit, params, coding),
+        names(specifications), specifications)
+    keys <- c(
+        "diagnostic.reitsma.sensitivity.coefficients",
+        "diagnostic.reitsma.specificity.coefficients"
+    )
+    titles <- vapply(plots, `[[`, character(1), "title")
+    paths <- stats::setNames(vapply(plots, `[[`, character(1), "path"), keys)
+    params.paths <- stats::setNames(
+        vapply(plots, `[[`, character(1), "params.path"), keys)
+    plot.names <- stats::setNames(rep("forest", length(keys)), keys)
+    capabilities <- stats::setNames(lapply(keys, function(key)
+        .rcmetar.plot.descriptor.for.kind("forest", has.params=TRUE)), keys)
+    sections <- lapply(seq_along(keys), function(index) list(
+        id=keys[[index]], kind="image", order=index,
+        title=titles[[index]], source_key=keys[[index]]
+    ))
+    list(images=paths, image.order=keys, plot_names=plot.names,
+         plot_params_paths=params.paths, plot_capabilities=capabilities,
+         sections=sections)
+}
+
 diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FALSE) {
     if (!requireNamespace("mada", quietly=TRUE) || as.character(packageVersion("mada")) != "0.5.12") {
         stop("Reitsma bivariate meta-regression requires mada 0.5.12.", call.=FALSE)
     }
-    covs <- reg.data@covariates
-    if (length(covs) < 1L) stop("Reitsma meta-regression requires at least one selected moderator.", call.=FALSE)
-    counts <- rcmetar.reitsma.validate.counts(reg.data, min.studies=1L)
-    data <- data.frame(TP=counts$TP, FN=counts$FN, FP=counts$FP, TN=counts$TN,
-                       stringsAsFactors=FALSE)
-    terms <- character()
-    coding <- list()
-    moderator.values <- list()
-    for (cov in covs) {
-        name <- as.character(cov@cov.name)
-        values <- cov@cov.vals
-        if (length(values) != nrow(data) || any(is.na(values) | values == ""))
-            stop(sprintf("Missing moderator values for '%s'. Confirm exclusions before fitting.", name), call.=FALSE)
-        if (identical(cov@cov.type, "factor")) {
-            levels <- sort(unique(as.character(values)))
-            if (length(levels) < 2L) {
-                observed <- if (length(levels)) sprintf("only observed level '%s'", levels[[1L]]) else "no observed levels"
-                stop(sprintf(
-                    "Categorical moderator '%s' has fewer than two observed levels after missing-value exclusions (%s). Restore eligible studies or remove this moderator before fitting.",
-                    name, observed
-                ), call.=FALSE)
-            }
-            ref <- as.character(cov@ref.var)
-            if (!(ref %in% levels)) stop(sprintf("Reference level '%s' for moderator '%s' is absent.", ref, name), call.=FALSE)
-            levels <- c(ref, setdiff(levels, ref))
-            moderator.values[[name]] <- factor(as.character(values), levels=levels)
-            contrasts(moderator.values[[name]]) <- stats::contr.treatment(length(levels), base=1L)
-            coding[[name]] <- list(type="factor", levels=levels, reference=ref)
-        } else {
-            numeric.values <- suppressWarnings(as.numeric(values))
-            if (any(!is.finite(numeric.values))) stop(sprintf("Moderator '%s' must contain finite numeric values.", name), call.=FALSE)
-            moderator.values[[name]] <- numeric.values
-            coding[[name]] <- list(type="continuous", range=range(numeric.values))
-        }
-        terms <- c(terms, name)
-    }
-    # mada rebuilds its design frame with data.frame(), which sanitizes
-    # non-syntactic column names. Fit against stable aliases while retaining
-    # the entered names for tables and researcher-facing model information.
-    model.terms <- make.names(terms, unique=TRUE)
-    for (i in seq_along(terms)) {
-        data[[model.terms[[i]]]] <- moderator.values[[terms[[i]]]]
-        coding[[terms[[i]]]]$model.name <- model.terms[[i]]
-    }
-    formula <- rcmetar.reitsma.formula(model.terms)
-    design <- stats::model.matrix(formula, data=cbind(data, tsens=0, tfpr=0))
-    p <- ncol(design)
-    if (qr(design)$rank < p) stop("Reitsma moderator design matrix is rank deficient; remove redundant moderators or levels.", call.=FALSE)
-    if (nrow(data) < max(5L, p + 2L)) stop(sprintf("Reitsma meta-regression requires at least %d eligible studies for %d model-matrix columns; %d supplied.", max(5L,p+2L), p, nrow(data)), call.=FALSE)
-    method <- rcmetar.reitsma.estimator(params)
-    adjust <- as.numeric(params$adjust %||% .5)
-    if (!is.finite(adjust) || adjust < 0) stop("Reitsma correction factor must be finite and non-negative.", call.=FALSE)
-    policy <- as.character(params$correction.policy %||% "All studies if any zero exists")
-    control <- rcmetar.reitsma.correction.control(policy)
-    if (control == "none" && any(unlist(counts) == 0)) stop("Correction policy None cannot fit boundary proportions.", call.=FALSE)
-    level <- as.numeric(params$conf.level %||% 95) / 100
-    validate.conf.level(level * 100)
-    digits <- suppressWarnings(as.integer(params$digits %||% 3L))
-    if (length(digits) != 1L || is.na(digits) || digits < 0L || digits > 15L) digits <- 3L
+    prepared <- .rcmetar.reitsma.prepare.meta.regression(reg.data)
+    counts <- prepared$counts
+    data <- prepared$data
+    terms <- prepared$terms
+    model.terms <- prepared$model.terms
+    coding <- prepared$coding
+    formula <- prepared$formula
+    settings <- .rcmetar.reitsma.meta.regression.settings(params, counts)
+    method <- settings$method
+    adjust <- settings$adjust
+    policy <- settings$policy
+    control <- settings$control
+    level <- settings$level
+    digits <- settings$digits
     warnings <- character()
     fit.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
         data=data, formula=formula, correction=adjust,
@@ -877,64 +1113,12 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
     spec.coefficients <- rcmetar.reitsma.restore.coefficient.labels(spec.coefficients, coding)
     sens.coefficients <- rcmetar.reitsma.add.reference.rows(sens.coefficients, coding)
     spec.coefficients <- rcmetar.reitsma.add.reference.rows(spec.coefficients, coding)
-    fit.ml.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
-        data=data, formula=formula, correction=adjust,
-        correction.control=control, method="ml"))
-    fit.ml <- rcmetar.reitsma.require.value(fit.ml.capture, "Reitsma full ML likelihood-ratio fit")
-    warnings <- c(warnings, rcmetar.reitsma.warning.messages(fit.ml.capture, "Full ML likelihood-ratio fit: "))
-    intercept.data <- data
-    intercept.formula <- stats::as.formula("cbind(tsens, tfpr) ~ 1")
-    reduced.ml.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
-        data=intercept.data, formula=intercept.formula, correction=adjust,
-        correction.control=control, method="ml"))
-    reduced.ml <- rcmetar.reitsma.require.value(reduced.ml.capture, "Reitsma intercept-only likelihood-ratio fit")
-    warnings <- c(warnings, rcmetar.reitsma.warning.messages(reduced.ml.capture, "Intercept-only likelihood-ratio fit: "))
-    rcmetar.reitsma.validate.fit(fit.ml, "Reitsma ML likelihood-ratio")
-    rcmetar.reitsma.validate.fit(reduced.ml, "Reitsma intercept-only likelihood-ratio")
-    lrt <- function(full, reduced, label) {
-        df <- attr(full$logLik,"df") - attr(reduced$logLik,"df")
-        statistic <- max(0, 2 * (as.numeric(full$logLik) - as.numeric(reduced$logLik)))
-        list(moderator=label, statistic=statistic, df=df, p.value=stats::pchisq(statistic, df=df, lower.tail=FALSE))
-    }
-    block.tests <- lapply(seq_along(terms), function(i) {
-        remaining <- model.terms[-i]
-        reduced.formula <- if (length(remaining))
-            rcmetar.reitsma.formula(remaining)
-        else intercept.formula
-        reduced.capture <- rcmetar.reitsma.capture.warnings(mada::reitsma(
-            data=data, formula=reduced.formula, correction=adjust,
-            correction.control=control, method="ml"))
-        reduced <- rcmetar.reitsma.require.value(
-            reduced.capture,
-            paste0("Reitsma reduced model for moderator '", terms[[i]], "'")
-        )
-        warnings <<- c(warnings, rcmetar.reitsma.warning.messages(
-            reduced.capture, paste0("Reduced model for moderator '", terms[[i]], "': ")))
-        rcmetar.reitsma.validate.fit(reduced, "Reitsma reduced meta-regression")
-        lrt(fit.ml, reduced, terms[[i]])
-    })
-    names(block.tests) <- terms
-    images <- character(); image.order <- character(); plot.names <- character(); plot.paths <- character(); plot.capabilities <- list()
-    if (!identical(params$create.plot, FALSE)) {
-        output <- as.character(params$fp_outpath %||% rcmetar.scratch.path("reitsma_coefficients.svg"))
-        extension <- tools::file_ext(output); if (!nzchar(extension)) extension <- "svg"
-        stem <- tools::file_path_sans_ext(output)
-        specifications <- list(Sensitivity=list(data=sens.coefficients, suffix="sensitivity"),
-                               Specificity=list(data=spec.coefficients, suffix="specificity"))
-        for (scale in names(specifications)) {
-            spec <- specifications[[scale]]
-            path <- paste0(stem, "_", spec$suffix, ".", extension)
-            plot.params <- params
-            plot.params$reitsma.coefficient.scale <- scale
-            plot.params$reitsma.moderator.coding <- coding
-            bundle <- rcmetar.reitsma.coefficient.bundle(spec$data, scale, plot.params)
-            rcmetar.draw.reitsma.coefficient(bundle, path)
-            saved <- save.data(reg.data, fit, plot.params, bundle)
-            title <- paste(scale, "Moderator Coefficients")
-            images[[title]] <- path; image.order <- c(image.order, title); plot.names[[title]] <- "forest"; plot.paths[[title]] <- saved
-            plot.capabilities[[title]] <- .rcmetar.plot.descriptor.for.kind("forest", has.params=TRUE)
-        }
-    }
+    likelihood <- .rcmetar.reitsma.likelihood.tests(
+        data, formula, terms, model.terms, adjust, control)
+    block.tests <- likelihood$blocks
+    warnings <- c(warnings, likelihood$warnings)
+    plots <- .rcmetar.reitsma.meta.regression.plots(
+        reg.data, fit, params, coding, sens.coefficients, spec.coefficients)
     full.aic.capture <- rcmetar.reitsma.capture.warnings(stats::AIC(fit))
     full.bic.capture <- rcmetar.reitsma.capture.warnings(stats::BIC(fit))
     warnings <- c(warnings,
@@ -962,10 +1146,15 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
                        BIC=if (is.null(full.bic.capture$value)) NULL else as.numeric(full.bic.capture$value),
                        warnings=all.warnings,
                        package.version=as.character(packageVersion("mada")))
-    list(images=images, image_order=image.order, plot_names=plot.names, plot_params_paths=plot.paths,
-         plot_capabilities=plot.capabilities, input_data=reg.data, input_params=params, res=fit,
+    sections <- list(list(
+        id="diagnostic.reitsma.meta.regression.summary", kind="text", order=0L,
+        title="Summary", source_key="Summary"
+    ))
+    if (length(plots$sections)) sections <- c(sections, plots$sections)
+    plots$sections <- sections
+    c(plots, list(input_data=reg.data, input_params=params, res=fit,
          Summary=list("Clinical interpretation"=clinical.interpretation,
-                      "Overall ML likelihood-ratio test"=lrt(fit.ml,reduced.ml,"All moderators"),
+                      "Overall ML likelihood-ratio test"=likelihood$overall,
                       "Moderator block tests"=block.tests,
                       "Sensitivity coefficients"=sens.coefficients, "Specificity coefficients"=spec.coefficients,
                       "Residual diagnostic I-squared"=list(
@@ -973,5 +1162,5 @@ diagnostic.reitsma.meta.regression <- function(reg.data, params, stop.at.rma=FAL
                           Interpretation="I-squared is shown as percent unexplained heterogeneity; residual values describe heterogeneity after moderator adjustment."
                       ), "Moderator coding"=public.coding,
                       "Model information"=model.info),
-         References=rcmetar.unique.references(rcmetar.method.references("reitsma")))
+         References=rcmetar.unique.references(rcmetar.method.references("reitsma"))))
 }

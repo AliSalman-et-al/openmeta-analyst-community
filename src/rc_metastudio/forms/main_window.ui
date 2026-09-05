@@ -335,7 +335,6 @@
     <addaction name="action_new_dataset"/>
     <addaction name="separator"/>
     <addaction name="action_edit"/>
-    <addaction name="action_view_network"/>
     <addaction name="action_add_covariate"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
@@ -439,15 +438,6 @@
    </property>
    <property name="text">
     <string>Edit</string>
-   </property>
-  </action>
-  <action name="action_view_network">
-   <property name="icon">
-    <iconset resource="../images/icons.qrc">
-     <normaloff>:/icons/actions/view-network.svg</normaloff>:/icons/actions/view-network.svg</iconset>
-   </property>
-   <property name="text">
-    <string>View Network</string>
    </property>
   </action>
   <action name="action_add_covariate">

@@ -30,12 +30,6 @@ load_rcms_r_binary_policy <- function(repo_root, python = Sys.getenv("RCMS_POLIC
         pkg_type = record[["windows_x64-Pkg-Type"]],
         contrib_path = record[["windows_x64-Contrib-Path"]]
       ),
-      `macos-x64` = list(
-        system = record[["macos_x64-System"]],
-        arch = record[["macos_x64-R-Arch"]],
-        pkg_type = record[["macos_x64-Pkg-Type"]],
-        contrib_path = record[["macos_x64-Contrib-Path"]]
-      ),
       `macos-arm64` = list(
         system = record[["macos_arm64-System"]],
         arch = record[["macos_arm64-R-Arch"]],

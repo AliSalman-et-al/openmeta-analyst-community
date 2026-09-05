@@ -10,10 +10,10 @@
 import copy
 from contextlib import ExitStack
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard, cast
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6.QtGui import QAction, QKeySequence, QPalette
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -30,7 +30,10 @@ from rc_metastudio import calculator_routines as calc_fncs
 
 from rc_metastudio import app_error_handler
 from rc_metastudio import adaptive_window
-from rc_metastudio import r_bridge
+from rc_metastudio.calculator_service import (
+    CalculatorService,
+    ContinuousValues,
+)
 from rc_metastudio import tabular_data
 from rc_metastudio.meta_globals import (
     CONTINUOUS_METRIC_NAMES,
@@ -89,12 +92,8 @@ def _is_true(x):
     return x == "TRUE"
 
 
-def is_list(x):
-    try:
-        list(x)
-        return True
-    except TypeError:
-        return False
+def is_list(x: object) -> TypeGuard[list[float | int | None] | tuple[float | int | None, ...]]:
+    return isinstance(x, (list, tuple))
 
 
 class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousDataDialog):
@@ -105,6 +104,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         group_comparison,
         current_effect,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(ContinuousDataDialog, self).__init__(parent)
@@ -123,7 +123,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             )
             raise ValueError("Confidence interval must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
 
@@ -165,7 +166,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
         self.setup_clear_button_palettes()  # Color for clear_button_pallette
         self.initialize_form()  # initialize cells to empty items
-        self.undoStack = QUndoStack(self)
+        self._field_history = calc_fncs.TransientEditHistory()
 
         self.update_raw_data()
         self._populate_effect_data()
@@ -503,43 +504,40 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         self.update_back_calculation_button()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                r_bridge.continuous_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-                elif val_str == "correlation_pre_post" and not is_empty(new_text):
-                    get_disp_scale_val_if_valid(
-                        opt_cmp_fn=lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
-                        opt_cmp_msg="Correlation must be between -1 and +1",
-                    )
-            # Scale conversion crosses the optional R backend boundary. Any
-            # backend failure makes the user-entered value invalid here.
-            except Exception:
-                return False, False
-        return True, display_scale_val
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        is_correlation = val_str == "correlation_pre_post"
+        if ci_param is None and not is_correlation:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                options = {}
+                if is_correlation:
+                    options = {
+                        "opt_cmp_fn": lambda x: -1 <= calc_fncs.numeric_value(x) <= 1,
+                        "opt_cmp_msg": "Correlation must be between -1 and +1",
+                    }
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.continuous_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                    **options,
+                )
+        except Exception:
+            return False, False
+        return True, "" if is_correlation else display_scale_val
 
     def _text_from_value(self, value):
         if value == "est":
@@ -592,7 +590,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.continuous_convert_scale(
+        calculation_scale_value = self.calculator.continuous_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -623,7 +621,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -682,6 +680,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 # Insert standard errors when available.
                 se_col = 3
                 se = self.analysis_unit.get_se(
+                    "entered",
                     self.current_effect,
                     self.group_comparison,
                     self.confidence_multiplier,
@@ -775,7 +774,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -833,7 +832,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        self.analysis_unit = copy.deepcopy(old_analysis_unit)
 
         self.initialize_form()  # clear form first
         self.update_raw_data()
@@ -907,10 +906,10 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     current_values[self._imputation_field_name(var_name)] = var_value
 
             alpha = self.confidence_level_to_alpha()
-            results_from_r = r_bridge.impute_continuous_data(current_values, alpha)
+            results_from_r = self.calculator.impute_continuous_data(current_values, alpha)
 
             if results_from_r["succeeded"]:
-                computed_vals = results_from_r["output"]
+                computed_vals = cast(ContinuousValues, results_from_r["output"])
                 for var_index, var_name in enumerate(var_names):
                     self._set_val(
                         row_index,
@@ -972,7 +971,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     ] = var_value
         params_dict["metric"] = "'%s'" % self.current_effect
 
-        results_from_r = r_bridge.impute_pre_post_continuous_data(
+        results_from_r = self.calculator.impute_pre_post_continuous_data(
             params_dict,
             calc_fncs.numeric_value(self.correlation_pre_post.text()),
             self.confidence_level_to_alpha(),
@@ -990,7 +989,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             self._fit_tables_to_contents()
             return None
 
-        computed_vals = results_from_r["output"]
+        computed_vals = cast(ContinuousValues, results_from_r["output"])
 
         for var_index, var_name in enumerate(self.get_column_header_strs()):
             field_name = self._imputation_field_name(var_name)
@@ -1019,8 +1018,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             raise
 
         # also update the pre/post tables
-        pre_vals = results_from_r["pre"]
-        post_vals = results_from_r["post"]
+        pre_vals = cast(ContinuousValues, results_from_r["pre"])
+        post_vals = cast(ContinuousValues, results_from_r["post"])
         for var_index, var_name in enumerate(var_names):
             field_name = self._imputation_field_name(var_name)
             pre_val = pre_vals[field_name]
@@ -1048,7 +1047,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             new_correlation = self._get_correlation_str()
 
             calc_fncs.push_field_edit(
-                self.undoStack,
+                self._field_history,
                 owner=self,
                 restore_state=self.restore_analysis_unit_and_tables,
                 old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -1122,16 +1121,10 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         )
         se1, se2 = self._get_float(0, 3), self._get_float(1, 3)
 
-        if (
-            not any([self._is_empty_value(x) for x in [n1, m1, sd1, n2, m2, sd2]])
-            or not any([self._is_empty_value(x) for x in [m1, se1, m2, se2]])
-            and self.current_effect == "MD"
-            or not any([self._is_empty_value(x) for x in [n1, m1, sd1]])
-            and self.current_effect in CONTINUOUS_ONE_ARM_METRICS
-        ):
-            est_and_ci_d = None
-            if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
-                est_and_ci_d = r_bridge.continuous_effect_for_study(
+        if not self._has_complete_raw_effect_data(n1, m1, sd1, n2, m2, sd2, se1, se2):
+            return
+        if self.current_effect in CONTINUOUS_TWO_ARM_METRICS:
+            est_and_ci_d = self.calculator.continuous_effect_for_study(
                     n1,
                     m1,
                     sd1,
@@ -1143,33 +1136,33 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     metric=self.current_effect,
                     confidence_level=self.confidence_level,
                 )
-            else:
-                # continuous, one-arm metric
-                est_and_ci_d = r_bridge.continuous_effect_for_study(
-                    n1,
-                    m1,
-                    sd1,
-                    two_arm=False,
-                    metric=self.current_effect,
-                    confidence_level=self.confidence_level,
-                )
-
-            est, low, high = r_bridge.effect_triplet(
-                est_and_ci_d,
-                "calc_scale",
-                metric=self.current_effect,
+        else:
+            est_and_ci_d = self.calculator.continuous_effect_for_study(
+                n1, m1, sd1, two_arm=False, metric=self.current_effect,
+                confidence_level=self.confidence_level,
             )
-            self.analysis_unit.set_effect_and_ci(
-                self.current_effect,
-                self.group_comparison,
-                est,
-                low,
-                high,
-                confidence_multiplier=self.confidence_multiplier,
-            )
-            self.set_current_effect()
+        est, low, high = self.calculator.effect_triplet(
+            est_and_ci_d, "calc_scale", metric=self.current_effect
+        )
+        self.analysis_unit.set_effect_and_ci(
+            self.current_effect, self.group_comparison, est, low, high,
+            confidence_multiplier=self.confidence_multiplier,
+        )
+        self.set_current_effect()
 
-    def _capture_back_calculation_state(self):
+    def _has_complete_raw_effect_data(self, n1, m1, sd1, n2, m2, sd2, se1, se2):
+        two_arm = [n1, m1, sd1, n2, m2, sd2]
+        mean_se = [m1, se1, m2, se2]
+        one_arm = [n1, m1, sd1]
+        return (
+            not any(self._is_empty_value(value) for value in two_arm)
+            or self.current_effect == "MD"
+            and not any(self._is_empty_value(value) for value in mean_se)
+            or self.current_effect in CONTINUOUS_ONE_ARM_METRICS
+            and not any(self._is_empty_value(value) for value in one_arm)
+        )
+
+    def _capture_dialog_state(self):
         return {
             "analysis_unit": copy.deepcopy(self.analysis_unit),
             "tables": self.save_tables_data(),
@@ -1184,9 +1177,9 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             },
         }
 
-    def _restore_back_calculation_state(self, state):
+    def _restore_dialog_state(self, state):
         """Restore directly without invoking R, imputation, or calculator setters."""
-        self.analysis_unit.__dict__ = copy.deepcopy(state["analysis_unit"].__dict__)
+        self.analysis_unit = copy.deepcopy(state["analysis_unit"])
         for table, rows in zip(self.tables, state["tables"]):
             blocked = table.blockSignals(True)
             try:
@@ -1217,124 +1210,19 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         finally:
             self.back_calculate_button.blockSignals(blocked)
 
-    def _restore_back_calculation_undo_state(self, count, index, clean, commands):
-        if self.undoStack.index() != index:
-            self.undoStack.setIndex(index)
-        if self.undoStack.count() != count:
-            if count == 0:
-                self.undoStack.clear()
-            else:
-                raise RuntimeError(
-                    "Back-calculation could not restore the prior undo history"
-                )
-        if any(
-            self.undoStack.command(command_index) is not command
-            for command_index, command in enumerate(commands)
-        ):
-            raise RuntimeError(
-                "Back-calculation changed the identity of prior undo commands"
-            )
-        if clean:
-            self.undoStack.setClean()
-        elif self.undoStack.isClean():
-            self.undoStack.resetClean()
-
-    def _rollback_back_calculation_transaction(self, state, undo_state):
-        errors = []
-        try:
-            self._restore_back_calculation_undo_state(*undo_state)
-        except BaseException as error:
-            errors.append(error)
-        try:
-            self._restore_back_calculation_state(state)
-        except BaseException as error:
-            errors.append(error)
-        return errors
-
-    def _back_calculation_state_matches(self, expected):
-        try:
-            current = self._capture_back_calculation_state()
-            return (
-                current["tables"] == expected["tables"]
-                and current["correlation"] == expected["correlation"]
-                and current["metric_parameter"] == expected["metric_parameter"]
-                and current["button"] == expected["button"]
-                and current["analysis_unit"].__dict__
-                == expected["analysis_unit"].__dict__
-            )
-        except BaseException:
-            return False
-
-    def _back_calculation_command_is_committed(
-        self, command, token, committed_state, prior_index
-    ):
-        expected_index = prior_index + 1
-        if (
-            self.undoStack.index() != expected_index
-            or self.undoStack.count() != expected_index
-            or self.undoStack.isClean()
-        ):
-            return False
-        published = self.undoStack.command(prior_index)
-        identity_matches = published is command or (
-            getattr(published, "_back_calculation_commit_token", None) is token
-        )
-        return identity_matches and self._back_calculation_state_matches(
-            committed_state
-        )
-
-    def _publish_back_calculation_command(self, command, committed_state, prior_index):
-        token = object()
-        command._back_calculation_commit_token = token
-        try:
-            self.undoStack.push(command)
-        except BaseException:
-            if self._back_calculation_command_is_committed(
-                command, token, committed_state, prior_index
-            ):
-                return
-            raise
-
     def update_back_calculation_button(self, engage=False):
         if not engage:
             return self._update_back_calculation_button(engage=False)
-
-        state = self._capture_back_calculation_state()
-        undo_state = (
-            self.undoStack.count(),
-            self.undoStack.index(),
-            self.undoStack.isClean(),
-            tuple(
-                self.undoStack.command(command_index)
-                for command_index in range(self.undoStack.count())
-            ),
-        )
+        state = self._capture_dialog_state()
         try:
             return self._update_back_calculation_button(
                 engage=True, transaction_state=state
             )
         except _BackCalculationCancelled:
-            rollback_errors = self._rollback_back_calculation_transaction(
-                state, undo_state
-            )
-            if rollback_errors:
-                raise RuntimeError(
-                    "Back-calculation cancellation rollback failed"
-                ) from (rollback_errors[0])
+            self._restore_dialog_state(state)
             return None
-        except BaseException as error:
-            rollback_errors = self._rollback_back_calculation_transaction(
-                state, undo_state
-            )
-            if rollback_errors:
-                # Qt does not expose removal of one arbitrary command. If a
-                # push changed an existing branch but cannot be proven to have
-                # committed this transaction, discard the compromised history
-                # so no ghost redo command can reapply it later.
-                self.undoStack.clear()
-                self.undoStack.resetClean()
-            for rollback_error in rollback_errors:
-                error.add_note("Rollback error: %s" % rollback_error)
+        except Exception:
+            self._restore_dialog_state(state)
             raise
 
     def _update_back_calculation_button(self, engage=False, transaction_state=None):
@@ -1394,8 +1282,11 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             group1_data = dict(tmp[0])
             group2_data = dict(tmp[1])
 
-            tmp = self.analysis_unit.get_effect_and_ci(
-                self.current_effect, self.group_comparison, self.confidence_multiplier
+            tmp = self.analysis_unit.get_effect_and_ci_for_source(
+                "entered",
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
             )
             effect_data = {
                 "est": tmp[0],
@@ -1461,7 +1352,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             for candidate in (True, False):
                 candidate_effect_data = dict(effect_data)
                 candidate_effect_data["met.param"] = candidate
-                candidate_imputed = r_bridge.back_calculate_continuous_data(
+                candidate_imputed = self.calculator.back_calculate_continuous_data(
                     group1_data,
                     group2_data,
                     candidate_effect_data,
@@ -1477,7 +1368,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             self.update_clear_button_color()
             return None
 
-        imputed = r_bridge.back_calculate_continuous_data(
+        imputed = self.calculator.back_calculate_continuous_data(
             group1_data, group2_data, effect_data, self.confidence_level
         )
 
@@ -1528,14 +1419,14 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         # Write the data to the table
         var_names = self.get_column_header_strs()
         group1_data = {
-            "n": imputed["n1"],
-            "sd": imputed["sd1"],
-            "mean": imputed["mean1"],
+            "n": cast(float | int | None, imputed["n1"]),
+            "sd": cast(float | int | None, imputed["sd1"]),
+            "mean": cast(float | int | None, imputed["mean1"]),
         }
         group2_data = {
-            "n": imputed["n2"],
-            "sd": imputed["sd2"],
-            "mean": imputed["mean2"],
+            "n": cast(float | int | None, imputed["n2"]),
+            "sd": cast(float | int | None, imputed["sd2"]),
+            "mean": cast(float | int | None, imputed["mean2"]),
         }
         for row in range(len(self.current_groups)):
             for var_index, var_name in enumerate(var_names):
@@ -1553,19 +1444,17 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         # The committed result has filled every value exposed by this
         # back-calculation, so no second R probe is needed to refresh the button.
         self.back_calculate_button.setEnabled(False)
-        new_state = self._capture_back_calculation_state()
+        new_state = self._capture_dialog_state()
 
         command = calc_fncs.make_field_edit_command(
             owner=self,
-            restore_state=self._restore_back_calculation_state,
+            restore_state=self._restore_dialog_state,
             old_state=(transaction_state,),
             new_state=(new_state,),
             description="Apply continuous back-calculation",
             refresh_on_initial_redo=False,
         )
-        self._publish_back_calculation_command(
-            command, new_state, self.undoStack.index()
-        )
+        self._field_history.push(command)
 
     def clear_form(self):
         # For undo/redo
@@ -1597,13 +1486,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 self.current_effect in CONTINUOUS_ONE_ARM_METRICS
                 and metric in CONTINUOUS_ONE_ARM_METRICS
             ):
-                self.analysis_unit.set_effect_and_ci(
-                    metric,
-                    self.group_comparison,
-                    None,
-                    None,
-                    None,
-                    confidence_multiplier=self.confidence_multiplier,
+                self.analysis_unit.set_effect_for_source(
+                    "entered", metric, self.group_comparison, None, None, None
                 )
         # clear line edits
         self.set_current_effect()
@@ -1622,7 +1506,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         new_correlation = self._get_correlation_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_tables,
             old_state=(old_analysis_unit, old_tables_data, old_correlation),
@@ -1651,10 +1535,10 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
         return group_comparison
 
     def undo(self):
-        self.undoStack.undo()
+        self._field_history.undo()
 
     def redo(self):
-        self.undoStack.redo()
+        self._field_history.redo()
 
 
 class ContinuousBackCalculationDialog(

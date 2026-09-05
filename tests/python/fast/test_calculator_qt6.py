@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+
+pytestmark = pytest.mark.usefixtures("inject_calculator_boundary")
 from PIL import Image
 from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import (
@@ -26,9 +28,11 @@ from PyQt6.QtWidgets import (
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
+from rc_metastudio import calculator_service
 
 prepare_generated_ui_imports()
 
@@ -158,18 +162,11 @@ def test_native_calculator_png_encoding_never_calls_qt_save(tmp_path):
         assert encoded.getpixel((6, 4)) == (211, 31, 69, 255)
 
 
-def test_native_calculator_installs_stub_without_loading_real_rpy2(monkeypatch):
+def test_native_calculator_creates_local_backend_without_loading_real_rpy2(monkeypatch):
     smoke = _load_native_calculator_smoke()
-    from rc_metastudio import r_backend
-
-    def register_backend(backend):
-        monkeypatch.setitem(sys.modules, "rc_metastudio.r_bridge", backend)
-        return backend
-
-    monkeypatch.setattr(r_backend, "_register_backend", register_backend)
     monkeypatch.delitem(sys.modules, "rpy2.rinterface", raising=False)
-    backend = smoke.install_native_stub_backend()
-    assert backend._rcms_stub_backend is True
+    backend = smoke.install_native_test_backend()
+    assert backend.execute_r_string("R.version.string") == [95.0]
     assert "rpy2.rinterface" not in sys.modules
 
 
@@ -178,7 +175,7 @@ def test_native_calculator_backend_contract_fails_closed_for_loaded_rpy2(monkeyp
     monkeypatch.setitem(sys.modules, "rpy2.rinterface", object())
 
     with pytest.raises(RuntimeError, match="rpy2.rinterface"):
-        smoke.install_native_stub_backend()
+        smoke.install_native_test_backend()
 
 
 def test_verified_hard_exit_flushes_marker_before_success_exit():
@@ -274,7 +271,13 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
             events.append(("set-auto-quit", enabled))
 
     class FailingWindow:
-        current_data_unsaved = True
+        class Workspace:
+            is_dirty = True
+
+            def mark_saved(self):
+                self.is_dirty = False
+
+        workspace = Workspace()
 
         def close(self):
             events.append("close")
@@ -284,7 +287,7 @@ def test_native_calculator_teardown_disables_auto_quit_and_restores_on_error():
     with pytest.raises(RuntimeError, match="close failed"):
         smoke.close_automation_window(FakeApplication(), window)
 
-    assert window.current_data_unsaved is False
+    assert window.workspace.is_dirty is False
     assert events == [
         "read-auto-quit",
         ("set-auto-quit", False),
@@ -367,38 +370,11 @@ def test_native_calculator_evidence_is_relocatable_and_tamper_evident(tmp_path):
         smoke.validate_evidence_bundle(relocated)
 
 
-def test_calculator_consumers_share_one_canonical_r_bridge_identity(monkeypatch):
+def test_calculator_service_owns_the_r_bridge_boundary():
     import importlib
 
-    from rc_metastudio import (
-        binary_data_dialog,
-        calculator_routines,
-        continuous_data_dialog,
-        diagnostic_data_dialog,
-        dataset_table_model,
-    )
-
-    canonical = importlib.import_module("rc_metastudio.r_bridge")
-    for consumer in (
-        binary_data_dialog,
-        calculator_routines,
-        continuous_data_dialog,
-        diagnostic_data_dialog,
-        dataset_table_model,
-    ):
-        assert consumer.r_bridge is canonical
-
-    marker = object()
-    monkeypatch.setattr(canonical, "_calculator_identity_marker", marker, raising=False)
-    assert all(
-        getattr(consumer.r_bridge, "_calculator_identity_marker", None) is marker
-        for consumer in (
-            binary_data_dialog,
-            calculator_routines,
-            continuous_data_dialog,
-            diagnostic_data_dialog,
-            dataset_table_model,
-        )
+    assert calculator_service.r_bridge is importlib.import_module(
+        "rc_metastudio.r_bridge"
     )
 
 
@@ -524,9 +500,9 @@ def test_field_edit_command_replays_captured_states_once(qapp):
     def restore_state(*state):
         restored.append(state)
 
-    stack = QtGui.QUndoStack()
+    history = calc_fncs.TransientEditHistory()
     calc_fncs.push_field_edit(
-        stack,
+        history,
         owner=Owner(),
         restore_state=restore_state,
         old_state=("old", 1),
@@ -535,9 +511,9 @@ def test_field_edit_command_replays_captured_states_once(qapp):
 
     assert restored == []
     assert refreshes == [False]
-    stack.undo()
+    history.undo()
     assert restored == [("old", 1)]
-    stack.redo()
+    history.redo()
     assert restored == [("old", 1), ("new", 2)]
 
 
@@ -551,7 +527,7 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
         return {"succeeded": False}
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_continuous_data",
         fake_impute_continuous_data,
     )
@@ -566,6 +542,9 @@ def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch
     form.current_groups = ["Group 1", "Group 2"]
     form.confidence_level = 95.0
     form.analysis_unit = object()
+    from rc_metastudio.calculator_service import CalculatorService
+
+    form.calculator = CalculatorService()
 
     form.simple_table.setItem(0, 0, QTableWidgetItem("10"))
     form.simple_table.setItem(0, 1, QTableWidgetItem("94"))
@@ -669,6 +648,11 @@ class FakeAnalysisUnit:
     def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return 1.0, 0.5, 2.0
 
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
     def set_effect_and_ci(self, *args, **kwargs):
         pass
 
@@ -688,17 +672,17 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
@@ -739,17 +723,17 @@ def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
@@ -838,47 +822,47 @@ def test_calculator_effect_ci_fields_fit_valid_domain_samples(qapp, monkeypatch)
     from rc_metastudio import diagnostic_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "continuous_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_continuous_data",
         lambda data, alpha: {"succeeded": False, "comment": "stub"},
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
@@ -971,17 +955,17 @@ def test_binary_calculator_grid_columns_fill_expanded_table_width(qapp, monkeypa
     from rc_metastudio import binary_data_dialog
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
@@ -1086,17 +1070,17 @@ def test_binary_calculator_does_not_wire_raw_edits_to_consistency_checker(
         raise AssertionError("raw count edits must not use the consistency checker")
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
@@ -1123,27 +1107,27 @@ def test_binary_calculator_accepts_single_raw_count_edit_and_recomputes_margins(
     warnings = []
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda data: {"FAIL": True},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_for_study",
         lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda effect, scale, metric=None: effect[scale],
     )
@@ -1191,6 +1175,11 @@ class FakeDiagnosticAnalysisUnit:
     def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return None, None, None
 
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
     def set_effect_and_ci(self, *args, **kwargs):
         pass
 
@@ -1215,17 +1204,17 @@ def test_diagnostic_calculator_grid_columns_fill_expanded_table_width(
     from rc_metastudio import diagnostic_data_dialog
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
@@ -1256,17 +1245,17 @@ def test_diagnostic_calculator_does_not_wire_raw_edits_to_consistency_checker(
         raise AssertionError("raw count edits must not use the consistency checker")
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
@@ -1292,29 +1281,29 @@ def test_diagnostic_calculator_accepts_single_raw_count_edit_and_recomputes_marg
     warnings = []
 
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_diagnostic_data",
         lambda data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "diagnostic_effects_for_study",
         lambda *args, metrics, **kwargs: {
             metric: {"calc_scale": (0.5, 0.4, 0.6)} for metric in metrics
         },
     )
     monkeypatch.setattr(
-        diagnostic_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda effect, scale, metric=None: effect[scale],
     )
@@ -1375,6 +1364,11 @@ class FakeContinuousAnalysisUnit:
     def get_effect_and_ci(self, *args, **kwargs):
         return None, None, None
 
+    def get_effect_and_ci_for_source(
+        self, source, effect, group_comparison, confidence_multiplier
+    ):
+        return self.get_effect_and_ci(effect, group_comparison, confidence_multiplier)
+
     def set_effect_and_ci(self, *args, **kwargs):
         pass
 
@@ -1392,17 +1386,17 @@ def test_continuous_calculator_grid_columns_keep_internal_overflow(qapp, monkeyp
     from rc_metastudio import continuous_data_dialog
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "continuous_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_continuous_data",
         lambda data, alpha: {"succeeded": False, "comment": "stub"},
     )
@@ -1446,17 +1440,17 @@ def test_continuous_calculator_keeps_long_imputed_values_compact(qapp, monkeypat
     }
 
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda conf: 1.96,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "continuous_convert_scale",
         lambda x, *args, **kwargs: x,
     )
     monkeypatch.setattr(
-        continuous_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_continuous_data",
         lambda data, alpha: {"succeeded": True, "output": long_imputed},
     )

@@ -442,6 +442,82 @@ def test_semantic_validation_enforces_domain_identity_family_and_numeric_contrac
         save_project(tmp_path / "invalid-domain.rcms", project, _minimal_state())
 
 
+def test_typed_snapshot_relationships_do_not_depend_on_editable_labels() -> None:
+    project = _group_project("binary", "proportions", [[1, 10], [2, 20]])
+    dataset = _object(project["dataset"])
+    outcome = _objects(dataset["outcomes"])[0]
+    study = _objects(dataset["studies"])[0]
+    unit = _objects(study["analysis_units"])[0]
+    groups = _objects(unit["groups"])
+
+    before = reconstruct_analysis_dataset(
+        project_format.ProjectDocument(1, project, _minimal_state())
+    )
+    outcome["name"] = "Renamed outcome"
+    outcome["follow_ups"] = ["Renamed follow-up"]
+    unit["outcome"] = "Renamed outcome"
+    unit["follow_up"] = "Renamed follow-up"
+    groups[0]["name"] = "Renamed treatment"
+    after = reconstruct_analysis_dataset(
+        project_format.ProjectDocument(1, project, _minimal_state())
+    )
+
+    assert after.outcomes[0].identity == before.outcomes[0].identity
+    assert (
+        after.outcomes[0].follow_ups[0].identity
+        == before.outcomes[0].follow_ups[0].identity
+    )
+    assert after.studies[0].identity == before.studies[0].identity
+    assert (
+        after.studies[0].units[0].outcome == before.studies[0].units[0].outcome
+    )
+    assert (
+        after.studies[0].units[0].follow_up == before.studies[0].units[0].follow_up
+    )
+    assert (
+        after.studies[0].units[0].groups[0].identity
+        == before.studies[0].units[0].groups[0].identity
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("outcomes", "stable_id"),
+        ("outcomes", "follow_up_ids"),
+        ("studies", "stable_id"),
+        ("analysis_units", "stable_id"),
+        ("groups", "stable_id"),
+    ],
+)
+def test_v1_schema_rejects_internal_identity_fields(
+    tmp_path: Path, path: tuple[str, str]
+) -> None:
+    destination = tmp_path / "identity-field.rcms"
+    save_project(
+        destination,
+        _group_project("binary", "proportions", [[1, 10], [2, 20]]),
+        _minimal_state(),
+    )
+    project = _group_project("binary", "proportions", [[1, 10], [2, 20]])
+    dataset = _object(project["dataset"])
+    if path[0] == "outcomes":
+        target = _objects(dataset["outcomes"])[0]
+    elif path[0] == "studies":
+        target = _objects(dataset["studies"])[0]
+    elif path[0] == "analysis_units":
+        target = _objects(_objects(dataset["studies"])[0]["analysis_units"])[0]
+    else:
+        target = _objects(
+            _objects(_objects(dataset["studies"])[0]["analysis_units"])[0]["groups"]
+        )[0]
+    target[path[1]] = ["identity"] if path[1] == "follow_up_ids" else "identity"
+    _replace_json_member(destination, "project.json", project)
+
+    with pytest.raises(ProjectFormatError, match="Additional properties"):
+        load_project(destination)
+
+
 def test_family_raw_counts_and_sample_sizes_reject_fractional_values_on_save_and_load(
     tmp_path: Path,
 ) -> None:

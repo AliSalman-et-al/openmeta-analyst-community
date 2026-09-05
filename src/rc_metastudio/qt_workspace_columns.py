@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""User-owned column sizing for persistent workspace tables."""
+"""Qt adapter for persisted workspace column widths."""
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QTableView
@@ -12,7 +12,7 @@ from rc_metastudio.workspace_column_identity import (
 )
 
 
-class WorkspaceColumnWidthController(object):
+class WorkspaceColumnWidthController:
     """Auto-fit a schema once, then preserve the user's section widths."""
 
     def __init__(self, table, saved_widths=None):
@@ -34,7 +34,6 @@ class WorkspaceColumnWidthController(object):
         self.synchronize_schema()
 
     def begin_schema_change(self):
-        """Ignore toolkit-driven section resizing during a model transition."""
         self._applying = True
 
     def end_schema_change(self):
@@ -46,10 +45,6 @@ class WorkspaceColumnWidthController(object):
         return self._widths.copy()
 
     def synchronize_schema(self):
-        """Restore known sections and content-fit only previously unseen ones."""
-        # The controller is constructed before the workspace installs its
-        # DatasetTableModel, so query the Qt base class without invoking the
-        # workspace view's maintained-model contract.
         model = QTableView.model(self.table)
         if model is None:
             return
@@ -68,7 +63,6 @@ class WorkspaceColumnWidthController(object):
             self._applying = False
 
     def auto_fit_all(self):
-        """Explicitly fit every visible section and transfer ownership back."""
         self._applying = True
         try:
             QTableView.resizeColumnsToContents(self.table)

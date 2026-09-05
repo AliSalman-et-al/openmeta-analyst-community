@@ -1,14 +1,14 @@
-import json
 import builtins
 import hashlib
 import importlib.util
+import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import types
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -35,19 +35,19 @@ def load_inspector():
 
 def _framework(root: Path) -> Path:
     framework = root / "R.framework"
-    resources = framework / "Versions/4.6-x86_64/Resources"
+    resources = framework / "Versions/4.6-arm64/Resources"
     (resources / "lib").mkdir(parents=True)
     (resources / "bin").mkdir()
     (resources / "lib/libR.dylib").write_bytes(b"libR")
     (resources / "bin/R").write_text("#!/bin/sh\n", encoding="utf-8")
     (framework / "Versions/Current").symlink_to(
-        Path("4.6-x86_64"), target_is_directory=True
+        Path("4.6-arm64"), target_is_directory=True
     )
     (framework / "Resources").symlink_to(
         Path("Versions/Current/Resources"), target_is_directory=True
     )
     (framework / "R").symlink_to(Path("Versions/Current/R"))
-    (framework / "Versions/4.6-x86_64/R").symlink_to(Path("Resources/lib/libR.dylib"))
+    (framework / "Versions/4.6-arm64/R").symlink_to(Path("Resources/lib/libR.dylib"))
     (resources / "R").symlink_to(Path("bin/R"))
     available = resources / "fontconfig/fonts/conf.avail"
     active = resources / "fontconfig/fonts/conf.d"
@@ -65,7 +65,7 @@ def _framework(root: Path) -> Path:
 def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
     adapter = load_embedded_r_adapter()
     framework = _framework(tmp_path)
-    version_root = framework / "Versions/4.6-x86_64"
+    version_root = framework / "Versions/4.6-arm64"
     executable = version_root / "R"
     runtime_library = version_root / "Resources/lib/libR.dylib"
 
@@ -76,13 +76,13 @@ def test_adapter_accepts_and_collects_canonical_signable_framework(tmp_path):
 
     links = adapter.audit_symlinks(framework)
     assert any(
-        record["path"] == "Versions/4.6-x86_64/Resources/lib/libR.dylib"
+        record["path"] == "Versions/4.6-arm64/Resources/lib/libR.dylib"
         and Path(record["target"]) == Path("../../R")
         for record in links
     )
     toc = {entry["destination"]: entry for entry in adapter.explicit_toc(framework)}
-    assert toc["R.framework/Versions/4.6-x86_64/R"]["type"] == "DATA"
-    runtime_entry = toc["R.framework/Versions/4.6-x86_64/Resources/lib/libR.dylib"]
+    assert toc["R.framework/Versions/4.6-arm64/R"]["type"] == "DATA"
+    runtime_entry = toc["R.framework/Versions/4.6-arm64/Resources/lib/libR.dylib"]
     assert runtime_entry["type"] == "SYMLINK"
     assert Path(runtime_entry["source"]) == Path("../../R")
 
@@ -96,7 +96,7 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
     bridge.write_bytes(b"bridge")
     dependency = ["/Library/Frameworks/R.framework/Resources/lib/libR.dylib"]
     monkeypatch.setattr(adapter, "is_macho_candidate", lambda path: path.is_file())
-    monkeypatch.setattr(adapter, "architectures", lambda _path: ["x86_64"])
+    monkeypatch.setattr(adapter, "architectures", lambda _path: ["arm64"])
     monkeypatch.setattr(adapter, "dependencies", lambda _path: list(dependency))
 
     def run(*args, **_kwargs):
@@ -106,11 +106,11 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
 
     monkeypatch.setattr(adapter, "_run", run)
     output = tmp_path / "bridge.json"
-    adapter.relocate_bridge(framework, bridge, "x86_64", output)
+    adapter.relocate_bridge(framework, bridge, "arm64", output)
     assert json.loads(output.read_text(encoding="utf-8"))["r_dependency"].startswith(
         "@loader_path/"
     )
-    version_root = framework / "Versions/4.6-x86_64"
+    version_root = framework / "Versions/4.6-arm64"
     executable = version_root / "R"
     runtime_library = version_root / "Resources/lib/libR.dylib"
     executable.unlink()
@@ -123,42 +123,15 @@ def test_adapter_relocates_bridge_and_rejects_displaced_libr(tmp_path, monkeypat
         lambda *_: [{"path": "libR", "install_id": None, "dependencies": []}],
     )
     monkeypatch.setattr(adapter, "validate_relocated_inventory", lambda *_: None)
-    adapter.post_app_gate(app, "x86_64", tmp_path / "post.json")
+    adapter.post_app_gate(app, "arm64", tmp_path / "post.json")
     displaced = app / "Contents/Frameworks/displaced/libR.dylib"
     displaced.parent.mkdir()
     displaced.symlink_to(framework / "Resources/lib/libR.dylib")
     with pytest.raises(adapter.AdapterError, match="duplicate or displaced"):
-        adapter.post_app_gate(app, "x86_64", tmp_path / "post-bad.json")
+        adapter.post_app_gate(app, "arm64", tmp_path / "post-bad.json")
 
 
-def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch):
-    adapter = load_embedded_r_adapter()
-    retained = adapter.filter_pyinstaller_r_binaries(
-        [
-            ("keep", str(tmp_path / "keep.dylib"), "BINARY"),
-            ("R", "/Library/Frameworks/R.framework/R", "BINARY"),
-        ],
-        {},
-    )
-    assert [item[0] for item in retained] == ["keep"]
-    staged = tmp_path / "R.framework"
-    staged_member = staged / "Resources/lib/libRblas.dylib"
-    staged_member.parent.mkdir(parents=True)
-    staged_member.write_bytes(b"blas")
-    retained = adapter.filter_pyinstaller_r_binaries(
-        [
-            ("PyQt6", "PyQt6", "DATA"),
-            ("libRblas.dylib", str(staged_member), "DATA"),
-            ("libRblas.dylib", "libRblas.0.dylib", "SYMLINK"),
-        ],
-        staged,
-    )
-    assert retained == [("PyQt6", "PyQt6", "DATA")]
-    with pytest.raises(adapter.AdapterError, match="unmapped /opt/R"):
-        adapter.filter_pyinstaller_r_binaries(
-            [("bad", "/opt/R/x86_64/lib/bad.dylib", "BINARY")], {}
-        )
-
+def test_unsigned_graph_fails_closed(tmp_path, monkeypatch):
     inspector = load_inspector()
     app = tmp_path / "Graph.app"
     executable = app / "Contents/MacOS/RCMetaStudio"
@@ -180,7 +153,7 @@ def test_host_binary_filter_and_unsigned_graph_fail_closed(tmp_path, monkeypatch
     ):
         inspector.inspect_unsigned_native_graph(app)
     monkeypatch.setattr(
-        inspector, "require_macho_architecture", lambda _path, _arch: ["x86_64"]
+        inspector, "require_macho_architecture", lambda _path, _arch: ["arm64"]
     )
     monkeypatch.setattr(
         inspector,
@@ -275,7 +248,6 @@ def test_frozen_application_entry_configures_r_before_rpy2_import(monkeypatch):
     events = []
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setenv("RCMS_REQUIRE_IN_PROCESS_RPY2", "1")
-    monkeypatch.delenv("RCMS_STUB_BACKEND", raising=False)
     import rc_metastudio
 
     monkeypatch.delattr(rc_metastudio, "r_bridge", raising=False)
@@ -338,7 +310,7 @@ def test_pkgutil_signature_parser_handles_certificate_chain_and_rejectable_team(
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     payload = module.parse_pkgutil_signature(
-        "Package: R-4.6.1-x86_64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
+        "Package: R-4.6.1-arm64.pkg\n   Status: signed by a certificate trusted by macOS\n   1. Developer ID Installer: R for macOS (VZLD955F6P)\n   2. Developer ID Certification Authority\n",
         "",
         0,
     )
@@ -361,7 +333,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "package": "pkg",
             "version": "1.0",
             "archive_url": inspector.DIRECT_R_PPM_SNAPSHOT
-            + "/bin/macosx/big-sur-x86_64/contrib/4.6/pkg_1.0.tgz",
+                + "/bin/macosx/sonoma-arm64/contrib/4.6/pkg_1.0.tgz",
             "sha256": hashlib.sha256(ppm_payload).hexdigest(),
             "size": len(ppm_payload),
         }
@@ -371,14 +343,14 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "schema_version": 1,
             "github_actions": "true",
             "runner_image": "macos15",
-            "runner_label": "macos-15-intel",
+                "runner_label": "macos-15",
             "runner_os": "macOS",
-            "runner_arch": "X64",
+                "runner_arch": "ARM64",
             "macos_version": "15.5",
             "macos_build": "24F74",
             "uname_system": "Darwin",
-            "uname_machine": "x86_64",
-            "python_machine": "x86_64",
+                "uname_machine": "arm64",
+                "python_machine": "arm64",
         }
     ).encode()
     valid_local_runner = {
@@ -387,26 +359,26 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         "runner_image": "local",
         "runner_label": "local",
         "runner_os": "macOS",
-        "runner_arch": "x86_64",
+            "runner_arch": "arm64",
         "macos_version": "15.5",
         "macos_build": "24F74",
         "uname_system": "Darwin",
-        "uname_machine": "x86_64",
-        "python_machine": "x86_64",
+            "uname_machine": "arm64",
+            "python_machine": "arm64",
     }
-    inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
-    inspector.validate_direct_build_runner(json.loads(runner), target="macos-x64")
+    inspector.validate_direct_build_runner(valid_local_runner, target="macos-arm64")
+    inspector.validate_direct_build_runner(json.loads(runner), target="macos-arm64")
     wrong_label = json.loads(runner)
-    wrong_label["runner_label"] = "macos-15"
+    wrong_label["runner_label"] = "macos-14"
     with pytest.raises(
         inspector.MacOSDeploymentInspectionError, match="hosted direct-build runner"
     ):
-        inspector.validate_direct_build_runner(wrong_label, target="macos-x64")
-    valid_local_runner["uname_machine"] = "arm64"
+        inspector.validate_direct_build_runner(wrong_label, target="macos-arm64")
+    valid_local_runner["uname_machine"] = "riscv64"
     with pytest.raises(
-        inspector.MacOSDeploymentInspectionError, match="native macos-x64"
+        inspector.MacOSDeploymentInspectionError, match="native macos-arm64"
     ):
-        inspector.validate_direct_build_runner(valid_local_runner, target="macos-x64")
+        inspector.validate_direct_build_runner(valid_local_runner, target="macos-arm64")
     ppm = json.dumps(
         {
             "schema_version": 1,
@@ -420,13 +392,13 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             "source_commit": "c" * 40,
             "pyinstaller_version": "6.21.0",
             "system": "Darwin",
-            "machine": "x86_64",
+            "machine": "arm64",
             "aliases": {
-                "Versions/Current": "4.6-x86_64",
+                "Versions/Current": "4.6-arm64",
                 "Resources": "Versions/Current/Resources",
                 "R": "Versions/Current/R",
-                "Versions/4.6-x86_64/R": "Resources/lib/libR.dylib",
-                "Versions/4.6-x86_64/Resources/R": "bin/R",
+                "Versions/4.6-arm64/R": "Resources/lib/libR.dylib",
+                "Versions/4.6-arm64/Resources/R": "bin/R",
             },
             "passed": True,
         }
@@ -476,11 +448,11 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
     manifest = {
         "schema_version": 1,
         "kind": "rc-metastudio-direct-macos-target-build",
-        "target": "macos-x64",
+        "target": "macos-arm64",
         "source_commit": "c" * 40,
         "official_r": {
-            "url": inspector.DIRECT_R_OFFICIAL_URL,
-            "sha256": inspector.DIRECT_R_OFFICIAL_SHA256,
+                "url": inspector.DIRECT_R_OFFICIAL_INPUTS["macos-arm64"]["url"],
+                "sha256": inspector.DIRECT_R_OFFICIAL_INPUTS["macos-arm64"]["sha256"],
         },
         "ppm_snapshot": inspector.DIRECT_R_PPM_SNAPSHOT,
         "ppm_archives": ppm_archives,
@@ -500,7 +472,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             },
         },
     }
-    inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+    inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
     archive = tmp_path / "inputs.zip"
     prefix = "artifact/"
     with zipfile.ZipFile(archive, "w") as bundle:
@@ -513,7 +485,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             prefix=prefix,
             names=bundle.namelist(),
             manifest=manifest,
-            target="macos-x64",
+            target="macos-arm64",
         )
         manifest["inputs"]["adapter_script"]["sha256"] = "0" * 64
         with pytest.raises(inspector.MacOSDeploymentInspectionError, match="differs"):
@@ -522,7 +494,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
         manifest["inputs"]["adapter_script"] = inputs["adapter_script"]
         del manifest["inputs"]["runtime_probe"]
@@ -530,7 +502,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             inspector.MacOSDeploymentInspectionError,
             match="complete hashed input inventory",
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["inputs"]["runtime_probe"] = {
             "sha256": hashlib.sha256(
                 payload_by_relative[
@@ -547,13 +519,13 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
         with pytest.raises(
             inspector.MacOSDeploymentInspectionError, match="PPM archive inventory"
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["ppm_archives"] = ppm_archives
         manifest["rcmetar_source"]["archive"]["sha256"] = "0" * 64
         with pytest.raises(
             inspector.MacOSDeploymentInspectionError, match="RCMetaR source provenance"
         ):
-            inspector.validate_direct_build_manifest(manifest, target="macos-x64")
+            inspector.validate_direct_build_manifest(manifest, target="macos-arm64")
         manifest["rcmetar_source"]["archive"]["sha256"] = hashlib.sha256(rcmetar_payload).hexdigest()
         adapter_payload = payload_by_relative[
             inspector.DIRECT_BUILD_INPUT_MEMBERS["adapter_script"]
@@ -591,7 +563,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=missing_bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
         substituted = tmp_path / "substituted-post-sign.zip"
         with zipfile.ZipFile(substituted, "w") as substituted_bundle:
@@ -616,7 +588,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
                 prefix=prefix,
                 names=substituted_bundle.namelist(),
                 manifest=manifest,
-                target="macos-x64",
+                target="macos-arm64",
             )
 
 
@@ -651,10 +623,14 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
                     "locale_variants": [
                         {
                             "locale": locale,
+                            "decimal_point": decimal_point,
+                            "input": input_value,
+                            "canonical_value": 1.2,
+                            "svg_sha256": {"forest": "b" * 64},
                             "normalized_summary_sha256": inspector.EXPECTED_SUMMARY_SHA256,
                             "raw_summary_sha256": "a" * 64,
                         }
-                        for locale in ("en_US", "de_DE")
+                        for locale, decimal_point, input_value in (("en_US", ".", "1.2"), ("de_DE", ",", "1,2"))
                     ],
                     "sample_projects": {
                         "passed": True,
@@ -729,3 +705,5 @@ def test_pyinstaller_preserves_miniature_cran_framework_toc():
         / "scripts/verify_macos_r_pyinstaller_toc.py"
     )
     subprocess.run([sys.executable, str(script)], check=True)
+
+

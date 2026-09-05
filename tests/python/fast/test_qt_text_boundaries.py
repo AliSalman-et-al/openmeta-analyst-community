@@ -1,6 +1,9 @@
 import os
 import sys
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.usefixtures("inject_python_boundary")
 
 
 sys.path.insert(0, os.path.abspath("src"))

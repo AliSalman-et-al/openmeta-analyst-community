@@ -41,11 +41,14 @@ def load_dataset_model(dataset_path):
 
 
 def _add_case_covariates(model, covariates):
+    added = []
     for covariate in covariates:
-        model.dataset.add_covariate(
-            analysis_dataset.Covariate(covariate["name"], covariate["type"]),
-            covariate["values"],
+        added_covariate = analysis_dataset.Covariate(
+            covariate["name"], covariate["type"]
         )
+        model.dataset.add_covariate(added_covariate, covariate["values"])
+        added.append(added_covariate)
+    return tuple(added)
 
 
 def _analysis_metric(case_metric, parameters, fallback=None):
@@ -57,11 +60,7 @@ def _analysis_metric(case_metric, parameters, fallback=None):
 
 def run_headless_analysis(case):
     model = load_dataset_model(case.dataset_path)
-    _add_case_covariates(model, case.covariates)
-    selected_covariates = [
-        analysis_dataset.Covariate(covariate["name"], covariate["type"])
-        for covariate in case.covariates
-    ]
+    selected_covariates = _add_case_covariates(model, case.covariates)
     settings.make_r_tmp()
     data_type = (
         case.data_type

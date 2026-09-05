@@ -1,6 +1,6 @@
 import hashlib
-import json
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -10,8 +10,8 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from ._workflow import load_module_from_path, load_workflow
 
+from ._workflow import load_module_from_path, load_workflow
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -118,7 +118,6 @@ def test_windows_distributable_contract_is_declared():
         "Copy-DirectoryTree",
         "Assert-AppLayout",
         "Invoke-PackagedAppSmokeTest",
-        "Invoke-PackagedWizardLayoutSmokeTest",
         "Get-ProjectVersion",
         "Test-BundledRPackages",
         "Assert-RCMetaRSummaryFormatting",
@@ -217,26 +216,10 @@ def test_packaged_smoke_launches_with_positional_project_argument():
     )
 
 
-def test_packaged_smoke_launches_visual_wizard_layout_gate():
-    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
-
-    assert relative_order(
-        script,
-        "function Invoke-PackagedAppSmokeTest",
-        "function Invoke-PackagedWizardLayoutSmokeTest",
-        "Invoke-PackagedAppSmokeTest -Root $appDir",
-        "Invoke-PackagedWizardLayoutSmokeTest -Root $appDir",
-    )
-    assert (
-        'Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")'
-        in script
-    )
-    assert '$env:QT_QPA_PLATFORM = "offscreen"' in script
-    assert '$startArguments.WindowStyle = "Hidden"' in script
-    assert "RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG" in script
-    assert "$env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath" in script
-    assert "automation-wizard-layout-smoke.log" in script
-    assert "QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM" in script
+def test_packaged_workflow_is_assembled_from_atomic_executable_observations():
+    assembler = read_repo_text("scripts", "assemble_packaged_smoke_evidence.py")
+    assert "--automation-package-edit-save" in assembler
+    assert "--automation-package-analyze" in assembler
 
 
 def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():
@@ -268,7 +251,6 @@ def test_fast_workflow_keeps_required_platforms_and_pins_external_actions():
     assert workflow["on"]["push"]["branches"] == ["master"]
     assert jobs["source-fast-targets"]["strategy"]["matrix"]["include"] == [
         {"target": "windows-x64", "runner": "windows-latest", "platform": "windows"},
-        {"target": "macos-x64", "runner": "macos-15-intel", "platform": "macos"},
         {"target": "macos-arm64", "runner": "macos-15", "platform": "macos"},
     ]
     refs = []
@@ -368,7 +350,6 @@ def test_package_workflow_builds_path_aware_artifacts():
         {key: item[key] for key in ("target", "architecture", "runner")}
         for item in target_job["strategy"]["matrix"]["include"]
     ] == [
-        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
         {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
     ]
     assert target_job["timeout-minutes"] == 90
@@ -409,7 +390,7 @@ def test_macos_distributable_contract_is_declared():
     macos_spec = read_repo_text("packaging", "pyinstaller", "rc-metastudio-macos.spec")
     assert "BUNDLE(" in macos_spec
     assert (
-        'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64")' in macos_spec
+        'target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "arm64")' in macos_spec
     )
     assert "RCMS_BUNDLE_IDENTIFIER" in macos_spec
     assert {
@@ -557,7 +538,7 @@ def test_macos_packager_relocates_every_bundled_r_macho_before_use():
 
 
 def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
-    automation = read_repo_text("src", "rc_metastudio", "automation.py")
+    automation = read_repo_text("tests", "python", "gui", "support", "automation_scenarios.py")
     probe = automation.split("def start_package_runtime_probe", 1)[1].split(
         "def _exercise_packaged_project_workflow", 1
     )[0]
@@ -570,6 +551,12 @@ def test_windows_runtime_probe_does_not_apply_macos_r_product_policy():
 def test_windows_packager_restores_smoke_environment():
     script = ps_contract("scripts", "build-windows-package.ps1")["text"]
 
+    for name in ("R_HOME", "R_LIBS", "R_LIBS_USER", "RCMS_R_HOME", "RCMS_R_LIBS"):
+        assert f"{name} = $env:{name}" in script
+    assert (
+        "Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS"
+        in script
+    )
     assert relative_order(
         script,
         "$previousEnv = @{",
@@ -703,8 +690,20 @@ def test_windows_packager_qualifies_qt6_deployment_and_packaged_surfaces():
     )
 
 
+def test_windows_packager_authenticates_neutral_probe_before_smoke():
+    script = ps_contract("scripts", "build-windows-package.ps1")["text"]
+    build = script.split("Assert-AppLayout -Root $appDir", 1)[1]
+
+    assert relative_order(
+        build,
+        "scripts\\inspect_windows_deployment.py inspect",
+        "Invoke-PackagedAppSmokeTest -Root $appDir",
+        "Compress-AppDirectory -SourceDirectory $appDir",
+    )
+
+
 def test_generated_ui_collection_matches_the_canonical_package_manifest(tmp_path):
-    from rc_metastudio.qt6_build import CANONICAL_FORMS
+    from scripts.qt6_build_impl import CANONICAL_FORMS
 
     build_root = tmp_path / "qt6"
     generated_root = build_root / "generated"
@@ -786,7 +785,7 @@ def test_frozen_windows_bootstrap_indexes_all_private_native_directories(tmp_pat
 def test_frozen_direct_runtime_probe_validates_private_r_without_a_kit(
     monkeypatch, tmp_path
 ):
-    from rc_metastudio import automation
+    from tests.python.gui.support import automation_scenarios as automation
 
     app = tmp_path / "RCMetaStudio"
     executable = app / "RCMetaStudio.exe"
@@ -1721,39 +1720,14 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
 
     inspector = _load_windows_deployment_inspector()
     windows_accessibility = {
-        "focus_before": None,
-        "focus_after_tab": None,
+        "focus_widget": "tableView",
         "accessible_name": "Packaged accessibility control",
         "accessible_description": "Verifies packaged Qt accessibility metadata.",
-        "native": {},
     }
     assert inspector._valid_windows_accessibility(windows_accessibility)
     assert not inspector._valid_windows_accessibility(
         {
-            **windows_accessibility,
-            "accessible_description": "",
-        }
-    )
-    windows_critical_dialog = {
-        "dont_use_native_dialog": False,
-        "application_dont_use_native_dialogs": False,
-        "dont_show_on_screen_before_show": False,
-        "dont_show_on_screen_after_show": False,
-        "native_helper_active": False,
-        "window_modality": "WindowModal",
-        "visible_before_close": True,
-        "critical_icon": True,
-        "finished_signal": True,
-        "result": 1,
-        "accepted_value": 1,
-        "timed_out": False,
-        "timeout_ms": 5_000,
-    }
-    assert inspector._valid_windows_critical_dialog(windows_critical_dialog)
-    assert not inspector._valid_windows_critical_dialog(
-        {
-            **windows_critical_dialog,
-            "finished_signal": False,
+            "accessible_name": windows_accessibility["accessible_name"],
         }
     )
     archive = tmp_path / "RCMetaStudio-windows-x64.zip"
@@ -1791,12 +1765,9 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             (
                 "packaged-workflow:evidence-written",
                 "packaged-runtime-probe:passed",
-                "packaged-workflow:shell-created",
-                "packaged-workflow:project-open:start",
-                "packaged-workflow:project-open:return",
-                "packaged-workflow:paint:complete",
                 "packaged-workflow:project-exercise:complete",
                 "packaged-workflow:post-close",
+                "packaged-workflow:process-exit:0",
                 "packaged-surface:scale-1.25-passed",
                 "packaged-surface:scale-1.50-passed",
                 "packaged-surface:scale-1.75-passed",
@@ -1866,10 +1837,6 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                         "qt_scale_factor": scale,
                         "device_pixel_ratio": float(scale),
                         "baseline_device_pixel_ratio": 1.0,
-                        "expected_device_pixel_ratio": float(scale),
-                        "dpr_tolerance": 0.05,
-                        "clipboard": True,
-                        "critical_dialog": windows_critical_dialog,
                         "binary_resources": True,
                         "locale": "de_DE",
                         "platform_plugin": "windows",
@@ -1984,3 +1951,4 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
             inspector.inspect_archive(
                 bad_archive, archive_root_name=root, embedded_files=embedded
             )
+

@@ -16,7 +16,6 @@ from PyQt6.QtGui import (
     QKeySequence,
     QResizeEvent,
     QTextDocument,
-    QUndoCommand,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -35,8 +34,9 @@ else:
 from rc_metastudio import dataset_table_view
 from rc_metastudio import dataset_table_model
 from rc_metastudio import meta_globals
-from rc_metastudio.meta_globals import DEFAULT_DATASET_NAME, NETWORK_ANALYSIS_DISABLED
+from rc_metastudio.meta_globals import DEFAULT_DATASET_NAME
 from rc_metastudio import analysis_dataset
+from rc_metastudio import analysis_adapter
 from rc_metastudio import app_error_handler
 from rc_metastudio import r_backend
 from rc_metastudio import progress_dialog
@@ -63,17 +63,18 @@ from rc_metastudio.runtime_types import required
 from rc_metastudio import add_new_dialogs
 from rc_metastudio import results_window, analysis_setup_dialog
 from rc_metastudio import publication_bias_dialog
+from rc_metastudio import publication_bias
 from rc_metastudio import diagnostic_metrics_dialog
 from rc_metastudio import subgroup_analysis_dialog
 from rc_metastudio import edit_dialog
 from rc_metastudio import edit_name_dialogs
 from rc_metastudio import covariate_type_dialog
-from rc_metastudio import network_view_dialog
 from rc_metastudio import confidence_level_dialog
 from rc_metastudio import main_wizard
 from rc_metastudio import about_legal_dialog
 
 from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.workspace_session import WorkspaceSession
 
 
 def _qt_item_text(value):
@@ -105,33 +106,10 @@ def _resolve_open_file_path(file_path):
     return file_path
 
 
-def _load_structured_project(file_path):
-    document = project_format.load_project(file_path)
-    runtime_project = project_adapter.document_to_runtime_project(document)
-    return (
-        runtime_project.dataset,
-        runtime_project.model_state,
-        runtime_project.restored_selection,
-    )
-
-
-class InvalidProjectFileError(ValueError):
-    pass
-
-
-def _validate_open_project_dataset(dataset):
-    if isinstance(dataset, analysis_dataset.Dataset):
-        return dataset
-    raise InvalidProjectFileError(
-        "This file is not a valid RC MetaStudio project file."
-    )
-
-
 def _format_open_project_error(file_path, exception):
     if isinstance(
         exception,
         (
-            InvalidProjectFileError,
             project_adapter.ProjectAdapterError,
             project_format.ProjectFormatError,
         ),
@@ -236,6 +214,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.analysis_service = analysis_adapter.AnalysisService()
+        self.small_study_effects_service = publication_bias.SmallStudyEffectsService()
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setupUi(self)
         qt_layout.configure_analysis_menu(self.menuAnalysis)
@@ -277,9 +257,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.cl_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.statusbar.addWidget(self.cl_label, 1)
 
+        self.workspace = WorkspaceSession()
         self.new_dataset()
-
-        self.current_data_unsaved = False
 
         self.tableView.setModel(self.model)
         self.tableView.setItemDelegate(dataset_table_view.StudyDelegate(self.tableView))
@@ -289,7 +268,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.update_dimension()
         self._model_signal_connections = []
         self._setup_connections()
-        self.tableView.undoStack.cleanChanged.connect(self._undo_clean_changed)
         self._configure_standard_shortcuts()
         self.tableView.setSelectionMode(QTableView.SelectionMode.ContiguousSelection)
         self.model.reset_model()
@@ -305,11 +283,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         load_settings()
         self.populate_open_recent_menu()
-
-        if NETWORK_ANALYSIS_DISABLED:
-            self.action_view_network.setEnabled(False)
-        else:
-            self.action_view_network.setEnabled(False)
 
     def createPopupMenu(self):
         return None
@@ -366,7 +339,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         event.accept()
 
     def _confirm_close(self):
-        if not self.current_data_unsaved:
+        if not self.workspace.is_dirty:
             return True
         choice = self.prompt_to_save_unsaved_data()
         if choice == QMessageBox.StandardButton.Yes:
@@ -375,164 +348,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def _authorize_destructive_project_action(self):
         """Return whether New/Open/Import may replace the current project."""
-        if not self.current_data_unsaved:
+        if not self.workspace.is_dirty:
             return True
         choice = self.prompt_to_save_unsaved_data()
         if choice == QMessageBox.StandardButton.Yes:
             return self.save() is True
         return choice == QMessageBox.StandardButton.No
-
-    def _capture_project_install_state(self):
-        action_states = {
-            action: action.isEnabled()
-            for action in (
-                self.action_go,
-                self.action_cum_ma,
-                self.action_loo_ma,
-                self.action_meta_regression,
-                self.action_publication_bias,
-                self.action_subgroup_ma,
-            )
-        }
-        current = self.tableView.currentIndex()
-        return {
-            "model": self.model,
-            "table_model": self.tableView.model(),
-            "out_path": self.out_path,
-            "dirty": self.current_data_unsaved,
-            "dataset_label": self.dataset_file_lbl.text(),
-            "outcome_label": self.current_outcome_label.text(),
-            "follow_up_label": self.current_follow_up_label.text(),
-            "confidence_label": self.cl_label.text(),
-            "metric_menu_type": self.metric_menu_is_set_for,
-            "metric_menu": self._capture_metric_menu_state(),
-            "action_states": action_states,
-            "current_index": (current.row(), current.column()),
-            "selection": [
-                (index.row(), index.column())
-                for index in required(
-                    self.tableView.selectionModel(), "workspace selection model"
-                ).selectedIndexes()
-            ],
-        }
-
-    def _capture_metric_menu_state(self):
-        submenus = []
-        for menu_action in self.menuMetric.actions():
-            submenu = menu_action.menu()
-            if submenu is None:
-                continue
-            submenus.append(
-                {
-                    "title": submenu.title(),
-                    "actions": [
-                        {
-                            "metric": _qt_item_text(action.data()),
-                            "checked": action.isChecked(),
-                            "enabled": action.isEnabled(),
-                        }
-                        for action in submenu.actions()
-                    ],
-                }
-            )
-        return {"enabled": self.menuMetric.isEnabled(), "submenus": submenus}
-
-    def _restore_metric_menu_state(self, snapshot):
-        self.menuMetric.clear()
-        self.menuMetric.setEnabled(snapshot["enabled"])
-        for submenu_state in snapshot["submenus"]:
-            submenu = self.add_sub_metric_menu(submenu_state["title"])
-            if submenu_state["title"] == "two-arm":
-                self.twoArmMetricMenu = submenu
-            elif submenu_state["title"] == "one-arm":
-                self.oneArmMetricMenu = submenu
-            for action_state in submenu_state["actions"]:
-                action = self.add_metric_action(action_state["metric"], submenu)
-                action.blockSignals(True)
-                action.setChecked(action_state["checked"])
-                action.setEnabled(action_state["enabled"])
-                action.blockSignals(False)
-
-    def _restore_project_install_state(self, previous, primary_error):
-        rollback_errors = []
-
-        def guarded(phase, operation):
-            try:
-                operation()
-            except Exception as exc:
-                rollback_errors.append((phase, exc))
-
-        old_model = previous["model"]
-        if self.model is not old_model:
-
-            def disconnect_candidate():
-                for connection in self._model_signal_connections:
-                    try:
-                        connection.disconnect()
-                    except Exception as exc:
-                        rollback_errors.append(("disconnect candidate signal", exc))
-                self._model_signal_connections = []
-
-            guarded("disconnect candidate model", disconnect_candidate)
-            guarded(
-                "restore table model",
-                lambda: QTableView.setModel(self.tableView, previous["table_model"]),
-            )
-            self.model = old_model
-            guarded(
-                "restore model signal connections",
-                lambda: self._setup_connections(menu_actions=False),
-            )
-        self.out_path = previous["out_path"]
-        self.current_data_unsaved = previous["dirty"]
-        guarded(
-            "restore project label",
-            lambda: self.dataset_file_lbl.setText(previous["dataset_label"]),
-        )
-        guarded(
-            "restore outcome label",
-            lambda: self.current_outcome_label.setText(previous["outcome_label"]),
-        )
-        guarded(
-            "restore follow-up label",
-            lambda: self.current_follow_up_label.setText(previous["follow_up_label"]),
-        )
-        guarded(
-            "restore Confidence Level label",
-            lambda: self.cl_label.setText(previous["confidence_label"]),
-        )
-        self.metric_menu_is_set_for = previous["metric_menu_type"]
-        guarded(
-            "restore metric menu",
-            lambda: self._restore_metric_menu_state(previous["metric_menu"]),
-        )
-        for action, enabled in previous["action_states"].items():
-            guarded(
-                "restore action availability",
-                lambda action=action, enabled=enabled: action.setEnabled(enabled),
-            )
-
-        def restore_selection():
-            selection_model = required(
-                self.tableView.selectionModel(), "workspace selection model"
-            )
-            selection_model.clearSelection()
-            for row, column in previous["selection"]:
-                selection_model.select(
-                    old_model.index(row, column),
-                    QtCore.QItemSelectionModel.SelectionFlag.Select,
-                )
-            row, column = previous["current_index"]
-            if row >= 0 and column >= 0:
-                self.tableView.setCurrentIndex(old_model.index(row, column))
-
-        guarded("restore table selection", restore_selection)
-        for phase, exc in rollback_errors:
-            primary_error.add_note(f"rollback {phase} also failed: {exc}")
-            try:
-                app_error_handler.log_exception(type(exc), exc, exc.__traceback__)
-            except Exception:
-                pass
 
     def _update_recent_project_nonfatal(self, path, operation):
         try:
@@ -607,25 +428,25 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
     ):
 
         data_model = analysis_dataset.Dataset(title=name, is_diagnostic=is_diagnostic)
+        # A new workspace needs one durable study for outcome setup. The table
+        # model's editable trailing row remains presentation-only.
+        data_model.add_study(analysis_dataset.Study(data_model.max_study_id() + 1))
         existing_model = getattr(self, "model", None)
         if existing_model is not None:
             if use_undo_framework:
-                original_dataset = copy.deepcopy(existing_model.dataset)
-                old_state_dict = self.tableView.model().get_state()
-
-                def undo_f():
-                    return self.set_model(original_dataset, old_state_dict)
-
-                def redo_f():
-                    return self.set_model(data_model)
-
-                edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-                self.tableView.undoStack.push(edit_command)
+                self._commit_model_operation(lambda: self.set_model(data_model))
             else:  # CSV import manages its own undo boundary.
                 self.set_model(data_model)
         else:
             self.model = dataset_table_model.DatasetTableModel(dataset=data_model)
             self.disable_menu_options_that_require_dataset()
+            self.workspace.update_live_state(
+                project_adapter.RuntimeProject(
+                    dataset=self.model.dataset,
+                    model_state=self.model.get_state(),
+                    restored_selection=False,
+                )
+            )
         self.out_path = None
 
     def _notify_user_that_data_is_unsaved(self):
@@ -732,7 +553,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             change_cl_command = ChangeConfidenceLevelCommand(
                 previous_confidence_level, new_confidence_level, mainform=self
             )
-            self.tableView.undoStack.push(change_cl_command)
+            self._commit_model_operation(change_cl_command.redo)
 
     def _import_csv(self):
         """Import data from csv file"""
@@ -750,6 +571,13 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             app_error_handler.connect_safely(
                 model.workspaceEditCommitted,
                 self.tableView.cell_content_changed,
+                parent=self,
+            )
+        )
+        self._model_signal_connections.append(
+            app_error_handler.connect_safely(
+                model.workspaceEditCommitted,
+                self._workspace_edit_committed,
                 parent=self,
             )
         )
@@ -814,7 +642,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             )
 
             _connect_action(self.action_edit, self.edit_dataset)
-            _connect_action(self.action_view_network, self.view_network)
             _connect_action(self.action_add_covariate, self.add_covariate)
 
             _connect_action(self.action_meta_regression, self.meta_reg)
@@ -858,16 +685,40 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         form.show()
 
     def publication_bias(self):
-        form = publication_bias_dialog.PublicationBiasDialog(self.model, parent=self)
+        form = publication_bias_dialog.PublicationBiasDialog(
+            self.model,
+            parent=self,
+            analysis_service=self.small_study_effects_service,
+        )
         form.exec()
 
     def data_dirtied(self):
         self._notify_user_that_data_is_unsaved()
-        self.current_data_unsaved = True
+        try:
+            runtime = project_adapter.RuntimeProject(
+                dataset=self.model.dataset,
+                model_state=self.model.get_state(),
+                restored_selection=self.model.current_outcome_name is not None,
+            )
+        except project_adapter.ProjectAdapterError:
+            self.workspace.mark_dirty()
+        else:
+            self.workspace.update_live_state(runtime)
+            self.workspace.checkpoint()
+
+    def _workspace_edit_committed(self, _edit):
+        self.data_dirtied()
+
+    def _commit_model_operation(self, operation):
+        """Run one already validated UI operation as one workspace change."""
+        self.workspace.begin_change()
+        try:
+            operation()
+        finally:
+            self.workspace.end_change()
 
     def _undo_clean_changed(self, is_clean):
         """Keep project dirty state aligned with the active undo history."""
-        self.current_data_unsaved = not bool(is_clean)
         if not is_clean:
             self._notify_user_that_data_is_unsaved()
 
@@ -947,7 +798,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 kwargs["external_params"] = external_params
             if diagnostic_metrics is not None:
                 kwargs["diagnostic_metrics"] = diagnostic_metrics
-            return analysis_setup_dialog.AnalysisSetupDialog(self.model, **kwargs)
+            return analysis_setup_dialog.AnalysisSetupDialog(
+                self.model, analysis_service=self.analysis_service, **kwargs
+            )
         except Exception as e:
             self._show_analysis_specs_error(e)
             return None
@@ -975,13 +828,35 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         QMessageBox.critical(self, "Could Not Prepare Analysis", message)
 
     def undo(self):
-        self.tableView.undoStack.undo()
+        if self.workspace.undo():
+            runtime = self.workspace.runtime
+            if runtime is not None:
+                self._install_workspace_runtime(runtime)
 
     def redo(self):
-        self.tableView.undoStack.redo()
+        if self.workspace.redo():
+            runtime = self.workspace.runtime
+            if runtime is not None:
+                self._install_workspace_runtime(runtime)
+
+    def _install_workspace_runtime(self, runtime):
+        target_digest = self.workspace.runtime_digest
+        current = self.tableView.currentIndex()
+        position = (current.row(), current.column()) if current.isValid() else None
+        self._set_model_adapter(
+            runtime.dataset,
+            runtime.model_state,
+            preserve_state_selection=runtime.restored_selection,
+            recalculate_outcomes=False,
+        )
+        self.workspace.update_live_state(runtime)
+        self.workspace.checkpoint(expected_digest=target_digest)
+        self.out_path = str(self.workspace.path) if self.workspace.path else None
+        if position is not None:
+            self.tableView.setCurrentIndex(self.model.index(*position))
 
     def edit_dataset(self):
-        current_dataset = copy.deepcopy(self.model.dataset)
+        current_dataset = self.workspace.snapshot().dataset
         edit_window = edit_dialog.EditDialog(current_dataset, parent=self)
 
         if edit_window.exec():
@@ -1021,16 +896,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 new_state_dict["current_groups"] = meta_globals.DEFAULT_GROUP_NAMES
             modified_dataset = edit_window.dataset
 
-            def redo_f():
-                return self.set_model(modified_dataset, new_state_dict)
-
-            original_dataset = copy.deepcopy(self.model.dataset)
-
-            def undo_f():
-                return self.set_model(original_dataset, old_state_dict)
-
-            edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(edit_command)
+            self._commit_model_operation(
+                lambda: self.set_model(modified_dataset, new_state_dict)
+            )
 
     def populate_metrics_menu(self, metric_to_check=None):
         """Populates the `metric` sub-menu with available metrics for the
@@ -1147,13 +1015,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 action.blockSignals(False)
 
         self.tableView.model().set_current_metric(metric_name)
-        self.model.try_to_update_outcomes()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
-
-    def view_network(self):
-        view_window = network_view_dialog.NetworkViewDialog(self.model, parent=self)
-        view_window.show()
 
     def analysis(self, results: AnalysisResult):
         try:
@@ -1193,7 +1057,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.model.rename_group(new_group_name, orig_group_name)
 
             rename_group_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(rename_group_command)
+            self._commit_model_operation(rename_group_command.redo)
 
     def add_covariate(self):
         form = add_new_dialogs.AddCovariateDialog(self)
@@ -1210,8 +1074,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
             # Covariate names must remain unique.
             new_covariate_type = str(form.datatype_cbo_box.currentText()).lower()
-            self.tableView.undoStack.push(
-                self._make_add_covariate_command(new_covariate_name, new_covariate_type)
+            self._commit_model_operation(
+                self._make_add_covariate_command(
+                    new_covariate_name, new_covariate_type
+                ).redo
             )
 
     def _make_add_covariate_command(self, covariate_name, covariate_type):
@@ -1335,7 +1201,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             next_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(next_command)
+            self._commit_model_operation(next_command.redo)
 
     def _add_new_group(self, new_group_name):
         self.model.add_new_group(new_group_name)
@@ -1414,7 +1280,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             next_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(next_command)
+            self._commit_model_operation(next_command.redo)
 
     def previous(self):
         redo_f, undo_f = None, None
@@ -1448,7 +1314,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         if redo_f is not None and undo_f is not None:
             prev_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(prev_command)
+            self._commit_model_operation(prev_command.redo)
 
     def next_dimension(self):
         """In keeping with the dimensions metaphor, wherein the various
@@ -1476,7 +1342,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
     def display_groups(self, groups):
         self.model.set_current_groups(groups)
-        self.model.try_to_update_outcomes()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
@@ -1522,12 +1388,14 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.current_follow_up_label.setText(
             "<font color='Blue'>%s</font>" % self.model.get_current_follow_up_name()
         )
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
     def display_follow_up(self, time_point):
         self.model.current_follow_up_index = time_point
         self.update_follow_up_label()
+        self.model.hydrate_derived_previews()
         self.model.reset_model()
         self.tableView.synchronize_column_widths()
 
@@ -1562,12 +1430,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         file_path = _resolve_open_file_path(file_path)
 
-        data_model = None
         try:
-            data_model, state_dict, restored_selection = _load_structured_project(
-                file_path
-            )
-            data_model = _validate_open_project_dataset(data_model)
+            self.workspace.open(file_path, install=self._install_open_document)
         except Exception as e:
             msg = _format_open_project_error(file_path, e)
             if raise_on_error:
@@ -1575,34 +1439,66 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             QMessageBox.critical(self, "Could Not Open Project", msg)
             return None
 
-        previous = self._capture_project_install_state()
-        try:
-            self.set_model(
-                data_model,
-                state_dict,
-                check_for_appropriate_metric=not restored_selection,
-                preserve_state_selection=restored_selection,
-                recalculate_outcomes=False,
-            )
-            self.model.analysis_source_path = file_path
-            self.dataset_file_lbl.setText("Open Project: %s" % file_path)
-        except Exception as e:
-            self._restore_project_install_state(previous, e)
-            msg = _format_open_project_error(file_path, e)
-            try:
-                app_error_handler.log_exception(type(e), e, e.__traceback__)
-            except Exception:
-                pass
-            if raise_on_error:
-                raise RuntimeError(msg) from e
-            QMessageBox.critical(self, "Could Not Open Project", msg)
-            return None
         self.out_path = file_path
-        self.tableView.undoStack.clear()
-        self.current_data_unsaved = False
+        self.model.analysis_source_path = file_path
+        self.dataset_file_lbl.setText("Open Project: %s" % file_path)
         self._update_recent_project_nonfatal(file_path, "opened")
-
         return True
+
+    def _install_open_document(self, document):
+        """Adapt a validated session document into the live Qt model."""
+        runtime = document
+        previous_model = self.model
+        previous_current = self.tableView.currentIndex()
+        current_cell = (
+            (previous_current.row(), previous_current.column())
+            if previous_current.isValid()
+            else None
+        )
+        selection_model = required(
+            self.tableView.selectionModel(), "workspace selection model"
+        )
+        selected_cells = [
+            (index.row(), index.column()) for index in selection_model.selectedIndexes()
+        ]
+        try:
+            self._set_model_adapter(
+                runtime.dataset,
+                runtime.model_state,
+                check_for_appropriate_metric=not runtime.restored_selection,
+                preserve_state_selection=runtime.restored_selection,
+                recalculate_outcomes=True,
+            )
+        except Exception:
+            self._restore_failed_open(previous_model, current_cell, selected_cells)
+            raise
+
+    def _restore_failed_open(self, model, current_cell, selected_cells):
+        """Restore the live Qt adapter after a candidate model fails to install."""
+        self._disconnect_model_signals()
+        self.model = model
+        self.tableView.restore_model(model)
+        self._setup_connections(menu_actions=False)
+        if len(model.dataset) >= 2:
+            self.enable_menu_options_that_require_dataset()
+        else:
+            self.disable_menu_options_that_require_dataset()
+        self._refresh_advanced_analysis_actions()
+        self.populate_metrics_menu(metric_to_check=model.current_effect)
+        self.update_outcome_lbl()
+        self.update_follow_up_label()
+        selection_model = required(
+            self.tableView.selectionModel(), "workspace selection model"
+        )
+        selection_model.clearSelection()
+        select = QtCore.QItemSelectionModel.SelectionFlag.Select
+        for row, column in selected_cells:
+            selection_model.select(model.index(row, column), select)
+        if current_cell is not None:
+            selection_model.setCurrentIndex(
+                model.index(*current_cell),
+                QtCore.QItemSelectionModel.SelectionFlag.NoUpdate,
+            )
 
     def delete_study(self, study, study_index=None):
         def undo_f():
@@ -1612,10 +1508,10 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             return self._remove_study(study)
 
         delete_command = meta_globals.CallbackCommand(redo_f, undo_f)
-        self.tableView.undoStack.push(delete_command)
+        self._commit_model_operation(delete_command.redo)
 
     def change_covariate_type(self, covariate):
-        current_dataset = copy.deepcopy(self.model.dataset)
+        current_dataset = self.workspace.snapshot().dataset
         # keep the current study order, because we're going to sort the studies
         # on the change_cov_form but we want to revert to the ordering
         # they came in with when we're done.
@@ -1641,16 +1537,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             old_state_dict = self.tableView.model().get_state()
             new_state_dict = copy.deepcopy(old_state_dict)
 
-            def redo_f():
-                return self.set_model(modified_dataset, new_state_dict)
-
-            original_dataset = copy.deepcopy(self.model.dataset)
-
-            def undo_f():
-                return self.set_model(original_dataset, old_state_dict)
-
-            edit_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(edit_command)
+            self._commit_model_operation(
+                lambda: self.set_model(modified_dataset, new_state_dict)
+            )
 
     def rename_covariate(self, covariate):
         orig_cov_name = copy.copy(covariate.name)
@@ -1682,9 +1571,12 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 return self.model.rename_covariate(new_cov, orig_cov_name)
 
             rename_cov_command = meta_globals.CallbackCommand(redo_f, undo_f)
-            self.tableView.undoStack.push(rename_cov_command)
+            self._commit_model_operation(rename_cov_command.redo)
 
     def delete_covariate(self, covariate):
+        # Synchronize direct model edits made by an adapter before publishing
+        # the next atomic workspace change.
+        self.data_dirtied()
         covariate_values_by_study = self.model.dataset.get_covariate_values(
             covariate.name
         )
@@ -1704,7 +1596,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self._refresh_advanced_analysis_actions()
 
         delete_command = meta_globals.CallbackCommand(redo_f, undo_f)
-        self.tableView.undoStack.push(delete_command)
+        self._commit_model_operation(delete_command.redo)
 
     def _refresh_advanced_analysis_actions(self):
         self._enable_action_meta_regression()
@@ -1721,6 +1613,23 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.data_dirtied()
 
     def set_model(
+        self,
+        data_model,
+        state_dict=None,
+        check_for_appropriate_metric=False,
+        preserve_state_selection=False,
+        recalculate_outcomes=True,
+    ):
+        self._set_model_adapter(
+            data_model,
+            state_dict=state_dict,
+            check_for_appropriate_metric=check_for_appropriate_metric,
+            preserve_state_selection=preserve_state_selection,
+            recalculate_outcomes=recalculate_outcomes,
+        )
+        self.data_dirtied()
+
+    def _set_model_adapter(
         self,
         data_model,
         state_dict=None,
@@ -1758,7 +1667,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             preserve_selection=preserve_state_selection,
             recalculate_outcomes=recalculate_outcomes,
         )
-        self.data_dirtied()
 
     def model_updated(self, preserve_selection=False, recalculate_outcomes=True):
         """Call me when the model is changed."""
@@ -1780,12 +1688,8 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.model.update_current_outcome()
             self.model.update_current_time_points()
 
-        if (
-            recalculate_outcomes
-            and self.model.current_outcome_name is not None
-            and not self.model.is_diagnostic()
-        ):
-            self.model.try_to_update_outcomes()
+        if recalculate_outcomes and self.model.current_outcome_name is not None:
+            self.model.hydrate_derived_previews()
 
         # The retired model remains connected to its slots, so reconnect the
         # view but not menu actions, which would otherwise accumulate handlers.
@@ -1855,12 +1759,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
 
         durability_error = None
         try:
-            project = project_adapter.dataset_to_project(self.model.dataset)
-            state = project_adapter.model_to_state(self.model)
-            project_format.save_project(destination, project, state)
+            self.data_dirtied()
+            self.workspace.save(destination)
         except project_format.ProjectDurabilityError as e:
-            # Atomic replacement already happened. Treat the installed document
-            # as the current saved project while reporting durability uncertainty.
             durability_error = e
         except Exception as e:
             app_error_handler.log_exception(type(e), e, e.__traceback__)
@@ -1877,8 +1778,6 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         self.out_path = destination
         self.model.analysis_source_path = destination
         self.dataset_file_lbl.setText("Open Project: %s" % destination)
-        self.tableView.undoStack.setClean()
-        self.current_data_unsaved = False
         if durability_error is not None:
             self._report_durability_uncertain_save(destination, durability_error)
         self._update_recent_project_nonfatal(destination, "saved")
@@ -1913,48 +1812,27 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
         elif path == "csv_import":
             csv_data = wizard_data["csv_data"]
 
-            # Back-up original dataset
-            original_dataset = copy.deepcopy(self.model.dataset)
-            old_state_dict = self.tableView.model().get_state()
+            def import_csv() -> None:
+                self._make_new_dataset_and_setup_spreadsheet(dataset_info)
+                ImportCsvCommand(
+                    imported_data=csv_data["data"],
+                    main_form=self,
+                    covariate_names=csv_data["covariate_names"],
+                    covariate_types=csv_data["covariate_types"],
+                ).redo()
 
-            self._make_new_dataset_and_setup_spreadsheet(dataset_info)
-
-            new_dataset = copy.deepcopy(self.model.dataset)
-            new_state_dict = self.tableView.model().get_state()
-
-            imported_data = csv_data["data"]
-            # Note: may want at some point to access the headers provided in the CSV;
-            #     these are accessible at csv_data['headers'] and
-            covariate_names = csv_data["covariate_names"]
-            covariate_types = csv_data["covariate_types"]
-
-            importcsv_command = ImportCsvCommand(
-                original_dataset=original_dataset,
-                old_state_dict=old_state_dict,
-                new_dataset=new_dataset,
-                new_state_dict=new_state_dict,
-                imported_data=imported_data,
-                main_form=self,
-                covariate_names=covariate_names,
-                covariate_types=covariate_types,
-            )
-            self.tableView.undoStack.push(importcsv_command)
+            self._commit_model_operation(import_csv)
 
 
-class ImportCsvCommand(QUndoCommand):
+class ImportCsvCommand:
     def __init__(
         self,
-        original_dataset=None,
-        old_state_dict=None,
-        new_dataset=None,
-        new_state_dict=None,
         main_form=None,
         imported_data=None,
         covariate_names=None,
         covariate_types=None,
         description="Import a CSV file",
     ):
-        super(ImportCsvCommand, self).__init__(description)
         if main_form is None:
             raise ValueError("CSV import requires a main form")
         self.imported_data = csv_import.normalize_import_rows(imported_data or [])
@@ -1962,32 +1840,10 @@ class ImportCsvCommand(QUndoCommand):
         self.covariate_types = list(covariate_types or [])
         self.main_form: MainWindow = main_form
 
-        self.original_dataset = original_dataset
-        self.old_state_dict = old_state_dict
-        self.new_dataset = new_dataset
-        self.new_state_dict = new_state_dict
-
-        self.new_dataset_has_imported_data = False
-
     def redo(self):
-        if (
-            self.new_dataset_has_imported_data
-        ):  # already imported once before, this is a real 'redo'
-            self.main_form.set_model(self.new_dataset, self.new_state_dict)
-        else:  # this a first run
-            self._import_data_into_new_dataset()
-            self.new_dataset = copy.deepcopy(self.main_form.model.dataset)
-            self.new_state_dict = self.main_form.tableView.model().get_state()
-            self.new_dataset_has_imported_data = True
-
-    def undo(self):
-        self.main_form.set_model(self.original_dataset, self.old_state_dict)
-        self.main_form.model.reset_model()
-        QApplication.processEvents()
+        self._import_data_into_new_dataset()
 
     def _import_data_into_new_dataset(self):
-        self.main_form.set_model(self.new_dataset, self.new_state_dict)
-
         num_rows = len(self.imported_data)
         if num_rows == 0:
             return
@@ -2018,7 +1874,7 @@ class ImportCsvCommand(QUndoCommand):
             progress_dialog.hide_once(import_progress)
 
 
-class ChangeConfidenceLevelCommand(QUndoCommand):
+class ChangeConfidenceLevelCommand:
     """Undo a confidence-level change."""
 
     def __init__(
@@ -2028,7 +1884,6 @@ class ChangeConfidenceLevelCommand(QUndoCommand):
         mainform,
         description="Change confidence level",
     ):
-        super(ChangeConfidenceLevelCommand, self).__init__(description)
 
         self.old_cl = old_conf_lvl
         self.new_cl = new_conf_lvl

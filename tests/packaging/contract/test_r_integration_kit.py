@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 import types
-from typing import Any
 import tarfile
 
 import pytest
@@ -32,6 +31,17 @@ def provenance_module():
     loaded = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(loaded)
     return loaded
+
+
+def record(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise AssertionError("expected a record")
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise AssertionError("expected string record keys")
+        result[key] = item
+    return result
 
 
 def test_source_license_inventory_retains_copyrights(tmp_path):
@@ -286,12 +296,12 @@ def test_arm64_kit_requires_macos_14(monkeypatch, tmp_path):
 
 def test_windows_closure_records_normal_delay_and_system_imports():
     kit = module()
-    dependency: dict[str, Any] = {
+    dependency: dict[str, object] = {
         "path": "runtime/bin/x64/dependency.dll",
         "sha256": "d" * 64,
         "_imports": [],
     }
-    owner: dict[str, Any] = {
+    owner: dict[str, object] = {
         "path": "bridge/api.pyd",
         "sha256": "a" * 64,
         "_imports": [
@@ -321,19 +331,22 @@ def test_macos_deployment_versions_normalize_trailing_zero_components():
 
 def test_windows_msvc_runtime_is_not_classified_as_a_system_import():
     kit = module()
-    runtime: dict[str, Any] = {
+    runtime: dict[str, object] = {
         "path": "native/vcruntime140.dll",
         "sha256": "d" * 64,
         "_imports": [],
     }
-    owner: dict[str, Any] = {
+    owner: dict[str, object] = {
         "path": "bridge/api.pyd",
         "sha256": "a" * 64,
         "_imports": [{"name": "VCRUNTIME140.dll", "kind": "delay"}],
     }
     kit._resolve_windows_closure([runtime, owner])
-    assert owner["imports"][0]["resolution"] == "kit"
-    assert owner["imports"][0]["resolved_path"] == "native/vcruntime140.dll"
+    imports = owner.get("imports")
+    assert isinstance(imports, list)
+    first_import = record(imports[0])
+    assert first_import.get("resolution") == "kit"
+    assert first_import.get("resolved_path") == "native/vcruntime140.dll"
 
 
 @pytest.mark.parametrize("matches", [0, 2])
@@ -364,14 +377,14 @@ def test_macos_closure_resolves_loader_path_and_rejects_forbidden_prefix(tmp_pat
     dependency_path.parent.mkdir(parents=True)
     owner_path.write_bytes(b"owner")
     dependency_path.write_bytes(b"dependency")
-    dependency: dict[str, Any] = {
+    dependency: dict[str, object] = {
         "path": "runtime/lib/libR.dylib",
         "sha256": "d" * 64,
         "install_id": "@rpath/libR.dylib",
         "rpaths": [],
         "_imports": [],
     }
-    owner: dict[str, Any] = {
+    owner: dict[str, object] = {
         "path": "bridge/api.so",
         "sha256": "a" * 64,
         "install_id": None,
@@ -379,7 +392,10 @@ def test_macos_closure_resolves_loader_path_and_rejects_forbidden_prefix(tmp_pat
         "_imports": ["@loader_path/../runtime/lib/libR.dylib"],
     }
     kit._resolve_macos_closure([owner, dependency], tmp_path)
-    assert owner["imports"][0]["resolved_path"] == dependency["path"]
+    imports = owner.get("imports")
+    assert isinstance(imports, list)
+    first_import = record(imports[0])
+    assert first_import.get("resolved_path") == dependency["path"]
     owner["_imports"] = ["/opt/X11/lib/libX11.6.dylib"]
     owner.pop("imports")
     with pytest.raises(kit.KitError, match="forbidden external"):

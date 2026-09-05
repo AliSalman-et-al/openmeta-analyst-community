@@ -6,13 +6,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypeAlias, runtime_checkable
+import hashlib
+import json
+from typing import Literal, Protocol, TypeAlias, cast, runtime_checkable
 
 from rc_metastudio import r_bridge
 from rc_metastudio import analysis_dataset
 from rc_metastudio import result_sections
 from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.analysis_errors import DiagnosticExecutionError
+from rc_metastudio.r_backend import AnalysisBackendUnavailableError
 
 
 AnalysisValue: TypeAlias = bool | int | float | str | None
@@ -85,9 +88,40 @@ class AnalysisRequest:
     method: str
     metric: str
     parameters: tuple[AnalysisParameter, ...]
+    version: int = 1
 
     def __post_init__(self) -> None:
+        if self.version != 1:
+            raise ValueError(f"unsupported analysis request version: {self.version}")
         _required_text("metric", self.metric)
+
+    @property
+    def semantic_id(self) -> str:
+        """Stable identity for this request's meaning, excluding presentation."""
+        payload = {
+            "data_type": self.data_type,
+            "metric": self.metric,
+            "method": self.method,
+            "parameters": [(item.name, item.value) for item in self.parameters],
+            "version": self.version,
+            "workflow": self.workflow,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    def to_mapping(self) -> dict[str, object]:
+        """Return the explicit wire representation consumed by RCMetaR."""
+        parameters = self.parameter_values()
+        parameters.setdefault("measure", self.metric)
+        return {
+            "version": self.version,
+            "data_type": self.data_type,
+            "workflow": self.workflow,
+            "method": self.method,
+            "metric": self.metric,
+            "params": parameters,
+        }
 
     def parameter_values(self) -> dict[str, AnalysisValue]:
         return {parameter.name: parameter.value for parameter in self.parameters}
@@ -100,6 +134,116 @@ class StudySelectionResult:
     studies: tuple[analysis_dataset.Study, ...]
     has_missing_values: bool
     excluded_study_names: tuple[str, ...] = ()
+
+
+class AnalysisService:
+    """Own the process-global R boundary used by analysis configuration UI."""
+
+    def prepare_method_dataset(
+        self, model: object, data_type: str, *, var_name: str = "tmp_obj"
+    ) -> None:
+        if data_type == "binary":
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_binary_r_object(
+                    model, var_name=var_name
+                )
+            )
+            return
+        if data_type == "continuous":
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_continuous_r_object(
+                    model, var_name=var_name
+                )
+            )
+            return
+        if data_type == "diagnostic":
+            _require_backend(
+                lambda: r_bridge.dataset_to_simple_diagnostic_r_object(
+                    model, var_name=var_name
+                )
+            )
+            return
+        raise ValueError(f"unsupported analysis data family: {data_type!r}")
+
+    def available_methods(self, **query: object) -> Mapping[str, str]:
+        return _require_backend(lambda: r_bridge.get_available_methods(**query))
+
+    def parameters(self, method: str):
+        return _require_backend(lambda: r_bridge.get_params(method))
+
+    def method_description(self, method: str) -> str:
+        return _require_backend(lambda: r_bridge.get_method_description(method))
+
+    def plot_capabilities(
+        self, data_type: str, method: str, *, workflow: str
+    ) -> list[Mapping[str, object]]:
+        return _require_backend(
+            lambda: r_bridge.get_analysis_plot_capabilities(
+                data_type, method, workflow=workflow
+            )
+        )
+
+    def select_studies_for_covariates(
+        self,
+        model: CovariateSelectionModel,
+        selected_covariates: Sequence[analysis_dataset.Covariate],
+    ) -> StudySelectionResult:
+        return select_studies_for_covariates(model, selected_covariates)
+
+    def make_request(
+        self,
+        *,
+        data_type: str,
+        workflow: str | None,
+        method: str,
+        metric: str,
+        parameters: Mapping[str, object],
+    ) -> AnalysisRequest:
+        return make_analysis_request(
+            data_type=data_type,
+            workflow=workflow,
+            method=method,
+            metric=metric,
+            parameters=parameters,
+        )
+
+    def execute(
+        self,
+        model: object,
+        requests: Sequence[AnalysisRequest],
+        selected_covariates: Sequence[analysis_dataset.Covariate] = (),
+    ) -> AnalysisResult:
+        return execute_analysis_requests(model, requests, selected_covariates)
+
+    def execute_meta_regression(
+        self,
+        model: MetaRegressionModel,
+        studies: Sequence[analysis_dataset.Study],
+        selected_covariates: Sequence[analysis_dataset.Covariate],
+        request: AnalysisRequest,
+        fixed_effects: bool,
+        default_confidence_level: AnalysisValue,
+    ) -> AnalysisResult:
+        return execute_meta_regression_request(
+            model,
+            studies,
+            selected_covariates,
+            request,
+            fixed_effects,
+            default_confidence_level,
+        )
+
+    def reset_working_directory(self) -> None:
+        r_bridge.reset_r_working_directory()
+
+
+def _require_backend(operation):
+    try:
+        return operation()
+    except KeyError as error:
+        raise AnalysisBackendUnavailableError(
+            "The embedded RCMetaR function registry is unavailable."
+        ) from error
 
 
 def select_studies_for_covariates(
@@ -201,6 +345,13 @@ def _native_value(value: object) -> AnalysisValue:
     )
 
 
+def _typed_result(value: object) -> AnalysisResult:
+    """Parse raw boundary data once; R bridge results are already typed."""
+    if isinstance(value, AnalysisResult):
+        return value
+    return parse_analysis_result(value)
+
+
 def execute_analysis_requests(
     model: object,
     requests: Sequence[AnalysisRequest],
@@ -214,24 +365,48 @@ def execute_analysis_requests(
         raise ValueError("One execution cannot mix analysis data families.")
     data_type = requests[0].data_type
     if data_type == "binary":
-        if len(requests) != 1:
-            raise ValueError("Binary execution requires exactly one request.")
-        conversion_kwargs = _conversion_kwargs(selected_covariates)
-        r_bridge.dataset_to_simple_binary_r_object(model, **conversion_kwargs)
-        return parse_analysis_result(_run_binary_request(requests[0]))
+        return _execute_binary_request(model, requests, selected_covariates)
     if data_type == "continuous":
-        if len(requests) != 1:
-            raise ValueError("Continuous execution requires exactly one request.")
-        conversion_kwargs = _conversion_kwargs(selected_covariates)
-        r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
-        return parse_analysis_result(_run_continuous_request(requests[0]))
+        return _execute_continuous_request(model, requests, selected_covariates)
     if data_type == "diagnostic":
-        if not isinstance(model, DiagnosticExecutionModel):
-            raise TypeError(
-                "Diagnostic execution requires the diagnostic model queries."
-            )
-        return _run_diagnostic_analysis_isolating_metric_failures(model, requests)
+        return _execute_diagnostic_request(model, requests)
     raise ValueError("Unsupported analysis data family: %s" % data_type)
+
+
+def _execute_binary_request(
+    model: object,
+    requests: Sequence[AnalysisRequest],
+    selected_covariates: Sequence[analysis_dataset.Covariate],
+) -> AnalysisResult:
+    if len(requests) != 1:
+        raise ValueError("Binary execution requires exactly one request.")
+    r_bridge.dataset_to_simple_binary_r_object(
+        model, **_conversion_kwargs(selected_covariates)
+    )
+    return _typed_result(r_bridge.run_versioned_analysis_request(requests[0].to_mapping()))
+
+
+def _execute_continuous_request(
+    model: object,
+    requests: Sequence[AnalysisRequest],
+    selected_covariates: Sequence[analysis_dataset.Covariate],
+) -> AnalysisResult:
+    if len(requests) != 1:
+        raise ValueError("Continuous execution requires exactly one request.")
+    r_bridge.dataset_to_simple_continuous_r_object(
+        model, **_conversion_kwargs(selected_covariates)
+    )
+    return _typed_result(
+        r_bridge.run_versioned_analysis_request(requests[0].to_mapping())
+    )
+
+
+def _execute_diagnostic_request(
+    model: object, requests: Sequence[AnalysisRequest]
+) -> AnalysisResult:
+    if not isinstance(model, DiagnosticExecutionModel):
+        raise TypeError("Diagnostic execution requires the diagnostic model queries.")
+    return _run_diagnostic_analysis_isolating_metric_failures(model, requests)
 
 
 def execute_small_study_effects_request(model, request):
@@ -255,7 +430,7 @@ def execute_meta_regression_request(
     selected_covariates: Sequence[analysis_dataset.Covariate],
     request: AnalysisRequest,
     fixed_effects: bool,
-    default_confidence_level: object,
+    default_confidence_level: AnalysisValue,
 ) -> AnalysisResult:
     """Convert the dataset and execute one frozen meta-regression request."""
     conversion_kwargs = {
@@ -270,52 +445,48 @@ def execute_meta_regression_request(
         r_bridge.dataset_to_simple_continuous_r_object(model, **conversion_kwargs)
     elif request.data_type == "binary":
         r_bridge.dataset_to_simple_binary_r_object(
-            model, include_raw_data=False, **conversion_kwargs
+            model, **conversion_kwargs
         )
     else:
         raise ValueError(
             "Unsupported meta-regression data family: %s" % request.data_type
         )
     parameters = request.parameter_values()
-    return parse_analysis_result(
-        r_bridge.run_meta_regression(
-            model.dataset,
-            list(studies),
-            list(selected_covariates),
-            request.metric,
-            fixed_effects=fixed_effects,
-            confidence_level=parameters.get("conf.level", default_confidence_level),
-            params=parameters,
-            method=request.method,
-        )
+    if request.data_type == "binary":
+        parameters.setdefault("to", "only0")
+        parameters.setdefault("adjust", 0.5)
+    parameters.setdefault("conf.level", default_confidence_level)
+    parameters["rm.method"] = (
+        "FE" if fixed_effects else parameters.get("rm.method", "DL")
     )
+    versioned = dict(request.to_mapping())
+    versioned["workflow"] = "meta-regression"
+    versioned["params"] = parameters
+    return _typed_result(r_bridge.run_versioned_analysis_request(versioned))
 
 
 def _run_diagnostic_backend(workflow, method_names, parameter_values):
-    if workflow == "standard":
-        return r_bridge.run_diagnostic_multi(method_names, parameter_values)
-    return r_bridge.run_diagnostic_workflow(workflow, method_names, parameter_values)
-
-
-def _run_binary_request(request):
-    parameters = request.parameter_values()
-    if request.workflow == "standard":
-        return r_bridge.run_binary_analysis(request.method, parameters)
-    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
-
-
-def _run_continuous_request(request):
-    parameters = request.parameter_values()
-    if request.workflow == "standard":
-        return r_bridge.run_continuous_analysis(request.method, parameters)
-    return r_bridge.run_workflow_analysis(request.workflow, request.method, parameters)
+    requests = [
+        {
+            "version": 1,
+            "data_type": "diagnostic",
+            "workflow": workflow,
+            "method": method,
+            "metric": params.get("measure", "DOR"),
+            "params": params,
+        }
+        for method, params in zip(method_names, parameter_values, strict=True)
+    ]
+    return r_bridge.run_versioned_analysis_requests(requests)
 
 
 def _diagnostic_direct_effects_need_metric_specific_data(model, requests):
     if model.included_studies_have_raw_data():
         return False
 
-    joint_methods = [request for request in requests if request.method == "diagnostic.reitsma"]
+    joint_methods = [
+        request for request in requests if request.method == "diagnostic.reitsma"
+    ]
     if joint_methods:
         raise ValueError(
             "Reitsma bivariate model requires complete TP/FN/FP/TN counts; "
@@ -347,7 +518,7 @@ def _run_diagnostic_analysis_isolating_metric_failures(model, requests):
         method_names = [request.method for request in requests]
         parameter_values = [request.parameter_values() for request in requests]
         workflow = requests[0].workflow
-        return parse_analysis_result(
+        return _typed_result(
             _run_diagnostic_backend(workflow, method_names, parameter_values)
         )
     except DiagnosticExecutionError:
@@ -379,23 +550,34 @@ def _run_diagnostic_methods_per_metric(requests, run_metric):
     for request in requests:
         metric = request.metric
         try:
-            metric_result = parse_analysis_result(run_metric(request))
+            metric_result = _typed_result(run_metric(request))
         except DiagnosticExecutionError as e:
             failures.append((metric, e))
-            merged_result["texts"]["%s Error" % metric] = str(e)
+            title = "%s Error" % metric
+            cast(dict[str, str], merged_result["texts"])[title] = str(e)
+            cast(list[dict[str, object]], merged_result["sections"]).append(
+                {
+                    "id": "diagnostic.%s.error" % metric.lower(),
+                    "kind": "text",
+                    "order": len(cast(list[object], merged_result["sections"])),
+                    "title": title,
+                    "source_key": title,
+                }
+            )
         else:
             _merge_diagnostic_result(merged_result, metric_result)
 
-    if failures and not _diagnostic_result_has_successes(merged_result):
+    if failures and not _diagnostic_result_has_successes(_typed_result(merged_result)):
         raise RuntimeError(_format_diagnostic_failures(failures))
 
     if not merged_result["image_order"]:
         merged_result["image_order"] = None
-    return merged_result
+    return _typed_result(merged_result)
 
 
-def _empty_diagnostic_result() -> AnalysisResult:
+def _empty_diagnostic_result() -> dict[str, object]:
     return {
+        "version": 1,
         "texts": {},
         "images": {},
         "display_images": {},
@@ -403,55 +585,108 @@ def _empty_diagnostic_result() -> AnalysisResult:
         "image_params_paths": {},
         "plot_capabilities": {},
         "image_order": [],
+        "sections": [],
     }
 
 
 def _merge_diagnostic_result(
-    merged_result: AnalysisResult, metric_result: AnalysisResult
+    merged_result: dict[str, object], metric_result: AnalysisResult
 ) -> None:
-    # References are a result-level collection rather than a metric-specific
-    # section.  A plain mapping update would silently discard citations from
-    # every metric except the last successful one.  Merge them first, keeping
-    # producer order and the existing reference formatter's de-duplication
-    # rules; the remaining keyed sections are intentionally metric-scoped.
+    _merge_diagnostic_texts(merged_result, metric_result)
+    _merge_diagnostic_artifacts(merged_result, metric_result)
+    _merge_diagnostic_image_order(merged_result, metric_result)
+    _merge_diagnostic_sections(merged_result, metric_result)
+
+
+def _merge_diagnostic_texts(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
+    merged_texts = cast(dict[str, str], merged_result["texts"])
+    metric_texts = metric_result.texts
     merged_references = _merge_reference_texts(
-        merged_result["texts"].get("References"),
-        metric_result.get("texts", {}).get("References"),
+        merged_texts.get("References"), metric_texts.get("References")
     )
     if merged_references:
-        merged_result["texts"]["References"] = merged_references
+        merged_texts["References"] = merged_references
+    merged_texts.update(
+        {name: value for name, value in metric_texts.items() if name != "References"}
+    )
 
-    for key in (
-        "texts",
-        "images",
-        "display_images",
-        "image_var_names",
-        "image_params_paths",
-        "plot_capabilities",
-    ):
-        if key == "texts":
-            merged_result[key].update(
-                {
-                    name: value
-                    for name, value in metric_result.get(key, {}).items()
-                    if name != "References"
+
+def _merge_diagnostic_artifacts(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
+    for key, values in (
+        ("images", metric_result.images),
+        ("display_images", metric_result.display_images),
+        ("image_var_names", metric_result.image_var_names),
+        ("image_params_paths", metric_result.image_params_paths),
+        (
+            "plot_capabilities",
+            {
+                key: {
+                    "plot_kind": capability.plot_kind,
+                    "editable": capability.editable,
+                    "styleable": capability.styleable,
+                    "composition": capability.composition,
+                    "regenerator": capability.regenerator,
                 }
-            )
-        else:
-            merged_result[key].update(metric_result.get(key, {}))
+                for key, capability in metric_result.plot_capabilities.items()
+            },
+        ),
+    ):
+        cast(dict[str, object], merged_result[key]).update(values)
 
-    image_order = metric_result.get("image_order")
-    if image_order:
-        merged_order = merged_result["image_order"]
-        if merged_order is None:
-            merged_result["image_order"] = list(image_order)
-        else:
-            merged_order.extend(image_order)
+
+def _merge_diagnostic_image_order(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
+    image_order = metric_result.image_order
+    if not image_order:
+        return
+    merged_order = cast(list[str] | None, merged_result["image_order"])
+    if merged_order is None:
+        merged_result["image_order"] = list(image_order)
+        return
+    merged_order.extend(image_order)
+
+
+def _merge_diagnostic_sections(
+    merged_result: dict[str, object], metric_result: AnalysisResult
+) -> None:
+    merged_texts = cast(dict[str, str], merged_result["texts"])
+    merged_sections = cast(list[dict[str, object]], merged_result["sections"])
+    reference_id = None
+    for section in metric_result.sections:
+        if section.kind == "text" and section.source_key == "References":
+            reference_id = section.semantic_id
+            continue
+        merged_sections.append(
+            {
+                "id": section.semantic_id,
+                "kind": section.kind,
+                "order": len(merged_sections),
+                "title": section.title,
+                "source_key": section.source_key,
+            }
+        )
+    if "References" in merged_texts and not any(
+        section["source_key"] == "References" for section in merged_sections
+    ):
+        merged_sections.append(
+            {
+                "id": reference_id or "diagnostic.references",
+                "kind": "text",
+                "order": len(merged_sections),
+                "title": "References",
+                "source_key": "References",
+            }
+        )
 
 
 def _diagnostic_result_has_successes(result: AnalysisResult) -> bool:
     return bool(
-        result["images"] or any(not key.endswith(" Error") for key in result["texts"])
+        result.images or any(not key.endswith(" Error") for key in result.texts)
     )
 
 

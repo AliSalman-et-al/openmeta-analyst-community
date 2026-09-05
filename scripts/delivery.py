@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS_PATH = ROOT / "delivery" / "targets.json"
+SUPPORTED_RELEASE_TARGETS = ("windows-x64", "macos-arm64")
 POLICY_INPUTS = (
     ".github/workflows/candidate.yml",
     ".github/workflows/community-release-candidate.yml",
@@ -123,6 +124,10 @@ def init_release(args: argparse.Namespace) -> None:
         raise ValueError(f"unsupported release targets: {', '.join(unsupported)}")
     if not selected_targets:
         raise ValueError("release set must contain at least one target")
+    if set(selected_targets) != set(SUPPORTED_RELEASE_TARGETS):
+        raise ValueError(
+            "future release sets must contain exactly Windows x64 and Apple silicon macOS"
+        )
     manifest = {
         "schema_version": 1,
         "product": "RC MetaStudio",
@@ -248,10 +253,10 @@ def verify(args: argparse.Namespace) -> None:
     selected = manifest.get("release_targets")
     if (
         not isinstance(selected, list)
-        or not selected
-        or not set(selected) <= set(configured)
+        or set(selected) != set(SUPPORTED_RELEASE_TARGETS)
+        or set(selected) != set(configured)
     ):
-        raise ValueError("release set target selection is invalid")
+        raise ValueError("release set must contain exactly the supported future targets")
     if set(manifest["targets"]) != set(selected):
         raise ValueError("release set does not contain exactly its selected targets")
     for name in selected:

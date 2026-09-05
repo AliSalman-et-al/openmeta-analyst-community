@@ -5,10 +5,10 @@
 import copy
 from contextlib import ExitStack
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette, QUndoStack
+from PyQt6.QtGui import QAction, QBrush, QColor, QKeySequence, QPalette
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -21,8 +21,12 @@ from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
 )
 
-from rc_metastudio import r_bridge
 from rc_metastudio import tabular_data
+from rc_metastudio.calculator_service import (
+    BinaryImputationOption,
+    CalculatorService,
+    Numeric,
+)
 from rc_metastudio.meta_globals import (
     BINARY_METRIC_NAMES,
     BINARY_ONE_ARM_METRICS,
@@ -61,6 +65,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         group_comparison,
         current_effect,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(BinaryDataDialog, self).__init__(parent)
@@ -74,7 +79,8 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
         self.current_item_data: int | None = None
@@ -102,7 +108,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
         self.initialize_form()  # initialize all cell to empty items
         self.setup_back_calculation_feedback()
-        self.undoStack = QUndoStack(self)
+        self._field_history = calc_fncs.TransientEditHistory()
 
         self._update_raw_data()  # analysis_unit --> table
         self._populate_effect_data()  # make combo boxes for effects
@@ -218,12 +224,15 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             d = {}
             d["metric"] = str(self.current_effect)
 
-            est, lower, upper = self.analysis_unit.get_effect_and_ci(
-                self.current_effect, self.group_comparison, self.confidence_multiplier
+            est, lower, upper = self.analysis_unit.get_effect_and_ci_for_source(
+                "entered",
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
             )
 
             def conv_to_disp_scale(x):
-                return r_bridge.binary_convert_scale(
+                return self.calculator.binary_convert_scale(
                     x, self.current_effect, convert_to="display.scale"
                 )
 
@@ -314,7 +323,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
         bin_data = build_back_calc_args_dict()
 
-        imputed = r_bridge.impute_binary_data(bin_data.copy())
+        imputed = self.calculator.impute_binary_data(bin_data.copy())
 
         # Leave if nothing was imputed
         if "FAIL" in imputed:
@@ -343,10 +352,11 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             for x in range(3):
                 self.clear_column(x)
             with QSignalBlocker(self.raw_data_table):
-                group_1_events = int(round(imputed[choice]["a"]))
-                group_1_total = int(round(imputed[choice]["b"]))
-                group_2_events = int(round(imputed[choice]["c"]))
-                group_2_total = int(round(imputed[choice]["d"]))
+                option = cast(BinaryImputationOption, imputed[choice])
+                group_1_events = int(round(cast(Numeric, option["a"])))
+                group_1_total = int(round(cast(Numeric, option["b"])))
+                group_2_events = int(round(cast(Numeric, option["c"])))
+                group_2_total = int(round(cast(Numeric, option["d"])))
                 self._set_val(0, 0, group_1_events)
                 self._set_val(0, 1, group_1_total - group_1_events)
                 self._set_val(1, 0, group_2_events)
@@ -366,7 +376,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -485,9 +495,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
     def _populate_effect_data(self):
-        available_effects = set(
-            str(effect) for effect in self.analysis_unit.effects.keys()
-        )
+        available_effects = {str(effect) for effect in self.analysis_unit.get_effect_names()}
         metric_family = (
             BINARY_ONE_ARM_METRICS
             if self.current_effect in BINARY_ONE_ARM_METRICS
@@ -591,35 +599,31 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         self._update_effect_choice_accessibility()
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                r_bridge.binary_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-            except Exception:
-                return False, False
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        if ci_param is None:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.binary_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                )
+        except Exception:
+            return False, False
         return True, display_scale_val
 
     def _text_from_value(self, value):
@@ -667,7 +671,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.binary_convert_scale(
+        calculation_scale_value = self.calculator.binary_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -691,7 +695,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -743,7 +747,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        self.analysis_unit = copy.deepcopy(old_analysis_unit)
 
         self.initialize_form()  # clear form first
         self._update_raw_data()
@@ -844,7 +848,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -954,7 +958,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         # Leave current effects untouched when raw data are incomplete.
         if two_arm_raw_data_ok or (current_effect_is_one_arm and one_arm_raw_data_ok):
             if current_effect_is_two_arm:
-                est_and_ci_d = r_bridge.effect_for_study(
+                est_and_ci_d = self.calculator.effect_for_study(
                     e1,
                     n1,
                     e2,
@@ -964,7 +968,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                 )
             else:
                 # binary, one-arm
-                est_and_ci_d = r_bridge.effect_for_study(
+                est_and_ci_d = self.calculator.effect_for_study(
                     e1,
                     n1,
                     two_arm=False,
@@ -972,7 +976,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                     confidence_level=self.confidence_level,
                 )
 
-            est, low, high = r_bridge.effect_triplet(
+            est, low, high = self.calculator.effect_triplet(
                 est_and_ci_d,
                 "calc_scale",
                 metric=self.current_effect,
@@ -1018,13 +1022,8 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                 self.current_effect in BINARY_ONE_ARM_METRICS
                 and metric in BINARY_ONE_ARM_METRICS
             ):
-                self.analysis_unit.set_effect_and_ci(
-                    metric,
-                    self.group_comparison,
-                    None,
-                    None,
-                    None,
-                    confidence_multiplier=self.confidence_multiplier,
+                self.analysis_unit.set_effect_for_source(
+                    "entered", metric, self.group_comparison, None, None, None
                 )
         # clear line edits
         self.set_current_effect()
@@ -1037,7 +1036,7 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         )
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table),
@@ -1053,10 +1052,10 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
         return group_comparison
 
     def undo(self):
-        self.undoStack.undo()
+        self._field_history.undo()
 
     def redo(self):
-        self.undoStack.redo()
+        self._field_history.redo()
 
 
 class BinaryBackCalculationDialog(

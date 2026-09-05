@@ -3,6 +3,8 @@ import sys
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("inject_python_boundary")
+
 
 sys.path.insert(0, os.path.abspath("src"))
 
@@ -16,6 +18,15 @@ from PyQt6.QtGui import QColor
 from rc_metastudio import dataset_table_model
 from rc_metastudio import analysis_dataset
 from rc_metastudio import meta_globals
+from rc_metastudio import r_bridge
+from rc_metastudio import workspace_editing
+
+
+def _derived_effect_and_ci(analysis_unit, metric, group_comparison):
+    value = analysis_unit.get_effect_for_source(
+        "derived_preview", metric, group_comparison
+    )
+    return value.estimate, value.lower, value.upper
 
 
 def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drift():
@@ -30,6 +41,14 @@ def test_workspace_numeric_edit_accepts_dot_and_comma_decimal_without_value_drif
     assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
     assert model.setData(index, "1,25") is True
     assert model.dataset.studies[0].covariate_values["Dose"] == 1.25
+
+
+def test_recalculate_display_scale_ignores_workspace_without_active_outcome():
+    dataset = analysis_dataset.Dataset()
+    dataset.add_study(analysis_dataset.Study(1, name="Alpha"))
+    model = dataset_table_model.DatasetTableModel(dataset=dataset, add_blank_study=False)
+
+    model.recalculate_display_scale()
 
 
 def test_workspace_numeric_edit_rejects_ambiguous_decimal_text_without_mutation():
@@ -69,7 +88,7 @@ def test_direct_outcomes_use_the_shared_strict_decimal_parser(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -135,6 +154,18 @@ def test_workspace_model_rejects_invalid_headers_and_flags():
         )
     for section in (-1, model.rowCount()):
         assert model.headerData(section, Qt.Orientation.Vertical) is None
+
+
+def test_diagnostic_raw_header_tooltips_keep_single_group_safe():
+    model = _diagnostic_model_with_empty_cells()
+
+    assert model.headerData(
+        model.RAW_DATA[3], Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole
+    ) == (
+        "# True Negatives\n"
+        "Sort on this column by right-clicking the column header and selecting "
+        "'sort studies by <column>'"
+    )
 
 
 @pytest.mark.parametrize("invalid_kind", ("foreign", "row", "column"))
@@ -287,6 +318,22 @@ def _model_with_real_study_and_empty_new_entry_row(data_type):
     )
     model.update_column_indices()
     return model
+
+
+def test_blank_entry_row_stays_out_of_the_durable_dataset_until_named():
+    model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
+
+    assert len(model.dataset.studies) == 1
+    blank_row = len(model.dataset.studies)
+    blank_study = model._study_for_row(blank_row)
+    assert blank_study not in model.dataset.studies
+    assert model.get_ordered_study_ids() == [1]
+
+    assert model.setData(model.index(blank_row, model.NAME), "Beta") is True
+
+    assert [study.name for study in model.dataset.studies] == ["Alpha", "Beta"]
+    assert model._study_for_row(len(model.dataset.studies)) not in model.dataset.studies
+    assert model.get_ordered_study_ids() == [1, 2]
 
 
 def _continuous_model_with_named_study():
@@ -500,8 +547,8 @@ def test_named_new_entry_row_keeps_populated_study_chrome(qapp):
 
     qt6_resources.ensure_application_resources()
     model = _model_with_real_study_and_empty_new_entry_row(meta_globals.BINARY)
-    model.dataset.studies[1].name = "Beta"
-    model.dataset.studies[1].include = True
+    model._study_for_row(1).name = "Beta"
+    model._study_for_row(1).include = True
 
     assert (
         model.headerData(
@@ -533,7 +580,7 @@ def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch)
     errors = []
     model.dataError.connect(errors.append)
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -553,6 +600,30 @@ def test_direct_effect_edit_on_unnamed_study_emits_study_name_error(monkeypatch)
     )
 
 
+def test_pft_outcome_edit_uses_first_arm_sample_size_for_scale_conversion(monkeypatch):
+    model = _binary_model_with_blank_study()
+    model.dataset.studies[0].name = "Alpha"
+    model.current_effect = "PFT"
+    analysis_unit = model.get_current_analysis_unit_for_study(0)
+    group = model.current_groups[0]
+    comparison = model.get_current_group_comparison()
+    analysis_unit.groups[group].raw_data[:] = [1, 20]
+    analysis_unit.set_effect_for_source(
+        "entered", "PFT", comparison, 0.2, 0.1, 0.3
+    )
+    calls = []
+
+    def convert(value, effect, *, convert_to, n1=None):
+        calls.append((convert_to, n1))
+        return value
+
+    monkeypatch.setattr(model.editing_service.bridge, "binary_convert_scale", convert)
+
+    assert model.setData(model.index(0, model.OUTCOMES[0]), "0.2") is True
+    assert ("calc.scale", 20) in calls
+    assert ("display.scale", 20) in calls
+
+
 def test_unnamed_study_cannot_be_manually_included():
     model = _binary_model_with_blank_study()
     errors = []
@@ -568,7 +639,7 @@ def test_named_direct_effect_entry_still_auto_includes_study(monkeypatch):
     model = _binary_model_with_blank_study()
     model.dataset.studies[0].name = "Alpha"
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -597,9 +668,7 @@ def test_study_name_edit_on_placeholder_row_creates_study():
     assert model.setData(model.index(1, model.NAME), "Beta") is True
 
     assert model.dataset.studies[1].name == "Beta"
-    assert len(model.dataset.studies) == 3
-    assert model.dataset.studies[2].name == ""
-    assert model.dataset.studies[2].include is False
+    assert len(model.dataset.studies) == 2
 
 
 def test_invalid_continuous_covariate_edit_emits_error_and_preserves_value():
@@ -627,7 +696,7 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -642,7 +711,7 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
         }
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -651,14 +720,14 @@ def test_diagnostic_raw_count_edit_accepts_scalar_metric_effects(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[group_comparison].raw_data[0] == 20.0
-    assert analysis_unit.get_effect_and_ci(
-        "Sens", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "Sens", group_comparison, model.get_confidence_multiplier()
     ) == (
         0.75,
         None,
         None,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Spec", group_comparison) == (
         0.95,
         0.88,
         0.99,
@@ -676,7 +745,7 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -692,7 +761,7 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
         }
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -700,12 +769,12 @@ def test_diagnostic_raw_count_edit_recomputes_sens_spec_confidence_intervals(
     assert model.setData(model.index(0, model.RAW_DATA[0]), "30") is True
 
     assert errors == []
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
         0.750,
         0.588,
         0.873,
     )
-    assert analysis_unit.get_entered_effect_and_ci("Spec", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Spec", group_comparison) == (
         0.988,
         0.919,
         0.998,
@@ -733,11 +802,12 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
             lambda value: value,
             confidence_level=model.get_confidence_level(),
             confidence_multiplier=model.get_confidence_multiplier(),
+            source="derived_preview",
         )
     model.dataset.studies[0].include = True
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -752,7 +822,9 @@ def test_diagnostic_partial_raw_count_edit_clears_all_derived_metrics(monkeypatc
             None,
             None,
         )
-        assert analysis_unit.get_display_effect_and_ci(metric, group_comparison) == (
+        assert analysis_unit.get_display_effect_and_ci_for_source(
+            "derived_preview", metric, group_comparison
+        ) == (
             None,
             None,
             None,
@@ -770,12 +842,12 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "effect_for_study",
         lambda *args, **kwargs: {"calc_scale": 0.5},
     )
@@ -784,8 +856,8 @@ def test_binary_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[model.current_groups[0]].raw_data[0] == 4.0
-    assert analysis_unit.get_effect_and_ci(
-        "OR", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "OR", group_comparison, model.get_confidence_multiplier()
     ) == (
         0.5,
         None,
@@ -803,12 +875,12 @@ def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
     model.dataError.connect(errors.append)
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "continuous_effect_for_study",
         lambda *args, **kwargs: {"calc_scale": 1.25},
     )
@@ -817,8 +889,8 @@ def test_continuous_raw_count_edit_accepts_scalar_metric_effect(monkeypatch):
 
     assert errors == []
     assert analysis_unit.groups[model.current_groups[0]].raw_data[1] == 5.5
-    assert analysis_unit.get_effect_and_ci(
-        "MD", group_comparison, model.get_confidence_multiplier()
+    assert analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", "MD", group_comparison, model.get_confidence_multiplier()
     ) == (
         1.25,
         None,
@@ -844,7 +916,7 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
         raise RuntimeError("simulated diagnostic calculation failure")
 
     monkeypatch.setattr(
-        dataset_table_model.r_bridge,
+        model.editing_service.bridge,
         "diagnostic_effects_for_study",
         diagnostic_effects_for_study,
     )
@@ -852,7 +924,7 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
     assert model.setData(model.index(0, model.RAW_DATA[0]), "20") is False
 
     assert analysis_unit.groups[group_comparison].raw_data == [19.0, 10.0, 1.0, 81.0]
-    assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+    assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
         0.66,
         0.50,
         0.80,
@@ -865,10 +937,10 @@ def test_diagnostic_raw_count_edit_rolls_back_when_effect_calculation_fails(
 
 
 def test_effect_normalizer_preserves_triplets_and_expands_scalars():
-    effect = dataset_table_model.r_bridge.normalize_effect_result(
+    effect = r_bridge.normalize_effect_result(
         {"calc_scale": 1.25, "display_scale": [1.25, 1.0, 1.5]},
     )
-    effects = dataset_table_model.r_bridge.normalize_diagnostic_effects(
+    effects = r_bridge.normalize_diagnostic_effects(
         {
             "Sens": {"calc_scale": 0.75},
             "Spec": {"calc_scale": [0.95, 0.88, 0.99]},
@@ -888,7 +960,7 @@ def test_effect_normalizer_can_require_diagnostic_triplets():
         ValueError,
         match="Expected calc_scale study effect for Sens to contain 3 values; got scalar",
     ):
-        dataset_table_model.r_bridge.normalize_diagnostic_effects(
+        r_bridge.normalize_diagnostic_effects(
             {"Sens": {"calc_scale": 0.75}},
             require_triplets=True,
         )
@@ -897,7 +969,7 @@ def test_effect_normalizer_can_require_diagnostic_triplets():
         ValueError,
         match="Expected calc_scale study effect for Spec to contain 3 values; got 1",
     ):
-        dataset_table_model.r_bridge.normalize_diagnostic_effects(
+        r_bridge.normalize_diagnostic_effects(
             {"Spec": {"calc_scale": [0.95]}},
             require_triplets=True,
         )

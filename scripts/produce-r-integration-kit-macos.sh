@@ -4,7 +4,7 @@ set -euo pipefail
 target="${1:?target}"; r_home="${2:?R home}"; python="${3:?python}"; official_artifact="${4:?official R pkg}"; official_url="${5:?official URL}"; signature="${6:?signature identity}"
 rpy2_sdist="${7:?rpy2 sdist}"; rpy2_url="${8:?rpy2 URL}"; rpy2_rinterface_sdist="${9:?rpy2-rinterface sdist}"; rpy2_rinterface_url="${10:?rpy2-rinterface URL}"
 rpy2_robjects_sdist="${11:?rpy2-robjects sdist}"; rpy2_robjects_url="${12:?rpy2-robjects URL}"; output="${13:?output}"
-case "$target" in macos-x64) arch=x86_64; deployment_target=13.0; package_type=mac.binary; contrib=bin/macosx/big-sur-x86_64/contrib/4.6 ;; macos-arm64) arch=arm64; deployment_target=14.0; package_type=mac.binary; contrib=bin/macosx/sonoma-arm64/contrib/4.6 ;; *) exit 2 ;; esac
+case "$target" in macos-arm64) arch=arm64; deployment_target=14.0; package_type=mac.binary; contrib=bin/macosx/sonoma-arm64/contrib/4.6 ;; *) exit 2 ;; esac
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$repo/build/r-kit-producer/$target"; stage="$work/R.framework"; archives="$work/ppm-archives"; logs="$work/logs"
 rm -rf "$work" "$output"; mkdir -p "$work" "$archives" "$logs"

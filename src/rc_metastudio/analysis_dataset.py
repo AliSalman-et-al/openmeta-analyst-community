@@ -4,15 +4,11 @@
 
 import copy
 import uuid
+from collections.abc import Callable
 
 from rc_metastudio import two_way_dict
-from rc_metastudio.analysis_unit import AnalysisUnit
+from rc_metastudio.analysis_unit import AnalysisUnit, EffectSource
 from rc_metastudio import meta_globals
-
-from rc_metastudio import r_backend
-
-r_backend.install_r_backend()
-from rc_metastudio import r_bridge
 
 BINARY = meta_globals.BINARY
 CONTINUOUS = meta_globals.CONTINUOUS
@@ -45,52 +41,104 @@ class Dataset:
         self.summary = summary
         self.studies = []
         self.is_diagnostic = is_diagnostic
-        self.follow_ups_by_outcome = {}
+        self._outcomes_by_id = {}
+        self._follow_ups_by_outcome_id = {}
 
         self.notes = ""
 
         self.covariates = []
 
+    @property
+    def outcomes_by_id(self):
+        return self._outcomes_by_id
+
+    @property
+    def follow_ups_by_outcome_id(self):
+        return self._follow_ups_by_outcome_id
+
+    @property
+    def follow_ups_by_outcome(self):
+        """Return the legacy ordinal view of the identity-owned follow-ups."""
+        return {
+            outcome.name: _follow_up_label_index(
+                self._follow_ups_by_outcome_id.get(outcome.stable_id, {})
+            )
+            for outcome in self._outcomes_by_id.values()
+        }
+
+    @property
+    def follow_up_stable_ids_by_outcome(self):
+        """Return follow-up labels mapped to their stable identities."""
+        return {
+            outcome.name: {
+                follow_up.label: stable_id
+                for stable_id, follow_up in self._follow_ups_by_outcome_id.get(
+                    outcome.stable_id, {}
+                ).items()
+            }
+            for outcome in self._outcomes_by_id.values()
+        }
+
     def copy(self):
         return copy.deepcopy(self)
 
     def get_outcome_names(self):
+        if self.outcomes_by_id:
+            return sorted(outcome.name for outcome in self.outcomes_by_id.values())
         return sorted(self.follow_ups_by_outcome.keys())
 
     def change_group_name(
         self, old_group_name, new_group_name, outcome=None, follow_up=None
     ):
-        if (outcome is None and follow_up is not None) or (
-            follow_up is None and outcome is not None
-        ):
+        if (outcome is None) != (follow_up is None):
             raise ValueError(
                 "outcome and follow_up must either both be provided or both be omitted"
             )
 
         for study in self.studies:
-            if outcome is None and follow_up is None:
-                for outcome_name in list(study.analysis_units_by_outcome.keys()):
-                    analysis_units = study.analysis_units_by_outcome[outcome_name]
-                    for analysis_unit in list(analysis_units.values()):
-                        analysis_unit.rename_group(old_group_name, new_group_name)
-            else:
-                analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
+            units = (
+                study.analysis_units
+                if outcome is None
+                else [study.get_analysis_unit(outcome, follow_up)]
+            )
+            for analysis_unit in units:
                 analysis_unit.rename_group(old_group_name, new_group_name)
 
     def change_outcome_name(self, old_outcome_name, new_outcome_name):
-        self.follow_ups_by_outcome[new_outcome_name] = self.follow_ups_by_outcome.pop(
-            old_outcome_name
-        )
+        outcome = self.get_outcome_obj(old_outcome_name)
+        if outcome is None:
+            raise KeyError(old_outcome_name)
+        outcome.name = new_outcome_name
         for study in self.studies:
-            study.analysis_units_by_outcome[new_outcome_name] = (
-                study.analysis_units_by_outcome.pop(old_outcome_name)
-            )
-            for outcome in study.outcomes:
-                if outcome.name == old_outcome_name:
-                    outcome.name = new_outcome_name
+            for unit in study.analysis_units:
+                if unit.outcome.stable_id == outcome.stable_id:
+                    unit.outcome = outcome
 
     def add_study(self, study, study_index=None):
         # Empty outcomes and follow-ups remain valid until analysis execution.
+        for outcome in study.outcomes:
+            self._outcomes_by_id.setdefault(outcome.stable_id, outcome)
+            follow_ups = self._follow_ups_by_outcome_id.setdefault(
+                outcome.stable_id, {}
+            )
+            for unit in study.analysis_units:
+                if unit.outcome.stable_id != outcome.stable_id:
+                    continue
+                follow_up_id = unit.follow_up_id or _new_stable_id()
+                unit.follow_up_id = follow_up_id
+                ordinal = max(
+                    (
+                        getattr(follow_up, "ordinal", index)
+                        for index, follow_up in enumerate(follow_ups.values())
+                    ),
+                    default=-1,
+                ) + 1
+                follow_ups.setdefault(
+                    follow_up_id,
+                    FollowUp(follow_up_id, unit.follow_up_label, ordinal=ordinal),
+                )
+        for covariate in self.covariates:
+            study.register_covariate(covariate, None)
         if study_index is None:
             self.studies.append(study)
         else:
@@ -114,10 +162,18 @@ class Dataset:
         return outcome.sub_type
 
     def get_outcome_obj(self, outcome_name):
+        if isinstance(outcome_name, Outcome):
+            return self._outcomes_by_id.get(outcome_name.stable_id, outcome_name)
+        outcome = next(
+            (outcome for outcome in self.outcomes_by_id.values() if outcome.name == outcome_name),
+            None,
+        )
+        if outcome is not None:
+            return outcome
         for study in self.studies:
-            outcome_obj = study.get_outcome(outcome_name)
-            if outcome_obj is not None:
-                return outcome_obj
+            outcome = study.get_outcome(outcome_name)
+            if outcome is not None:
+                return outcome
         return None
 
     def max_study_id(self):
@@ -130,14 +186,17 @@ class Dataset:
         covariate_name = (
             covariate.name if isinstance(covariate, Covariate) else covariate
         )
+        removed_covariate = next(
+            (item for item in self.covariates if item.name == covariate_name), None
+        )
         for i, cov in enumerate(self.covariates):
             if cov.name == covariate_name:
                 self.covariates.remove(cov)
                 covariate_index = i
                 break
         for study in self.studies:
-            if covariate_name in study.covariate_values:
-                study.covariate_values.pop(covariate_name)
+            if removed_covariate is not None:
+                study.remove_covariate(removed_covariate)
         return covariate_index
 
     def add_covariate(self, covariate, covariate_values=None, covariate_index=None):
@@ -148,15 +207,12 @@ class Dataset:
 
         if covariate_values is None:
             for study in self.studies:
-                study.covariate_values[covariate.name] = None
+                study.register_covariate(covariate, None)
         else:
             for study in self.studies:
-                if study.name in covariate_values:
-                    study.covariate_values[covariate.name] = covariate_values[
-                        study.name
-                    ]
-                else:
-                    study.covariate_values[covariate.name] = None
+                study.register_covariate(
+                    covariate, covariate_values.get(study.name)
+                )
 
     def change_covariate_name(self, old_covariate, new_covariate_name):
         covariate_values = copy.deepcopy(self.get_covariate_values(old_covariate.name))
@@ -188,12 +244,11 @@ class Dataset:
                 covariate_name in study.covariate_values
                 and study.covariate_values[covariate_name] is not None
             ):
+                value = study.covariate_values[covariate_name]
                 if ids_for_keys:
-                    covariate_values[study.id] = study.covariate_values[covariate_name]
+                    covariate_values[study.id] = value
                 else:
-                    covariate_values[study.name] = study.covariate_values[
-                        covariate_name
-                    ]
+                    covariate_values[study.name] = value
         return covariate_values
 
     def get_covariate_names(self):
@@ -205,16 +260,27 @@ class Dataset:
             current_group_names = None
 
         follow_up = "first"
-        self.follow_ups_by_outcome[outcome.name] = two_way_dict.TwoWayDict()
-        self.follow_ups_by_outcome[outcome.name][0] = follow_up
+        self._outcomes_by_id[outcome.stable_id] = outcome
+        follow_up_id = _new_stable_id()
+        self._follow_ups_by_outcome_id[outcome.stable_id] = {
+            follow_up_id: FollowUp(follow_up_id, follow_up, ordinal=0)
+        }
 
         for study in self.studies:
-            study.add_outcome(outcome, follow_up, group_names=current_group_names)
+            study.add_outcome(
+                outcome,
+                follow_up,
+                group_names=current_group_names,
+                follow_up_id=follow_up_id,
+            )
 
     def remove_outcome(self, outcome_name):
         if outcome_name is None:
             return
-        self.follow_ups_by_outcome.pop(outcome_name)
+        outcome = self.get_outcome_obj(outcome_name)
+        if outcome is not None:
+            self._outcomes_by_id.pop(outcome.stable_id, None)
+            self._follow_ups_by_outcome_id.pop(outcome.stable_id, None)
         for study in self.studies:
             study.remove_outcome(outcome_name)
 
@@ -227,12 +293,24 @@ class Dataset:
             group_names = None
         for study in self.studies:
             if outcome_name not in study.analysis_units_by_outcome:
-                study.add_outcome(outcome, group_names=group_names)
-                for follow_up in list(
-                    self.follow_ups_by_outcome[outcome_name].values()
-                ):
-                    if follow_up not in study.analysis_units_by_outcome[outcome_name]:
-                        study.add_outcome_at_follow_up(outcome, follow_up)
+                study.add_outcome(
+                    outcome,
+                    group_names=group_names,
+                    follow_up_id=self.get_follow_up_stable_id(
+                        outcome_name, "first"
+                    ),
+                )
+                for follow_up in self.get_follow_up_names_for_outcome(outcome_name):
+                    if follow_up not in study.analysis_units_by_outcome.get(
+                        outcome_name, {}
+                    ):
+                        study.add_outcome_at_follow_up(
+                            outcome,
+                            follow_up,
+                            follow_up_id=self.get_follow_up_stable_id(
+                                outcome_name, follow_up
+                            ),
+                        )
             analysis_units = study.analysis_units_by_outcome[outcome_name]
             if follow_up_name is None:
                 for analysis_unit in list(analysis_units.values()):
@@ -261,86 +339,105 @@ class Dataset:
         if not current_group_names:
             current_group_names = None
 
-        previous_index = max(self.follow_ups_by_outcome[outcome.name].keys())
-        next_index = previous_index + 1
-
-        self.follow_ups_by_outcome[outcome.name][next_index] = follow_up_name
+        follow_up_id = _new_stable_id()
+        follow_ups = self._follow_ups_by_outcome_id.setdefault(
+            outcome.stable_id, {}
+        )
+        next_ordinal = max(
+            (
+                getattr(follow_up, "ordinal", index)
+                for index, follow_up in enumerate(follow_ups.values())
+            ),
+            default=-1,
+        ) + 1
+        follow_ups[follow_up_id] = FollowUp(
+            follow_up_id, follow_up_name, ordinal=next_ordinal
+        )
 
         for study in self.studies:
             study.add_follow_up_to_outcome(
-                outcome, follow_up_name, group_names=current_group_names
+                outcome,
+                follow_up_name,
+                group_names=current_group_names,
+                follow_up_id=follow_up_id,
             )
 
     def remove_follow_up_from_outcome(self, follow_up_name, outcome_name):
-        follow_up_index = self.follow_ups_by_outcome[outcome_name].get_key(
-            follow_up_name
-        )
-
-        self.follow_ups_by_outcome[outcome_name].pop(follow_up_index)
+        outcome = self.get_outcome_obj(outcome_name)
+        if outcome is None:
+            raise KeyError(outcome_name)
+        stable_id = self.get_follow_up_stable_id(outcome, follow_up_name)
+        outcome = self.get_outcome_obj(outcome_name)
+        if outcome is not None and stable_id is not None:
+            self._follow_ups_by_outcome_id.get(outcome.stable_id, {}).pop(stable_id, None)
         for study in self.studies:
             study.remove_follow_up_from_outcome(outcome_name, follow_up_name)
 
     def get_group_names(self):
         group_names = []
         for study in self.studies:
-            for outcome_name in list(study.analysis_units_by_outcome.keys()):
-                analysis_units = study.analysis_units_by_outcome[outcome_name]
-                for analysis_unit in list(analysis_units.values()):
-                    group_names.extend(analysis_unit.get_group_names())
+            for analysis_unit in study.analysis_units:
+                group_names.extend(analysis_unit.get_group_names())
         return _unique_in_first_seen_order(group_names)
 
     def get_group_names_for_outcome_follow_up(self, outcome_name, follow_up):
         group_names = []
         for study in self.studies:
-            if outcome_name in study.analysis_units_by_outcome:
-                if follow_up in study.analysis_units_by_outcome[outcome_name]:
-                    analysis_unit = study.analysis_units_by_outcome[outcome_name][
-                        follow_up
-                    ]
-                    group_names.extend(analysis_unit.get_group_names())
+            try:
+                analysis_unit = study.get_analysis_unit(outcome_name, follow_up)
+            except KeyError:
+                continue
+            group_names.extend(analysis_unit.get_group_names())
         return _unique_in_first_seen_order(group_names)
 
     def change_follow_up_name(self, outcome, old_name, new_name):
         if new_name in self.get_follow_up_names_for_outcome(outcome):
             raise ValueError(f"follow-up {new_name!r} already exists for this outcome")
+        outcome_obj = self.get_outcome_obj(outcome)
+        if outcome_obj is None:
+            raise KeyError(outcome)
+        stable_id = self.get_follow_up_stable_id(outcome_obj, old_name)
+        follow_up = self._follow_ups_by_outcome_id[outcome_obj.stable_id][stable_id]
+        follow_up.label = new_name
         for study in self.studies:
-            study.analysis_units_by_outcome[outcome][new_name] = (
-                study.analysis_units_by_outcome[outcome].pop(old_name)
-            )
-        follow_up_key = self.follow_ups_by_outcome[outcome].get_key(old_name)
-        self.follow_ups_by_outcome[outcome][follow_up_key] = new_name
+            for unit in study.analysis_units:
+                if unit.outcome.stable_id == outcome_obj.stable_id and unit.follow_up_id == stable_id:
+                    unit.follow_up_label = new_name
 
     def get_follow_up_names(self):
-        follow_up_names = []
-        for analysis_units_by_follow_up in list(self.follow_ups_by_outcome.values()):
-            follow_up_names.extend(list(analysis_units_by_follow_up.values()))
-        return _unique_in_first_seen_order(follow_up_names)
+        return _unique_in_first_seen_order(
+            follow_up.label
+            for follow_ups in self.follow_ups_by_outcome_id.values()
+            for follow_up in follow_ups.values()
+        )
 
     def get_study_names(self):
         return [study.name for study in self.studies]
 
     def get_follow_up_names_for_outcome(self, outcome):
-        return list(self.follow_ups_by_outcome[outcome].values())
+        outcome_obj = self.get_outcome_obj(outcome)
+        if outcome_obj is None:
+            return []
+        return [
+            follow_up.label
+            for follow_up in self.follow_ups_by_outcome_id[outcome_obj.stable_id].values()
+        ]
 
-    def get_network(self, outcome, time_point):
-        node_list = []
-        adjacency_list = []
-        for study in self.studies:
-            analysis_unit = study.analysis_units_by_outcome[outcome][time_point]
-            group_names = analysis_unit.get_group_names()
-            for g1 in group_names:
-                node_list.append(g1)
-                for g2 in [group for group in group_names if group != g1]:
-                    if (
-                        self.analysis_unit_has_edge_between_groups(
-                            analysis_unit, [g1, g2]
-                        )
-                        and (g1, g2) not in adjacency_list
-                        and (g2, g1) not in adjacency_list
-                    ):
-                        adjacency_list.append((g1, g2))
-
-        return (_unique_in_first_seen_order(node_list), adjacency_list)
+    def get_follow_up_stable_id(self, outcome, follow_up):
+        """Return identity independent of the editable follow-up label."""
+        outcome_obj = self.get_outcome_obj(outcome)
+        if outcome_obj is None:
+            raise KeyError(outcome)
+        for identity, candidate in self._follow_ups_by_outcome_id.setdefault(
+            outcome_obj.stable_id, {}
+        ).items():
+            if candidate.label == follow_up:
+                return identity
+        identity = _new_stable_id()
+        self._follow_ups_by_outcome_id[outcome_obj.stable_id][identity] = FollowUp(
+            identity, follow_up
+        )
+        return identity
 
     def analysis_unit_has_edge_between_groups(self, analysis_unit, groups):
         comp_str = "-".join(groups)
@@ -348,7 +445,9 @@ class Dataset:
             comp_str_present = comp_str in analysis_unit.get_group_strings(effect)
             try:
                 estimate_is_present = (
-                    analysis_unit.get_estimate(effect, comp_str) is not None
+                    analysis_unit.get_estimate_for_source(
+                        "entered", effect, comp_str
+                    ) is not None
                 )
             except KeyError:
                 estimate_is_present = False
@@ -367,6 +466,8 @@ class Dataset:
         ordered_list=None,
         directions_to_analysis_unit=None,
         confidence_multiplier=None,
+        convert_to_display_scale: Callable[[object, str, object], object] | None = None,
+        effect_source: EffectSource = "entered",
     ):
         """Compare studies in various ways -- pass the returned function
         to the (built-in) sort function.
@@ -420,6 +521,11 @@ class Dataset:
         elif compare_by == "outcomes":
             if confidence_multiplier is None:
                 raise ValueError("confidence multiplier must be specified")
+            # Sorting remains useful in a pure domain context.  UI callers can
+            # inject the display-scale conversion; identity is the safe domain
+            # default and keeps sorting independent of the R bridge.
+            if convert_to_display_scale is None:
+                convert_to_display_scale = lambda value, _effect, _n1: value
 
             def compare_outcomes(study_a, study_b):
                 analysis_unit_a = study_a.get_analysis_unit(outcome_name, follow_up)
@@ -430,30 +536,30 @@ class Dataset:
                 if outcome_type is BINARY:
 
                     def to_display_scale(x):
-                        return r_bridge.binary_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 elif outcome_type is CONTINUOUS:
 
                     def to_display_scale(x):
-                        return r_bridge.continuous_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 elif outcome_type is DIAGNOSTIC:
 
                     def to_display_scale(x):
-                        return r_bridge.diagnostic_convert_scale(
-                            x, current_effect, convert_to="display.scale"
-                        )
+                        return convert_to_display_scale(x, current_effect, None)
                 else:
                     raise ValueError(f"Unsupported outcome type: {outcome_type!r}")
 
                 if outcome_type in (BINARY, CONTINUOUS):
-                    outcome_data_a = analysis_unit_a.get_effect_and_ci(
-                        current_effect, group_comparison, confidence_multiplier
+                    outcome_data_a = analysis_unit_a.get_effect_and_ci_for_source(
+                        effect_source,
+                        current_effect,
+                        group_comparison,
+                        confidence_multiplier,
                     )
-                    outcome_data_b = analysis_unit_b.get_effect_and_ci(
-                        current_effect, group_comparison, confidence_multiplier
+                    outcome_data_b = analysis_unit_b.get_effect_and_ci_for_source(
+                        effect_source,
+                        current_effect,
+                        group_comparison,
+                        confidence_multiplier,
                     )
                     outcome_data_a = [
                         to_display_scale(c_val) for c_val in outcome_data_a
@@ -463,11 +569,17 @@ class Dataset:
                     ]
                 elif outcome_type == DIAGNOSTIC:
                     for diagnostic_metric in ("Sens", "Spec"):
-                        estimate_and_ci_a = analysis_unit_a.get_effect_and_ci(
-                            diagnostic_metric, group_comparison, confidence_multiplier
+                        estimate_and_ci_a = analysis_unit_a.get_effect_and_ci_for_source(
+                            effect_source,
+                            diagnostic_metric,
+                            group_comparison,
+                            confidence_multiplier,
                         )
-                        estimate_and_ci_b = analysis_unit_b.get_effect_and_ci(
-                            diagnostic_metric, group_comparison, confidence_multiplier
+                        estimate_and_ci_b = analysis_unit_b.get_effect_and_ci_for_source(
+                            effect_source,
+                            diagnostic_metric,
+                            group_comparison,
+                            confidence_multiplier,
                         )
                         estimate_and_ci_a = [
                             to_display_scale(c_val) for c_val in estimate_and_ci_a
@@ -543,30 +655,149 @@ class Dataset:
             return _cmp(study_a_val, study_b_val)
 
 
+def _new_stable_id() -> str:
+    return uuid.uuid4().hex
+
+
+def _follow_up_label_index(follow_ups):
+    result = two_way_dict.TwoWayDict()
+    for index, follow_up in enumerate(follow_ups.values()):
+        ordinal = getattr(follow_up, "ordinal", None)
+        result[index if ordinal is None else ordinal] = follow_up.label
+    return result
+
+
+def _unit_matches(unit, outcome, outcome_id, follow_up):
+    if outcome_id is not None and unit.outcome.stable_id != outcome_id:
+        return False
+    if outcome_id is None and unit.outcome.name != outcome:
+        return False
+    return follow_up in {
+        getattr(unit, "follow_up_id", None),
+        getattr(unit, "follow_up_label", None),
+    }
+
+
+class FollowUp:
+    """Editable follow-up label owned by one immutable identity."""
+
+    def __init__(self, stable_id, label, ordinal=None):
+        self.stable_id = stable_id
+        self.label = label
+        self.ordinal = ordinal
+
+    @property
+    def identity(self):
+        return self.stable_id
+
+    @property
+    def name(self):
+        return self.label
+
+    @name.setter
+    def name(self, value):
+        self.label = value
+
+
 class Study:
     """Store a study's metadata, covariates, and analysis units."""
 
-    def __init__(self, id, name="", year=None, include=True):
+    def __init__(self, id, name="", year=None, include=True, stable_id=None):
         self.id = id
+        self.stable_id = stable_id or _new_stable_id()
         self.year = year
         self.name = name
 
         self.sample_size = None
         self.notes = ""
-        self.analysis_units_by_outcome = {}
-        self.outcomes = []
+        self._analysis_units_by_id = {}
         self.include = include
-        self.covariate_values = {}
+        self._covariate_values_by_id = {}
+        self._covariate_names_by_id = {}
         self.manually_excluded = False
+
+    @property
+    def analysis_units_by_id(self):
+        return self._analysis_units_by_id
+
+    @property
+    def analysis_units(self):
+        return list(self._analysis_units_by_id.values())
+
+    @property
+    def analysis_units_by_outcome(self):
+        result = {}
+        for unit in self._analysis_units_by_id.values():
+            result.setdefault(unit.outcome.name, {})[unit.follow_up_label] = unit
+        return result
+
+    @property
+    def outcomes(self):
+        outcomes = {}
+        for unit in self._analysis_units_by_id.values():
+            outcomes.setdefault(unit.outcome.stable_id, unit.outcome)
+        return list(outcomes.values())
+
+    @property
+    def covariate_values_by_id(self):
+        return self._covariate_values_by_id
+
+    @property
+    def covariate_values(self):
+        return {
+            self._covariate_names_by_id[covariate_id]: value
+            for covariate_id, value in self._covariate_values_by_id.items()
+            if covariate_id in self._covariate_names_by_id
+        }
+
+    @covariate_values.setter
+    def covariate_values(self, values):
+        for name, value in values.items():
+            covariate_id = next(
+                (
+                    identity
+                    for identity, label in self._covariate_names_by_id.items()
+                    if label == name
+                ),
+                name,
+            )
+            self._covariate_values_by_id[covariate_id] = value
+
+    def register_covariate(self, covariate, value=None):
+        self._covariate_names_by_id[covariate.stable_id] = covariate.name
+        self._covariate_values_by_id.setdefault(covariate.stable_id, value)
+
+    def set_covariate_value(self, covariate, value):
+        self.register_covariate(covariate)
+        self._covariate_values_by_id[covariate.stable_id] = value
+
+    def remove_covariate(self, covariate):
+        self._covariate_values_by_id.pop(covariate.stable_id, None)
+        self._covariate_names_by_id.pop(covariate.stable_id, None)
 
     def __str__(self):
         return self.name
+
+    @property
+    def identity(self):
+        return self.stable_id
 
     def get_analysis_unit(
         self,
         outcome,
         follow_up,
     ):
+        outcome_id = outcome.stable_id if isinstance(outcome, Outcome) else None
+        legacy_first = None
+        for unit in self.analysis_units:
+            if not _unit_matches(unit, outcome, outcome_id, follow_up):
+                continue
+            if follow_up == "first" and getattr(unit, "follow_up_id", None) is None:
+                legacy_first = unit
+                continue
+            return unit
+        if legacy_first is not None:
+            return legacy_first
         try:
             return self.analysis_units_by_outcome[outcome][follow_up]
         except KeyError as exc:
@@ -574,23 +805,28 @@ class Study:
                 f"No analysis unit exists for outcome {outcome!r} at {follow_up!r}"
             ) from exc
 
-    def add_outcome(self, outcome, follow_up_name="first", group_names=None):
+    def add_outcome(
+        self, outcome, follow_up_name="first", group_names=None, follow_up_id=None
+    ):
         if outcome.name in self.analysis_units_by_outcome:
             raise ValueError(f"study already contains outcome {outcome.name!r}")
-        self.analysis_units_by_outcome[outcome.name] = {}
-        self.analysis_units_by_outcome[outcome.name][follow_up_name] = AnalysisUnit(
+        unit = AnalysisUnit(
             outcome, group_names=group_names
         )
-        self.outcomes.append(outcome)
+        unit.follow_up_id = follow_up_id
+        unit.follow_up_label = follow_up_name
+        self._analysis_units_by_id[unit.stable_id] = unit
 
     def remove_outcome(self, outcome_name):
-        self.analysis_units_by_outcome.pop(outcome_name)
-        for outcome in self.outcomes:
-            if outcome.name == outcome_name:
-                self.outcomes.remove(outcome)
+        for identity, unit in tuple(self._analysis_units_by_id.items()):
+            if unit.outcome.name == outcome_name:
+                self._analysis_units_by_id.pop(identity)
 
-    def add_outcome_at_follow_up(self, outcome, follow_up):
-        self.analysis_units_by_outcome[outcome.name][follow_up] = AnalysisUnit(outcome)
+    def add_outcome_at_follow_up(self, outcome, follow_up, follow_up_id=None):
+        unit = AnalysisUnit(outcome)
+        unit.follow_up_id = follow_up_id
+        unit.follow_up_label = follow_up
+        self._analysis_units_by_id[unit.stable_id] = unit
 
     def get_outcome(self, outcome_name):
         for outcome in self.outcomes:
@@ -601,27 +837,46 @@ class Study:
     def get_outcome_names(self):
         return [outcome.name for outcome in self.outcomes]
 
-    def add_follow_up_to_outcome(self, outcome, follow_up_name, group_names=None):
-        self.analysis_units_by_outcome[outcome.name][follow_up_name] = AnalysisUnit(
+    def add_follow_up_to_outcome(
+        self, outcome, follow_up_name, group_names=None, follow_up_id=None
+    ):
+        unit = AnalysisUnit(
             outcome, group_names=group_names
         )
+        unit.follow_up_id = follow_up_id
+        unit.follow_up_label = follow_up_name
+        self._analysis_units_by_id[unit.stable_id] = unit
+
+    def replace_analysis_unit(self, outcome, follow_up, unit):
+        """Update the label index and identity-owned unit reference together."""
+        self._analysis_units_by_id[unit.stable_id] = unit
+
+    def add_analysis_unit(self, unit):
+        """Add a fully reconstructed unit to the identity-owned collection."""
+        self._analysis_units_by_id[unit.stable_id] = unit
 
     def remove_follow_up_from_outcome(self, outcome, follow_up_name):
         outcome_name = outcome
         if isinstance(outcome, Outcome):
             outcome_name = outcome.name
 
-        self.analysis_units_by_outcome[outcome_name].pop(follow_up_name)
+        unit = self.get_analysis_unit(outcome_name, follow_up_name)
+        self._analysis_units_by_id.pop(unit.stable_id, None)
 
 
 class Outcome:
     """Holds a few fields that define outcomes."""
 
-    def __init__(self, name, data_type, links=None, sub_type=None):
+    def __init__(self, name, data_type, links=None, sub_type=None, stable_id=None):
         self.name = name
+        self.stable_id = stable_id or _new_stable_id()
         self.data_type = data_type
         self.links = links
         self.sub_type = sub_type
+
+    @property
+    def identity(self):
+        return self.stable_id
 
 
 class Covariate:
@@ -639,6 +894,10 @@ class Covariate:
 
     def get_type_str(self):
         return {CONTINUOUS: "continuous", FACTOR: "factor"}[self.data_type]
+
+    @property
+    def identity(self):
+        return self.stable_id
 
     def get_data_type(self):
         return self.data_type

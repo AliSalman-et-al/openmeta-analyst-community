@@ -35,7 +35,6 @@ class WindowRole(str, Enum):
     MAIN = "main"
     RESULTS = "results"
     EDIT_DATASET = "edit_dataset"
-    NETWORK_VIEW = "network_view_dialog"
     WORKFLOW = "workflow"
     TRANSACTIONAL = "transactional"
     CONFIDENCE_LEVEL = "confidence_level"
@@ -72,9 +71,6 @@ WINDOW_POLICIES = {
         WindowArchetype.WORKSPACE, FirstUseBehavior.MAXIMIZED, 1.00, False
     ),
     WindowRole.EDIT_DATASET: WindowPolicy(
-        WindowArchetype.WORKSPACE, FirstUseBehavior.SCREEN_FRACTION, 0.80, False
-    ),
-    WindowRole.NETWORK_VIEW: WindowPolicy(
         WindowArchetype.WORKSPACE, FirstUseBehavior.SCREEN_FRACTION, 0.80, False
     ),
     WindowRole.WORKFLOW: WindowPolicy(
@@ -302,16 +298,19 @@ class AdaptiveWindowController(QObject):
     def eventFilter(  # ty: ignore[invalid-method-override] -- PyQt6's QObject stub rejects this runtime-supported filter override.
         self, watched: QObject | None, event: QEvent | None
     ) -> bool:
+        window = getattr(self, "window", None)
+        if window is None:
+            return False
         if event is None:
             return super().eventFilter(watched, event)
         if (
-            watched is self.window
+            watched is window
             and event.type() in (QEvent.Type.Move, QEvent.Type.Resize)
-            and not self.window.isMaximized()
-            and not self.window.isFullScreen()
+            and not window.isMaximized()
+            and not window.isFullScreen()
         ):
-            self._normal_frame_geometry = QRect(self.window.frameGeometry())
-        if watched is self.window and event.type() == QEvent.Type.Show:
+            self._normal_frame_geometry = QRect(window.frameGeometry())
+        if watched is window and event.type() == QEvent.Type.Show:
             if self._first_show_pending:
                 self._first_show_pending = False
                 self.apply_first_use_geometry()
@@ -326,13 +325,16 @@ class AdaptiveWindowController(QObject):
         return super(AdaptiveWindowController, self).eventFilter(watched, event)
 
     def _restore_minimum_size_contract(self):
+        window = getattr(self, "window", None)
+        if window is None:
+            return
         contract = QSize(
-            getattr(self.window, "_adaptive_minimum_size_contract", self._minimum_size_contract)
+            getattr(window, "_adaptive_minimum_size_contract", self._minimum_size_contract)
         )
         if not self._has_minimum_size_contract():
             return
         # layout-audit: allow=adaptive-window-policy; reason=restore explicit content minimum after native QDialog show-time size adjustment
-        self.window.setMinimumWidth(contract.width())
+        window.setMinimumWidth(contract.width())
         self.request_content_refit()
 
     def _has_minimum_size_contract(self):

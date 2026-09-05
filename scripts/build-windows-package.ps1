@@ -4,7 +4,6 @@ param(
     [switch]$SkipDependencyInstall,
     [switch]$SkipClean,
     [switch]$SkipSmoke,
-    [switch]$CaptureAdaptiveLayoutEvidence,
     [string]$QualifyExistingArchive
 )
 
@@ -274,6 +273,9 @@ function Invoke-PackagedAppSmokeTest {
     $exePath = Join-Path $Root "RCMetaStudio.exe"
     $samplePath = Join-Path $Root "sample_projects\amino.rcms"
     $smokeEvidencePath = Join-Path $Root "qualification\packaged-smoke.json"
+    $workflowObservationPath = Join-Path $Root "qualification\workflow-observation.json"
+    $surfaceDirectory = Join-Path $Root "qualification\surface-records"
+    $sampleObservationsPath = Join-Path $Root "qualification\sample-observations.json"
     $smokeLogPath = Join-Path $Root "qualification\packaged-smoke.log"
     $smokeStdoutPath = Join-Path $Root "qualification\packaged-smoke.stdout.log"
     $smokeStderrPath = Join-Path $Root "qualification\packaged-smoke.stderr.log"
@@ -282,6 +284,11 @@ function Invoke-PackagedAppSmokeTest {
     $quotedSmokeEvidencePath = '"{0}"' -f $smokeEvidencePath
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $smokeEvidencePath) | Out-Null
     $previousEnv = @{
+        R_HOME = $env:R_HOME
+        R_LIBS = $env:R_LIBS
+        R_LIBS_USER = $env:R_LIBS_USER
+        RCMS_R_HOME = $env:RCMS_R_HOME
+        RCMS_R_LIBS = $env:RCMS_R_LIBS
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_STARTUP_PROJECT_SMOKE = $env:RCMS_STARTUP_PROJECT_SMOKE
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
@@ -292,24 +299,21 @@ function Invoke-PackagedAppSmokeTest {
         RCMS_PACKAGE_BASELINE_DPR = $env:RCMS_PACKAGE_BASELINE_DPR
     }
     try {
+        Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS -ErrorAction SilentlyContinue
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
         $env:RPY2_CFFI_MODE = "API"
-        $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $smokeEvidencePath
+        $env:RCMS_PACKAGE_SMOKE_EVIDENCE = $workflowObservationPath
         $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
         $env:RCMS_AUTOMATION_HANG_TRACE = $hangTracePath
         $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
         $env:RCMS_PACKAGE_BASELINE_DPR = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
         if ($LASTEXITCODE -ne 0 -or -not $env:RCMS_PACKAGE_BASELINE_DPR) { throw "Could not read packaged baseline DPR." }
-        $env:QT_SCALE_FACTOR = "1.25"
-        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath `
-            -ArgumentList @("--automation-native-smoke", $quotedSamplePath) `
-            -StandardOutputPath $smokeStdoutPath -StandardErrorPath $smokeStderrPath
-        if ($exitCode -ne 0) { throw "Packaged app smoke test failed while opening '$samplePath' with exit code $exitCode." }
-
         foreach ($scale in @("1.25", "1.50", "1.75")) {
             $env:QT_SCALE_FACTOR = $scale
+            $surfacePath = Join-Path $surfaceDirectory ("surface-{0}.json" -f $scale)
+            New-Item -ItemType Directory -Force -Path $surfaceDirectory | Out-Null
             $surfaceExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
-                "--automation-package-surface-smoke", $quotedSmokeEvidencePath, $scale
+                "--automation-package-surface-smoke", ('"{0}"' -f $surfacePath), $scale
             )
             if ($surfaceExitCode -ne 0) {
                 throw "Packaged Qt surface smoke failed at scale $scale with exit code $surfaceExitCode."
@@ -319,104 +323,19 @@ function Invoke-PackagedAppSmokeTest {
         $env:RCMS_STARTUP_PROJECT_SMOKE = "1"
         $startupExitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @($quotedSamplePath)
         if ($startupExitCode -ne 0) { throw "Packaged startup project smoke test failed while opening '$samplePath' with exit code $startupExitCode." }
+        & $PythonExe scripts\assemble_packaged_smoke_evidence.py `
+            --workflow-observation $workflowObservationPath `
+            --surface-records $surfaceDirectory `
+            --sample-observations $sampleObservationsPath `
+            --sample amino.rcms --sample-root (Join-Path $Root "sample_projects") `
+            --sample-path $samplePath `
+            --executable $exePath --runtime-probe $runtimeProbePath `
+            --surface-directory $surfaceDirectory --log-path $smokeLogPath `
+            --output $smokeEvidencePath
+        if ($LASTEXITCODE -ne 0) { throw "Packaged evidence assembly failed." }
         & $PythonExe scripts\inspect_windows_deployment.py finalize-smoke `
             --smoke-evidence $smokeEvidencePath --smoke-log $smokeLogPath
         if ($LASTEXITCODE -ne 0) { throw "Packaged smoke finalization failed after clean process exits." }
-    }
-    finally {
-        foreach ($name in $previousEnv.Keys) {
-            if ($null -eq $previousEnv[$name]) {
-                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-Item "Env:\$name" $previousEnv[$name]
-            }
-        }
-    }
-}
-
-function Invoke-PackagedAdaptiveLayoutEvidence {
-    param([string]$Root)
-    $exePath = Join-Path $Root "RCMetaStudio.exe"
-    $samplePath = Join-Path $Root "sample_projects\amino.rcms"
-    $evidenceRoot = Join-Path $repoRoot "build\windows-package\adaptive-layout-evidence\windows-x64"
-    if (Test-Path $evidenceRoot) { Remove-Item -LiteralPath $evidenceRoot -Recurse -Force }
-    $previousEnv = @{
-        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
-        QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
-        RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
-        RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG
-        RCMS_ADAPTIVE_LAYOUT_SCALE = $env:RCMS_ADAPTIVE_LAYOUT_SCALE
-        RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
-    }
-    try {
-        Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
-        $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
-        $env:RPY2_CFFI_MODE = "API"
-        $runtimeProbePath = Join-Path $Root "qualification\runtime-probe.json"
-        $baselineDpr = (& $PythonExe -c "import json,sys; print(json.load(open(sys.argv[1], encoding='utf-8'))['qt']['baseline_device_pixel_ratio'])" $runtimeProbePath).Trim()
-        if ($LASTEXITCODE -ne 0 -or -not $baselineDpr) { throw "Could not read packaged baseline DPR for adaptive-layout evidence." }
-        foreach ($scale in @(
-            @{ Value = "1.0"; Directory = "scale-100" },
-            @{ Value = "1.5"; Directory = "scale-150" }
-        )) {
-            $outputDir = Join-Path $evidenceRoot $scale.Directory
-            $logPath = Join-Path $outputDir "automation-adaptive-layout-evidence.log"
-            New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-            $env:RCMS_ADAPTIVE_LAYOUT_SCALE = $scale.Value
-            $env:QT_SCALE_FACTOR = ([double]$scale.Value / [double]$baselineDpr).ToString("0.############", [Globalization.CultureInfo]::InvariantCulture)
-            $env:RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG = $logPath
-            $quotedOutputDir = '"{0}"' -f $outputDir
-            $quotedSamplePath = '"{0}"' -f $samplePath
-            $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @(
-                "--automation-adaptive-layout-evidence", $quotedOutputDir, $quotedSamplePath
-            ) -Visible
-            if ($exitCode -ne 0) {
-                $message = "Native adaptive-layout evidence failed at scale $($scale.Value) with exit code $exitCode."
-                if (Test-Path $logPath) {
-                    $message = $message + " " + (Get-Content -Raw -LiteralPath $logPath).Trim()
-                }
-                throw $message
-            }
-            & $PythonExe (Join-Path $repoRoot "scripts\validate_adaptive_layout_evidence.py") `
-                --root $outputDir --platform-plugin windows --scale-factor $scale.Value
-            if ($LASTEXITCODE -ne 0) {
-                throw "Adaptive-layout evidence validation failed at scale $($scale.Value)."
-            }
-        }
-    }
-    finally {
-        foreach ($name in $previousEnv.Keys) {
-            if ($null -eq $previousEnv[$name]) {
-                Remove-Item "Env:\$name" -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-Item "Env:\$name" $previousEnv[$name]
-            }
-        }
-    }
-}
-
-function Invoke-PackagedWizardLayoutSmokeTest {
-    param([string]$Root)
-    $exePath = Join-Path $Root "RCMetaStudio.exe"
-    $smokeLogPath = Join-Path $Root "automation-wizard-layout-smoke.log"
-    if (Test-Path $smokeLogPath) { Remove-Item -LiteralPath $smokeLogPath -Force }
-    $previousEnv = @{
-        QT_QPA_PLATFORM = $env:QT_QPA_PLATFORM
-        RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
-    }
-    try {
-        $env:QT_QPA_PLATFORM = "offscreen"
-        $env:RCMS_AUTOMATION_SMOKE_LOG = $smokeLogPath
-        $exitCode = Invoke-BoundedPackageProcess -FilePath $exePath -ArgumentList @("--automation-wizard-layout-smoke")
-        if ($exitCode -ne 0) {
-            $message = "Packaged wizard layout smoke test failed with exit code $exitCode."
-            if (Test-Path $smokeLogPath) {
-                $message = $message + " " + (Get-Content -Raw -LiteralPath $smokeLogPath).Trim()
-            }
-            throw $message
-        }
     }
     finally {
         foreach ($name in $previousEnv.Keys) {
@@ -499,7 +418,7 @@ function Copy-RRuntime {
 function Test-RDependencyPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -568,12 +487,18 @@ function Invoke-PackagedRuntimeProbe {
     $probeStderrPath = Join-Path $Root "qualification\runtime-probe.stderr.log"
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $probePath) | Out-Null
     $previousEnv = @{
+        R_HOME = $env:R_HOME
+        R_LIBS = $env:R_LIBS
+        R_LIBS_USER = $env:R_LIBS_USER
+        RCMS_R_HOME = $env:RCMS_R_HOME
+        RCMS_R_LIBS = $env:RCMS_R_LIBS
         RPY2_CFFI_MODE = $env:RPY2_CFFI_MODE
         RCMS_REQUIRE_IN_PROCESS_RPY2 = $env:RCMS_REQUIRE_IN_PROCESS_RPY2
         RCMS_AUTOMATION_SMOKE_LOG = $env:RCMS_AUTOMATION_SMOKE_LOG
         QT_SCALE_FACTOR = $env:QT_SCALE_FACTOR
     }
     try {
+        Remove-Item Env:R_HOME,Env:R_LIBS,Env:R_LIBS_USER,Env:RCMS_R_HOME,Env:RCMS_R_LIBS -ErrorAction SilentlyContinue
         Remove-Item "Env:\QT_SCALE_FACTOR" -ErrorAction SilentlyContinue
         $env:RPY2_CFFI_MODE = "API"
         $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
@@ -609,7 +534,7 @@ function Invoke-StrictRDependencyPolicy {
 function Test-BundledRPackages {
     param([string]$RscriptExe, [string]$Library)
     if (-not (Test-Path $Library)) { return $false }
-    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    $verify = "lib <- normalizePath('$($Library -replace '\\', '/')', winslash='/'); .libPaths(c(lib, .libPaths())); pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','mice','Hmisc'); ok <- vapply(pkgs, requireNamespace, logical(1), quietly=TRUE); if (!all(ok)) { print(ok); quit(status=1) }; if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     & $RscriptExe -e $verify
     return ($LASTEXITCODE -eq 0)
 }
@@ -704,7 +629,7 @@ function Install-BundledRPackages {
 
     Write-Step "Installing local RCMetaR package"
     Install-LocalRPackagesFromSource -Root $Root
-    & $rscriptExe -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','igraph','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
+    & $rscriptExe -e "pkgs <- c('mada','meta','RCMetaR','metafor','rsvg','svglite','tiff','xml2','mice','Hmisc'); ok <- vapply(pkgs, require, logical(1), character.only=TRUE); print(ok); if (!all(ok)) quit(status=1); if (as.character(packageVersion('mada')) != '0.5.12') quit(status=1); if (as.character(getElement(packageDescription('meta'), 'Version')) != '8.5-0') quit(status=1)"
     if ($LASTEXITCODE -ne 0) { throw "Bundled R package verification failed." }
 
     if (-not (Test-BundledRPackages -RscriptExe $rscriptExe -Library $rLibrary)) { throw "Bundled R package verification failed after local RCMetaR install." }
@@ -889,11 +814,6 @@ if ($LASTEXITCODE -ne 0) { throw "Windows deployment inspection failed." }
 if (-not $SkipSmoke) {
     Write-Step "Running packaged Windows smoke checks"
     Invoke-PackagedAppSmokeTest -Root $appDir
-    Invoke-PackagedWizardLayoutSmokeTest -Root $appDir
-}
-if ($CaptureAdaptiveLayoutEvidence) {
-    Write-Step "Capturing controlled native Windows adaptive-layout evidence"
-    Invoke-PackagedAdaptiveLayoutEvidence -Root $appDir
 }
 Compress-AppDirectory -SourceDirectory $appDir -ArchiveStagingRoot $archiveStagingRoot -ArchiveRootDirectory $archiveRootDir -DestinationPath $zipPath
 Assert-ZipLayout -Path $zipPath -ArchiveRootName $archiveRootName

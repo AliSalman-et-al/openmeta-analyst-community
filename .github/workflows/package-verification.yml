@@ -9,7 +9,7 @@ on:
         default: true
         type: boolean
       build_macos:
-        description: Build both native macOS packages without publishing them.
+        description: Build the native Apple-silicon macOS package without publishing it.
         required: true
         default: true
         type: boolean

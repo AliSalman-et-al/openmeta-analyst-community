@@ -1,45 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-regression.wrapper <- function(data, mods.str, method, level, digits, btt=NULL) {
-	if (!is.null(btt)) {
-		btt.str <- paste("c(",paste(btt,collapse=", "),")", sep="")
-		call_str <- sprintf("rma.uni(yi,vi, mods=%s, data=data, method=\"%s\", level=%f, digits=%d, btt=%s)", mods.str, method, level, digits, btt.str)
-	} else {
-		call_str <- sprintf("rma.uni(yi,vi, mods=%s, data=data, method=\"%s\", level=%f, digits=%d)", mods.str, method, level, digits)
-
-	}
-
-	expr<-parse(text=call_str)
-	res <- eval(expr)
-	res
+regression.wrapper <- function(data, mods.formula, method, level, digits, btt=NULL) {
+	rma.args <- list(yi=data$yi, vi=data$vi, mods=mods.formula, data=data,
+	                 method=method, level=level, digits=digits)
+	if (!is.null(btt)) rma.args$btt <- btt
+	do.call(metafor::rma.uni, rma.args)
 }
 
-make.mods.str <-function(mods) {
-
-	str.els <- c()
-
-	for (mod in mods[["numeric"]]) {
-		str.els <- c(str.els, mod)
-	}
-
-	for (mod in mods[["categorical"]]) {
-		str.els <- c(str.els, mod)
-	}
-
-	for (interaction in names(mods[['interactions']])) {
-		str.els <- c(str.els, interaction)
-	}
-
-
-
-	if (length(str.els)!=0) {
-		mods.str <- paste("~", paste(str.els,collapse=" + "), sep=" ")
-	} else {
-		mods.str <- "~ 1"
-	}
-
-	mods.str
+make.mods.formula <- function(mods, response=NULL) {
+    terms <- c(mods[["numeric"]], mods[["categorical"]], names(mods[["interactions"]]))
+    stats::reformulate(terms, response=response)
 }
 
 make.design.matrix <- function(strat.cov, mods, cond.means.data, data) {
@@ -273,9 +244,9 @@ g.meta.regression <- function(
   disable.plots = FALSE)
 {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
-	res <- regression.wrapper(data, mods.str, method, level, digits,btt)
+	res <- regression.wrapper(data, mods.formula, method, level, digits,btt)
 
 	residuals <- rstandard(res, digits=digits)
 	residuals$slab <- data$slab
@@ -285,7 +256,7 @@ g.meta.regression <- function(
 			                    list(residuals=list(type="blob", description="Standardized residuals for fitted models")))
 
 	Summary <- paste(capture.output(res), collapse="\n")
-	regression.model.formula.str <- sprintf("Regression model formula: yi %s", mods.str)
+	regression.model.formula.str <- sprintf("Regression model formula: %s", paste(deparse(stats::reformulate(attr(terms(mods.formula), "term.labels"), response="yi")), collapse=" "))
 	Summary <- paste(Summary, regression.model.formula.str, sep="\n\n")
 	est.coeffs <- round(res$b[,1], digits=digits)
 	tmp <- est.coeffs[2:length(est.coeffs)]
@@ -295,8 +266,7 @@ g.meta.regression <- function(
 	reg.equation.str <- sprintf("Regression model equation: %s", reg.equation)
 	Summary <- paste(Summary, reg.equation.str, sep="\n")
 
-	model.formula.str <- paste("yi", mods.str)
-	model.formula <- eval(model.formula.str)
+	model.formula <- stats::reformulate(attr(terms(mods.formula), "term.labels"), response="yi")
 	more.output <- reg.output.helper(theData=data, rma.results=res, model.formula=model.formula, digits=digits)
 	pre.summary <- ""
 	for (name in names(more.output)) {
@@ -420,9 +390,9 @@ g.get.scale <- function (measure)
 
 g.meta.regression.cond.means <- function(data, mods, method, level, digits, strat.cov, cond.means.data, btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
-	res <- regression.wrapper(data, mods.str, method, level, digits,btt)
+	res <- regression.wrapper(data, mods.formula, method, level, digits,btt)
 
 	A <- make.design.matrix(strat.cov, mods, cond.means.data, data)
 	new_betas <- A %*% res$b
@@ -459,7 +429,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 		n.replicates, histogram.title="", bootstrap.plot.path="./r_tmp/bootstrap.png",
 		btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
 
 	max.failures <- 5*n.replicates
@@ -482,7 +452,7 @@ g.bootstrap.meta.regression <- function(data, mods, method, level, digits,
 			}
 
 			analysis_result <- tryCatch({
-						regression.wrapper(data[indices,], mods.str, method, level, digits,btt)
+						regression.wrapper(data[indices,], mods.formula, method, level, digits,btt)
 					  }, error = function(e) {
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)
@@ -550,7 +520,7 @@ g.bootstrap.meta.regression.cond.means <- function(
     n.replicates, histogram.title="", bootstrap.plot.path="./r_tmp/bootstrap.png",
 	btt=NULL) {
 
-	mods.str <- make.mods.str(mods)
+	mods.formula <- make.mods.formula(mods)
 
 	A <- make.design.matrix(strat.cov, mods, cond.means.data, data)
 
@@ -574,7 +544,7 @@ g.bootstrap.meta.regression.cond.means <- function(
 			}
 
 			analysis_result <- tryCatch({
-						regression.wrapper(data[indices,], mods.str, method, level, digits,btt)
+						regression.wrapper(data[indices,], mods.formula, method, level, digits,btt)
 					}, error = function(e) {
 						failures <<- failures + 1
 						indices <- sample.int(nrow(data), size=length(indices), replace=TRUE)
@@ -654,6 +624,7 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
 	if (is(reg.data, "DiagnosticData")) {
 		return(diagnostic.reitsma.meta.regression(reg.data, params, stop.at.rma=stop.at.rma))
 	}
+	params$digits <- display.digits(params)
 	cov.data <- extract.cov.data(reg.data)
 	cov.array <- cov.data$cov.array
 	cat.ref.var.and.levels <- cov.data$cat.ref.var.and.levels
@@ -865,8 +836,7 @@ extract.cov.data <- function(reg.data, dont.make.array = FALSE) {
 binary.fixed.meta.regression <- function(reg.data, params){
     cov.data <- array(dim=c(length(reg.data@y), length(cov.names)), dimnames=list(NULL, cov.names))
     for (cov.name in cov.names) {
-       cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-       cov.vals <- eval(parse(text=cov.val.str))
+       cov.vals <- reg.data@covariates[[cov.name]]
        cov.data[,cov.name] <- cov.vals
     }
     inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), ncol(cov.data) + 1)
@@ -890,8 +860,7 @@ binary.fixed.meta.regression <- function(reg.data, params){
 }
 
 random.meta.regression <- function(reg.data, params, cov.name){
-    cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-    cov.vals <- eval(parse(text=cov.val.str))
+    cov.vals <- reg.data@covariates[[cov.name]]
     inference.method <- rcmetar.validate.inference.method(params, length(reg.data@y), 2)
     res<-rma.uni(yi=reg.data@y, sei=reg.data@SE, slab=reg.data@study.names,
                                 level=params$conf.level, digits=params$digits,
@@ -929,8 +898,7 @@ categorical.meta.regression <- function(reg.data, params, cov.names) {
   cov.data <- array()
   var.names <- NULL
   for (cov.name in cov.names) {
-       cov.val.str <- paste("reg.data@covariates$", cov.name, sep="")
-       groups <- eval(parse(text=cov.val.str))
+       groups <- reg.data@covariates[[cov.name]]
        group.list <- unique(groups)
        design_matrix_block <- array(dim=c(length(reg.data@y), length(group.list)-1), dimnames=list(NULL, group.list[-1]))
        for (group in group.list[-1]) {

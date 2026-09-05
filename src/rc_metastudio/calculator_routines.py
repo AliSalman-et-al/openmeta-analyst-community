@@ -8,7 +8,7 @@ from functools import partial
 from typing import Protocol, TypeAlias
 from weakref import WeakKeyDictionary
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QUndoCommand, QUndoStack
+
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from rc_metastudio.meta_globals import (
@@ -376,32 +376,24 @@ def set_current_effect_from_value(
     if confidence_multiplier is None:
         raise ValueError("confidence multiplier must be specified")
 
-    if data_type == "binary":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.binary_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    elif data_type == "continuous":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.continuous_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    elif data_type == "diagnostic":
-
-        def conv_to_disp_scale(x):
-            return r_bridge.diagnostic_convert_scale(
-                x, current_effect, convert_to="display.scale"
-            )
-    else:
-        raise Exception("data_type unrecognized")
+    converters = {
+        "binary": r_bridge.binary_convert_scale,
+        "continuous": r_bridge.continuous_convert_scale,
+        "diagnostic": r_bridge.diagnostic_convert_scale,
+    }
+    try:
+        converter = converters[data_type]
+    except KeyError as exc:
+        raise ValueError("data_type unrecognized") from exc
+    conv_to_disp_scale = lambda value: converter(
+        value, current_effect, convert_to="display.scale"
+    )
     effect_tbox, lower_tbox, upper_tbox = [
         txt_boxes[box_name] for box_name in ("effect", "lower", "upper")
     ]
 
-    (est, lower, upper) = analysis_unit.get_effect_and_ci(
-        current_effect, group_comparison, confidence_multiplier
+    (est, lower, upper) = analysis_unit.get_effect_and_ci_for_source(
+        "entered", current_effect, group_comparison, confidence_multiplier
     )
     (display_estimate, display_lower, display_upper) = [
         conv_to_disp_scale(x) for x in (est, lower, upper)
@@ -416,17 +408,14 @@ def set_current_effect_from_value(
         else:
             txt_box.setText("")
         txt_box.blockSignals(False)
+    semantic_samples = {
+        "binary": binary_effect_display_samples,
+        "continuous": continuous_effect_display_samples,
+        "diagnostic": diagnostic_effect_display_samples,
+    }[data_type](current_effect)
     fit_effect_ci_line_edits_to_contents(
         [effect_tbox, lower_tbox, upper_tbox],
-        semantic_samples=(
-            binary_effect_display_samples(current_effect)
-            if data_type == "binary"
-            else (
-                continuous_effect_display_samples(current_effect)
-                if data_type == "continuous"
-                else diagnostic_effect_display_samples(current_effect)
-            )
-        ),
+        semantic_samples=semantic_samples,
     )
 
 
@@ -454,8 +443,8 @@ EditState: TypeAlias = tuple[object, ...]
 StateRestorer: TypeAlias = Callable[..., None]
 
 
-class FieldEditCommand(QUndoCommand):
-    """Undo one already-applied calculator edit and its complete UI state."""
+class FieldEditCommand:
+    """Transient undo record for fields inside one open calculator dialog."""
 
     def __init__(
         self,
@@ -467,8 +456,6 @@ class FieldEditCommand(QUndoCommand):
         description: str = "",
         refresh_on_initial_redo: bool = True,
     ) -> None:
-        super().__init__(description)
-
         self.owner = owner
         self.just_created = True
         self.restore_state = restore_state
@@ -488,8 +475,32 @@ class FieldEditCommand(QUndoCommand):
         self.restore_state(*self.old_state)
 
 
+class TransientEditHistory:
+    """Small dialog-local history; it is discarded when the dialog closes."""
+
+    def __init__(self) -> None:
+        self._commands: list[FieldEditCommand] = []
+        self._index = 0
+
+    def push(self, command: FieldEditCommand) -> None:
+        del self._commands[self._index :]
+        self._commands.append(command)
+        self._index += 1
+        command.redo()
+
+    def undo(self) -> None:
+        if self._index:
+            self._index -= 1
+            self._commands[self._index].undo()
+
+    def redo(self) -> None:
+        if self._index < len(self._commands):
+            self._commands[self._index].redo()
+            self._index += 1
+
+
 def push_field_edit(
-    undo_stack: QUndoStack,
+    history: TransientEditHistory,
     *,
     owner: CalculatorCommandOwner,
     restore_state: StateRestorer,
@@ -499,7 +510,7 @@ def push_field_edit(
     refresh_on_initial_redo: bool = True,
 ) -> None:
     """Publish an already-applied calculator edit as one undoable state change."""
-    undo_stack.push(
+    history.push(
         make_field_edit_command(
             owner=owner,
             restore_state=restore_state,
@@ -594,8 +605,8 @@ def evaluate(
     if confidence_multiplier is None:
         raise ValueError("confidence multiplier must be specified")
 
-    est, lower, upper = analysis_unit.get_effect_and_ci(
-        current_effect, group_comparison, confidence_multiplier
+    est, lower, upper = analysis_unit.get_effect_and_ci_for_source(
+        "entered", current_effect, group_comparison, confidence_multiplier
     )  # calc scale
     display_estimate, display_lower, display_upper = [
         conv_to_disp_scale(x) for x in (est, lower, upper)

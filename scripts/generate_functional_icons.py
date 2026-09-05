@@ -116,10 +116,6 @@ ACTIONS = {
     "undo.svg": """
   <path d="M38 35c-1-12-7-18-18-18h-9M18 10l-8 7 8 7" fill="none" stroke="#2B88D8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
 """,
-    "view-network.svg": """
-  <path d="M12 13 24 24 37 11M24 24 11 37M24 24l14 14" fill="none" stroke="#647D89" stroke-width="2.5" stroke-linecap="round"/>
-  <g stroke="#fff" stroke-width="1.5"><circle cx="12" cy="13" r="5" fill="#2B88D8"/><circle cx="37" cy="11" r="5" fill="#6F52B5"/><circle cx="24" cy="24" r="5.5" fill="#1769AA"/><circle cx="11" cy="37" r="5" fill="#168A80"/><circle cx="38" cy="38" r="5" fill="#6F52B5"/></g>
-""",
 }
 
 

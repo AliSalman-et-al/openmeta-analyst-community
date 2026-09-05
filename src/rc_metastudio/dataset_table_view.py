@@ -14,7 +14,8 @@ from PyQt6.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt6.QtGui import QAction, QKeyEvent, QUndoCommand, QUndoStack
+from PyQt6.QtGui import QAction, QKeyEvent
+
 from PyQt6.QtWidgets import (
     QApplication,
     QItemDelegate,
@@ -41,7 +42,7 @@ from rc_metastudio.meta_globals import (
     TWO_ARM_METRICS,
 )
 from rc_metastudio.runtime_types import required
-from rc_metastudio.workspace_columns import WorkspaceColumnWidthController
+from rc_metastudio.qt_workspace_columns import WorkspaceColumnWidthController
 
 if TYPE_CHECKING:
     from rc_metastudio.dataset_table_model import DatasetTableModel
@@ -49,11 +50,11 @@ if TYPE_CHECKING:
 
 class MainWindowProtocol(Protocol):
     model: "DatasetTableModel"
-    current_data_unsaved: bool | None
     oneArmMetricMenu: QMenu
     twoArmMetricMenu: QMenu
 
     def data_dirtied(self) -> None: ...
+    def data_error(self, message: str) -> None: ...
     def delete_study(self, study, *, study_index: int) -> None: ...
     def edit_group_name(self, group: str) -> None: ...
     def rename_covariate(self, covariate) -> None: ...
@@ -64,7 +65,8 @@ class MainWindowProtocol(Protocol):
     def enable_menu_options_that_require_dataset(self) -> None: ...
     def disable_menu_options_that_require_dataset(self) -> None: ...
     def set_model(self, dataset, state_dict=None) -> None: ...
-    def data_error(self, message: str) -> None: ...
+    def undo(self) -> None: ...
+    def redo(self) -> None: ...
 
 
 _newlines_re = QRegularExpression("\r\n?")
@@ -105,17 +107,13 @@ class DatasetTableView(QtWidgets.QTableView):
 
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
+        self._batch_editing = False
 
         # the main gui is assumed to be the form
         # that owns this table view, i.e., the 'main'
         # user interface/form. it is assumed that this
         # is set elsewhere.
         self.main_gui: MainWindowProtocol | None = None
-
-        # None maps to the special, no outcome/no follow up
-        # undo stack
-        self.undo_stack_dict = {None: QUndoStack(self)}
-        self.undoStack = QUndoStack(self)
 
         header = required(self.horizontalHeader(), "workspace column header")
         header.sectionClicked.connect(
@@ -163,15 +161,26 @@ class DatasetTableView(QtWidgets.QTableView):
         finally:
             self._column_widths.end_schema_change()
         self._column_model = model
-        if model is not None:
-            model.modelAboutToBeReset.connect(self._begin_column_schema_change)
-            model.modelReset.connect(self._end_column_schema_change)
-            model.columnsAboutToBeInserted.connect(self._begin_column_schema_change)
-            model.columnsInserted.connect(self._end_column_schema_change)
-            model.columnsAboutToBeRemoved.connect(self._begin_column_schema_change)
-            model.columnsRemoved.connect(self._end_column_schema_change)
-            model.headerDataChanged.connect(self.synchronize_column_widths)
+        self._connect_column_model(model)
         self.synchronize_column_widths()
+
+    def restore_model(self, model):
+        """Restore a previously bound model without repeating failed layout work."""
+        self._disconnect_column_model()
+        QTableView.setModel(self, model)
+        self._column_model = model
+        self._connect_column_model(model)
+
+    def _connect_column_model(self, model):
+        if model is None:
+            return
+        model.modelAboutToBeReset.connect(self._begin_column_schema_change)
+        model.modelReset.connect(self._end_column_schema_change)
+        model.columnsAboutToBeInserted.connect(self._begin_column_schema_change)
+        model.columnsInserted.connect(self._end_column_schema_change)
+        model.columnsAboutToBeRemoved.connect(self._begin_column_schema_change)
+        model.columnsRemoved.connect(self._end_column_schema_change)
+        model.headerDataChanged.connect(self.synchronize_column_widths)
 
     def _disconnect_column_model(self):
         if self._column_model is None:
@@ -371,9 +380,9 @@ class DatasetTableView(QtWidgets.QTableView):
             return
         if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             if event.key() == QtCore.Qt.Key.Key_Z:
-                self.undoStack.undo()
+                self._main_gui().undo()
             elif event.key() == QtCore.Qt.Key.Key_Y:
-                self.undoStack.redo()
+                self._main_gui().redo()
             elif event.key() == QtCore.Qt.Key.Key_C:
                 # ctrl + c = copy
                 self.copy()
@@ -491,24 +500,15 @@ class DatasetTableView(QtWidgets.QTableView):
             # dispatch on the data type
             form = None
             study_index = row
-            # Preserve the analysis unit so cancellation can restore it.
             analysis_unit = copy.deepcopy(
                 self.model().get_current_analysis_unit_for_study(study_index)
             )
-            old_analysis_unit = copy.deepcopy(analysis_unit)
             current_groups = self.model().current_groups
             current_effect = self.model().current_effect
             group_comparison = self.model().get_current_group_comparison()
             data_type = self.model().get_current_outcome_type()
 
-            # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
-                cur_raw_data_dict = {}
-                for group in current_groups:
-                    cur_raw_data_dict[group] = list(
-                        analysis_unit.get_raw_data_for_group(group)
-                    )
-
                 form = binary_data_dialog.BinaryDataDialog(
                     analysis_unit,
                     current_groups,
@@ -518,18 +518,14 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    # push the edit even
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
             elif data_type == "continuous":
-                cur_raw_data_dict = {}
-                for group_name in current_groups:
-                    cur_raw_data_dict[group_name] = list(
-                        analysis_unit.get_raw_data_for_group(group_name)
-                    )
-
                 form = continuous_data_dialog.ContinuousDataDialog(
                     analysis_unit,
                     current_groups,
@@ -539,19 +535,14 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    # update the model; push this event onto the stack
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
             else:
-                # then this is diagnostic data
-                cur_raw_data_dict = {}
-                for group in current_groups:
-                    cur_raw_data_dict[group] = list(
-                        analysis_unit.get_raw_data_for_group(group)
-                    )
-
                 form = diagnostic_data_dialog.DiagnosticDataDialog(
                     analysis_unit,
                     current_groups,
@@ -560,27 +551,21 @@ class DatasetTableView(QtWidgets.QTableView):
                     parent=self,
                 )
                 if form.exec():
-                    analysis_edit = EditAnalysisUnitCommand(
-                        self, study_index, analysis_unit, old_analysis_unit
+                    self.model().set_current_analysis_unit_for_study(
+                        study_index, analysis_unit
                     )
-                    self.undoStack.push(analysis_edit)
+                    self.model().reset_model()
+                    self.model().try_to_update_outcomes()
+                    self.synchronize_column_widths()
+                    self.dataDirtied.emit()
         finally:
             del signal_blocker
 
-    def cell_content_changed(self, edit):
-        index = edit.index
-        old_val = edit.old_value
-        new_val = edit.new_value
-        study_added = edit.added_study_id
+    def cell_content_changed(self, _edit):
         # Only make a cell edit if the old values and new values are different
-        if not self._new_eq_old(old_val, new_val):
-            cell_edit = CellEditCommand(
-                self, index, old_val, new_val, added_study=study_added
-            )
-            self.undoStack.push(cell_edit)
-        self._enable_analysis_menus_if_appropriate()
-
-        # make analysis menus change even when checkbox is (un)checked
+        # DatasetTableModel has already applied the edit.  The owning window's
+        # data-dirtied boundary snapshots it into WorkspaceSession, which is
+        # the only durable history.
         self._enable_analysis_menus_if_appropriate()
 
     def _new_eq_old(self, old, new):
@@ -648,11 +633,10 @@ class DatasetTableView(QtWidgets.QTableView):
         # current table view; rebuild it when covariate columns move or vanish.
         if column not in self.reverse_column_sorts:
             self.reverse_column_sorts[column] = False
-        sort_command = SortCommand(
-            self.model(), column, self.reverse_column_sorts[column]
-        )
-        self.undoStack.push(sort_command)
+        self.model().sort_studies(column, self.reverse_column_sorts[column])
+        self.model().reset_model()
         self.reverse_column_sorts[column] = not self.reverse_column_sorts[column]
+        self.dataDirtied.emit()
 
     def _normalize_newlines(self, qstr_text):
         if isinstance(qstr_text, str):
@@ -661,6 +645,7 @@ class DatasetTableView(QtWidgets.QTableView):
 
     def paste_from_clipboard(self, upper_left_index):
         """Pastes the data in the clipboard starting at the currently selected cell."""
+        origin = (upper_left_index.row(), upper_left_index.column())
         clipboard = required(QApplication.clipboard(), "application clipboard")
         clipboard_text = clipboard.text()
 
@@ -677,33 +662,12 @@ class DatasetTableView(QtWidgets.QTableView):
         if not new_content:
             return False
 
-        valid, message = self._preflight_paste(upper_left_index, new_content)
-        if not valid:
-            self._report_model_data_error(message)
+        if not self.paste_contents(upper_left_index, new_content):
             return False
-
-        lower_row = upper_left_index.row() + len(new_content)
-        lower_col = upper_left_index.column() + len(new_content[0])
-        studies_pre_paste = list(self.model().dataset.studies)
-        lower_right_index = self.model().createIndex(lower_row - 1, lower_col - 1)
-        old_content = self._str_to_matrix(
-            self.copy_contents_in_range(
-                upper_left_index, lower_right_index, to_clipboard=False
-            )
-        )
-
-        paste_command = PasteCommand(
-            self,
-            new_content,
-            old_content,
-            upper_left_index,
-            studies_pre_paste,
-            self.column_widths(),
-            "paste %s" % new_content,
-        )
         self._last_paste_committed = True
-        self.undoStack.push(paste_command)
-        return self._last_paste_committed
+        active_model = self.model()
+        self.setCurrentIndex(active_model.index(*origin))
+        return True
 
     def _preflight_paste(self, upper_left_index, content):
         model = self.model()
@@ -716,24 +680,6 @@ class DatasetTableView(QtWidgets.QTableView):
             return False, "Clipboard rows must form one rectangular range."
         if upper_left_index.column() + width > model.columnCount():
             return False, "Clipboard data extends beyond the workspace columns."
-        if upper_left_index.row() + len(content) > model.rowCount():
-            return False, "Clipboard data extends beyond the workspace rows."
-
-        candidate = type(model)(
-            dataset=copy.deepcopy(model.dataset), add_blank_study=False
-        )
-        candidate.set_state(copy.deepcopy(model.get_state()))
-        for row_offset, row in enumerate(content):
-            for column_offset, value in enumerate(row):
-                index = candidate.index(
-                    upper_left_index.row() + row_offset,
-                    upper_left_index.column() + column_offset,
-                )
-                if not candidate.setData(index, value):
-                    return False, (
-                        getattr(candidate, "last_data_error", None)
-                        or "The clipboard data could not be validated."
-                    )
         return True, None
 
     def copy_contents_in_range(self, upper_left_index, lower_right_index, to_clipboard):
@@ -764,9 +710,7 @@ class DatasetTableView(QtWidgets.QTableView):
         return copied_str
 
     def paste_contents(self, upper_left_index, source_content):
-        """Paste the content in source_content into the matrix starting at the upper_left_coord
-        cell. new rows will be added as needed; existing data will be overwritten
-        """
+        """Validate and publish one clipboard edit through the workspace."""
         origin_row, origin_col = upper_left_index.row(), upper_left_index.column()
         source_content = self._normalize_matrix_rows(source_content)
         if not source_content:
@@ -784,59 +728,44 @@ class DatasetTableView(QtWidgets.QTableView):
             if not source_content:
                 return True
 
-        # temporarily disable sorting to prevent automatic sorting of pasted data.
-        # (note: this is consistent with Excel's approach.)
-        original_dataset = copy.deepcopy(self.model().dataset)
-        original_state_dict = copy.deepcopy(self.model().get_state())
-        original_model = self.model()
-        original_unsaved = (
-            self._main_gui().current_data_unsaved if self.main_gui is not None else None
-        )
-        signal_blocker = QSignalBlocker(original_model)
-        failure = None
-        try:
-            for src_row in range(len(source_content)):
-                # do we need to append a row?
-                cur_row_count = self.model().rowCount()
-                if cur_row_count <= origin_row + src_row:
-                    self._add_new_row()
-
-                for src_col in range(len(source_content[0])):
-                    # Treat the entire paste as one undoable action.
-                    index = self.model().createIndex(
-                        origin_row + src_row, origin_col + src_col
-                    )
-                    if not self.model().setData(
-                        index, source_content[src_row][src_col]
-                    ):
-                        failure = self._model_data_error_message()
-                        break
-                if failure is not None:
-                    break
-        except Exception as exc:
-            failure = "Exception while pasting: %s" % exc
-        finally:
-            del signal_blocker
-
-        if failure is not None:
-            if self.main_gui is not None:
-                self._main_gui().set_model(
-                    original_dataset, state_dict=original_state_dict
-                )
-                self._main_gui().current_data_unsaved = original_unsaved
-            else:
-                original_model.dataset = original_dataset
-                original_model.set_state(original_state_dict)
-                original_model.reset_model()
+        valid, failure = self._preflight_paste(upper_left_index, source_content)
+        if not valid:
             self._report_model_data_error(failure)
             return False
-        self.model().reset_model()
+        model = self.model()
+        candidate = type(model)(
+            dataset=copy.deepcopy(model.dataset), add_blank_study=False
+        )
+        candidate.set_state(copy.deepcopy(model.get_state()))
+        required_rows = origin_row + len(source_content)
+        while candidate.rowCount() < required_rows:
+            candidate.dataset.add_study(Study(candidate.dataset.max_study_id() + 1))
+            candidate.reset_model()
+        try:
+            for src_row, row in enumerate(source_content):
+                for src_col, value in enumerate(row):
+                    index = candidate.createIndex(
+                        origin_row + src_row, origin_col + src_col
+                    )
+                    if not candidate.setData(index, value):
+                        raise ValueError(
+                            getattr(candidate, "last_data_error", None)
+                            or "The clipboard data could not be validated."
+                        )
+        except (IndexError, TypeError, ValueError) as exc:
+            self._report_model_data_error(str(exc))
+            return False
+        model.dataset = candidate.dataset
+        model.set_state(candidate.get_state())
+        model.reset_model()
+        self.dataDirtied.emit()
         return True
 
     def set_data_in_model(self, index, val):
         if not self.model().setData(index, val):
             self._report_model_data_error(self._model_data_error_message())
         self.model().reset_model()
+        self.setCurrentIndex(index)
 
     def _model_data_error_message(self):
         return (
@@ -968,274 +897,6 @@ class DatasetTableView(QtWidgets.QTableView):
             self.model().study_auto_added = int(new_study.id)
 
         self.model().reset_model()
-
-
-class CellEditCommand(QUndoCommand):
-    """Here we make use of QT's undo/redo framework. This is an UndoCommand for individual
-    cell edits (as opposed to paste actions, which are represented by PasteCommand objects,
-    defined below).
-    """
-
-    def __init__(
-        self,
-        dataset_table_view,
-        index,
-        original_content,
-        new_content,
-        added_study=None,
-        description="",
-    ):
-        super(CellEditCommand, self).__init__(description)
-        self.first_call = True
-        if original_content is None:
-            self.original_content = ""
-        else:
-            self.original_content = original_content
-        self.new_content = new_content
-        self.row, self.col = index.row(), index.column()
-        self.dataset_table_view = dataset_table_view
-        self.added_study = added_study
-        self.selection = [
-            (selected.row(), selected.column())
-            for selected in dataset_table_view.selectionModel().selectedIndexes()
-        ]
-        current = dataset_table_view.currentIndex()
-        self.current_cell = (
-            (current.row(), current.column()) if current.isValid() else None
-        )
-
-    def redo(self):
-        index = self._get_index()
-
-        if self.first_call:
-            self.first_call = False
-        else:
-            model = self.dataset_table_view.model()
-            # Qt views may dereference transient model indexes during dataEdited.
-            signal_blocker = QSignalBlocker(model)
-            try:
-                edit_ok = self._apply_content(model, index, self.new_content)
-                self.added_study = self.dataset_table_view.model().study_auto_added
-                self.dataset_table_view.model().study_auto_added = None
-            finally:
-                del signal_blocker
-            if not edit_ok:
-                self.dataset_table_view._report_model_data_error(
-                    self.dataset_table_view._model_data_error_message()
-                )
-            self.dataset_table_view.model().reset_model()
-
-        self.dataset_table_view._enable_analysis_menus_if_appropriate()
-        self.dataset_table_view.synchronize_column_widths()
-
-        self.dataset_table_view.dataDirtied.emit()
-        self._restore_selection()
-
-    def undo(self):
-        if self.added_study is not None:
-            self.dataset_table_view.model().remove_study(self.added_study)
-
-        index = self._get_index()
-        model = self.dataset_table_view.model()
-
-        with QSignalBlocker(model):
-            edit_ok = self._apply_content(
-                model, index, self.original_content, allow_empty_names=True
-            )
-        if not edit_ok:
-            self.dataset_table_view._report_model_data_error(
-                self.dataset_table_view._model_data_error_message()
-            )
-        self.dataset_table_view.model().reset_model()
-
-        self.dataset_table_view._enable_analysis_menus_if_appropriate()
-        self.dataset_table_view.synchronize_column_widths()
-        self.dataset_table_view.dataDirtied.emit()
-        self._restore_selection()
-
-    def _get_index(self):
-        return self.dataset_table_view.model().createIndex(self.row, self.col)
-
-    def _apply_content(self, model, index, content, allow_empty_names=False):
-        if index.column() == model.INCLUDE_STUDY and hasattr(
-            content, "manually_excluded"
-        ):
-            study = model.dataset.studies[index.row()]
-            study.include = bool(content.include)
-            study.manually_excluded = bool(content.manually_excluded)
-            return True
-        return model.setData(index, content, allow_empty_names=allow_empty_names)
-
-    def _restore_selection(self):
-        _restore_table_selection(
-            self.dataset_table_view,
-            self.selection,
-            self.current_cell,
-        )
-
-
-class PasteCommand(QUndoCommand):
-    """Apply or reverse one table paste operation."""
-
-    def __init__(
-        self,
-        dataset_table_view,
-        new_content,
-        old_content,
-        upper_left_coord,
-        old_studies,
-        old_col_widths,
-        description,
-    ):
-        super(PasteCommand, self).__init__(description)
-        self.new_content, self.old_content = new_content, old_content
-        self.upper_left_coord = upper_left_coord
-        self.old_column_widths = old_col_widths
-        self.dataset_table_view = dataset_table_view
-        self.added_study = None
-        self.metric_changed = None
-        self.old_metric = None
-        self.new_metric = None
-        self.selection = [
-            (index.row(), index.column())
-            for index in dataset_table_view.selectionModel().selectedIndexes()
-        ]
-        current = dataset_table_view.currentIndex()
-        self.current_cell = (
-            (current.row(), current.column()) if current.isValid() else None
-        )
-        # is this the first time?
-        self.first_call = True
-
-    def redo(self):
-        # Snapshot before any row growth so every paste mutation shares one
-        # rollback boundary.
-        self.original_dataset = copy.deepcopy(self.dataset_table_view.model().dataset)
-        self.original_state_dict = copy.deepcopy(
-            self.dataset_table_view.model().get_state()
-        )
-        self.original_unsaved = self.dataset_table_view.main_gui.current_data_unsaved
-
-        try:
-            self.dataset_table_view._add_studies_if_necessary(
-                self.upper_left_coord, self.new_content
-            )
-            committed = self.dataset_table_view.paste_contents(
-                self.upper_left_coord, self.new_content
-            )
-            if not committed:
-                self._rollback_failed_redo()
-                return
-
-            if self.first_call:
-                # On the first application, record any automatic metric change.
-                self.metric_changed, self.old_metric = (
-                    self.dataset_table_view.change_metric_if_appropriate()
-                )
-
-                if self.metric_changed:
-                    self.new_metric = self.dataset_table_view.model().current_effect
-                self.first_call = False
-            elif self.metric_changed:
-                self.dataset_table_view.set_metric_in_ui(self.new_metric)
-
-            self.dataset_table_view.model().reset_model()
-            self.dataset_table_view._enable_analysis_menus_if_appropriate()
-            self.dataset_table_view.dataDirtied.emit()
-            self.dataset_table_view.synchronize_column_widths()
-            self._restore_selection()
-        except Exception as exc:
-            self._rollback_failed_redo("Exception while pasting: %s" % exc)
-
-    def _rollback_failed_redo(self, message=None):
-        self.dataset_table_view.main_gui.set_model(
-            self.original_dataset, state_dict=self.original_state_dict
-        )
-        self.dataset_table_view.main_gui.current_data_unsaved = self.original_unsaved
-        self.dataset_table_view._last_paste_committed = False
-        self.setObsolete(True)
-        self._restore_selection()
-        if message is not None:
-            self.dataset_table_view._report_model_data_error(message)
-
-    def undo(self):
-        if self.added_study is not None:
-            self.dataset_table_view.model().remove_study(self.added_study)
-        self.dataset_table_view.main_gui.set_model(
-            self.original_dataset, state_dict=self.original_state_dict
-        )
-
-        # did we change the metric automatically (e.g., because it
-        # looked like the user was exploring single-arm data?) if
-        # so, change it back
-        if self.metric_changed:
-            self.dataset_table_view.set_metric_in_ui(self.old_metric)
-
-        self.dataset_table_view.model().reset_model()
-        self.dataset_table_view._enable_analysis_menus_if_appropriate()
-        self.dataset_table_view.dataDirtied.emit()
-        self._restore_selection()
-
-    def _restore_selection(self):
-        _restore_table_selection(
-            self.dataset_table_view,
-            self.selection,
-            self.current_cell,
-        )
-
-
-class EditAnalysisUnitCommand(QUndoCommand):
-    def __init__(
-        self,
-        table_view,
-        study_index,
-        new_analysis_unit,
-        old_analysis_unit,
-        description="Analysis unit edit",
-    ):
-        super().__init__(description)
-        self.model = table_view.model()
-        self.old_analysis_unit = old_analysis_unit
-        self.new_analysis_unit = new_analysis_unit
-        self.table_view = table_view
-        self.study_index = study_index
-        self.dataset_table_view = table_view
-
-    def undo(self):
-        self.model.set_current_analysis_unit_for_study(
-            self.study_index, self.old_analysis_unit
-        )
-        self.model.reset_model()
-        self.table_view.synchronize_column_widths()
-        self.dataset_table_view.dataDirtied.emit()
-
-    def redo(self):
-        self.model.set_current_analysis_unit_for_study(
-            self.study_index, self.new_analysis_unit
-        )
-        self.model.reset_model()
-        self.model.try_to_update_outcomes()
-
-        self.table_view.synchronize_column_widths()
-        self.dataset_table_view.dataDirtied.emit()
-
-
-class SortCommand(QUndoCommand):
-    def __init__(self, dataset_table_model, col, reverse_order, description="Sort"):
-        super(SortCommand, self).__init__(description)
-        self.model = dataset_table_model
-        self.col = col
-        self.reverse = reverse_order
-        self.previous_order = None
-
-    def redo(self):
-        self.previous_order = self.model.get_ordered_study_ids()
-        self.model.sort_studies(self.col, self.reverse)
-        self.model.reset_model()
-
-    def undo(self):
-        self.model.order_studies(self.previous_order)
-        self.model.reset_model()
 
 
 class StudyDelegate(QItemDelegate):

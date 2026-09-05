@@ -27,6 +27,36 @@ uv run python scripts/verify.py fast
 uv run python scripts/verify.py r-stack
 ```
 
+For deterministic complexity, dependency, churn, and hotspot evidence, run the
+locked code-health command against a comparison commit. Both snapshots are
+measured from their named revisions: history is bounded at the measured head,
+and Radon, Complexipy, and Grimp analyze that revision's source. The command
+writes machine-readable JSON and a short text report; the exit status enforces
+only new cycles, forbidden boundary imports, and changed-function thresholds.
+
+```powershell
+uv run python scripts/code_health.py --base 8b7796b --head HEAD `
+  --baseline artifacts/code-health/baseline.json `
+  --output artifacts/code-health/final.json `
+  --report artifacts/code-health/final.txt
+```
+
+Use the stable rewrite baseline `8b7796b` for trend snapshots (as the CI
+workflow does) and use the PR or push base separately for changed-code gates.
+CI passes the recorded baseline artifact with `--baseline`; this makes the
+final report compare directly with the evidence that was emitted for that
+baseline, rather than relying on a branch name or an implicit merge base.
+The evidence records the requested names and their resolved commit SHAs; all
+snapshot measurements use those SHAs, so a dirty worktree cannot alter them.
+Use the same commit for `--base` and `--head` to capture a baseline snapshot.
+The report records rename-aware 30-, 90-, and 180-day line churn. Hotspots are
+ranked as normalized 180-day churn multiplied by cyclomatic complexity density;
+coupling, cycles, cognitive complexity, maintainability, defect history, and
+revision-bound typing indicators are reported independently. The typing
+indicators report annotated-parameter and annotated-return coverage plus
+`Any` annotations, `type: ignore` directives, and casts to `Any`; repository-wide strict `ty`
+verification remains part of the Qt6 verification lane.
+
 Add `--sync` when the environment may be stale. Add `--require-r-evidence` when R is required, or `--skip-r-evidence` when a separate full R run owns that evidence.
 
 During development, run the narrowest relevant test file first. The maintained suites are grouped by execution needs:

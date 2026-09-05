@@ -4,6 +4,9 @@ import subprocess
 import sys
 import textwrap
 import builtins
+import pytest
+
+pytestmark = pytest.mark.usefixtures("inject_python_boundary")
 
 
 sys.path.insert(0, os.path.abspath("src"))
@@ -22,28 +25,19 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
     script = textwrap.dedent(
         """
         import json
-        from rc_metastudio import r_backend
-
-        r_backend.install_r_backend()
-
         from rc_metastudio import analysis_dataset
         from rc_metastudio import meta_globals
 
         dataset = analysis_dataset.Dataset()
         outcome = analysis_dataset.Outcome("Mortality", meta_globals.BINARY)
         study = analysis_dataset.Study(1, "Alpha")
-        study.add_outcome(outcome, group_names=["tx A", "tx B", "tx C", "tx D"])
-        study.add_follow_up_to_outcome(
-            outcome,
-            "week 4",
-            group_names=["tx A", "tx B", "tx C", "tx D"],
-        )
         dataset.add_study(study)
-        dataset.follow_ups_by_outcome["Mortality"] = {
-            0: "baseline",
-            1: "week 4",
-            2: "week 8",
-        }
+        dataset.add_outcome(outcome)
+        dataset.add_group("tx C", "Mortality")
+        dataset.add_group("tx D", "Mortality")
+        dataset.change_follow_up_name("Mortality", "first", "baseline")
+        dataset.add_follow_up_to_outcome("Mortality", "week 4")
+        dataset.add_follow_up_to_outcome("Mortality", "week 8")
 
         print(json.dumps({
             "all_groups": dataset.get_group_names(),
@@ -51,7 +45,6 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
                 "Mortality", "week 4"
             ),
             "follow_ups": dataset.get_follow_up_names(),
-            "network_nodes": dataset.get_network("Mortality", "week 4")[0],
         }))
         """
     )
@@ -59,12 +52,10 @@ def test_dataset_group_and_follow_up_order_is_stable_across_hash_seeds():
         "all_groups": ["tx A", "tx B", "tx C", "tx D"],
         "fu_groups": ["tx A", "tx B", "tx C", "tx D"],
         "follow_ups": ["baseline", "week 4", "week 8"],
-        "network_nodes": ["tx A", "tx B", "tx C", "tx D"],
     }
 
     for seed in ("1", "2"):
         env = os.environ.copy()
-        env["RCMS_STUB_BACKEND"] = "1"
         env["PYTHONHASHSEED"] = seed
         env["PYTHONPATH"] = os.path.abspath("src")
         result = subprocess.run(
@@ -123,7 +114,8 @@ def _sortable_dataset_model():
 
 
 def _study_names(model):
-    return [study.name for study in model.dataset.studies]
+    studies = {study.id: study for study in model.dataset.studies}
+    return [studies[study_id].name for study_id in model.get_ordered_study_ids()]
 
 
 def test_follow_up_navigation_handles_removed_middle_index():
@@ -161,3 +153,51 @@ def test_dataset_model_sort_studies_uses_key_function(monkeypatch):
         model.sort_studies(column, reverse=False)
 
         assert _study_names(model) == expected_order
+
+
+def test_outcome_sort_uses_each_study_display_effect_source():
+    model = _sortable_dataset_model()
+    group_comparison = model.get_current_group_comparison()
+    studies = {study.name: study for study in model.dataset.studies}
+
+    for study in model.dataset.studies:
+        unit = study.get_analysis_unit("Mortality", "first")
+        for group in model.current_groups:
+            unit.groups[group].raw_data[:] = ["", ""]
+        unit.set_effect_for_source(
+            "entered", "OR", group_comparison,
+            {"Alpha": 1.0, "Beta": 2.0, "Gamma": 3.0}[study.name],
+            0.1,
+            4.0,
+        )
+
+    alpha = studies["Alpha"].get_analysis_unit("Mortality", "first")
+    alpha.groups[model.current_groups[0]].raw_data[:] = [1, 10]
+    alpha.set_effect_for_source("derived_preview", "OR", group_comparison, 9.0, 8.0, 10.0)
+
+    model.sort_studies(model.OUTCOMES[0], reverse=False)
+
+    assert _study_names(model) == ["Beta", "Gamma", "Alpha"]
+
+
+def test_sort_only_changes_table_presentation_order():
+    model = _sortable_dataset_model()
+    canonical_order = [study.id for study in model.dataset.studies]
+
+    model.sort_studies(model.NAME, reverse=False)
+
+    assert [study.id for study in model.dataset.studies] == canonical_order
+    assert model.get_ordered_study_ids() != canonical_order
+
+
+def test_edit_after_sort_targets_the_visible_study():
+    model = _sortable_dataset_model()
+    model.sort_studies(model.NAME, reverse=False)
+    index = model.index(0, model.NAME)
+
+    assert model.setData(index, "Alpha revised")
+    assert [study.name for study in model.dataset.studies] == [
+        "Gamma",
+        "Alpha revised",
+        "Beta",
+    ]

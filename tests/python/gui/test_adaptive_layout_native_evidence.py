@@ -17,21 +17,21 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     with pytest.raises(RuntimeError, match="native Qt platform"):
         adaptive_layout_evidence.validate_native_platform("offscreen", "win32", "AMD64")
     with pytest.raises(RuntimeError, match="expected Qt platform cocoa"):
         adaptive_layout_evidence.validate_native_platform("windows", "darwin", "x86_64")
-    with pytest.raises(RuntimeError, match="requires an x64 host"):
-        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "arm64")
+    with pytest.raises(RuntimeError, match="requires an Apple silicon arm64 host"):
+        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "x86_64")
 
     assert (
         adaptive_layout_evidence.validate_native_platform("windows", "win32", "AMD64")
         == "windows"
     )
     assert (
-        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "x86_64")
+        adaptive_layout_evidence.validate_native_platform("cocoa", "darwin", "arm64")
         == "cocoa"
     )
 
@@ -39,7 +39,7 @@ def test_native_evidence_rejects_non_native_and_wrong_platform_plugins():
 def test_native_evidence_records_absolute_scale_when_qt_uses_native_multiplier(
     monkeypatch,
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     monkeypatch.setenv("QT_SCALE_FACTOR", "1.2")
     monkeypatch.setenv("RCMS_ADAPTIVE_LAYOUT_SCALE", "1.5")
@@ -50,7 +50,7 @@ def test_native_evidence_records_absolute_scale_when_qt_uses_native_multiplier(
 
 
 def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     window = adaptive_layout_evidence.QtWidgets.QMainWindow()
     window.show()
@@ -74,7 +74,7 @@ def test_exact_client_size_repositions_the_outer_frame_inside_the_screen(qapp):
 
 
 def test_exact_client_size_clears_sticky_maximized_state(qapp):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     class StickyMaximizedWindow(adaptive_layout_evidence.QtWidgets.QMainWindow):
         first_show = True
@@ -117,7 +117,7 @@ def test_exact_client_size_clears_sticky_maximized_state(qapp):
 def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
     qapp, monkeypatch
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
     blank.fill(adaptive_layout_evidence.QtGui.QColor("white"))
@@ -146,7 +146,7 @@ def test_native_frame_capture_retries_until_compositor_pixels_are_visible(
 def test_native_frame_capture_targets_window_frame_not_desktop(
     qapp, monkeypatch
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     painted = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
     painted.fill(adaptive_layout_evidence.QtGui.QColor("white"))
@@ -186,7 +186,7 @@ def test_native_frame_capture_targets_window_frame_not_desktop(
 def test_native_frame_capture_fails_closed_on_persistent_blank_frame(
     qapp, monkeypatch
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
     blank.fill(adaptive_layout_evidence.QtGui.QColor("black"))
@@ -222,7 +222,7 @@ def test_native_frame_capture_fails_closed_on_persistent_blank_frame(
 def test_native_frame_requests_a_fresh_client_paint_before_each_native_grab(
     qapp, monkeypatch
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     blank = adaptive_layout_evidence.QtGui.QPixmap(140, 89)
     blank.fill(adaptive_layout_evidence.QtGui.QColor("white"))
@@ -267,7 +267,7 @@ def test_native_frame_requests_a_fresh_client_paint_before_each_native_grab(
 def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
     qapp, monkeypatch, tmp_path
 ):
-    from rc_metastudio import adaptive_layout_evidence
+    from scripts import adaptive_layout_evidence
 
     sample = ROOT / "sample_projects" / "amino.rcms"
     output = tmp_path / "native-evidence"
@@ -394,3 +394,5 @@ def test_evidence_runner_captures_all_archetypes_and_runtime_contracts(
         "test-native-plugin",
         manifest["scale_factor_environment"],
     )
+
+

@@ -19,7 +19,7 @@
 \alias{get.row.vector.cat.cont}
 \alias{is.single.numeric.covariate}
 \alias{make.design.matrix}
-\alias{make.mods.str}
+\alias{make.mods.formula}
 \alias{meta.regression}
 \alias{meta.regression.plot}
 \alias{random.meta.regression}
@@ -41,7 +41,7 @@ around model fitting and resampling.
 
 \section{Covariate design}{
 
-\code{make.mods.str()}, \code{make.design.matrix()},
+\code{make.mods.formula()}, \code{make.design.matrix()},
 \code{get.row.vector.cat.cat()}, \code{get.row.vector.cat.cont()},
 \code{coded.cat.mod.level()}, \code{is.single.numeric.covariate()},
 \code{extract.cov.data()}, and \code{cond.means.info()} prepare covariate
@@ -62,4 +62,3 @@ model terms and conditional-mean metadata.
 See \code{rcmetar.method.references("meta.regression")} for the
 meta-regression method citations used in result payloads.
 }
-

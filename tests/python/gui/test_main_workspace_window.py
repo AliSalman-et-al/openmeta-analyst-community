@@ -3,13 +3,13 @@ import sys
 import json
 from pathlib import Path
 import subprocess
+from typing import cast
 
 import pytest
 
 pytestmark = pytest.mark.qsettings
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 
 from PyQt6 import QtCore, QtWidgets
 
@@ -58,6 +58,49 @@ def test_main_is_a_managed_workspace_with_expanding_table_and_layouted_navigatio
         window.hide()
         window.deleteLater()
         qapp.processEvents()
+
+
+def test_direct_table_view_mutation_is_checkpointed_for_one_undo(qapp):
+    from rc_metastudio import analysis_dataset, dataset_table_model
+    from rc_metastudio import main_window, project_adapter, workspace_session
+    from rc_metastudio.meta_globals import BINARY
+
+    dataset = analysis_dataset.Dataset()
+    dataset.add_outcome(analysis_dataset.Outcome("Outcome", BINARY))
+    dataset.add_study(analysis_dataset.Study(1, name="Beta"))
+    dataset.add_study(analysis_dataset.Study(2, name="Alpha"))
+    model = dataset_table_model.DatasetTableModel(dataset=dataset, add_blank_study=False)
+    model.current_outcome_name = "Outcome"
+    model.update_column_indices()
+    model.current_groups = []
+    initial = project_adapter.RuntimeProject(
+        dataset=model.dataset,
+        model_state=model.get_state(),
+        restored_selection=True,
+    )
+
+    class BoundaryOwner:
+        def __init__(self):
+            self.model = model
+            self.workspace = workspace_session.WorkspaceSession(
+                project_adapter.runtime_project_to_document(initial)
+            )
+
+        def _notify_user_that_data_is_unsaved(self):
+            pass
+
+    owner = BoundaryOwner()
+    model.order_studies([2, 1])
+    main_window.MainWindow.data_dirtied(cast(main_window.MainWindow, owner))
+    assert [study.name for study in model.dataset.studies] == ["Alpha", "Beta"]
+    assert owner.workspace.undo() is True
+    runtime = owner.workspace.runtime
+    assert runtime is not None
+    assert [study.name for study in runtime.dataset.studies] == [
+        "Beta",
+        "Alpha",
+    ]
+    assert owner.workspace.undo() is False
 
 
 def test_runtime_content_changes_do_not_resize_or_reposition_visible_main(qapp):
@@ -171,15 +214,15 @@ def test_added_covariate_keeps_identity_and_width_through_undo_redo(qapp):
     window = main_window.MainWindow()
     try:
         command = window._make_add_covariate_command("Age", "continuous")
-        window.tableView.undoStack.push(command)
+        window._commit_model_operation(command.redo)
         column = window.model.columnCount() - 1
         identity_before = window.model.headerData(
             column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
         )
         window.tableView.setColumnWidth(column, 277)
 
-        window.tableView.undoStack.undo()
-        window.tableView.undoStack.redo()
+        window.undo()
+        window.redo()
         qapp.processEvents()
 
         identity_after = window.model.headerData(
@@ -210,7 +253,7 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         window.delete_covariate(covariate)
         assert window.model.dataset.get_covariate("Age") is None
 
-        window.tableView.undoStack.undo()
+        window.undo()
         qapp.processEvents()
         identity_after_undo = window.model.headerData(
             column, QtCore.Qt.Orientation.Horizontal, WORKSPACE_COLUMN_IDENTITY_ROLE
@@ -218,9 +261,9 @@ def test_deleted_covariate_keeps_identity_and_width_through_undo_redo(qapp):
         assert identity_after_undo == identity_before
         assert window.tableView.columnWidth(column) == 263
 
-        window.tableView.undoStack.redo()
+        window.redo()
         assert window.model.dataset.get_covariate("Age") is None
-        window.tableView.undoStack.undo()
+        window.undo()
         qapp.processEvents()
         assert (
             window.model.headerData(
@@ -277,6 +320,12 @@ def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors
     script = r"""
 import json
 from rc_metastudio import automation
+from scripts.local_r_test_backend import create
+from rc_metastudio import r_bridge
+
+for name, implementation in vars(create()).items():
+    setattr(r_bridge, name, implementation)
+
 app, window = automation.start_automation()
 try:
     window.showNormal()
@@ -302,7 +351,6 @@ try:
     }
     print("QT6_SCALE_EVIDENCE=" + json.dumps(evidence, sort_keys=True))
 finally:
-    window.current_data_unsaved = False
     window.close()
     app.processEvents()
 """

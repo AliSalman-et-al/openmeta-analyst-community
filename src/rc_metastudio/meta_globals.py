@@ -10,7 +10,7 @@ import math
 from collections.abc import Callable, Sequence
 from typing import TypeVar, overload
 
-from PyQt6.QtGui import QColor, QUndoCommand
+from PyQt6.QtGui import QColor
 
 APPLICATION_NAME = "RCMetaStudio"
 APPLICATION_DISPLAY_NAME = "RC MetaStudio"
@@ -27,9 +27,8 @@ PERCENTAGE_DISPLAY_DIGITS = 1
 #   levels of granularity).
 CALC_NUM_DIGITS = 4
 
-VERSION = "0.3.1"
+VERSION = "0.4.0"
 
-NETWORK_ANALYSIS_DISABLED = True
 DEFAULT_DATASET_NAME = "untitled_dataset"
 
 # Supported metrics are part of the application contract. R methods operate on
@@ -113,7 +112,7 @@ TYPE_TO_STR_DICT = {
 }
 
 # enumeration of meta-analytic types
-VANILLA, NETWORK = range(2)
+VANILLA = 0
 
 EMPTY_VALS = ("", None)  # these indicate an empty row/cell
 
@@ -294,7 +293,7 @@ def is_nan(value: object) -> bool:
     return value != value
 
 
-class CallbackCommand(QUndoCommand):
+class CallbackCommand:
     """Execute paired redo and undo callbacks."""
 
     def __init__(
@@ -303,7 +302,6 @@ class CallbackCommand(QUndoCommand):
         undo_f: Callable[[], None],
         description: str = "",
     ) -> None:
-        super().__init__(description)
         self.redo_f = redo_f
         self.undo_f = undo_f
 

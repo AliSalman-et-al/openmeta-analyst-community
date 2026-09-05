@@ -2,13 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """R bridge for RCMetaR calls through rpy2."""
 
+import importlib
+import importlib.metadata
 import locale
 import math
 import os
 import re
 import sys
-from collections.abc import Mapping
-from typing import Callable
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Callable, Literal, cast, overload
 
 from rc_metastudio import r_runtime
 from rc_metastudio.analysis_method_labels import (
@@ -17,7 +20,7 @@ from rc_metastudio.analysis_method_labels import (
 )
 from rc_metastudio import result_sections
 from rc_metastudio.analysis_errors import DiagnosticExecutionError
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
 from rc_metastudio.study_effect_shapes import (
     effect_triplet as effect_triplet,
     normalize_diagnostic_effects,
@@ -37,8 +40,6 @@ from rc_metastudio.meta_globals import (
     tabulate,
     validate_confidence_level,
 )
-
-r_runtime.configure_bundled_r_environment()
 
 try:
     import rpy2.robjects as ro
@@ -88,6 +89,43 @@ if sys.platform == "win32":
 _RFunction = Callable[..., object]
 
 
+@serialized_r_call
+def packaged_runtime_observation() -> dict[str, object]:
+    """Return raw facts about the initialized rpy2/R runtime.
+
+    Runtime qualification needs these facts from the exact frozen process, but
+    rpy2's native modules belong behind this bridge rather than in the shipped
+    automation dispatcher.
+    """
+    from rpy2.rinterface_lib import openrlib
+
+    api_bridge = importlib.import_module("_rinterface_cffi_api")
+    r_home = str(_first_dynamic(_r_eval("normalizePath(R.home(), winslash='/', mustWork=TRUE)")))
+    r_version = str(_first_dynamic(_r_eval("as.character(getRversion())")))
+    r_library_paths = [
+        str(item)
+        for item in cast(
+            Sequence[object],
+            _r_eval("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)"),
+        )
+    ]
+    api_bridge_path = Path(str(api_bridge.__file__)).resolve()
+    return {
+        "r_home": r_home,
+        "r_version": r_version,
+        "r_library_paths": r_library_paths,
+        "rpy2": {
+            "distribution_version": importlib.metadata.version("rpy2"),
+            "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
+            "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"),
+            "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
+            "loaded_cffi_mode": openrlib.cffi_mode.name,
+            "api_bridge_loaded": openrlib.cffi_mode.name == "API",
+            "api_bridge_path": str(api_bridge_path),
+        },
+    }
+
+
 def _r_function(function_name: str) -> _RFunction:
     """Return a callable R function after checking rpy2's dynamic lookup."""
     function = ro.r[function_name]
@@ -121,23 +159,10 @@ def _first_dynamic(value: object) -> object:
 
 
 def _r_is_null(r_object):
-    """True if an rpy2 object is R's NULL.
-
-    rpy2 >= 3.x represents NULL as a ``NULLType`` singleton whose ``str()`` is
-    an object repr (e.g. ``<rpy2...NULLType object at 0x...>``), not the literal
-    ``"NULL"`` emitted by older rpy2 builds. Code that detected NULL via
-    ``str(x) == "NULL"`` therefore silently misfires (e.g. treating a list with
-    NULL names as if it had names). Prefer identity/type checks and keep the
-    string fallback for older rpy2 compatibility.
-    """
-    try:
-        if r_object is rpy2.rinterface.NULL:
-            return True
-        if isinstance(r_object, type(rpy2.rinterface.NULL)):
-            return True
-    except Exception:
-        pass
-    return str(r_object) == "NULL"
+    """Return whether an rpy2 object represents R's NULL value."""
+    return r_object is rpy2.rinterface.NULL or isinstance(
+        r_object, type(rpy2.rinterface.NULL)
+    )
 
 
 @serialized_r_call
@@ -167,14 +192,8 @@ class RLibraryLoader:
     def load_rcmetar(self):
         return self._load_r_lib("RCMetaR")
 
-    def load_igraph(self):
-        return self._load_r_lib("igraph")
-
     def load_grid(self):
         return self._load_r_lib("grid")
-
-    def load_gemtc(self):
-        return self._load_r_lib("gemtc")
 
     def _load_r_lib(self, name, expected_version=None):
         try:
@@ -478,42 +497,6 @@ def get_analysis_plot_capabilities(data_type, method_name, workflow="standard"):
     return r_object_to_python(capabilities)
 
 
-def _analysis_output_path(filename):
-    from rc_metastudio import settings
-
-    return settings.analysis_output_path(filename)
-
-
-@serialized_r_call
-def draw_network(edge_list, unconnected_vertices, network_path=None):
-    """Draw a treatment network from adjacent pairs in ``edge_list``."""
-    network_path = _strip_wrapping_quotes(
-        network_path or _analysis_output_path("network.png")
-    )
-    if len(edge_list) > 0:
-        edge_matrix = execute_r_function(
-            "matrix", _r_character_vector(edge_list), ncol=2, byrow=True
-        )
-        graph = execute_r_function("graph.edgelist", edge_matrix, directed=False)
-    else:
-        graph = execute_r_function("graph.empty")
-
-    if len(unconnected_vertices) > 0:
-        graph = execute_r_function(
-            "add.vertices",
-            graph,
-            len(unconnected_vertices),
-            name=_r_character_vector(unconnected_vertices),
-        )
-    ro.globalenv["g"] = graph
-    execute_r_function("png", network_path)
-    execute_r_string(
-        "plot(g, vertex.label=V(g)$name, layout=layout.circle, vertex.size=25, asp=.3, margin=-.05)"
-    )
-    execute_r_string("dev.off()")
-    return network_path
-
-
 @serialized_r_call
 def dataset_to_simple_continuous_r_object(
     table_model, var_name="tmp_obj", covs_to_include=None, studies=None
@@ -623,115 +606,6 @@ def dataset_to_simple_binary_r_object(
     r_obj = execute_r_function("rcmetar.create.binary.data", **data_kwargs)
     ro.globalenv[var_name] = r_obj
     return r_obj
-
-
-@serialized_r_call
-def dataset_to_simple_network(
-    table_model,
-    var_name="tmp_obj",
-    studies=None,
-    data_type=None,
-    outcome=None,
-    follow_up=None,
-    network_path=None,
-):
-    """This converts a DatasetTableModel to an mtc.network R object as described
-    in the getmc documentation for mtc.network
-    """
-    network_path = network_path or _analysis_output_path("network.png")
-    if data_type not in (BINARY, CONTINUOUS):
-        raise ValueError("Given data type: '%s' is unknown." % str(data_type))
-
-    if studies is None:
-        # we will exclude studies later on if they do not have full raw_data
-        studies = table_model.get_studies(only_if_included=False)
-
-    group_names = table_model.dataset.get_group_names_for_outcome_follow_up(
-        outcome, follow_up
-    )
-    groups_to_include = []
-    for group in group_names:
-        for study in studies:
-            analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
-            raw_data = analysis_unit.get_raw_data_for_group(group)
-            if not _data_blank_or_none(*raw_data):
-                groups_to_include.append(group)
-                break
-
-    descriptions = groups_to_include
-    treatments = {
-        "id": [x.replace(" ", "_") for x in descriptions],  # ids, ""
-        "description": descriptions,
-    }
-    ro.globalenv["treatments"] = _r_function("data.frame")(
-        **{
-            "id": _r_character_vector(treatments["id"]),
-            "description": _r_character_vector(treatments["description"]),
-        }
-    )
-
-    if data_type == BINARY:
-        data = {"study": [], "treatment": [], "responders": [], "sampleSize": []}
-    else:
-        data = {
-            "study": [],
-            "treatment": [],
-            "mean": [],
-            "std.dev": [],
-            "sampleSize": [],
-        }
-
-    for study in studies:
-        # analysis_unit = table_model.get_analysis_unit(study=study, outcome=outcome, follow_up=follow_up):
-        analysis_unit = study.analysis_units_by_outcome[outcome][follow_up]
-
-        for treatment_id, group_name in zip(
-            treatments["id"], treatments["description"]
-        ):
-            raw_data = analysis_unit.get_raw_data_for_group(group_name)
-            if _data_blank_or_none(*raw_data):  # make sure raw data is full
-                continue
-            if data_type == BINARY:
-                responders, sample_size = raw_data
-                data["responders"].append(responders)
-                data["sampleSize"].append(sample_size)
-            elif data_type == CONTINUOUS:
-                sample_size, mean, std_dev = raw_data
-                data["mean"].append(mean)
-                data["std.dev"].append(std_dev)
-                data["sampleSize"].append(sample_size)
-            data["study"].append(study.id)
-            data["treatment"].append(treatment_id)
-    data_frame_kwargs = {
-        "study": _r_numeric_vector(data["study"]),
-        "treatment": _r_character_vector(data["treatment"]),
-        "sampleSize": _r_numeric_vector(data["sampleSize"]),
-    }
-    if data_type == BINARY:
-        data_frame_kwargs["responders"] = _r_numeric_vector(data["responders"])
-    else:
-        data_frame_kwargs["mean"] = _r_numeric_vector(data["mean"])
-        data_frame_kwargs["std.dev"] = _r_numeric_vector(data["std.dev"])
-    ro.globalenv["data"] = _r_function("data.frame")(**data_frame_kwargs)
-
-    make_network_r_str = (
-        'network <- mtc.network(data, description="MEWANTFOOD", treatments=treatments)'
-    )
-    execute_r_string(make_network_r_str)
-
-    # plot the network and return path to the image
-    execute_r_function("png", network_path)
-    execute_r_string("plot(network)")
-    execute_r_string("dev.off()")
-
-    return network_path
-
-
-def _strip_wrapping_quotes(value):
-    value = str(value)
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-        return value[1:-1]
-    return value
 
 
 def _data_blank_or_none(*args):
@@ -951,22 +825,24 @@ def covariate_to_r_expression(
     return covariate_expression
 
 
-@serialized_r_call
-def run_continuous_analysis(
-    function_name, params, res_name="result", continuous_data_name="tmp_obj"
-):
-    return _run_rcmetar_core_analysis(
-        continuous_data_name, function_name, params, res_name=res_name
-    )
+@overload
+def run_small_study_effects(
+    table_model,
+    request,
+    res_name="small_study_effects_result",
+    data_name="tmp_obj",
+    preview: Literal[False] = False,
+) -> AnalysisResult: ...
 
 
-@serialized_r_call
-def run_binary_analysis(
-    function_name, params, res_name="result", binary_data_name="tmp_obj"
-):
-    return _run_rcmetar_core_analysis(
-        binary_data_name, function_name, params, res_name=res_name
-    )
+@overload
+def run_small_study_effects(
+    table_model,
+    request,
+    res_name="small_study_effects_result",
+    data_name="tmp_obj",
+    preview: Literal[True] = True,
+) -> Mapping[str, object]: ...
 
 
 @serialized_r_call
@@ -976,7 +852,7 @@ def run_small_study_effects(
     res_name="small_study_effects_result",
     data_name="tmp_obj",
     preview=False,
-):
+) -> AnalysisResult | Mapping[str, object]:
     """Run the complete guided small-study effects workflow in one R call.
 
     Conversion is intentionally performed at this boundary.  RCMetaR then
@@ -985,6 +861,9 @@ def run_small_study_effects(
     """
     if not isinstance(request, dict):
         raise TypeError("small-study effects request must be a mapping")
+    version = request.get("version")
+    if type(version) is not int or version != 1:
+        raise ValueError("unsupported small-study effects request version")
     family = request.get("data.type")
     if family == "binary":
         dataset_to_simple_binary_r_object(table_model, var_name=data_name)
@@ -1039,6 +918,8 @@ def generate_small_study_effects_funnel(file_path, params_name="params"):
 
 
 def _r_param_value(param):
+    if isinstance(param, ro.ListVector):
+        return param
     if param is None:
         return rpy2.rinterface.NULL
     if isinstance(param, bool):
@@ -1106,54 +987,131 @@ def _normalize_rcmetar_workflow(workflow):
     return workflow
 
 
-def _run_rcmetar_core_analysis(
-    data_name,
-    method_name,
-    params,
-    workflow="standard",
-    res_name="result",
-    cond_means_data="NULL",
-    stop_at_rma=False,
+@serialized_r_call
+def run_versioned_analysis_request(
+    request: Mapping[str, object],
+    res_name: str = "result",
+    data_name: str = "tmp_obj",
 ):
-    workflow = _normalize_rcmetar_workflow(workflow)
-    params = normalize_confidence_level_params(params)
-    request = ro.ListVector(
-        {
-            "method": ro.StrVector([str(method_name)]),
-            "params": _to_r_params(params),
-            "workflow": ro.StrVector([workflow]),
-            "cond.means.data": (
-                rpy2.rinterface.NULL
-                if cond_means_data in (None, "NULL")
-                else cond_means_data
-            ),
-            "stop.at.rma": ro.BoolVector([bool(stop_at_rma)]),
-        }
+    """Execute one complete immutable request through the public RCMetaR API."""
+    data_type, method, metric, workflow, params = _validated_versioned_request(request)
+    return _execute_versioned_request(
+        data_type, method, metric, workflow, params, res_name, data_name
     )
+
+
+def _validated_versioned_request(
+    request: Mapping[str, object],
+) -> tuple[str, str, str, object, Mapping[str, object]]:
+    if request.get("version") != 1 or type(request.get("version")) is not int:
+        raise ValueError("unsupported analysis request version")
+    return (
+        _required_request_text(request, "data_type"),
+        _required_request_text(request, "method"),
+        _required_request_text(request, "metric"),
+        _required_request_text(request, "workflow"),
+        _request_params(request),
+    )
+
+
+def _required_request_text(request: Mapping[str, object], name: str) -> str:
+    value = request.get(name)
+    if not isinstance(value, str) or not value:
+        raise ValueError("analysis request %s must be non-empty text" % name)
+    return value
+
+
+def _request_params(request: Mapping[str, object]) -> Mapping[str, object]:
+    params = request.get("params")
+    if not isinstance(params, Mapping):
+        raise TypeError("analysis request params must be a mapping")
+    return {str(key): value for key, value in params.items()}
+
+
+def _execute_versioned_request(
+    data_type: str,
+    method: str,
+    metric: str,
+    workflow: object,
+    params: Mapping[str, object],
+    res_name: str,
+    data_name: str,
+) -> object:
+    normalized = {
+        "version": 1,
+        "data_type": data_type,
+        "method": method,
+        "metric": metric,
+        "params": _to_r_params(params),
+        "workflow": _normalize_rcmetar_workflow(workflow),
+    }
     result = execute_r_function(
-        "rcmetar.run.analysis", _r_object_from_symbol(data_name), request
+        "rcmetar.run.analysis",
+        _r_object_from_symbol(data_name),
+        _to_r_params(normalized),
     )
     ro.globalenv[_r_symbol(res_name)] = result
     return parse_out_results(result)
 
 
 @serialized_r_call
-def run_diagnostic_multi(
-    function_names, list_of_params, res_name="result", diagnostic_data_name="tmp_obj"
+def run_versioned_analysis_requests(
+    requests: list[Mapping[str, object]],
+    res_name: str = "result",
+    diagnostic_data_name: str = "tmp_obj",
 ):
-    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
+    """Execute a validated diagnostic request set through one R operation."""
+    validated_requests = _validated_versioned_requests(requests)
+    return _execute_versioned_requests(
+        validated_requests, res_name, diagnostic_data_name
+    )
+
+
+def _validated_versioned_requests(
+    requests: list[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    if not requests:
+        raise ValueError("at least one analysis request is required")
+    first = _validated_versioned_request(requests[0])
+    data_type, _, _, workflow, _ = first
+    validated: list[dict[str, object]] = []
+    for request in requests:
+        current_data_type, method, metric, current_workflow, values = (
+            _validated_versioned_request(request)
+        )
+        if current_data_type != data_type or current_workflow != workflow:
+            raise ValueError("one execution cannot mix analysis workflows")
+        validated.append(
+            {
+                "version": 1,
+                "data_type": current_data_type,
+                "method": method,
+                "metric": metric,
+                "params": dict(values),
+                "workflow": current_workflow,
+            }
+        )
+    return validated
+
+
+def _execute_versioned_requests(
+    requests: list[dict[str, object]],
+    res_name: str,
+    diagnostic_data_name: str,
+) -> object:
+    request_list = execute_r_function(
+        "list", *[_to_r_params(request) for request in requests]
+    )
     try:
         result = execute_r_function(
             "rcmetar.run.diagnostic.analyses",
             _r_object_from_symbol(diagnostic_data_name),
-            _r_character_vector(function_names),
-            execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
-            workflow="standard",
+            **{"request.list": request_list},
+            **{"request.version": 1},
         )
     except RRuntimeError as error:
         raise DiagnosticExecutionError(str(error)) from error
     ro.globalenv[_r_symbol(res_name)] = result
-
     return parse_out_results(result)
 
 
@@ -1275,96 +1233,302 @@ def generate_forest_plot(file_path, params_name="plot.data"):
 
 @serialized_r_call
 def parse_out_results(result):
-    # ``plot_names`` identifies R plot variables used for graphics manipulation.
-    text_d = {}
-    image_var_name_d, image_params_paths_d, image_path_d = {}, {}, {}
-    display_image_path_d = {}
-    image_order = None
-    plot_capability_d = {}
-
     if _r_inherits(result, "try-error"):
         raise RuntimeError(_r_error_message(result))
 
-    # Turn result into an ordered stream of display sections.  RCMetaR returns
-    # a named list, but keeping this boundary total makes diagnostics and
-    # future producers safe when they return a scalar, vector, or unnamed list.
-    result_items = _result_items_for_display(result)
-    result = dict(result_items)
+    result = dict(_result_items_for_display(result))
     study_names = _study_names_from_result(result)
+    metadata = _result_metadata(result)
+    text_d = {}
+    text_sources = {}
 
     for text_n, text in list(result.items()):
-        display_text_n = _display_section_name(text_n)
-        # Optional RCMetaR sections are represented by R NULL when a
-        # procedure is not applicable.  Drop those sections before any
-        # display formatting so the rpy2 NULLType repr cannot leak into the
-        # Results window.
-        if _r_is_null(text):
+        if text_n in _RESULT_METADATA_KEYS or _r_is_null(text):
             continue
-        # Some result sections carry plot names and forest-plot parameter paths.
-        # Diagnostic analyses may return several plot parameter objects, so keep
-        # this branch broad enough to preserve all named plot metadata.
-        if text_n == "images":
-            image_path_d = _r_mapping_or_empty(text)
-        elif text_n == "display_images":
-            display_image_path_d = _r_mapping_or_empty(text)
-        elif text_n == "image_order":
-            image_order = None if _r_is_null(text) else list(text)
-        elif text_n == "plot_names":
-            image_var_name_d = _r_mapping_or_empty(text)
-        elif text_n == "plot_params_paths":
-            image_params_paths_d = _r_mapping_or_empty(text)
-        elif text_n == "plot_capabilities":
-            plot_capability_d = _r_mapping_or_empty(text)
-        elif text_n == "References":
-            text_d[display_text_n] = result_sections.format_references(text)
-        elif text_n in ("weights", "Weights"):
-            text_d["Weights"] = make_weights_str(result)
-        elif text_n in [
-            "res",
-            "res.info",
-            "input_data",
-            "input_params",
-            "eligibility",
-            "tests.data",
-            "Trim-and-fill data",
-        ]:  # skip low-level RCMetaR internals that are not display sections
-            pass
-        elif "gui.ignore" in text_n:
-            pass
-        else:
-            if _is_summary_display(text):
-                text_d[display_text_n] = _format_result_text(
-                    _capture_formatted_summary(text)
-                )
-            elif _is_table_summary(text):
-                text_d.update(
-                    _format_table_summary(display_text_n, text, study_names=study_names)
-                )
-            elif _is_named_result_summary(text):
-                text_d.update(
-                    _format_named_result_summary(
-                        display_text_n, text, study_names=study_names
-                    )
-                )
-            elif _is_r_iterable(text):
-                text_d[display_text_n] = _format_r_vector(
-                    text, field_name=text_n
-                )
-            else:
-                text_d[display_text_n] = _format_r_table_cell(
-                    text, field_name=text_n
-                )
+        _add_result_text(text_d, text_n, text, result, study_names)
+        for index, key in enumerate(key for key in text_d if key not in text_sources):
+            text_sources[key] = (text_n, index)
 
+    text_d, text_sources = _apply_text_value_keys(
+        text_d, text_sources, metadata["sections"]
+    )
+    (
+        metadata["images"],
+        metadata["display_images"],
+        metadata["image_var_names"],
+        metadata["image_params_paths"],
+        metadata["plot_capabilities"],
+        metadata["image_order"],
+    ) = _apply_image_value_keys(
+        metadata["images"],
+        metadata["display_images"],
+        metadata["image_var_names"],
+        metadata["image_params_paths"],
+        metadata["plot_capabilities"],
+        metadata["image_order"],
+        metadata["sections"],
+    )
+    sections = _text_section_metadata(text_sources, metadata["sections"])
+    image_offset = len(sections)
+    sections.extend(
+        _image_section_metadata(
+            metadata["images"],
+            metadata["image_order"],
+            metadata["image_var_names"],
+            metadata["plot_capabilities"],
+            metadata["sections"],
+            image_offset,
+        )
+    )
     to_return = {
-        "images": image_path_d,
-        "display_images": display_image_path_d,
-        "image_var_names": image_var_name_d,
+        "version": 1,
+        "images": metadata["images"],
+        "display_images": metadata["display_images"],
+        "image_var_names": metadata["image_var_names"],
         "texts": text_d,
-        "image_params_paths": image_params_paths_d,
-        "image_order": image_order,
-        "plot_capabilities": plot_capability_d,
+        "image_params_paths": metadata["image_params_paths"],
+        "image_order": metadata["image_order"],
+        "plot_capabilities": metadata["plot_capabilities"],
+        "sections": sections,
     }
     return parse_analysis_result(to_return)
+
+
+def _apply_text_value_keys(texts, sources, producer_sections):
+    """Map producer display fields to their stable semantic source keys."""
+    aliases = _semantic_value_aliases(producer_sections, "text")
+    for value_key, source_key in aliases.items():
+        display_key = _display_section_name(value_key)
+        if display_key not in texts or source_key in texts:
+            continue
+        texts[source_key] = texts.pop(display_key)
+        _replace_source_key(sources, value_key, source_key)
+    return texts, sources
+
+
+def _semantic_value_aliases(producer_sections, kind):
+    aliases = {}
+    for section in producer_sections:
+        if section.get("kind") != kind:
+            continue
+        value_key = section.get("value_key")
+        source_key = section.get("source_key")
+        if isinstance(value_key, str) and isinstance(source_key, str):
+            aliases[value_key] = source_key
+    return aliases
+
+
+def _replace_source_key(sources, value_key, source_key):
+    remapped = {}
+    for key, (source_name, child_index) in sources.items():
+        if source_name == value_key:
+            remapped[source_key] = (source_key, child_index)
+        else:
+            remapped[key] = (source_name, child_index)
+    sources.clear()
+    sources.update(remapped)
+
+
+def _result_metadata(result):
+    image_order = result.get("image_order")
+    if image_order is None or _r_is_null(image_order):
+        image_order = None
+    else:
+        image_order = list(image_order)
+    return {
+        "images": _r_mapping_or_empty(result.get("images")),
+        "display_images": _r_mapping_or_empty(result.get("display_images")),
+        "image_var_names": _r_mapping_or_empty(result.get("plot_names")),
+        "image_params_paths": _r_mapping_or_empty(result.get("plot_params_paths")),
+        "plot_capabilities": _r_mapping_or_empty(result.get("plot_capabilities")),
+        "sections": _r_section_metadata(result.get("sections")),
+        "image_order": image_order,
+    }
+
+
+def _apply_image_value_keys(
+    images,
+    display_images,
+    variable_names,
+    params_paths,
+    capabilities,
+    image_order,
+    producer_sections,
+):
+    """Map producer display-keyed plot values to stable section source keys."""
+    aliases = {
+        section["value_key"]: section["source_key"]
+        for section in producer_sections
+        if section.get("kind") == "image"
+        and isinstance(section.get("value_key"), str)
+        and isinstance(section.get("source_key"), str)
+    }
+
+    def remap(values):
+        return {aliases.get(key, key): value for key, value in values.items()}
+
+    return (
+        remap(images),
+        remap(display_images),
+        remap(variable_names),
+        remap(params_paths),
+        remap(capabilities),
+        None if image_order is None else [aliases.get(key, key) for key in image_order],
+    )
+
+
+_RESULT_METADATA_KEYS = frozenset(
+    {
+        "images",
+        "display_images",
+        "image_order",
+        "plot_names",
+        "plot_titles",
+        "plot_source_keys",
+        "plot_params_paths",
+        "plot_capabilities",
+        "sections",
+        "res",
+        "res.info",
+        "input_data",
+        "input_params",
+        "eligibility",
+        "tests.data",
+        "Trim-and-fill data",
+    }
+)
+
+
+def _add_result_text(texts, name, value, result, study_names):
+    title = _display_section_name(name)
+    if name == "References":
+        texts[title] = result_sections.format_references(value)
+        return
+    if name in ("weights", "Weights"):
+        texts["Weights"] = make_weights_str(result)
+        return
+    if "gui.ignore" in name:
+        return
+    if _is_summary_display(value):
+        texts[title] = _format_result_text(_capture_formatted_summary(value))
+        return
+    if _is_table_summary(value):
+        texts.update(_format_table_summary(title, value, study_names=study_names))
+        return
+    if _has_r_names(value):
+        texts.update(
+            _format_named_result_summary(title, value, study_names=study_names)
+        )
+        return
+    if _is_r_iterable(value):
+        texts[title] = _format_r_vector(value, field_name=name)
+        return
+    texts[title] = _format_r_table_cell(value, field_name=name)
+
+
+def _text_section_metadata(sources, producer_sections):
+    by_source = {
+        section["source_key"]: section
+        for section in producer_sections
+        if section.get("kind") == "text"
+    }
+    sections = []
+    for order, (title, source) in enumerate(sources.items()):
+        source_key, child_index = source
+        supplied = by_source.get(source_key)
+        semantic_id = _section_semantic_id("text", source_key, supplied, child_index)
+        section_title, section_source = _section_display_fields(
+            title, supplied, child_index
+        )
+        sections.append(
+            {
+                "id": semantic_id,
+                "kind": "text",
+                "order": order,
+                "title": section_title,
+                "source_key": section_source,
+            }
+        )
+    return sections
+
+
+def _section_semantic_id(kind, source_key, supplied, child_index):
+    semantic_id = (
+        supplied["id"] if supplied is not None else _result_section_id(kind, source_key)
+    )
+    if child_index:
+        return f"{semantic_id}:{child_index + 1}"
+    return semantic_id
+
+
+def _section_display_fields(title, supplied, child_index):
+    if supplied is not None and child_index == 0:
+        # A producer section may describe a named container (for example,
+        # ``Summary``) that renders into several text values.  Keep its
+        # semantic title, but point at the first rendered child value so the
+        # validated result still has exactly one section per value.
+        return supplied["title"], title
+    return title, title
+
+
+def _image_section_metadata(
+    images, image_order, variable_names, capabilities, producer_sections, offset
+):
+    by_source = {
+        section["source_key"]: section
+        for section in producer_sections
+        if section.get("kind") == "image"
+    }
+    sections = []
+    used_ids = set()
+    ordered_keys = _ordered_image_keys(images, image_order)
+    for index, image_key in enumerate(ordered_keys):
+        supplied = by_source.get(image_key)
+        capability = capabilities.get(image_key, {})
+        semantic_key = _image_semantic_key(image_key, variable_names, capability)
+        semantic_id = _image_section_id(supplied, semantic_key, used_ids)
+        used_ids.add(semantic_id)
+        sections.append(
+            {
+                "id": semantic_id,
+                "kind": "image",
+                "order": offset + index,
+                "title": _image_section_title(supplied, image_key),
+                "source_key": image_key,
+            }
+        )
+    return sections
+
+
+def _ordered_image_keys(images, image_order):
+    return [key for key in (image_order or images) if key in images]
+
+
+def _image_semantic_key(image_key, variable_names, capability):
+    return variable_names.get(
+        image_key,
+        variable_names.get(image_key.lower(), capability.get("plot_kind", "plot")),
+    )
+
+
+def _image_section_id(supplied, semantic_key, used_ids):
+    if supplied is not None:
+        return supplied["id"]
+    return _unique_result_section_id("image", semantic_key, used_ids)
+
+
+def _image_section_title(supplied, image_key):
+    return supplied["title"] if supplied is not None else image_key
+
+
+def _unique_result_section_id(kind, source_key, used_ids):
+    semantic_id = _result_section_id(kind, source_key)
+    if semantic_id not in used_ids:
+        return semantic_id
+    suffix = 2
+    while f"{semantic_id}:{suffix}" in used_ids:
+        suffix += 1
+    return f"{semantic_id}:{suffix}"
 
 
 def _result_items_for_display(result):
@@ -1427,6 +1591,24 @@ def _r_mapping_or_empty(r_object):
     return converted if isinstance(converted, Mapping) else {}
 
 
+def _r_section_metadata(r_object):
+    converted = r_object_to_python(r_object)
+    if converted is None:
+        return []
+    if not isinstance(converted, list):
+        raise ValueError("RCMetaR result sections must be a list")
+    sections = []
+    for item in converted:
+        if not isinstance(item, Mapping):
+            raise ValueError("RCMetaR result section must be a mapping")
+        section = {
+            key: value[0] if isinstance(value, list) and len(value) == 1 else value
+            for key, value in item.items()
+        }
+        sections.append(section)
+    return sections
+
+
 def _r_inherits(r_object, class_name):
     try:
         return bool(execute_r_function("inherits", r_object, class_name)[0])
@@ -1471,9 +1653,7 @@ def _format_table_summary(section_name, r_object, title=None, study_names=None):
         return _format_r_array_sections(
             "Summary", section_name, r_object, study_names=study_names
         )
-    return {
-        section_name: _format_r_table_cell(r_object, field_name=section_name)
-    }
+    return {section_name: _format_r_table_cell(r_object, field_name=section_name)}
 
 
 def _is_named_table_summary(r_object):
@@ -1487,15 +1667,10 @@ def _is_named_table_summary(r_object):
     return False
 
 
-def _is_named_result_summary(r_object):
-    """Return whether an R value can be safely rendered as named output."""
-    if not _has_r_names(r_object):
-        return False
-    if isinstance(r_object, rpy2.robjects.vectors.ListVector):
-        return True
-    if isinstance(r_object, rpy2.robjects.vectors.Vector):
-        return True
-    return False
+def _result_section_id(kind, source_key):
+    """Return a stable semantic ID supplied by the result producer's key."""
+    normalized = re.sub(r"[^a-z0-9]+", "-", str(source_key).lower()).strip("-")
+    return f"{kind}:{normalized or 'unnamed'}"
 
 
 def _format_named_result_summary(parent_name, r_object, study_names=None):
@@ -1503,12 +1678,9 @@ def _format_named_result_summary(parent_name, r_object, study_names=None):
     # ``MAResults`` list for compatibility with the multi-study model.  It is
     # not a meaningful heading in the Results window, so unwrap that single
     # transport layer before rendering the fields.
-    if _has_r_names(r_object):
-        names = [str(name) for name in list(r_object.names)]
-        if len(names) == 1 and names[0].replace(" ", "") == "MAResults":
-            wrapped = list(r_object)[0]
-            if _has_r_names(wrapped):
-                return {parent_name: _format_named_value(wrapped, study_names=study_names)}
+    wrapped = _unwrapped_ma_results(r_object)
+    if wrapped is not None:
+        return {parent_name: _format_named_value(wrapped, study_names=study_names)}
     if _is_named_table_summary(r_object):
         return _format_named_table_summary(
             parent_name, r_object, study_names=study_names
@@ -1517,6 +1689,16 @@ def _format_named_result_summary(parent_name, r_object, study_names=None):
         return _format_named_text_summary(parent_name, r_object)
     rendered = _format_named_value(r_object, study_names=study_names)
     return {parent_name: rendered} if rendered else {}
+
+
+def _unwrapped_ma_results(r_object):
+    if not _has_r_names(r_object):
+        return None
+    names = [str(name) for name in list(r_object.names)]
+    if len(names) != 1 or names[0].replace(" ", "") != "MAResults":
+        return None
+    wrapped = list(r_object)[0]
+    return wrapped if _has_r_names(wrapped) else None
 
 
 def _is_named_text_summary(r_object):
@@ -1553,45 +1735,37 @@ def _format_named_table_summary(parent_name, r_object, study_names=None):
     for name, item in zip(list(r_object.names), list(r_object)):
         if name == "":
             continue
-
-        display_name = _display_section_name(name)
-        section_name = _summary_section_name(parent_name, display_name)
-        dims = _r_dims(item)
-        if len(dims) == 2:
-            sections.update(
-                _format_table_summary(
-                    section_name,
-                    item,
-                    display_name,
-                    study_names=study_names,
-                )
-            )
-        elif len(dims) == 3:
-            sections.update(
-                _format_r_array_sections(
-                    parent_name, display_name, item, study_names=study_names
-                )
-            )
-        elif _is_r_string_vector(item):
-            sections[section_name] = _format_result_text(
-                ", ".join(str(value) for value in item)
-            )
-        elif _has_r_names(item):
-            rendered = _format_named_value(item, study_names=study_names)
-            if rendered:
-                sections[section_name] = rendered
-        elif _is_r_iterable(item):
-            rendered = _format_r_vector(item)
-            if rendered:
-                sections[section_name] = rendered
-        else:
-            sections[section_name] = _format_r_table_cell(
-                item, field_name=name
-            )
+        sections.update(
+            _format_named_table_item(parent_name, str(name), item, study_names)
+        )
 
     if not sections:
         sections[parent_name] = _format_result_text(str(r_object))
     return sections
+
+
+def _format_named_table_item(parent_name, name, item, study_names):
+    display_name = _display_section_name(name)
+    section_name = _summary_section_name(parent_name, display_name)
+    dims = _r_dims(item)
+    if len(dims) == 2:
+        return _format_table_summary(
+            section_name, item, display_name, study_names=study_names
+        )
+    if len(dims) == 3:
+        return _format_r_array_sections(
+            parent_name, display_name, item, study_names=study_names
+        )
+    if _is_r_string_vector(item):
+        text = ", ".join(str(value) for value in item)
+        return {section_name: _format_result_text(text)}
+    if _has_r_names(item):
+        rendered = _format_named_value(item, study_names=study_names)
+    elif _is_r_iterable(item):
+        rendered = _format_r_vector(item)
+    else:
+        rendered = _format_r_table_cell(item, field_name=name)
+    return {section_name: rendered} if rendered else {}
 
 
 def _format_named_value(r_object, study_names=None):
@@ -1607,9 +1781,7 @@ def _format_named_value(r_object, study_names=None):
         if not name or _r_is_null(item):
             continue
         label = _format_summary_label(name)
-        rendered = _format_nested_value(
-            item, study_names=study_names, field_name=name
-        )
+        rendered = _format_nested_value(item, study_names=study_names, field_name=name)
         if not rendered:
             continue
         if "\n" in rendered:
@@ -1645,7 +1817,8 @@ def _format_r_vector(r_object, field_name=None):
         return ""
     if names is not None:
         return "\n".join(
-            "%s: %s" % (
+            "%s: %s"
+            % (
                 _format_summary_label(name),
                 _format_r_table_cell(value, field_name=name),
             )
@@ -1988,31 +2161,36 @@ def _format_result_text(text):
         lambda match: chr(int(match.group(1), 16)),
         text,
     )
-    # ``capture.output(print(...))`` is occasionally the only representation
-    # available for a legacy R object.  Remove console framing while retaining
-    # the actual text.  Structured values are rendered by the helpers above,
-    # so this is intentionally conservative for arbitrary user prose.
+    text = _clean_console_text(text)
+    text = _replace_result_labels(text)
+    return text
+
+
+def _clean_console_text(text):
     cleaned_lines = []
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith(("attr(,\"", "[[")):
-            if stripped.startswith(("attr(,\"", "[[")):
-                continue
+        if not stripped:
             cleaned_lines.append("")
             continue
-        if stripped == "NULL":
+        if stripped == "NULL" or stripped.startswith(('attr(,"', "[[", "$")):
             continue
-        match = re.match(r"^\[\d+\]\s+(.*)$", stripped)
-        if match:
-            payload = match.group(1)
-            quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
-            if quoted and " ".join(quoted) == payload.replace('"', '').strip():
-                payload = ", ".join(quoted)
-            line = payload
-        if stripped.startswith("$"):
-            continue
-        cleaned_lines.append(line)
-    text = "\n".join(cleaned_lines).strip()
+        cleaned_lines.append(_console_payload(line, stripped))
+    return "\n".join(cleaned_lines).strip()
+
+
+def _console_payload(line, stripped):
+    match = re.match(r"^\[\d+\]\s+(.*)$", stripped)
+    if match is None:
+        return line
+    payload = match.group(1)
+    quoted = re.findall(r'"((?:[^"\\]|\\.)*)"', payload)
+    if quoted and " ".join(quoted) == payload.replace('"', "").strip():
+        return ", ".join(quoted)
+    return payload
+
+
+def _replace_result_labels(text):
     for raw_label, display_label in (
         ("Zhou.Dendukuri", "Zhou-Dendukuri"),
         ("Holling.Unadjusted", "Holling (unadjusted)"),
@@ -2046,113 +2224,54 @@ def make_weights_str(results):
     if weights_object is None:
         raise Exception("make_weights_str() requires 'weights' in the results")
 
-    digits = PERCENTAGE_DISPLAY_DIGITS
-    if _is_r_iterable(weights_object):
-        raw_weights = list(weights_object)
-    else:
-        raw_weights = [weights_object]
+    raw_weights = _weight_values(weights_object)
     if not raw_weights:
         return "No study weights available.\n"
-    weights = []
-    for value in raw_weights:
-        scalar = _r_singleton_to_scalar(value) if _is_r_iterable(value) and len(value) == 1 else value
-        if scalar is None or str(scalar) == "NA":
-            weights.append("NA")
-        else:
-            try:
-                weights.append("{0:.{digits}f}%".format(float(scalar), digits=digits))
-            except (TypeError, ValueError):
-                weights.append(_format_r_table_cell(scalar))
+    weights = [_format_weight(value) for value in raw_weights]
+    study_names = _weight_study_names(results, weights_object, len(weights))
+    return _weight_table(study_names, weights)
+
+
+def _weight_values(weights_object):
+    return list(weights_object) if _is_r_iterable(weights_object) else [weights_object]
+
+
+def _format_weight(value):
+    scalar = value
+    if _is_r_iterable(value) and len(value) == 1:
+        scalar = _r_singleton_to_scalar(value)
+    if scalar is None or str(scalar) == "NA":
+        return "NA"
+    try:
+        return "{0:.{digits}f}%".format(float(scalar), digits=PERCENTAGE_DISPLAY_DIGITS)
+    except (TypeError, ValueError):
+        return _format_r_table_cell(scalar)
+
+
+def _weight_study_names(results, weights_object, count):
     if "input_data" in results:
         study_names = list(results["input_data"].do_slot("study.names"))
     else:
         weight_names = _r_names_or_none(weights_object)
-        if weight_names is not None and len(weight_names) == len(weights):
+        if weight_names is not None and len(weight_names) == count:
             study_names = weight_names
         else:
-            study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
-    if len(study_names) != len(weights):
-        study_names = ["Study %d" % (index + 1) for index in range(len(weights))]
+            study_names = _default_study_names(count)
+    return study_names if len(study_names) == count else _default_study_names(count)
 
+
+def _default_study_names(count):
+    return ["Study %d" % (index + 1) for index in range(count)]
+
+
+def _weight_table(study_names, weights):
     table, widths = tabulate(
         [study_names, weights], sep=": ", return_col_widths=True, align=["L", "R"]
     )
     header = "{0:<{widths[0]}}  {1:<{widths[1]}}".format(
         "Study names", "Weights", widths=widths
     )
-    table = "\n".join([header, table]) + "\n"
-    return table
-
-
-@serialized_r_call
-def run_meta_regression(
-    dataset,
-    study_names,
-    covariates,
-    metric_name,
-    data_name="tmp_obj",
-    results_name="results_obj",
-    fixed_effects=False,
-    confidence_level=None,
-    params=None,
-    method="meta.regression",
-):
-
-    confidence_level = validate_confidence_level(confidence_level)
-
-    params = dict(params or {})
-    params["conf.level"] = confidence_level
-    params.setdefault("digits", 2)
-    params["rm.method"] = "FE" if fixed_effects else params.get("rm.method", "DL")
-    params["measure"] = metric_name
-    return _run_rcmetar_core_analysis(
-        data_name,
-        method,
-        params,
-        workflow="meta-regression",
-        res_name=results_name,
-    )
-
-
-@serialized_r_call
-def run_diagnostic_workflow(
-    workflow,
-    function_names,
-    list_of_params,
-    res_name="result",
-    diagnostic_data_name="tmp_obj",
-):
-    # list of parameter objects
-    list_of_params = [normalize_confidence_level_params(p) for p in list_of_params]
-
-    workflow = _normalize_rcmetar_workflow(workflow)
-    try:
-        result = execute_r_function(
-            "rcmetar.run.diagnostic.analyses",
-            _r_object_from_symbol(diagnostic_data_name),
-            _r_character_vector(function_names),
-            execute_r_function("list", *[_to_r_params(p) for p in list_of_params]),
-            workflow=workflow,
-        )
-    except RRuntimeError as error:
-        raise DiagnosticExecutionError(str(error)) from error
-    ro.globalenv[_r_symbol(res_name)] = result
-
-    return parse_out_results(result)
-
-
-@serialized_r_call
-def run_workflow_analysis(
-    workflow, function_name, params, res_name="result", data_name="tmp_obj"
-):
-    """Runs a non-standard RCMetaR workflow through the core analysis facade."""
-    return _run_rcmetar_core_analysis(
-        data_name,
-        function_name,
-        params,
-        workflow=workflow,
-        res_name=res_name,
-    )
+    return "\n".join([header, table]) + "\n"
 
 
 def _get_col(m, i):

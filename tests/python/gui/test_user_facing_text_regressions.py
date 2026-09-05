@@ -36,7 +36,6 @@ GENERATED_UI_MODULE_NAMES = [
     "rc_metastudio.forms.ui_edit_plot_dialog",
     "rc_metastudio.forms.ui_edit_name_dialog",
     "rc_metastudio.forms.ui_analysis_setup_dialog",
-    "rc_metastudio.forms.ui_network_view_dialog",
     "rc_metastudio.forms.ui_new_covariate_dialog",
     "rc_metastudio.forms.ui_new_follow_up_dialog",
     "rc_metastudio.forms.ui_new_group_dialog",
@@ -101,6 +100,7 @@ def test_issue_190_main_window_does_not_expose_toolbar_toggle_popup():
         ),
     )
     window = MainWindow()
+    window.workspace.mark_saved()
 
     try:
         assert window.createPopupMenu() is None

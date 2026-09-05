@@ -27,7 +27,6 @@
     <file alias="save-as.svg">icons/actions/save-as.svg</file>
     <file alias="save.svg">icons/actions/save.svg</file>
     <file alias="undo.svg">icons/actions/undo.svg</file>
-    <file alias="view-network.svg">icons/actions/view-network.svg</file>
   </qresource>
   <qresource prefix="icons/analyses">
     <file alias="cumulative-analysis.svg">icons/analyses/cumulative-analysis.svg</file>

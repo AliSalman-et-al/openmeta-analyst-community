@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib
 import importlib.util
 import json
@@ -11,7 +13,9 @@ import tomllib
 
 import pytest
 
-from rc_metastudio import qt6_build, qt6_resources
+from scripts import qt6_build_impl as qt6_build
+from scripts import qt6_macos_feasibility_impl as macos_feasibility
+from rc_metastudio import qt6_resources
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -172,18 +176,18 @@ def test_rcc_wrong_version_is_rejected(official_rcc):
         qt6_build.validate_rcc(official_rcc, expected_version="6.11.0")
 
 
-def test_macos_official_rcc_requires_pinned_version_and_host_slice(
-    tmp_path, monkeypatch
-):
+def test_macos_official_rcc_requires_pinned_version_and_host_slice(tmp_path):
     rcc = tmp_path / "Qt SDK" / "libexec" / "rcc"
     rcc.parent.mkdir(parents=True)
     rcc.write_bytes(b"official macOS rcc fixture")
     responses = {
         "version": "rcc 6.11.1",
-        "architectures": "arm64 x86_64",
+        "architectures": "arm64",
     }
 
-    def completed(command, **_kwargs):
+    def completed(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         stdout = (
             responses["architectures"]
             if str(command[0]).endswith("lipo")
@@ -191,19 +195,38 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
         )
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr(qt6_build.subprocess, "run", completed)
-    monkeypatch.setattr(qt6_build.platform, "machine", lambda: "arm64")
+    macos_feasibility.validate_macos_rcc(
+        rcc, command_runner=completed, host_machine=lambda: "arm64"
+    )
 
-    qt6_build.validate_macos_rcc(rcc)
+    responses["architectures"] = "x86_64 arm64"
+    assert macos_feasibility.validate_macos_rcc(
+        rcc, command_runner=completed, host_machine=lambda: "arm64"
+    ) == ["arm64", "x86_64"]
+
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "x86_64"
+        )
+
+    responses["architectures"] = "x86_64"
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
 
     responses["version"] = "rcc 6.11.0"
     with pytest.raises(RuntimeError, match="version mismatch"):
-        qt6_build.validate_macos_rcc(rcc)
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
 
     responses["version"] = "rcc 6.11.1"
-    responses["architectures"] = "x86_64"
-    with pytest.raises(RuntimeError, match="architecture mismatch"):
-        qt6_build.validate_macos_rcc(rcc)
+    responses["architectures"] = "i386"
+    with pytest.raises(RuntimeError, match="invalid architecture slices"):
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
 
 
 class _DownloadResponse:
@@ -316,7 +339,7 @@ def test_canonical_form_generation_is_deterministic_and_importable(
         path.relative_to(second / "generated").as_posix()
         for path in (second / "generated").rglob("ui_*.py")
     )
-    assert len(first_modules) == 30
+    assert len(first_modules) == 29
     assert first_modules == second_modules
     for relative in first_modules:
         first_payload = (first / "generated" / relative).read_bytes()
@@ -561,3 +584,4 @@ def test_timeout_runner_kills_sigterm_ignoring_grandchild(tmp_path):
     while time.monotonic() < deadline and not marker.exists():
         time.sleep(0.05)
     assert not marker.exists()
+

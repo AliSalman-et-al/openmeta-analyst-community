@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Authoritative PyInstaller definition for both native macOS applications."""
+"""Authoritative PyInstaller definition for the native Apple-silicon macOS application."""
 
 import os
 import hashlib
@@ -110,7 +110,7 @@ exe = EXE(
     upx=False,
     console=False,
     argv_emulation=False,
-    target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "x86_64"),
+    target_arch=os.environ.get("RCMS_TARGET_ARCHITECTURE", "arm64"),
     codesign_identity=None,
     entitlements_file=None,
 )

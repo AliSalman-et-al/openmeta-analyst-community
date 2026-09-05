@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Run and validate the pre-codemod native macOS Qt6 feasibility proof."""
 
 from __future__ import annotations
@@ -13,26 +15,21 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Callable, cast
+from typing import Callable, cast
 
-from rc_metastudio.macos_macho import (
-    is_macho_candidate as _is_macho_candidate,
-    is_valid_java_class as _is_valid_java_class,
-)
-from rc_metastudio.macos_evidence import (
+from scripts.macos_evidence import (
     EXPECTED_VERSIONS,
-    EvidenceError,  # noqa: F401 - preserved public import for callers
+    _archs as _evidence_archs,
     MAX_DEPLOYMENT_BYTES,
     MAX_DEPLOYMENT_FILES,
     MAX_RETAINED_NATIVE_BYTES,
     TARGET_MACHINES,
-    _archs as _evidence_archs,
     _sha256,
     validate_evidence as _validate_evidence,
 )
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 QT_RCC_VERSION = EXPECTED_VERSIONS["qt"]
 RUNNER_KEYS = {
     "system",
@@ -45,33 +42,6 @@ RUNNER_KEYS = {
     "github_runner_arch",
     "runner_image",
 }
-
-
-def is_valid_java_class(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Java ClassFile discriminator."""
-    return _is_valid_java_class(path)
-
-
-def is_macho_candidate(path: Path) -> bool:
-    """Compatibility wrapper for the canonical Mach-O discriminator."""
-    return _is_macho_candidate(path)
-
-
-def _archs(path: Path) -> list[str]:
-    """Compatibility wrapper preserving the feasibility error contract."""
-    return _evidence_archs(path)
-
-
-def validate_evidence(
-    evidence: object, target: str, *, evidence_dir: Path | None = None
-) -> None:
-    """Validate evidence through the pure contract with runner-local seams."""
-    _validate_evidence(
-        evidence,
-        target,
-        evidence_dir=evidence_dir,
-        architecture_reader=_archs,
-    )
 
 
 def _run(
@@ -113,9 +83,26 @@ def _dependency_versions() -> tuple[dict[str, str], float]:
     from PyQt6 import QtCore
     import rpy2.robjects as ro
 
-    result = float(cast(Any, ro.r("sum(c(1.25, 2.5, 3.75))"))[0])
+    def first_r_value(value: object, expression: str) -> object:
+        get_item = getattr(value, "__getitem__", None)
+        if not callable(get_item):
+            raise RuntimeError(f"rpy2 expression did not return a vector: {expression}")
+        try:
+            return get_item(0)
+        except (IndexError, KeyError, TypeError) as exc:
+            raise RuntimeError(
+                f"rpy2 expression returned no first value: {expression}"
+            ) from exc
+
+    raw_result = first_r_value(ro.r("sum(c(1.25, 2.5, 3.75))"), "sum")
+    if not isinstance(raw_result, (int, float)):
+        raise RuntimeError("rpy2 sum expression did not return a number")
+    result = float(raw_result)
     r_version = str(
-        cast(Any, ro.r("paste(R.version$major, R.version$minor, sep='.')"))[0]
+        first_r_value(
+            ro.r("paste(R.version$major, R.version$minor, sep='.')"),
+            "R.version",
+        )
     )
     versions = {
         "python": platform.python_version(),
@@ -211,15 +198,16 @@ def validate_macos_rcc(
         capture_output=True,
         text=True,
     ).stdout.split()
-    supported = {"x86_64", "arm64"}
+    supported = {"arm64", "x86_64"}
+    unique_architectures = set(architectures)
     if (
-        not architectures
-        or len(architectures) != len(set(architectures))
-        or any(architecture not in supported for architecture in architectures)
+        not unique_architectures
+        or len(architectures) != len(unique_architectures)
+        or not unique_architectures <= supported
     ):
         raise RuntimeError(f"rcc has invalid architecture slices: {architectures!r}")
     host = host_machine().lower()
-    if host not in architectures:
+    if host != "arm64" or host not in architectures:
         raise RuntimeError(
             f"rcc architecture mismatch: host {host!r}, slices {architectures!r}"
         )
@@ -318,7 +306,7 @@ def _retain_native_components(evidence_dir: Path) -> dict[str, dict[str, object]
                     "retained_path": destination.relative_to(evidence_dir).as_posix(),
                     "size": destination.stat().st_size,
                     "sha256": _sha256(destination),
-                    "architectures": _archs(destination),
+                    "architectures": _evidence_archs(destination),
                 }
             )
         inventory[name] = {
@@ -339,63 +327,8 @@ def _maybe_archs(path: Path) -> list[str]:
 
 def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, object]:
     root = app_root.resolve()
-    files: list[dict[str, object]] = []
-    total_bytes = 0
-    for current, directories, filenames in os.walk(root, followlinks=False):
-        current_path = Path(current)
-        for name in list(directories):
-            path = current_path / name
-            if path.is_symlink():
-                directories.remove(name)
-                resolved = path.resolve(strict=True)
-                if not resolved.is_relative_to(root):
-                    raise RuntimeError(
-                        f"packaged symlink escapes the app bundle: {path}"
-                    )
-                size = path.lstat().st_size
-                files.append(
-                    {
-                        "path": path.relative_to(root).as_posix(),
-                        "kind": "symlink",
-                        "size": size,
-                        "link_target": os.readlink(path),
-                        "resolved_path": resolved.relative_to(root).as_posix(),
-                    }
-                )
-                total_bytes += size
-        for name in filenames:
-            path = current_path / name
-            relative = path.relative_to(root).as_posix()
-            if path.is_symlink():
-                resolved = path.resolve(strict=True)
-                if not resolved.is_relative_to(root):
-                    raise RuntimeError(
-                        f"packaged symlink escapes the app bundle: {path}"
-                    )
-                size = path.lstat().st_size
-                record: dict[str, object] = {
-                    "path": relative,
-                    "kind": "symlink",
-                    "size": size,
-                    "link_target": os.readlink(path),
-                    "resolved_path": resolved.relative_to(root).as_posix(),
-                }
-            else:
-                size = path.stat().st_size
-                record = {
-                    "path": relative,
-                    "kind": "file",
-                    "size": size,
-                    "sha256": _sha256(path),
-                    "architectures": _maybe_archs(path),
-                }
-            files.append(record)
-            total_bytes += size
-        if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
-            raise RuntimeError(
-                "minimal PyInstaller deployment exceeded its inventory bound"
-            )
-    files.sort(key=lambda record: cast(str, record["path"]))
+    files, total_bytes = _collect_deployment_files(root)
+    files.sort(key=lambda record: record["path"])
     inventory = {
         "schema_version": 2,
         "file_count": len(files),
@@ -410,6 +343,74 @@ def _write_deployment_inventory(app_root: Path, destination: Path) -> dict[str, 
     return inventory
 
 
+def _collect_deployment_files(
+    root: Path,
+) -> tuple[list[dict[str, object]], int]:
+    files: list[dict[str, object]] = []
+    total_bytes = 0
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        entries, entry_bytes = _collect_deployment_directory(
+            current_path, directories, filenames, root
+        )
+        files.extend(entries)
+        total_bytes += entry_bytes
+        if len(files) > MAX_DEPLOYMENT_FILES or total_bytes > MAX_DEPLOYMENT_BYTES:
+            raise RuntimeError(
+                "minimal PyInstaller deployment exceeded its inventory bound"
+            )
+    return files, total_bytes
+
+
+def _collect_deployment_directory(
+    current: Path,
+    directories: list[str],
+    filenames: list[str],
+    root: Path,
+) -> tuple[list[dict[str, object]], int]:
+    records: list[dict[str, object]] = []
+    total_bytes = 0
+    for name in list(directories):
+        path = current / name
+        if not path.is_symlink():
+            continue
+        directories.remove(name)
+        record = _deployment_symlink_record(path, root)
+        records.append(record)
+        total_bytes += cast(int, record["size"])
+    for name in filenames:
+        path = current / name
+        record = _deployment_file_record(path, root)
+        records.append(record)
+        total_bytes += cast(int, record["size"])
+    return records, total_bytes
+
+
+def _deployment_symlink_record(path: Path, root: Path) -> dict[str, object]:
+    resolved = path.resolve(strict=True)
+    if not resolved.is_relative_to(root):
+        raise RuntimeError(f"packaged symlink escapes the app bundle: {path}")
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "kind": "symlink",
+        "size": path.lstat().st_size,
+        "link_target": os.readlink(path),
+        "resolved_path": resolved.relative_to(root).as_posix(),
+    }
+
+
+def _deployment_file_record(path: Path, root: Path) -> dict[str, object]:
+    if path.is_symlink():
+        return _deployment_symlink_record(path, root)
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "kind": "file",
+        "size": path.stat().st_size,
+        "sha256": _sha256(path),
+        "architectures": _maybe_archs(path),
+    }
+
+
 def _retained_record(
     path: Path, evidence_dir: Path, *, architectures: bool
 ) -> dict[str, object]:
@@ -417,7 +418,7 @@ def _retained_record(
         "retained_path": path.relative_to(evidence_dir).as_posix(),
         "size": path.stat().st_size,
         "sha256": _sha256(path),
-        **({"architectures": _archs(path)} if architectures else {}),
+        **({"architectures": _evidence_archs(path)} if architectures else {}),
     }
 
 
@@ -590,7 +591,7 @@ def _prepare_private_r_framework(
     return staged_framework, toc
 
 
-def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
+def _native_target(target: str) -> tuple[str, str]:
     if sys.platform != "darwin":
         raise RuntimeError("native macOS feasibility can run only on macOS")
     expected_machine = TARGET_MACHINES[target]
@@ -600,12 +601,51 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
             f"native target mismatch: expected {expected_machine}, got {machine}, "
             f"Rosetta={_rosetta_translated()}"
         )
+    return expected_machine, machine
 
+
+def _feasibility_build_root(target: str, evidence_dir: Path) -> Path:
     evidence_dir.mkdir(parents=True, exist_ok=True)
     build_root = ROOT / "build" / "qt6-macos-feasibility" / target
     if build_root.exists():
         shutil.rmtree(build_root)
     build_root.mkdir(parents=True)
+    return build_root
+
+
+def _packaged_bridge(app_root: Path) -> Path:
+    packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))
+    if len(packaged_bridges) != 1:
+        raise RuntimeError(
+            f"packaged feasibility app must contain one rpy2 API bridge: {packaged_bridges}"
+        )
+    return packaged_bridges[0]
+
+
+def _validate_packaged_smoke(
+    package: dict[str, object], app_root: Path
+) -> Path:
+    plugin_value = package.get("cocoa_plugin")
+    r_home_value = package.get("r_home")
+    if not isinstance(plugin_value, str) or not isinstance(r_home_value, str):
+        raise RuntimeError("packaged smoke omitted its path fields")
+    plugin = Path(plugin_value)
+    private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
+    if Path(r_home_value) != private_r_home:
+        raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
+    if package.get("rpy2_mode") != "API":
+        raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
+    if not plugin.is_file() or app_root not in plugin.parents:
+        raise RuntimeError(f"Cocoa plugin was not collected inside the app: {plugin}")
+    package["r_home"] = private_r_home.relative_to(app_root).as_posix()
+    package["cocoa_plugin"] = plugin.relative_to(app_root).as_posix()
+    return plugin
+
+
+def run_feasibility(target: str, evidence_dir: Path) -> dict[str, object]:
+    expected_machine, machine = _native_target(target)
+
+    build_root = _feasibility_build_root(target, evidence_dir)
 
     versions, r_result = _dependency_versions()
     components = _retain_native_components(evidence_dir)
@@ -629,7 +669,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
 
     generated = build_root / "source/generated/rc_metastudio/forms/ui_about_legal.py"
     resource = build_root / "source/resources/icons.rcc"
-    target_arch = "x86_64" if target == "macos-x64" else "arm64"
+    target_arch = "arm64"
     staged_r_framework, r_toc = _prepare_private_r_framework(
         build_root, evidence_dir, target_arch
     )
@@ -678,11 +718,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         build_root / "dist/Qt6MacFeasibility.app/Contents/MacOS/Qt6MacFeasibility"
     )
     app_root = build_root / "dist/Qt6MacFeasibility.app"
-    packaged_bridges = list(app_root.rglob("_rinterface_cffi_api*.so"))
-    if len(packaged_bridges) != 1:
-        raise RuntimeError(
-            f"packaged feasibility app must contain one rpy2 API bridge: {packaged_bridges}"
-        )
+    packaged_bridge = _packaged_bridge(app_root)
     _run(
         [
             sys.executable,
@@ -691,7 +727,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
             "--framework",
             str(app_root / "Contents/Frameworks/R.framework"),
             "--bridge",
-            str(packaged_bridges[0]),
+            str(packaged_bridge),
             "--architecture",
             target_arch,
             "--output",
@@ -719,16 +755,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
     package_environment["RCMS_FEASIBILITY_PHASES"] = str(packaged_phases)
     _run([str(executable)], environment=package_environment)
     package = json.loads(packaged_report.read_text(encoding="utf-8"))
-    plugin = Path(package["cocoa_plugin"])
-    private_r_home = app_root / "Contents/Frameworks/R.framework/Resources"
-    if Path(package.get("r_home", "")) != private_r_home:
-        raise RuntimeError("packaged smoke did not own its explicit private R_HOME")
-    if package.get("rpy2_mode") != "API":
-        raise RuntimeError("packaged smoke did not load the rpy2 API bridge")
-    package["r_home"] = private_r_home.relative_to(app_root).as_posix()
-    if not plugin.is_file() or app_root not in plugin.parents:
-        raise RuntimeError(f"Cocoa plugin was not collected inside the app: {plugin}")
-    package["cocoa_plugin"] = plugin.relative_to(app_root).as_posix()
+    plugin = _validate_packaged_smoke(package, app_root)
     probe_root = evidence_dir / "package-probe"
     probe_root.mkdir()
     retained_executable = probe_root / "Qt6MacFeasibility"
@@ -760,7 +787,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
         }
     )
 
-    evidence: dict[str, Any] = {
+    evidence: dict[str, object] = {
         "schema_version": 1,
         "target": target,
         "status": "passed",
@@ -805,7 +832,7 @@ def run_feasibility(target: str, evidence_dir: Path) -> dict[str, Any]:
             "path": path.name,
             "sha256": _sha256(path),
         }
-    validate_evidence(evidence, target, evidence_dir=evidence_dir)
+    _validate_evidence(evidence, target, evidence_dir=evidence_dir)
     output = evidence_dir / "evidence.json"
     output.write_text(
         json.dumps(evidence, indent=2, sort_keys=True) + "\n",
@@ -845,7 +872,7 @@ def main(arguments: list[str] | None = None) -> int:
         print(json.dumps(record, sort_keys=True))
         return 0
     evidence = json.loads(options.evidence.read_text(encoding="utf-8"))
-    validate_evidence(evidence, options.target, evidence_dir=options.evidence.parent)
+    _validate_evidence(evidence, options.target, evidence_dir=options.evidence.parent)
     return 0
 
 

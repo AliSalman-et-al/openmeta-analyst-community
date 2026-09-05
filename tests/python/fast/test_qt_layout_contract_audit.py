@@ -213,14 +213,14 @@ def test_audit_allows_qt_chrome_and_scroll_area_content_geometry(tmp_path, monke
 """,
         encoding="utf-8",
     )
-    source = tmp_path / "src" / "rc_metastudio" / "network_view_dialog.py"
+    source = tmp_path / "src" / "rc_metastudio" / "results_window.py"
     source.write_text(
         """from PyQt6.QtGui import QFont, QFontDatabase
 
 class Allowed:
     def __init__(self):
         adaptive_window.register_adaptive_window(
-            self, adaptive_window.WindowRole.MAIN
+            self, adaptive_window.WindowRole.RESULTS
         )
         system_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         inherited_font = QFont(self.font())
@@ -253,6 +253,6 @@ swatch.setFixedSize(style_metric)
     monkeypatch.setattr(
         audit_qt_layout_contracts.qt_window_ownership,
         "TOP_LEVEL_FORM_INVENTORY",
-        {"allowed.ui": (("network_view_dialog.py", "Allowed", "MAIN"),)},
+        {"allowed.ui": (("results_window.py", "Allowed", "RESULTS"),)},
     )
     assert audit_qt_layout_contracts.audit_repository(tmp_path) == []

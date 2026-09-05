@@ -111,7 +111,7 @@ SOURCE_EXCEPTION_RULES = {
         "methods": {"setMaximumWidth", "setMinimumWidth"},
     },
     "intrinsic-ratio": {
-        "paths": {"network_view_dialog.py", "results_window.py"},
+        "paths": {"results_window.py"},
         "methods": {"fitInView", "setSceneRect"},
     },
     "numeric-domain-control": {
@@ -140,7 +140,7 @@ SOURCE_EXCEPTION_RULES = {
         },
     },
     "verification-layout-fixture": {
-        "paths": {"adaptive_layout_evidence.py", "automation.py"},
+        "paths": {"adaptive_layout_evidence.py"},
         "methods": {"adjustSize", "move", "resize"},
     },
 }

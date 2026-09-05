@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Callable
 
 from PyQt6 import QtCore, QtWidgets, sip
 
@@ -54,22 +54,26 @@ def validate_evidence(path: Path) -> dict[str, object]:
     return evidence
 
 
-def _install_backend_stub(
+def _install_backend_test_double(
     backend: object, name: str, implementation: Callable[..., object]
 ) -> None:
-    """Install a deliberately dynamic test double at the R backend seam."""
+    """Patch one explicitly selected R bridge operation for this smoke test."""
     setattr(backend, name, implementation)
 
 
 def main() -> int:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
-    from rc_metastudio import r_backend
+    from local_r_test_backend import create
 
-    r_backend.install_stub_r_bridge()
+    backend_fake = create()
+    from rc_metastudio import app_error_handler, r_bridge
+
+    for name, implementation in vars(backend_fake).items():
+        setattr(r_bridge, name, implementation)
     _phase("backend-installed")
-    from rc_metastudio import app_error_handler, analysis_setup_dialog, progress_dialog
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
+    from rc_metastudio import analysis_setup_dialog, progress_dialog
 
     progress_class = progress_dialog.AnalysisProgressDialog
     created_progress_dialogs = []
@@ -85,14 +89,14 @@ def main() -> int:
         create_progress_dialog,
     )
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
 
-    _install_backend_stub(
+    _install_backend_test_double(
         backend,
         "dataset_to_simple_binary_r_object",
         lambda *_args, **_kwargs: None,
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend,
         "get_available_methods",
         lambda **_kwargs: {"Random": "binary.random"},
@@ -107,10 +111,10 @@ def main() -> int:
             {},
         ),
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend, "get_method_description", lambda _method: "Random-effects analysis"
     )
-    _install_backend_stub(
+    _install_backend_test_double(
         backend, "get_analysis_plot_capabilities", lambda *_args, **_kwargs: []
     )
 
@@ -135,12 +139,30 @@ def main() -> int:
     baseline = len(app.topLevelWidgets())
     calls = []
 
-    def run_backend(method: str, parameters: dict[str, object]) -> dict[str, object]:
-        calls.append({"method": method, "parameters": dict(parameters)})
-        return {"texts": {"Summary": "ok"}, "images": {}}
+    def run_backend(request: dict[str, object]) -> dict[str, object]:
+        calls.append(dict(request))
+        return {
+            "version": 1,
+            "texts": {"Summary": "ok"},
+            "images": {},
+            "display_images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+            "plot_capabilities": {},
+            "sections": [
+                {
+                    "id": "summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                }
+            ],
+        }
 
-    _install_backend_stub(backend, "run_binary_analysis", run_backend)
-    _install_backend_stub(backend, "reset_r_working_directory", lambda: None)
+    _install_backend_test_double(backend, "run_versioned_analysis_request", run_backend)
+    _install_backend_test_double(backend, "reset_r_working_directory", lambda: None)
 
     def deferred_delete() -> None:
         QtCore.QCoreApplication.sendPostedEvents(
@@ -148,7 +170,7 @@ def main() -> int:
         )
         app.processEvents()
 
-    def make_configuration() -> Any:
+    def make_configuration() -> analysis_setup_dialog.AnalysisSetupDialog:
         dialog = analysis_setup_dialog.AnalysisSetupDialog(
             Model(), parent=owner, confidence_level=95.0
         )
@@ -164,7 +186,10 @@ def main() -> int:
     if confidence_input is None:
         raise RuntimeError("confidence-level input is missing")
     confidence_input.setLocale(QtCore.QLocale(QtCore.QLocale.Language.German))
-    confidence_input.lineEdit().setText("90,5")
+    line_edit = confidence_input.lineEdit()
+    if line_edit is None:
+        raise RuntimeError("confidence-level line edit is missing")
+    line_edit.setText("90,5")
     confidence_input.interpretText()
     request = configuration.analysis_requests()[0]
 
@@ -219,9 +244,9 @@ def main() -> int:
     failing = make_configuration()
     _phase("failure-configuration-created")
     progress_count = len(created_progress_dialogs)
-    backend.run_binary_analysis = lambda *_args, **_kwargs: (_ for _ in ()).throw(
-        RuntimeError("native backend failure")
-    )
+    backend.run_versioned_analysis_request = lambda *_args, **_kwargs: (
+        _ for _ in ()
+    ).throw(RuntimeError("native backend failure"))
     original_critical = analysis_setup_dialog.QMessageBox.critical
     setattr(
         analysis_setup_dialog.QMessageBox, "critical", lambda *_args, **_kwargs: None

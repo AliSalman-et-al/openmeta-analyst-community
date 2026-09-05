@@ -52,15 +52,21 @@ _DRIVER = textwrap.dedent(
 
     def raise_workflow_r_error(name, *args, **kwargs):
         if name == "rcmetar.run.diagnostic.analyses":
+            assert "request.list" in kwargs
             raise r_bridge.RRuntimeError("workflow execution failed")
         return original_execute_r_function(name, *args, **kwargs)
 
     r_bridge.execute_r_function = raise_workflow_r_error
     try:
-        r_bridge.run_diagnostic_workflow(
-            "subgroup",
-            ["diagnostic.random"],
-            [{"measure": "Sens"}],
+        r_bridge.run_versioned_analysis_requests(
+            [{
+                "version": 1,
+                "data_type": "diagnostic",
+                "workflow": "subgroup",
+                "method": "diagnostic.random",
+                "metric": "Sens",
+                "params": {"measure": "Sens"},
+            }],
             diagnostic_data_name="workflow_data",
         )
     except r_bridge.DiagnosticExecutionError as exc:
@@ -69,24 +75,6 @@ _DRIVER = textwrap.dedent(
         raise AssertionError("diagnostic workflow R failure was not translated")
     finally:
         r_bridge.execute_r_function = original_execute_r_function
-
-    class InvalidNetworkModel:
-        def __getattribute__(self, name):
-            raise AssertionError(
-                "invalid network data type must be rejected before model access"
-            )
-
-    sentinel = ro.r("structure('untouched')")
-    ro.globalenv["treatments"] = sentinel
-    try:
-        r_bridge.dataset_to_simple_network(
-            InvalidNetworkModel(), data_type="unsupported"
-        )
-    except ValueError as exc:
-        assert "unknown" in str(exc)
-    else:
-        raise AssertionError("invalid network data type was accepted")
-    assert bool(ro.r("identical")(ro.globalenv["treatments"], sentinel)[0])
 
     assert not hasattr(r_bridge, "_sanitize_for_R")
 
@@ -230,36 +218,52 @@ _DRIVER = textwrap.dedent(
     analysis_dir = tempfile.mkdtemp(prefix="rcmetastudio-display-contract-")
     forest_path = os.path.join(analysis_dir, "forest.png")
     forest_display_path = os.path.join(analysis_dir, "forest.display.svg")
-    continuous_result = r_bridge.run_continuous_analysis(
-        "continuous.random",
+    continuous_result = r_bridge.run_versioned_analysis_request(
         {
-            "conf.level": 95.0,
-            "digits": 3,
-            "measure": "MD",
-            "rm.method": "DL",
-            "fp_style": "default",
-            "fp_col1_str": "Study or Subgroup",
-            "fp_col2_str": "[default]",
-            "fp_col3_str": "Intervention",
-            "fp_col4_str": "Control",
-            "fp_xlabel": "[default]",
-            "fp_outpath": forest_path,
-            "fp_display_path": forest_display_path,
-            "fp_plot_lb": "[default]",
-            "fp_plot_ub": "[default]",
-            "fp_show_col1": True,
-            "fp_show_col2": True,
-            "fp_show_col3": True,
-            "fp_show_col4": True,
-            "fp_show_summary_line": True,
-            "fp_xticks": "[default]",
-            "create.plot": True,
-            "write.to.file": False,
+            "version": 1,
+            "data_type": "continuous",
+            "method": "continuous.random",
+            "metric": "MD",
+            "workflow": "standard",
+            "params": {
+                "conf.level": 95.0,
+                "digits": 3,
+                "measure": "MD",
+                "rm.method": "DL",
+                "fp_style": "default",
+                "fp_col1_str": "Study or Subgroup",
+                "fp_col2_str": "[default]",
+                "fp_col3_str": "Intervention",
+                "fp_col4_str": "Control",
+                "fp_xlabel": "[default]",
+                "fp_outpath": forest_path,
+                "fp_display_path": forest_display_path,
+                "fp_plot_lb": "[default]",
+                "fp_plot_ub": "[default]",
+                "fp_show_col1": True,
+                "fp_show_col2": True,
+                "fp_show_col3": True,
+                "fp_show_col4": True,
+                "fp_show_summary_line": True,
+                "fp_xticks": "[default]",
+                "create.plot": True,
+                "write.to.file": False,
+            },
         },
-        continuous_data_name="issue146_continuous",
+        data_name="issue146_continuous",
     )
-    assert continuous_result["images"]["Forest Plot"] == forest_path
-    assert continuous_result["display_images"]["Forest Plot"] == forest_display_path
+    forest_section = next(
+        section
+        for section in continuous_result.sections
+        if section.title == "Forest Plot"
+    )
+    assert forest_section.source_key == forest_section.semantic_id
+    assert forest_section.source_key != forest_section.title
+    assert continuous_result.images[forest_section.source_key] == forest_path
+    assert (
+        continuous_result.display_images[forest_section.source_key]
+        == forest_display_path
+    )
 
     from PyQt6 import QtWidgets
     from rc_metastudio import results_window
@@ -448,7 +452,7 @@ _DRIVER = textwrap.dedent(
     finally:
         if previous_scratch_dir is not None:
             os.environ["RCMS_ANALYSIS_SCRATCH_DIR"] = previous_scratch_dir
-    assert "Sensitivity coefficients" in diagnostic_meta_result["texts"]
+        assert "Sensitivity coefficients" in diagnostic_meta_result.texts
     assert list(ro.r("tmp_obj@study.names")) == [
         "Included 1",
         "Included 2",
@@ -472,14 +476,14 @@ _DRIVER = textwrap.dedent(
     ''')
     assert all(bool(value) for value in invalid_confidence_level_checks)
 
-    from rc_metastudio import golden_analysis
+    from tests.analysis_regression.golden.support import golden_analysis
 
     subgroup_bundle = [
         bundle for bundle in golden_analysis.curated_golden_bundles()
         if bundle["id"] == "amino-binary-subgroup"
     ][0]
     subgroup_result = golden_analysis.headless_analysis.run_headless_analysis(subgroup_bundle["case"])
-    assert "Subgroup Summary" in subgroup_result["texts"]
+    assert "Subgroup Summary" in subgroup_result.texts
 
     sys.stdout.write("OK\\n")
     # Hard-exit so embedded-R finalizers don't run: rpy2/R teardown can
@@ -511,17 +515,39 @@ _NULL_RESULT_DRIVER = textwrap.dedent(
         "list(Warning='kept', `Trim-and-fill data`=NULL, References='refs')"
     )
     parsed_null_section = r_bridge.parse_out_results(null_section_result)
-    assert "Trim-and-fill data" not in parsed_null_section["texts"]
-    assert parsed_null_section["texts"]["Warning"] == "kept"
+    assert "Trim-and-fill data" not in parsed_null_section.texts
+    assert parsed_null_section.texts["Warning"] == "kept"
     nested_section_result = r_bridge.ro.r(
         "list(Warning='kept', Summary='kept summary', `Trim-and-fill data`="
         "list(fit=list(effect=c(0.1, 0.2), se=c(0.05, 0.06)), side='left'), "
         "References='refs')"
     )
     parsed_nested_section = r_bridge.parse_out_results(nested_section_result)
-    assert "Trim-and-fill data" not in parsed_nested_section["texts"]
-    assert parsed_nested_section["texts"]["Warning"] == "kept"
-    assert parsed_nested_section["texts"]["Summary"] == "kept summary"
+    assert "Trim-and-fill data" not in parsed_nested_section.texts
+    assert parsed_nested_section.texts["Warning"] == "kept"
+    assert parsed_nested_section.texts["Summary"] == "kept summary"
+    semantic_section_result = r_bridge.ro.r(
+        "list(Warning='kept', sections=list(list(id='small-study.warning', "
+        "kind='text', order=0L, title='Warning', source_key='small-study.warning', "
+        "value_key='Warning')))"
+    )
+    parsed_semantic_section = r_bridge.parse_out_results(semantic_section_result)
+    assert parsed_semantic_section.texts["small-study.warning"] == "kept"
+    assert parsed_semantic_section.sections[0].title == "Warning"
+    semantic_image_result = r_bridge.ro.r(
+        "list(images=c('Ordinary Funnel Plot'='plot.png'), "
+        "plot_names=c('Ordinary Funnel Plot'='funnel'), "
+        "plot_params_paths=c('Ordinary Funnel Plot'='params'), "
+        "plot_capabilities=list('Ordinary Funnel Plot'=list(plot_kind='funnel', "
+        "editable=FALSE, styleable=TRUE, composition='single', regenerator='funnel')), "
+        "image_order='Ordinary Funnel Plot', sections=list(list(id='small-study.funnel.1', "
+        "kind='image', order=0L, title='Ordinary Funnel Plot', "
+        "source_key='small-study.funnel.1', value_key='Ordinary Funnel Plot')))"
+    )
+    parsed_semantic_image = r_bridge.parse_out_results(semantic_image_result)
+    assert parsed_semantic_image.images["small-study.funnel.1"] == "plot.png"
+    assert parsed_semantic_image.image_order == ("small-study.funnel.1",)
+    assert parsed_semantic_image.sections[0].title == "Ordinary Funnel Plot"
     sys.stdout.write("OK\\n")
     sys.stdout.flush()
     sys.stderr.flush()
@@ -536,7 +562,6 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
     import sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     sys.path.insert(0, os.path.join(repo_root, "src"))
     sys.path.insert(0, os.path.join(repo_root, "tests", "python", "fast"))
@@ -570,7 +595,7 @@ _RCHAR_UTF8_DRIVER = textwrap.dedent(
         ))
         '''
     )
-    text = r_bridge.parse_out_results(r_result)["texts"]["Summary"]
+    text = r_bridge.parse_out_results(r_result).texts["Summary"]
     assert tau_squared in text, text
     assert "t²" not in text, text
 
@@ -615,7 +640,6 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("RCMS_STUB_BACKEND", None)
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         env["R_LIBS"] = (
             r_lib if not existing_r_libs
@@ -731,18 +755,18 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             rcmetar.run.analysis(
               advanced_data,
-              list(method="meta.regression", params=params, workflow="meta-regression")
+              list(version=1, method="meta.regression", params=params, workflow="meta-regression")
             )
             '''
         )
         meta_reg_result = ro.r(meta_regression_expr)
         parsed_meta_regression = r_bridge.parse_out_results(meta_reg_result)
-        regression_summary = parsed_meta_regression["texts"]["Summary"]
+        regression_summary = parsed_meta_regression.texts["Summary"]
         assert "Overall moderators (Qₘ)" in regression_summary, regression_summary
         assert "Residual heterogeneity (Qₑ)" in regression_summary, regression_summary
         assert "Q<U+2098>" not in regression_summary, regression_summary
         assert "Q<U+2091>" not in regression_summary, regression_summary
-        weights = parsed_meta_regression["texts"]["Weights"]
+        weights = parsed_meta_regression.texts["Weights"]
         assert weights.splitlines()[0].strip() == "Study names  Weights", weights
         assert "study names" not in weights, weights
         assert "Gonzalez" in weights, weights
@@ -757,7 +781,7 @@ _SUMMARY_PRINT_DRIVER = textwrap.dedent(
             )
             '''
         )
-        named_weights = r_bridge.parse_out_results(named_weights_result)["texts"]["Weights"]
+        named_weights = r_bridge.parse_out_results(named_weights_result).texts["Weights"]
         assert named_weights.splitlines()[0].strip() == "Study names  Weights", named_weights
         assert "Alpha Study" in named_weights, named_weights
         assert "Beta Study" in named_weights, named_weights
@@ -803,7 +827,6 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             sys.stdout.write("SKIP R CMD INSTALL RCMetaR failed\\n%s\\n%s\\n" % (install.stdout[-2000:], install.stderr[-2000:]))
             sys.exit(42)
 
-        env.pop("RCMS_STUB_BACKEND", None)
         env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
         os.environ.update(env)
         sys.path.insert(0, os.path.join(repo_root, "src"))
@@ -852,7 +875,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             )
             boot.result <- rcmetar.run.analysis(
               advanced_data,
-              list(method="binary.random", params=params, workflow="bootstrap")
+              list(version=1, method="binary.random", params=params, workflow="bootstrap")
             )
             stopifnot("Summary" %in% names(boot.result))
             stopifnot("Histogram" %in% names(boot.result$images))
@@ -862,7 +885,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             params$bootstrap.plot.path <- "./r_tmp/issue113_bootstrap_meta_reg.png"
             boot.reg.result <- rcmetar.run.analysis(
               advanced_data,
-              list(method="binary.random", params=params, workflow="bootstrap")
+              list(version=1, method="binary.random", params=params, workflow="bootstrap")
             )
             stopifnot("Summary" %in% names(boot.reg.result))
             stopifnot("Histograms" %in% names(boot.reg.result$images))
@@ -903,6 +926,7 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
             funnel_result <- rcmetar.run.small.study.effects(
               funnel_data,
               list(
+                version=1L,
                 data.type="continuous", metric="MD",
                 funnels=c("ordinary", "contour"),
                 tests=c("mixed-effects-egger", "begg-mazumdar"), conf.level=95,
@@ -920,8 +944,8 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
         parsed_funnel_result = r_bridge.parse_out_results(
             ro.globalenv["funnel_result"]
         )
-        assert "Method details" in parsed_funnel_result["texts"]
-        method_details = parsed_funnel_result["texts"]["Method details"]
+        assert "small-study.method-details" in parsed_funnel_result.texts
+        method_details = parsed_funnel_result.texts["small-study.method-details"]
         assert "Package:" in method_details
         assert (
             "Weighting: inverse-variance weights with REML heterogeneity"
@@ -958,17 +982,13 @@ _ADVANCED_RCMetaR_DRIVER = textwrap.dedent(
 
 def test_RCMetaR_advanced_bootstrap_and_permutation_paths_execute():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_ADVANCED_RCMetaR_DRIVER, env=env)
 
 
 def test_inprocess_rpy2_backend_contract():
-    # Force the real in-process backend: the surrounding test suite sets
-    # RCMS_STUB_BACKEND=1 (which selects the no-R stub), so clear it in the child
-    # env and require the real rpy2 path instead.
+    # Require the real in-process rpy2 path in this integration driver.
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     result = run_python_driver(_DRIVER, env=env)
     combined_output = result.stdout + result.stderr
@@ -978,7 +998,6 @@ def test_inprocess_rpy2_backend_contract():
 
 def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     run_python_driver(_RCHAR_UTF8_DRIVER, env=env)
@@ -986,12 +1005,10 @@ def test_rpy2_r_character_conversion_preserves_utf8_before_native_codepage():
 
 def test_r_null_result_sections_are_omitted_before_formatting():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     run_python_driver(_NULL_RESULT_DRIVER, env=env)
 
 
 def test_RCMetaR_summary_capture_uses_formatted_print_methods():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_SUMMARY_PRINT_DRIVER, env=env)

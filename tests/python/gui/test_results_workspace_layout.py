@@ -4,28 +4,54 @@ from test_types import key_click, key_clicks, required
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtSvg, QtTest, QtWidgets
-from rc_metastudio.analysis_results import parse_analysis_result
+from rc_metastudio.analysis_results import PlotCapability, parse_analysis_result
 from rc_metastudio.plot_text import normalize_plot_text_value
 
 pytestmark = pytest.mark.qsettings
 
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
-from rc_metastudio import plot_editor_dialog, results_window
+from rc_metastudio import plot_editor_dialog, plot_service, results_window
 
 
 def _empty_results(summary="Summary text"):
-    return parse_analysis_result({"texts": {"Summary": summary}})
+    return _analysis_result({"texts": {"Summary": summary}})
 
 
 def _analysis_result(payload):
     """Build the complete result contract used by ResultsWindow fixtures."""
+    payload = dict(payload)
+    payload.setdefault("version", 1)
+    text_titles = list(payload.get("texts", {}))
+    image_titles = list(payload.get("images", {}))
+    payload.setdefault(
+        "sections",
+        [
+            {
+                "id": f"fixture.text.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(text_titles)
+        ]
+        + [
+            {
+                "id": f"fixture.image.{index}",
+                "kind": "image",
+                "order": len(text_titles) + index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(image_titles)
+        ],
+    )
     return parse_analysis_result(payload)
 
 
@@ -39,6 +65,18 @@ def _plot_capability(
         "regenerator": regenerator,
         "composition": "single",
     }
+
+
+def _plot_capability_model(
+    plot_kind="forest", editable=True, styleable=True, regenerator="forest"
+):
+    return PlotCapability(
+        plot_kind=plot_kind,
+        editable=editable,
+        styleable=styleable,
+        regenerator=regenerator,
+        composition="single",
+    )
 
 
 def _use_isolated_settings(tmp_path):
@@ -567,7 +605,7 @@ def test_sroc_plot_editor_uses_acronym_safe_browse_title(qapp, tmp_path, monkeyp
     monkeypatch.setattr(
         plot_editor_dialog.QFileDialog,
         "getSaveFileName",
-        lambda _parent, title, *_args: (titles.append(title) or ("", "")),
+        lambda _parent, title, *_args: titles.append(title) or ("", ""),
     )
     try:
         dialog.save_btn.click()
@@ -609,7 +647,7 @@ def test_results_window_presents_summary_references_and_vector_plot_artifacts(
             required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
+        assert nav_titles == ["Summary", "References", "Forest Plot"]
         svg_items = [
             item
             for item in window.scene.items()
@@ -664,7 +702,7 @@ def test_regenerable_plot_families_expose_native_edit_and_export_actions(
     artifact = results_window.PlotArtifact(
         title,
         str(tmp_path / "plot.svg"),
-        _plot_capability(plot_kind=plot_kind, regenerator=regenerator),
+        _plot_capability_model(plot_kind=plot_kind, regenerator=regenerator),
         params_path=str(tmp_path / "plot-params"),
     )
     try:
@@ -694,17 +732,17 @@ def test_results_window_regenerates_each_supported_export_format(
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.svg"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest-params"),
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("generate", path)),
         raising=False,
@@ -735,17 +773,17 @@ def test_results_window_exports_sroc_with_format_specific_default_name(
     artifact = results_window.PlotArtifact(
         "SROC",
         str(tmp_path / "sroc.svg"),
-        _plot_capability(plot_kind="sroc", regenerator="sroc"),
+        _plot_capability_model(plot_kind="sroc", regenerator="sroc"),
         params_path=str(tmp_path / "sroc-params"),
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_sroc_plot",
         lambda path: calls.append(("generate", path)),
         raising=False,
@@ -775,18 +813,18 @@ def test_results_window_rejects_svgz_for_funnel_export_before_r(
     artifact = results_window.PlotArtifact(
         "Contour Funnel Plot",
         str(tmp_path / "funnel.png"),
-        _plot_capability(plot_kind="contour_funnel", regenerator="funnel"),
+        _plot_capability_model(plot_kind="contour_funnel", regenerator="funnel"),
         params_path=str(tmp_path / "funnel-params"),
     )
     calls = []
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_small_study_effects_funnel",
         lambda path: calls.append(("generate", path)),
         raising=False,

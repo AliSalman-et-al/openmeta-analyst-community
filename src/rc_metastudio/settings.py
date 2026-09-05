@@ -31,7 +31,6 @@ WORKSPACE_LAYOUT_SCHEMA_VERSION = 2
 MAIN_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/main"
 RESULTS_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/results"
 EDIT_DATASET_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/edit_dataset"
-NETWORK_VIEW_WORKSPACE_GROUP = WORKSPACE_LAYOUT_GROUP + "/network_view_dialog"
 DEFAULT_RESULTS_SPLITTER_PROPORTIONS = (0.30, 0.70)
 DEFAULT_EDIT_DATASET_SPLITTER_PROPORTIONS = (1.0 / 3.0,) * 3
 DEFAULT_SETTINGS = {
@@ -256,7 +255,6 @@ def migrate_workspace_layout_settings():
             MAIN_WORKSPACE_GROUP,
             RESULTS_WORKSPACE_GROUP,
             EDIT_DATASET_WORKSPACE_GROUP,
-            NETWORK_VIEW_WORKSPACE_GROUP,
         )
         for group in groups:
             for suffix in obsolete_suffixes:
@@ -623,33 +621,6 @@ def restore_edit_dataset_window_state(window):
         show_window=False,
     )
     return state
-
-
-def load_network_view_dialog_placement(available_geometries=None):
-    """Load Network View's independent screen-safe Workspace placement."""
-    return load_workspace_placement(
-        NETWORK_VIEW_WORKSPACE_GROUP,
-        available_geometries=available_geometries,
-        default_maximized=False,
-    )
-
-
-def save_network_view_dialog_placement(window):
-    """Persist Network View geometry independently of other Workspaces."""
-    settings = save_workspace_placement(NETWORK_VIEW_WORKSPACE_GROUP, window)
-    settings.sync()
-
-
-def restore_network_view_dialog_placement(window):
-    """Restore Network View placement without displaying the modeless window."""
-    placement = load_network_view_dialog_placement()
-    restore_workspace_placement(
-        window,
-        placement,
-        default_maximized=False,
-        show_window=False,
-    )
-    return placement
 
 
 def save_main_window_placement(window, column_widths=None):

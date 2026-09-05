@@ -1,4 +1,4 @@
-"""Exercise Results, SVG, plot actions, and Network View on native Qt6."""
+"""Exercise Results, SVG, and plot actions on native Qt6."""
 
 from __future__ import annotations
 
@@ -11,9 +11,12 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import subprocess
 import sys
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
 
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
+
+if TYPE_CHECKING:
+    from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -111,7 +114,7 @@ def _canonical_member(root: Path, value: object, suffix: str) -> Path:
 def _rect(value: object, name: str) -> dict[str, int]:
     if not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}:
         raise ValueError("native Results evidence has malformed %s" % name)
-    record = cast(dict[str, Any], value)
+    record = cast(dict[str, object], value)
     return {
         "x": _strict_int(record["x"], "%s x" % name),
         "y": _strict_int(record["y"], "%s y" % name),
@@ -129,7 +132,7 @@ def _pixel_size(value: object) -> list[int]:
     ]
 
 
-def _image_has_variation(image: Any) -> bool:
+def _image_has_variation(image: QtGui.QImage) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull() or converted.width() < 1 or converted.height() < 1:
         return False
@@ -148,7 +151,7 @@ def _validate_png_capture(
 
     if not isinstance(capture, dict):
         raise ValueError("native Results evidence capture is malformed")
-    capture = cast(dict[str, Any], capture)
+    capture = cast(dict[str, object], capture)
     path = _canonical_member(root, capture.get("path"), ".png")
     payload = path.read_bytes()
     if not payload.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -231,10 +234,13 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
     records = []
     for scale in SCALE_FACTORS:
         record_path = _record_path(root, scale)
-        record = json.loads(
+        record_value = json.loads(
             record_path.read_text(encoding="utf-8"),
             parse_constant=_reject_nonstandard_json_constant,
         )
+        if not isinstance(record_value, dict):
+            raise ValueError("native Results evidence record is malformed")
+        record = cast(dict[str, object], record_value)
         expected_dpr = scale
         scale_factor = _strict_number(
             record.get("scale_factor"), "scale factor", minimum=0.01
@@ -267,26 +273,10 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
             "styleable": True,
         }:
             raise ValueError("native Results evidence has the wrong plot descriptor")
-        network = record.get("network")
-        if not isinstance(network, dict):
-            raise ValueError("native Results evidence has malformed Network View state")
-        item_count = _strict_int(
-            network.get("item_count"), "network item count", minimum=0
-        )
-        if {
-            "follow_up": network.get("follow_up"),
-            "item_count": item_count,
-            "outcome": network.get("outcome"),
-        } != {
-            "follow_up": "12 months",
-            "item_count": 1,
-            "outcome": "Mortality",
-        }:
-            raise ValueError("native Results evidence has the wrong Network View state")
         ratio = _strict_number(record.get("plot_ratio"), "plot ratio", minimum=0.01)
         _require_close(ratio, 2.0, "plot ratio")
         captures = record.get("captures")
-        if not isinstance(captures, dict) or set(captures) != {"results", "network"}:
+        if not isinstance(captures, dict) or set(captures) != {"results"}:
             raise ValueError("native Results evidence capture set is incomplete")
         dpr_values = [scale_factor, device_pixel_ratio]
         for capture in captures.values():
@@ -313,95 +303,21 @@ def validate_evidence(root: Path) -> list[dict[str, object]]:
 
 
 def _capture_window(
-    app: Any, window: Any, destination: Path, attempts: int = MAX_CAPTURE_ATTEMPTS
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempts: int = MAX_CAPTURE_ATTEMPTS,
 ) -> dict[str, object]:
-    from PyQt6 import QtCore, QtGui
+    from PyQt6 import QtCore
 
     last_problem = "window was not exposed"
     for attempt in range(1, attempts + 1):
-        screen = window.screen()
-        if screen is None:
-            last_problem = "window was not attached to a screen"
-        elif not window.isVisible() or window.isMinimized():
-            last_problem = "window was hidden or minimized"
-        else:
-            frame = window.frameGeometry()
-            screen_geometry = screen.geometry()
-            if not screen_geometry.contains(frame):
-                last_problem = "window frame did not fit its screen"
-            else:
-                # Force a synchronous client paint before asking the Windows
-                # compositor for the desktop.  qwindows can otherwise block in
-                # grabWindow() while a newly shown widget still has a pending
-                # paint event.
-                paint_probe = window.grab()
-                if paint_probe.isNull() or not _image_has_variation(
-                    paint_probe.toImage()
-                ):
-                    last_problem = "window client was not painted"
-                    desktop = QtGui.QPixmap()
-                else:
-                    desktop = screen.grabWindow(0)
-                if desktop.isNull():
-                    if attempt < attempts:
-                        QtCore.QThread.msleep(50)
-                        app.processEvents()
-                    continue
-                dpr = float(desktop.devicePixelRatioF())
-                physical = QtCore.QRect(
-                    logical_extent_to_physical_pixels(
-                        frame.x() - screen_geometry.x(), dpr
-                    ),
-                    logical_extent_to_physical_pixels(
-                        frame.y() - screen_geometry.y(), dpr
-                    ),
-                    logical_extent_to_physical_pixels(frame.width(), dpr),
-                    logical_extent_to_physical_pixels(frame.height(), dpr),
-                )
-                captured = (
-                    desktop.copy(physical) if not desktop.isNull() else QtGui.QPixmap()
-                )
-                expected_size = [physical.width(), physical.height()]
-                actual_size = [captured.width(), captured.height()]
-                if captured.isNull() or actual_size != expected_size:
-                    last_problem = "desktop crop did not match the physical frame"
-                elif not _image_has_variation(captured.toImage()):
-                    last_problem = "desktop crop was blank or single-colour"
-                else:
-                    image_dpr = float(captured.devicePixelRatioF())
-                    captured.setDevicePixelRatio(dpr)
-                    if not captured.save(str(destination), "PNG"):
-                        raise RuntimeError("failed to save native Qt6 frame capture")
-                    payload = destination.read_bytes()
-                    return {
-                        "attempts": attempt,
-                        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
-                        "device_pixel_ratio": dpr,
-                        "image_device_pixel_ratio": image_dpr,
-                        "logical_frame": {
-                            "x": frame.x(),
-                            "y": frame.y(),
-                            "width": frame.width(),
-                            "height": frame.height(),
-                        },
-                        "path": destination.name,
-                        "physical_crop": {
-                            "x": physical.x(),
-                            "y": physical.y(),
-                            "width": physical.width(),
-                            "height": physical.height(),
-                        },
-                        "pixel_size": actual_size,
-                        "screen_geometry": {
-                            "x": screen_geometry.x(),
-                            "y": screen_geometry.y(),
-                            "width": screen_geometry.width(),
-                            "height": screen_geometry.height(),
-                        },
-                        "sha256": hashlib.sha256(payload).hexdigest(),
-                        "size_bytes": len(payload),
-                        "varied_pixels": True,
-                    }
+        captured, problem = _capture_window_attempt(
+            window, destination, attempt, last_problem
+        )
+        if captured is not None:
+            return captured
+        last_problem = problem
         if attempt < attempts:
             QtCore.QThread.msleep(50)
             app.processEvents()
@@ -409,6 +325,120 @@ def _capture_window(
         "%s native frame capture failed after %s attempts: %s"
         % (window.objectName() or window.windowTitle(), attempts, last_problem)
     )
+
+
+def _capture_window_attempt(
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempt: int,
+    last_problem: str,
+) -> tuple[dict[str, object] | None, str]:
+    geometry = _window_capture_geometry(window)
+    if isinstance(geometry, str):
+        return None, geometry
+    screen, frame, screen_geometry = geometry
+    return _capture_window_frame(
+        window, destination, attempt, screen, frame, screen_geometry, last_problem
+    )
+
+
+def _window_capture_geometry(
+    window: QtWidgets.QWidget,
+) -> tuple[QtGui.QScreen, QtCore.QRect, QtCore.QRect] | str:
+    screen = window.screen()
+    if screen is None:
+        return "window was not attached to a screen"
+    if not window.isVisible() or window.isMinimized():
+        return "window was hidden or minimized"
+    frame = window.frameGeometry()
+    screen_geometry = screen.geometry()
+    if not screen_geometry.contains(frame):
+        return "window frame did not fit its screen"
+    return screen, frame, screen_geometry
+
+
+def _capture_window_frame(
+    window: QtWidgets.QWidget,
+    destination: Path,
+    attempt: int,
+    screen: QtGui.QScreen,
+    frame: QtCore.QRect,
+    screen_geometry: QtCore.QRect,
+    last_problem: str,
+) -> tuple[dict[str, object] | None, str]:
+    from PyQt6 import QtCore, sip
+
+    # Force a synchronous client paint before asking the compositor for the
+    # desktop, which avoids grabbing a newly shown widget's pending paint.
+    paint_probe = window.grab()
+    if paint_probe.isNull() or not _image_has_variation(paint_probe.toImage()):
+        return None, "window client was not painted"
+    desktop = screen.grabWindow(sip.voidptr(0))
+    if desktop.isNull():
+        return None, last_problem
+    dpr = float(desktop.devicePixelRatioF())
+    physical = QtCore.QRect(
+        logical_extent_to_physical_pixels(frame.x() - screen_geometry.x(), dpr),
+        logical_extent_to_physical_pixels(frame.y() - screen_geometry.y(), dpr),
+        logical_extent_to_physical_pixels(frame.width(), dpr),
+        logical_extent_to_physical_pixels(frame.height(), dpr),
+    )
+    captured = desktop.copy(physical)
+    actual_size = [captured.width(), captured.height()]
+    if captured.isNull() or actual_size != [physical.width(), physical.height()]:
+        return None, "desktop crop did not match the physical frame"
+    if not _image_has_variation(captured.toImage()):
+        return None, "desktop crop was blank or single-colour"
+    image_dpr = float(captured.devicePixelRatioF())
+    captured.setDevicePixelRatio(dpr)
+    if not captured.save(str(destination), "PNG"):
+        raise RuntimeError("failed to save native Qt6 frame capture")
+    return _capture_window_record(
+        destination,
+        attempt,
+        dpr,
+        image_dpr,
+        frame,
+        physical,
+        actual_size,
+        screen_geometry,
+    )
+
+
+def _capture_window_record(
+    destination: Path,
+    attempt: int,
+    dpr: float,
+    image_dpr: float,
+    frame: QtCore.QRect,
+    physical: QtCore.QRect,
+    pixel_size: list[int],
+    screen_geometry: QtCore.QRect,
+) -> tuple[dict[str, object], str]:
+    payload = destination.read_bytes()
+    return {
+        "attempts": attempt,
+        "capture_method": "QScreen.grabWindow(desktop); physical frame crop",
+        "device_pixel_ratio": dpr,
+        "image_device_pixel_ratio": image_dpr,
+        "logical_frame": _rect_record(frame),
+        "path": destination.name,
+        "physical_crop": _rect_record(physical),
+        "pixel_size": pixel_size,
+        "screen_geometry": _rect_record(screen_geometry),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+        "varied_pixels": True,
+    }, ""
+
+
+def _rect_record(rect: QtCore.QRect) -> dict[str, int]:
+    return {
+        "x": rect.x(),
+        "y": rect.y(),
+        "width": rect.width(),
+        "height": rect.height(),
+    }
 
 
 def _native_device_pixel_ratio(repo_root: Path) -> float:
@@ -432,16 +462,18 @@ def _native_device_pixel_ratio(repo_root: Path) -> float:
 
 
 def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-    from PyQt6 import QtCore, QtGui, QtWidgets
+    from PyQt6 import QtCore, QtWidgets
 
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    from rc_metastudio import r_backend
-
-    r_backend.install_stub_r_bridge()
-    from rc_metastudio import app_error_handler, network_view_dialog, results_window
+    from local_r_test_backend import create
+    backend_fake = create()
+    from rc_metastudio import r_bridge
+    for name, implementation in vars(backend_fake).items():
+        setattr(r_bridge, name, implementation)
+    from rc_metastudio import app_error_handler, results_window
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
     from rc_metastudio.analysis_results import parse_analysis_result
 
     evidence_root.mkdir(parents=True, exist_ok=True)
@@ -475,49 +507,44 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     results = results_window.ResultsWindow(
         parse_analysis_result(
             {
+                "version": 1,
                 "texts": {
                     "Summary": "Random-effects model\nEstimate  Lower bound  Upper bound",
                     "References": "Maintained native Qt6 Results evidence.",
                 },
                 "images": {"Forest Plot": str(svg)},
                 "display_images": {"Forest Plot": str(svg)},
+                "image_var_names": {"Forest Plot": "forest"},
                 "image_params_paths": {"Forest Plot": str(evidence_root / "forest")},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": capability},
+                "sections": [
+                    {
+                        "id": "summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Meta-Analysis Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "forest-plot",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "Forest Plot",
+                    },
+                    {
+                        "id": "text:references",
+                        "kind": "text",
+                        "order": 2,
+                        "title": "References",
+                        "source_key": "References",
+                    },
+                ],
             }
         )
     )
-    network_image = evidence_root / ("network-source-%s.png" % slug)
-    source = QtGui.QImage(640, 320, QtGui.QImage.Format.Format_ARGB32)
-    source.fill(QtGui.QColor("white"))
-    if not source.save(str(network_image), "PNG"):
-        raise RuntimeError("failed to create Network View smoke artifact")
-
-    class Model:
-        current_outcome_name = "Mortality"
-        dataset = type(
-            "Dataset",
-            (),
-            {
-                "get_outcome_names": staticmethod(lambda: ["Mortality"]),
-                "get_follow_up_names": staticmethod(lambda: ["12 months"]),
-            },
-        )()
-
-        def get_current_follow_up_name(self) -> str:
-            return "12 months"
-
-        def get_outcome_type(self, _outcome: Any, get_str: bool = False) -> str:
-            return "binary"
-
-    setattr(
-        network_view_dialog.r_bridge,
-        "dataset_to_simple_network",
-        lambda **_kwargs: str(network_image),
-    )
-    network = network_view_dialog.NetworkViewDialog(Model())
     results_image = evidence_root / ("results-%s.png" % slug)
-    network_capture = evidence_root / ("network-%s.png" % slug)
     try:
         available = app.primaryScreen().availableGeometry()
         results.setGeometry(
@@ -528,7 +555,6 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
         )
         results.showNormal()
         results.show()
-        network.show()
         for _ in range(3):
             app.processEvents()
         if results.isMaximized():
@@ -557,22 +583,11 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             if item is None:
                 raise RuntimeError("native Results navigation contains a missing item")
             navigation.append(item.text(0))
-        if network._network_pixmap_item is None:
-            raise RuntimeError("native Network View has no scene item")
         results_capture = _capture_window(app, results, results_image)
-        network_capture_record = _capture_window(app, network, network_capture)
         record = {
-            "captures": {
-                "network": network_capture_record,
-                "results": results_capture,
-            },
+            "captures": {"results": results_capture},
             "device_pixel_ratio": float(results.devicePixelRatioF()),
             "navigation": navigation,
-            "network": {
-                "follow_up": network.follow_up_combo_box.currentText(),
-                "item_count": len(network.scene.items()),
-                "outcome": network.outcome_combo_box.currentText(),
-            },
             "plot_artifact": svg.name,
             "plot_artifact_sha256": _sha256(svg),
             "plot_artifact_size": svg.stat().st_size,
@@ -589,7 +604,6 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
             json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
     finally:
-        network.close()
         results.close()
         QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
         app.processEvents()

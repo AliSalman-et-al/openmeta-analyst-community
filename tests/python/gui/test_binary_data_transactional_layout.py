@@ -7,7 +7,7 @@ import pytest
 from rc_metastudio import automation
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-from rc_metastudio import adaptive_window
+from rc_metastudio import adaptive_window, calculator_service
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -32,27 +32,27 @@ def _open_binary_dialog(monkeypatch):
         lambda _window: QtCore.QRect(AVAILABLE),
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _level: 1.96,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "binary_convert_scale",
         lambda value, *_args, **_kwargs: value,
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "impute_binary_data",
         lambda _data: {"FAIL": True},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {},
     )
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge,
+        calculator_service.r_bridge,
         "effect_triplet",
         lambda *_args, **_kwargs: (None, None, None),
     )
@@ -275,6 +275,12 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
 
     app, window, dialog = _open_binary_dialog(monkeypatch)
     observed = []
+    warnings = []
+    monkeypatch.setattr(
+        binary_data_dialog.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
 
     def back_calculate(data):
         observed.append(dict(data))
@@ -291,10 +297,16 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
         }
 
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", back_calculate
+        calculator_service.r_bridge, "impute_binary_data", back_calculate
     )
     try:
         dialog.clear_form()
+        assert dialog.analysis_unit.get_effect_and_ci_for_source(
+            "entered",
+            dialog.current_effect,
+            dialog.group_comparison,
+            dialog.confidence_multiplier,
+        ) == (None, None, None)
         for row in (0, 1):
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
@@ -338,6 +350,7 @@ def test_binary_back_calculation_unlocks_from_arm_totals_and_effect(monkeypatch)
             total_item = dialog.raw_data_table.item(row, 2)
             assert total_item.text() == "100"
             assert not total_item.flags() & QtCore.Qt.ItemFlag.ItemIsEditable
+        assert warnings == []
     finally:
         _close(app, window, dialog)
 
@@ -361,7 +374,7 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
+        calculator_service.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def cancel_choice(chooser):
@@ -383,11 +396,10 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
     )
     try:
         dialog.clear_form()
-        dialog.undoStack.clear()
         dialog.update_back_calculation_button()
         table_before = _binary_table_snapshot(dialog)
         model_before = copy.deepcopy(dialog.analysis_unit)
-        dirty_before = window.current_data_unsaved
+        dirty_before = window.workspace.is_dirty
         ok = dialog.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
         assert dialog.back_calculate_button.isEnabled()
 
@@ -398,9 +410,8 @@ def test_binary_back_calculation_chooser_cancel_is_an_exact_nested_transaction(
         assert dialog.analysis_unit.get_raw_data_for_groups(dialog.current_groups) == (
             model_before.get_raw_data_for_groups(dialog.current_groups)
         )
-        assert dialog.analysis_unit.effects == model_before.effects
-        assert dialog.undoStack.count() == 0
-        assert window.current_data_unsaved is dirty_before
+        assert dialog.analysis_unit.entered_effects == model_before.entered_effects
+        assert window.workspace.is_dirty is dirty_before
         assert dialog.result() == 0
         assert ok.isEnabled()
     finally:
@@ -416,7 +427,7 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
         "op2": {"a": 4, "b": 14, "c": 5, "d": 16},
     }
     monkeypatch.setattr(
-        binary_data_dialog.r_bridge, "impute_binary_data", lambda _d: imputed
+        calculator_service.r_bridge, "impute_binary_data", lambda _d: imputed
     )
 
     def accept_second_choice(chooser):
@@ -437,7 +448,6 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
     )
     try:
         dialog.clear_form()
-        dialog.undoStack.clear()
         dialog.update_back_calculation_button()
         mouse_click(dialog.back_calculate_button, QtCore.Qt.MouseButton.LeftButton)
         app.processEvents()
@@ -449,7 +459,6 @@ def test_binary_back_calculation_chooser_accept_commits_selected_option(monkeypa
             5,
             16,
         ]
-        assert dialog.undoStack.count() == 1
     finally:
         _close(app, window, dialog)
 

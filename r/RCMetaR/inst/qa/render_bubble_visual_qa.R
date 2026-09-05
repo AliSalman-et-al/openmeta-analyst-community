@@ -167,7 +167,7 @@ qa_render_matrix <- function(output.root = qa_root()) {
       params$cov_name <- data@covariates[[1]]@cov.name
       result <- rcmetar.run.analysis(
         data,
-        list(method = "meta.regression", params = params, workflow = "meta-regression")
+        list(version=1, method= "meta.regression", params = params, workflow = "meta-regression")
       )
       plot.data <- local({
         env <- new.env(parent = emptyenv())

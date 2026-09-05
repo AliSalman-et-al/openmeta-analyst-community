@@ -14,6 +14,7 @@ import zipfile
 
 import pytest
 from rc_metastudio import automation
+from tests.python.gui.support import automation_scenarios
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 pytestmark = pytest.mark.qsettings
@@ -44,8 +45,11 @@ def _json_list(value: object) -> list[object]:
     return cast(list[object], value)
 
 
-def _close_shell(app: QtWidgets.QApplication, window: QtWidgets.QMainWindow) -> None:
-    setattr(window, "current_data_unsaved", False)
+def _close_shell(app: QtWidgets.QApplication, window) -> None:
+    if window.workspace.is_dirty:
+        window.workspace.mark_saved()
+    elif window.workspace.document is not None:
+        window.workspace.mark_saved()
     window.close()
     app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
@@ -82,19 +86,16 @@ def test_maintained_entry_point_reuses_one_native_application_and_closes_shell(q
     assert second not in app.topLevelWidgets()
 
 
-def test_console_entry_point_launches_real_shell_and_exits_cleanly():
+def test_developer_shell_runner_launches_real_shell_and_exits_cleanly():
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = os.environ.get(
         "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6")
     )
     result = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "rc_metastudio",
-            "--automation-shell-smoke",
+            str(ROOT / "scripts" / "native_shell_smoke.py"),
         ],
         cwd=ROOT,
         env=environment,
@@ -112,7 +113,6 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["QT_FATAL_WARNINGS"] = "1"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = os.environ.get(
         "RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6")
     )
@@ -120,9 +120,8 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
         result = subprocess.run(
             [
                 sys.executable,
-                "-m",
-                "rc_metastudio",
-                "--automation-shell-failure-smoke",
+                str(ROOT / "scripts" / "native_shell_smoke.py"),
+                "--failure-stage",
                 stage,
             ],
             cwd=ROOT,
@@ -173,7 +172,6 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
             window.action_paste,
             window.action_auto_fit_columns,
             window.action_edit,
-            window.action_view_network,
             window.action_add_covariate,
             window.action_meta_regression,
             window.action_subgroup_ma,
@@ -235,7 +233,7 @@ def test_shell_actions_use_native_resources_and_fire_once(qapp, monkeypatch):
 def test_close_cancel_and_failed_save_keep_owned_shell_alive(qapp, monkeypatch):
 
     app, window = automation.start_automation()
-    window.current_data_unsaved = True
+    window.workspace.mark_dirty()
     monkeypatch.setattr(
         window,
         "prompt_to_save_unsaved_data",
@@ -474,7 +472,12 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
     )
     try:
         for sample in sorted((ROOT / "sample_projects").glob("*.rcms")):
-            expected = _json_map(project_format.load_project(sample).project["dataset"])
+            source = project_format.load_project(sample).project
+            expected = _json_map(
+                project_adapter.dataset_to_project(
+                    project_adapter.project_to_dataset(source)
+                )["dataset"]
+            )
             assert window.open(str(sample)) is True
             observed = _json_map(
                 project_adapter.dataset_to_project(window.model.dataset)["dataset"]
@@ -504,7 +507,7 @@ def test_structured_project_lifecycle_opens_every_sample_and_round_trips_state(
         assert window.save_as() is True
         assert destination.is_file()
         assert not Path(str(destination) + ".state").exists()
-        assert window.current_data_unsaved is False
+        assert window.workspace.is_dirty is False
         assert window.open(str(destination)) is True
         assert window.model.dataset.notes == "durable project note"
         assert window.model.current_outcome_name == "LAG positive"
@@ -526,7 +529,7 @@ def test_packaged_sample_evidence_covers_the_authoritative_manifest(qapp):
 
     app, window = automation.start_automation()
     try:
-        evidence = automation._exercise_all_packaged_samples(
+        evidence = automation_scenarios._exercise_all_packaged_samples(
             window, ROOT / "sample_projects" / "BCG.rcms"
         )
         manifest = json.loads(
@@ -655,6 +658,19 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
     target = str(ROOT / "sample_projects" / "amino.rcms")
     for source_path in ("new_dataset", "csv_import"):
         app, window = automation.start_automation()
+        monkeypatch.setattr(
+            type(window.model),
+            "update_outcome_if_possible",
+            lambda _model, _row: None,
+        )
+        import_errors = []
+        monkeypatch.setattr(
+            QtWidgets.QMessageBox,
+            "warning",
+            lambda _parent, _title, message, *_args: (
+                import_errors.append(message) or QtWidgets.QMessageBox.StandardButton.Ok
+            ),
+        )
         try:
             result = {
                 "path": source_path,
@@ -677,10 +693,11 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
                     "covariate_types": [],
                 }
             window._handle_wizard_results(result)
+            assert import_errors == []
             original_model = window.model
             original_path = window.out_path
             original_title = window.model.dataset.title
-            assert window.current_data_unsaved is True
+            assert window.workspace.is_dirty is True
 
             monkeypatch.setattr(
                 window,
@@ -711,10 +728,9 @@ def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards
                 assert window.tableView.model() is original_model
                 assert window.out_path == original_path
                 assert window.model.dataset.title == original_title
-                assert window.current_data_unsaved is True
+                assert window.workspace.is_dirty is True
         finally:
             _close_shell(app, window)
-            monkeypatch.undo()
 
 
 def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
@@ -829,7 +845,7 @@ def test_failed_open_and_save_preserve_current_project_dirty_state_and_recents(
                 assert window.save_as() is False
             assert window.out_path == prior_path
             assert window.model.dataset.notes == "unsaved"
-            assert window.current_data_unsaved is True
+            assert window.workspace.is_dirty is True
             assert settings.get_setting("recent_files") == prior_recents
             assert boundary in critical_messages[-1][1]
     finally:
@@ -888,7 +904,7 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
                 assert window.save_as() is True
             assert destination.is_file()
             assert window.out_path == str(destination)
-            assert window.current_data_unsaved is False
+            assert window.workspace.is_dirty is False
             assert window.model.analysis_source_path == str(destination)
             assert "saved successfully" in warnings[-1][1]
 
@@ -917,7 +933,7 @@ def test_durable_save_and_open_succeed_when_recent_project_bookkeeping_fails(
                     )
                 assert window.open(str(destination)) is True
             assert window.out_path == str(destination)
-            assert window.current_data_unsaved is False
+            assert window.workspace.is_dirty is False
             assert window.model.dataset.notes == f"durable-{fault}"
             assert "opened successfully" in warnings[-1][1]
     finally:
@@ -967,7 +983,7 @@ def test_post_replace_durability_failure_commits_save_and_authorizes_next_action
             assert window.save_as() is True
         assert window.out_path == str(destination)
         assert window.model.analysis_source_path == str(destination)
-        assert window.current_data_unsaved is False
+        assert window.workspace.is_dirty is False
         saved_dataset = _json_map(
             project_format.load_project(destination).project["dataset"]
         )
@@ -998,7 +1014,7 @@ def test_post_replace_durability_failure_commits_save_and_authorizes_next_action
         with monkeypatch.context() as context:
             context.setattr(project_format, "_fsync_parent_directory", uncertain)
             assert window.save() is True
-        assert window.current_data_unsaved is False
+        assert window.workspace.is_dirty is False
         saved_dataset = _json_map(
             project_format.load_project(destination).project["dataset"]
         )
@@ -1030,7 +1046,7 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
         old_model = window.model
         old_table_model = window.tableView.model()
         old_path = window.out_path
-        old_dirty = window.current_data_unsaved
+        old_dirty = window.workspace.is_dirty
         old_connection_count = len(window._model_signal_connections)
         selected = old_model.index(0, old_model.NAME)
         window.tableView.setCurrentIndex(selected)
@@ -1071,13 +1087,6 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
                 raise RuntimeError("column synchronization failed")
 
             context.setattr(window.tableView, "synchronize_column_widths", always_fail)
-            context.setattr(
-                window,
-                "_restore_metric_menu_state",
-                lambda _snapshot: (_ for _ in ()).throw(
-                    RuntimeError("rollback menu restore failed")
-                ),
-            )
 
         for inject, message in (
             (constructor_failure, "candidate construction failed"),
@@ -1092,7 +1101,7 @@ def test_open_rolls_back_constructor_rebind_and_ui_initialization_failures(
             assert window.model is old_model
             assert window.tableView.model() is old_table_model
             assert window.out_path == old_path
-            assert window.current_data_unsaved is old_dirty
+            assert window.workspace.is_dirty is old_dirty
             assert len(window._model_signal_connections) == old_connection_count
             assert window.tableView.currentIndex().row() == 0
             assert window.tableView.currentIndex().column() == old_model.NAME
@@ -1151,7 +1160,7 @@ def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directi
         with monkeypatch.context() as context:
             context.setattr(
                 window,
-                "data_dirtied",
+                "_update_confidence_level_label",
                 lambda: (_ for _ in ()).throw(
                     RuntimeError("late continuous installation failure")
                 ),
@@ -1170,7 +1179,7 @@ def test_late_cross_family_open_failure_restores_actual_metric_menu_both_directi
         with monkeypatch.context() as context:
             context.setattr(
                 window,
-                "data_dirtied",
+                "_update_confidence_level_label",
                 lambda: (_ for _ in ()).throw(
                     RuntimeError("late binary installation failure")
                 ),

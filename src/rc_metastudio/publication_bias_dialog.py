@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QSizePolicy
 
-from rc_metastudio import adaptive_window, app_error_handler, r_bridge
+from rc_metastudio import adaptive_window, app_error_handler
 from rc_metastudio.meta_globals import ALL_METRIC_NAMES, ONE_ARM_METRICS
 from rc_metastudio.publication_bias import (
     CorrectionPolicy,
@@ -16,11 +16,10 @@ from rc_metastudio.publication_bias import (
     FunnelStyle,
     LabelPolicy,
     SmallStudyEffectsRequest,
+    SmallStudyEffectsService,
     TrimAndFillEstimator,
     TrimAndFillModel,
     TrimAndFillSide,
-    execute_small_study_effects,
-    parse_eligibility_report,
 )
 
 if TYPE_CHECKING:
@@ -50,16 +49,44 @@ PUBLICATION_BIAS_MIN_WIDTH = 560
 PUBLICATION_BIAS_PREFERRED_WIDTH = 700
 
 
+def _available_method_text(methods) -> str:
+    primary = [
+        _TEST_LABELS.get(item.method, item.method)
+        for item in methods
+        if item.role == "primary"
+    ]
+    additional = [
+        _TEST_LABELS.get(item.method, item.method)
+        for item in methods
+        if item.role != "primary"
+    ]
+    lines = []
+    if primary:
+        lines.append("Primary: " + ", ".join(primary))
+    if additional:
+        lines.append("Additional: " + ", ".join(additional))
+    return "\n".join(lines)
+
+
 class PublicationBiasDialog(
     QDialog, _ui_publication_bias_dialog.Ui_PublicationBiasDialog
 ):
     """Configure methods and plots while RCMetaR chooses eligible tests."""
 
-    def __init__(self, model, parent=None):
+    def __init__(self, model, parent=None, analysis_service=None):
         super().__init__(parent)
         self.model = model
+        self.analysis_service = analysis_service or SmallStudyEffectsService()
         self.setupUi(self)
         self._configure_scroll_surfaces()
+        self._configure_initial_values()
+        self._populate_context()
+        self._update_controls()
+        self.failure_label.clear()
+        self._connect_controls()
+        self._configure_window()
+
+    def _configure_initial_values(self):
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setModal(True)
         self.correction_policy_combo.addItems(
@@ -82,9 +109,8 @@ class PublicationBiasDialog(
             self.correction_policy_combo.setCurrentText(
                 CorrectionPolicy.ALL_STUDIES_IF_ANY_ZERO_EXISTS.value
             )
-        self._populate_context()
-        self._update_controls()
-        self.failure_label.clear()
+
+    def _connect_controls(self):
         for control in (
             self.ordinary_funnel_check,
             self.contour_funnel_check,
@@ -99,6 +125,8 @@ class PublicationBiasDialog(
         self.button_box.accepted.connect(
             app_error_handler.safe_slot(self.run, parent=self)
         )
+
+    def _configure_window(self):
         self._layout_controller = adaptive_window.register_adaptive_window(
             self, adaptive_window.WindowRole.TRANSACTIONAL
         )
@@ -149,11 +177,7 @@ class PublicationBiasDialog(
     def _populate_context(self):
         request = self._preview_request()
         try:
-            report = parse_eligibility_report(
-                r_bridge.run_small_study_effects(
-                    self.model, request.to_mapping(), preview=True
-                )
-            )
+            report = self.analysis_service.preview(self.model, request)
         except Exception:  # noqa: BLE001 - Qt boundary remains recoverable
             self._eligibility_report = None
             self.context_label.setText(self._context_summary())
@@ -164,27 +188,12 @@ class PublicationBiasDialog(
         self._eligibility_report = report
         self.context_label.setText(self._context_summary(report))
         available = [item for item in report.methods if item.available]
-        if available:
-            primary = [
-                _TEST_LABELS.get(item.method, item.method)
-                for item in available
-                if item.role == "primary"
-            ]
-            additional = [
-                _TEST_LABELS.get(item.method, item.method)
-                for item in available
-                if item.role != "primary"
-            ]
-            lines = []
-            if primary:
-                lines.append("Primary: " + ", ".join(primary))
-            if additional:
-                lines.append("Additional: " + ", ".join(additional))
-            self.automatic_test_label.setText("\n".join(lines))
-        else:
+        if not available:
             self.automatic_test_label.setText(
                 "No formal asymmetry test is available for this effect measure."
             )
+            return
+        self.automatic_test_label.setText(_available_method_text(available))
 
     def _context_summary(self, report=None) -> str:
         data_type = str(self.model.get_current_outcome_type())
@@ -328,7 +337,7 @@ class PublicationBiasDialog(
         self.failure_label.clear()
         self.failure_label.setVisible(False)
         try:
-            result = execute_small_study_effects(self.model, self._request())
+            result = self.analysis_service.execute(self.model, self._request())
             owner = self.parentWidget()
             callback = getattr(owner, "analysis", None)
             if not callable(callback):

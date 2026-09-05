@@ -11,15 +11,19 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Any, cast
+from collections.abc import Callable
 
 
-_killpg = cast(Any, getattr(os, "killpg", None))
-_getpgid = cast(Any, getattr(os, "getpgid", None))
-_sigkill = cast(Any, getattr(signal, "SIGKILL", None))
+_killpg: Callable[[int, int | signal.Signals], None] | None = getattr(
+    os, "killpg", None
+)
+_getpgid: Callable[[int], int] | None = getattr(os, "getpgid", None)
+_sigkill: int = getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
 def _process_group_exists(process_group_id: int) -> bool:
+    if _killpg is None:
+        raise RuntimeError("process groups are unavailable on this platform")
     try:
         _killpg(process_group_id, 0)
         return True
@@ -40,26 +44,48 @@ def _wait_for_group_exit(process_group_id: int, timeout_seconds: float) -> bool:
     return not _process_group_exists(process_group_id)
 
 
-def _terminate_posix_group(process: subprocess.Popen[bytes]) -> None:
-    process_group_id = _getpgid(process.pid)
+def _terminate_process_group(
+    process: subprocess.Popen[bytes],
+    process_group_id: int,
+    killpg: Callable[[int, int | signal.Signals], None],
+) -> bool:
     try:
-        _killpg(process_group_id, signal.SIGTERM)
+        killpg(process_group_id, signal.SIGTERM)
     except ProcessLookupError:
         process.wait(timeout=1)
-        return
+        return False
     try:
         process.wait(timeout=1)
     except subprocess.TimeoutExpired:
         pass
+    return True
+
+
+def _kill_surviving_group(
+    process: subprocess.Popen[bytes],
+    process_group_id: int,
+    killpg: Callable[[int, int | signal.Signals], None],
+) -> None:
     if _process_group_exists(process_group_id):
         try:
-            _killpg(process_group_id, _sigkill)
+            killpg(process_group_id, _sigkill)
         except ProcessLookupError:
-            pass
+            return
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("package process-group leader survived SIGKILL") from exc
+
+
+def _terminate_posix_group(process: subprocess.Popen[bytes]) -> None:
+    if _getpgid is None or _killpg is None:
+        raise RuntimeError("process groups are unavailable on this platform")
+    assert _killpg is not None
+    process_group_id = _getpgid(process.pid)
+    killpg = _killpg
+    if not _terminate_process_group(process, process_group_id, killpg):
+        return
+    _kill_surviving_group(process, process_group_id, killpg)
     if not _wait_for_group_exit(process_group_id, 5):
         raise RuntimeError("package process group remained alive after SIGKILL")
 

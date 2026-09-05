@@ -5,17 +5,12 @@ from pathlib import Path
 import pytest
 
 
-# Python verification tests run without a live R backend; use the pure-Python stub.
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
+# Python verification tests inject a local fake at the R bridge seam.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
-
-from rc_metastudio import r_backend
-
-r_backend.install_stub_r_bridge()
 
 _QAPPLICATION = None
 

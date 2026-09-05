@@ -16,16 +16,12 @@ TARGETS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TARGETS)
 
 
-def test_shared_target_manifest_defines_both_native_macos_builds():
-    x64 = TARGETS.load_target("x64")
+def test_shared_target_manifest_defines_apple_silicon_macos_build():
     arm64 = TARGETS.load_target("arm64")
 
-    assert x64["machine"] == "x86_64"
-    assert x64["runner"] == "macos-15-intel"
     assert arm64["machine"] == "arm64"
     assert arm64["runner"] == "macos-15"
-    assert x64["minimum_macos"] == arm64["minimum_macos"] == "14.0"
-    assert x64["r_url"].endswith("R-4.6.1-x86_64.pkg")
+    assert arm64["minimum_macos"] == "14.0"
     assert arm64["r_url"].endswith("R-4.6.1-arm64.pkg")
     assert arm64["r_component_identifier"] == "org.R-project.R.fw.pkg"
     assert arm64["r_sha256"] == (
@@ -45,73 +41,42 @@ def test_target_manifest_rejects_silent_architecture_drift(tmp_path: Path):
         TARGETS.load_target("arm64", path)
 
 
-def test_public_macos_command_accepts_both_architectures_from_the_manifest():
+def test_public_macos_command_accepts_only_apple_silicon_from_the_manifest():
     wrapper = (ROOT / "scripts/package-macos.sh").read_text(encoding="utf-8")
 
     assert "resolve_macos_package_target.py" in wrapper
-    assert "x64|arm64)" in wrapper
-    assert "Issue #342 packages macOS Intel only" not in wrapper
+    assert "arm64)" in wrapper
+    assert "x64|arm64)" not in wrapper
 
 
-def test_reusable_workflow_is_a_two_architecture_native_matrix():
+def test_reusable_workflow_is_an_apple_silicon_native_matrix():
     workflow = load_workflow(".github/workflows/package-target.yml")
     matrix = workflow["jobs"]["package"]["strategy"]["matrix"]["include"]
     assert [
         {key: item[key] for key in ("target", "architecture", "runner")}
         for item in matrix
-    ] == [
-        {"target": "macos-x64", "architecture": "x64", "runner": "macos-15-intel"},
-        {"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"},
-    ]
+    ] == [{"target": "macos-arm64", "architecture": "arm64", "runner": "macos-15"}]
 
 
 def test_first_green_gate_uses_the_bcg_packaged_workflow():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
 
     assert 'sample_path="$sample_root/BCG.rcms"' in build
-    assert (
-        '--automation-native-smoke "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
-        in build
-    )
-    assert (
-        '--automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"'
-        in build
-    )
-    assert "--automation-native-smoke" in build
+    assembler = (ROOT / "scripts/assemble_packaged_smoke_evidence.py").read_text(encoding="utf-8")
+    assert '--automation-package-open-report' in assembler
+    assert '--automation-package-analyze' in assembler
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
 
-def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition():
+def test_both_native_packages_use_the_positional_startup_transition():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
-    automation_source = (ROOT / "src/rc_metastudio/automation.py").read_text(
-        encoding="utf-8"
-    )
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
         encoding="utf-8"
     )
-    trusted_workflow = (
-        ROOT / ".github/workflows/macos-trusted-release-candidate.yml"
-    ).read_text(encoding="utf-8")
-
-    assert build.count("--automation-startup-wizard-smoke") == 2
-    assert (
-        'startup_wizard_evidence_path="$qualification_root/startup-wizard-smoke.json"'
-        in build
-    )
-    assert (
-        'extracted_wizard="$qualification_root/extracted-startup-wizard-smoke.json"'
-        in build
-    )
-    assert 'evidence.get("platform_plugin") != "cocoa"' in build
-    assert 'not evidence.get("passed")' in build
-    assert "handle.isExposed()" in automation_source
-    assert "geometry.width() <= 0 or geometry.height() <= 0" in automation_source
-    assert '"rows": model.rowCount() if model is not None else 0' in automation_source
+    assert "--automation-startup-wizard-smoke" not in build
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
-    assert trust.count("--automation-startup-wizard-smoke") == 1
-    assert "qualified/diagnostics/startup-wizard.json" in trusted_workflow
-    assert 'evidence.get("platform_plugin") == "cocoa"' in trusted_workflow
+    assert "--automation-startup-wizard-smoke" not in trust
 
 
 def test_source_r_packages_link_against_the_private_staged_runtime():
@@ -221,3 +186,4 @@ def test_arm64_launcher_adapter_rejects_intel_build_metadata():
     wrapper = launchers.private_config("arm64")
     assert "/opt/R/arm64/lib" in wrapper
     assert "/opt/R/x86_64/lib" not in wrapper
+

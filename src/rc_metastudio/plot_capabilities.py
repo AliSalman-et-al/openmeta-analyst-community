@@ -115,7 +115,7 @@ def validate_result(result: Mapping[str, object]) -> dict[str, PlotCapability]:
     missing_params = sorted(
         title
         for title, descriptor in normalized.items()
-        if descriptor["editable"] and title not in params_paths
+        if descriptor.editable and title not in params_paths
     )
     if missing_params:
         raise ValueError(
@@ -157,6 +157,33 @@ def _descriptor_mapping(value: object) -> dict[str, dict[str, object]]:
 
 
 def _validate_descriptor(title: str, descriptor: dict[str, object]) -> PlotCapability:
+    plot_kind, editable, styleable, composition, regenerator = _descriptor_values(title, descriptor)
+    regenerator_name(regenerator)
+    _validate_plot_rules(title, plot_kind, editable, styleable, regenerator)
+    return PlotCapability(
+        plot_kind=plot_kind,
+        editable=editable,
+        styleable=styleable,
+        composition=composition,
+        regenerator=regenerator,
+    )
+
+
+def _descriptor_values(
+    title: str, descriptor: dict[str, object]
+) -> tuple[PlotKind, bool, bool, PlotComposition, PlotRegenerator]:
+    _validate_descriptor_fields(title, descriptor)
+    editable, styleable = _descriptor_flags(title, descriptor)
+    return (
+        _plot_kind(descriptor["plot_kind"], title),
+        editable,
+        styleable,
+        _composition(descriptor["composition"], title),
+        _regenerator(descriptor["regenerator"], title),
+    )
+
+
+def _validate_descriptor_fields(title: str, descriptor: dict[str, object]) -> None:
     if not isinstance(descriptor, dict):
         raise ValueError("Plot capability descriptor for %s must be a mapping" % title)
     missing = [field for field in REQUIRED_FIELDS if field not in descriptor]
@@ -167,16 +194,24 @@ def _validate_descriptor(title: str, descriptor: dict[str, object]) -> PlotCapab
             % (title, ", ".join(missing) or "none", ", ".join(extra) or "none")
         )
 
-    plot_kind = _plot_kind(descriptor["plot_kind"], title)
+
+def _descriptor_flags(title: str, descriptor: dict[str, object]) -> tuple[bool, bool]:
     editable = descriptor["editable"]
     styleable = descriptor["styleable"]
     if not isinstance(editable, bool):
         raise ValueError("editable for %s must be boolean" % title)
     if not isinstance(styleable, bool):
         raise ValueError("styleable for %s must be boolean" % title)
-    composition = _composition(descriptor["composition"], title)
-    regenerator = _regenerator(descriptor["regenerator"], title)
-    regenerator_name(regenerator)
+    return editable, styleable
+
+
+def _validate_plot_rules(
+    title: str,
+    plot_kind: PlotKind,
+    editable: bool,
+    styleable: bool,
+    regenerator: str,
+) -> None:
     if editable and regenerator == "none":
         raise ValueError("Editable plot %s requires a regenerator" % title)
     if editable and plot_kind not in REGENERATORS[regenerator]["plot_kinds"]:
@@ -186,13 +221,6 @@ def _validate_descriptor(title: str, descriptor: dict[str, object]) -> PlotCapab
         )
     if styleable and not option_groups(plot_kind):
         raise ValueError("Styleable plot %s requires option groups" % title)
-    return {
-        "plot_kind": plot_kind,
-        "editable": editable,
-        "styleable": styleable,
-        "composition": composition,
-        "regenerator": regenerator,
-    }
 
 
 def _plot_kind(value: object, title: str) -> PlotKind:

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 import copy
 import hashlib
 import json
@@ -8,13 +10,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from rc_metastudio.qt6_macos_feasibility import (
-    EvidenceError,
-    _archs,
+from scripts.macos_evidence import EvidenceError, _archs, validate_evidence
+from scripts.qt6_macos_feasibility_impl import (
     append_github_env,
     discover_macos_rcc,
     discover_rpy2_native_extensions,
-    validate_evidence,
 )
 
 
@@ -340,7 +340,7 @@ def _materialize_retained_evidence(evidence: dict, root: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("target", ["macos-x64", "macos-arm64"])
+@pytest.mark.parametrize("target", ["macos-arm64"])
 def test_native_macos_evidence_accepts_the_complete_locked_contract(target):
     validate_evidence(_valid_evidence(target), target)
 
@@ -349,7 +349,7 @@ def test_macho_architecture_parser_reads_thin_and_universal_without_lipo(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility.subprocess.run",
+        "scripts.qt6_macos_feasibility_impl.subprocess.run",
         lambda *_args, **_kwargs: pytest.fail("Mach-O parsing must not invoke lipo"),
     )
     for index, magic in enumerate((b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe")):
@@ -518,12 +518,6 @@ def test_native_macos_workflow_uses_one_ordered_native_package_matrix():
 
     assert targets == [
         {
-            "target": "macos-x64",
-            "architecture": "x64",
-            "runner": "macos-15-intel",
-            "artifact": "RCMetaStudio-macos-x64",
-        },
-        {
             "target": "macos-arm64",
             "architecture": "arm64",
             "runner": "macos-15",
@@ -647,7 +641,7 @@ def test_native_macos_evidence_recomputes_retained_diagnostic_hashes(
     evidence = _valid_evidence()
     _materialize_retained_evidence(evidence, tmp_path)
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     validate_evidence(evidence, "macos-arm64", evidence_dir=tmp_path)
 
@@ -660,7 +654,7 @@ def test_native_macos_evidence_rejects_invented_hashes_and_missing_artifacts(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     invented = _valid_evidence()
     invented_root = tmp_path / "invented"
@@ -693,7 +687,7 @@ def test_pyinstaller_plan_rejects_split_equals_and_ambiguous_collection_options(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     forbidden_arguments = [
         ["--add-binary", "/tmp/QtCore:/Qt"],
@@ -725,7 +719,7 @@ def test_pyinstaller_plan_accepts_native_macos_paths_when_validated_on_any_host(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     evidence = _valid_evidence()
     _materialize_retained_evidence(evidence, tmp_path)
@@ -749,7 +743,7 @@ def test_pyinstaller_plan_rejects_noncanonical_feasibility_specification(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     unsafe_specifications = [
         "relative/qt6-macos-feasibility.spec",
@@ -777,7 +771,7 @@ def test_deployment_inventory_rejects_incoherent_qt_payloads_and_aliases(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
 
     def second_payload(files):
@@ -977,7 +971,7 @@ def test_deployment_inventory_requires_exact_qt_directory_aliases(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
 
     def wrong_target(files):
@@ -1071,7 +1065,7 @@ def test_deployment_inventory_requires_exact_qt_directory_aliases(
 
 def test_deployment_inventory_rejects_displaced_runtime_symlinks(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     forged_paths = [
         "Contents/Frameworks/shiboken6/Shiboken.abi3.so",
@@ -1119,7 +1113,7 @@ def test_deployment_inventory_allows_unrelated_shiboken_prose_and_data(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     evidence = _valid_evidence()
     _materialize_retained_evidence(evidence, tmp_path)
@@ -1151,7 +1145,7 @@ def test_deployment_inventory_allows_unrelated_shiboken_prose_and_data(
 
 def test_deployment_inventory_rejects_noncanonical_record_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     forged_paths = [
         "",
@@ -1186,7 +1180,7 @@ def test_deployment_inventory_rejects_noncanonical_resolved_paths(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     forged_paths = [
         "/Contents/Frameworks/PyQt6",
@@ -1223,7 +1217,7 @@ def test_deployment_inventory_resolves_a_long_symlink_chain_iteratively(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
     evidence = _valid_evidence()
     _materialize_retained_evidence(evidence, tmp_path)
@@ -1255,7 +1249,7 @@ def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(
-        "rc_metastudio.qt6_macos_feasibility._archs", lambda _path: ["arm64"]
+        "scripts.macos_evidence._archs", lambda _path: ["arm64"]
     )
 
     def forged_escape(files):
@@ -1361,3 +1355,4 @@ def test_deployment_inventory_resolves_symlink_graph_and_rejects_forgery(
 
         with pytest.raises(EvidenceError, match=expected_error):
             validate_evidence(evidence, "macos-arm64", evidence_dir=root)
+

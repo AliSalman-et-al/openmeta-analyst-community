@@ -28,7 +28,7 @@ binary_preparation_params <- function(target) {
 run_prepared_binary <- function(method, target, workflow="standard") {
   rcmetar.run.analysis(
     binary_preparation_fixture(),
-    list(method=method, params=binary_preparation_params(target), workflow=workflow)
+    list(version=1, method=method, params=binary_preparation_params(target), workflow=workflow)
   )
 }
 
@@ -89,12 +89,12 @@ test_that("single diagnostic execution uses reconstructed or entered DOR", {
                  create.plot=FALSE, write.to.file=FALSE)
   raw <- new("DiagnosticData", TP=0, FN=10, TN=20, FP=2,
               y=99, SE=.001, study.names="zero", years=2011L)
-  raw.result <- rcmetar.run.analysis(raw, list(method="diagnostic.fixed.inv.var", params=params))
+  raw.result <- rcmetar.run.analysis(raw, list(version=1, method="diagnostic.fixed.inv.var", params=params))
   expected <- rcmetar.prepare.analysis.data(raw, params)
   expect_equal(raw.result$Summary$MAResults$b[[1]], expected@y[[1]], tolerance=1e-12)
 
   entered <- new("DiagnosticData", y=.7, SE=.2, study.names="entered", years=2011L)
-  entered.result <- rcmetar.run.analysis(entered, list(method="diagnostic.fixed.inv.var", params=params))
+  entered.result <- rcmetar.run.analysis(entered, list(version=1, method="diagnostic.fixed.inv.var", params=params))
   expect_equal(entered.result$Summary$MAResults$b[[1]], .7, tolerance=1e-12)
 })
 
@@ -130,7 +130,7 @@ test_that("Peto remains count-native and entered effect-only data stay unchanged
   prepared <- rcmetar.prepare.analysis.data(entered, params)
   expect_identical(prepared@y, entered@y)
   expect_identical(prepared@SE, entered@SE)
-  result <- rcmetar.run.analysis(entered, list(method="binary.fixed.peto", params=params))
+  result <- rcmetar.run.analysis(entered, list(version=1, method="binary.fixed.peto", params=params))
   expect_equal(result$Summary$b[[1]], .2, tolerance=1e-12)
 })
 

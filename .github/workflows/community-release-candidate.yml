@@ -29,9 +29,6 @@ jobs:
           - target: windows-x64
             runner: windows-2025
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            runner: macos-15-intel
-            artifact: RCMetaStudio-macos-x64.zip
           - target: macos-arm64
             runner: macos-15
             artifact: RCMetaStudio-macos-arm64.zip
@@ -62,7 +59,7 @@ jobs:
           if ($releaseSet.trust_profile -ne 'unsigned-community') { throw "Candidate trust profile is $($releaseSet.trust_profile), expected unsigned-community." }
           if ($releaseSet.version -ne $env:EXPECTED_VERSION) { throw "Candidate version is $($releaseSet.version), expected $env:EXPECTED_VERSION." }
           if ($releaseSet.source.commit -ne $env:EXPECTED_SOURCE_SHA) { throw "Candidate source is $($releaseSet.source.commit), expected $env:EXPECTED_SOURCE_SHA." }
-          if (($releaseSet.release_targets -join ',') -ne 'windows-x64,macos-x64,macos-arm64') { throw "Candidate release targets must contain all three native targets." }
+          if (($releaseSet.release_targets -join ',') -ne 'windows-x64,macos-arm64') { throw "Candidate release targets must contain exactly Windows x64 and Apple silicon macOS." }
       - name: Expand unsigned Windows artifact
         if: matrix.target == 'windows-x64'
         shell: pwsh
@@ -80,16 +77,25 @@ jobs:
           New-Item -ItemType Directory -Force qualified/diagnostics | Out-Null
           $env:RCMS_REQUIRE_IN_PROCESS_RPY2 = "1"
           $env:RPY2_CFFI_MODE = "API"
-          $env:QT_SCALE_FACTOR = "1.25"
-          $env:RCMS_PACKAGE_BASELINE_DPR = (Get-Content $runtimeProbe.FullName -Raw | ConvertFrom-Json).qt.baseline_device_pixel_ratio
-          $env:RCMS_PACKAGE_SMOKE_EVIDENCE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.json"
           $env:RCMS_AUTOMATION_SMOKE_LOG = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.log"
           $env:RCMS_AUTOMATION_HANG_TRACE = (Resolve-Path qualified/diagnostics).Path + "\packaged-smoke.hang-trace.log"
           Remove-Item Env:\QT_QPA_PLATFORM -ErrorAction SilentlyContinue
-          $quotedSample = '"{0}"' -f $sample.FullName
-          $process = Start-Process -FilePath $exe.FullName -ArgumentList @("--automation-native-smoke", $quotedSample) -PassThru -Wait -WindowStyle Hidden -RedirectStandardOutput qualified/diagnostics/packaged-smoke.stdout.log -RedirectStandardError qualified/diagnostics/packaged-smoke.stderr.log
-          if ($process.ExitCode -ne 0) { throw "Unsigned packaged smoke failed with exit code $($process.ExitCode)." }
-          $evidence = Get-Content $env:RCMS_PACKAGE_SMOKE_EVIDENCE -Raw | ConvertFrom-Json
+          $surfaceDirectory = Join-Path (Resolve-Path qualified/diagnostics).Path "surface-records"
+          $workflowObservation = Join-Path (Resolve-Path qualified/diagnostics).Path "workflow-observation.json"
+          $sampleObservations = Join-Path (Resolve-Path qualified/diagnostics).Path "sample-observations.json"
+          $evidencePath = Join-Path (Resolve-Path qualified/diagnostics).Path "packaged-smoke.json"
+          $sampleRoot = Split-Path $sample.FullName -Parent
+          & uv run python scripts/assemble_packaged_smoke_evidence.py `
+            --workflow-observation $workflowObservation `
+            --surface-records $surfaceDirectory `
+            --sample-observations $sampleObservations `
+            --sample amino.rcms --sample-root $sampleRoot `
+            --sample-path $sample.FullName `
+            --executable $exe.FullName --runtime-probe $runtimeProbe.FullName `
+            --surface-directory $surfaceDirectory --log-path $env:RCMS_AUTOMATION_SMOKE_LOG `
+            --output $evidencePath *> qualified/diagnostics/packaged-smoke.stdout.log
+          if ($LASTEXITCODE -ne 0) { throw "Unsigned packaged evidence assembly failed with exit code $LASTEXITCODE." }
+          $evidence = Get-Content $evidencePath -Raw | ConvertFrom-Json
           if ($evidence.passed -ne $true) { throw "Unsigned packaged smoke did not produce passing evidence." }
       - name: Expand unsigned native macOS artifact
         if: startsWith(matrix.target, 'macos-')
@@ -108,21 +114,25 @@ jobs:
           test -n "$app" && test -x "$executable" && test -n "$sample" && test -n "$runtime_probe"
           sample="$PWD/$sample"
           runtime_probe="$PWD/$runtime_probe"
-          baseline_dpr="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["qt"]["baseline_device_pixel_ratio"])' "$runtime_probe")"
           mkdir -p qualified/diagnostics
-          QT_SCALE_FACTOR=1.25 \
-            RCMS_PACKAGE_BASELINE_DPR="$baseline_dpr" \
-            RCMS_PACKAGE_SMOKE_EVIDENCE="$PWD/qualified/diagnostics/packaged-smoke.json" \
+          env -u QT_QPA_PLATFORM -u RCMS_PACKAGE_SMOKE_EVIDENCE \
+            RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
+            RCMS_R_HOME="$app/Contents/Frameworks/R.framework/Resources" \
+            RCMS_R_LIBS="$app/Contents/Frameworks/R.framework/Resources/library" \
             RCMS_AUTOMATION_SMOKE_LOG="$PWD/qualified/diagnostics/packaged-smoke.log" \
             RCMS_AUTOMATION_HANG_TRACE="$PWD/qualified/diagnostics/packaged-smoke.hang-trace.log" \
-            env -u QT_QPA_PLATFORM RCMS_REQUIRE_IN_PROCESS_RPY2=1 RPY2_CFFI_MODE=API \
-              RCMS_R_HOME="$app/Contents/Frameworks/R.framework/Resources" \
-              RCMS_R_LIBS="$app/Contents/Frameworks/R.framework/Resources/library" \
-              uv run python scripts/run_bounded_process.py --timeout-seconds 900 \
-                --stdout qualified/diagnostics/packaged-smoke.stdout.log \
-                --stderr qualified/diagnostics/packaged-smoke.stderr.log \
-                --completion-log qualified/diagnostics/packaged-smoke.log -- \
-                "$executable" --automation-native-smoke "$sample"
+            uv run python scripts/assemble_packaged_smoke_evidence.py \
+              --workflow-observation "$PWD/qualified/diagnostics/workflow-observation.json" \
+              --surface-records "$PWD/qualified/diagnostics/surface-records" \
+              --sample-observations "$PWD/qualified/diagnostics/sample-observations.json" \
+              --sample BCG.rcms --sample-root "$(dirname "$sample")" \
+              --sample-path "$sample" --executable "$executable" \
+              --runtime-probe "$runtime_probe" \
+              --surface-directory "$PWD/qualified/diagnostics/surface-records" \
+              --log-path "$PWD/qualified/diagnostics/packaged-smoke.log" \
+              --output "$PWD/qualified/diagnostics/packaged-smoke.json" \
+              > qualified/diagnostics/packaged-smoke.stdout.log \
+              2> qualified/diagnostics/packaged-smoke.stderr.log
           python3 -c 'import json,sys; evidence=json.load(open(sys.argv[1])); assert evidence.get("passed") is True' qualified/diagnostics/packaged-smoke.json
       - name: Upload RC qualification diagnostics
         if: ${{ always() }}
@@ -165,8 +175,6 @@ jobs:
         include:
           - target: windows-x64
             artifact: RCMetaStudio-windows-x64.zip
-          - target: macos-x64
-            artifact: RCMetaStudio-macos-x64.zip
           - target: macos-arm64
             artifact: RCMetaStudio-macos-arm64.zip
     runs-on: ubuntu-latest
@@ -234,8 +242,8 @@ jobs:
           test "$(jq -r .trust_profile "$manifest")" = unsigned-community
           test "$(jq -r .version "$manifest")" = "$EXPECTED_VERSION"
           test "$(jq -r .source.commit "$manifest")" = "$EXPECTED_SOURCE_SHA"
-          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-x64","macos-arm64"]'
-          for target in windows-x64 macos-x64 macos-arm64; do
+          test "$(jq -c .release_targets "$manifest")" = '["windows-x64","macos-arm64"]'
+          for target in windows-x64 macos-arm64; do
             root="release/targets/community-$target"
             for stage in assembled unsigned-qualified verified attested; do
               python scripts/delivery.py attach --manifest "$manifest" --result "$root/records/$target.$stage.json"
@@ -243,12 +251,12 @@ jobs:
           done
           python scripts/delivery.py verify --manifest "$manifest"
           python scripts/delivery.py promote --manifest "$manifest" --from-channel candidate --channel rc --output release/release-set-rc.json
-          for target in windows-x64 macos-x64 macos-arm64; do
+          for target in windows-x64 macos-arm64; do
             root="release/targets/community-$target"
             cp "$root/RCMetaStudio-$target.zip" release/
             cp "$root/$target.cdx.json" release/
           done
-          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
+          python scripts/delivery.py checksums --files release/RCMetaStudio-windows-x64.zip --files release/RCMetaStudio-macos-arm64.zip --files release/windows-x64.cdx.json --files release/macos-arm64.cdx.json --output release/SHA256SUMS
       - name: Publish clearly labeled immutable unsigned RC
         env:
           GH_TOKEN: ${{ github.token }}
@@ -263,4 +271,4 @@ jobs:
           else
             tag_args=(--target "${{ inputs.source_sha }}")
           fi
-          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned community builds.\n\nWindows x64, macOS Intel x64, and macOS Apple Silicon artifacts were built once on native runners, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested. The immutable unsigned artifacts are suitable inputs for a future no-rebuild signing stage.'
+          gh release create "$TAG" release/RCMetaStudio-*.zip release/*.cdx.json release/SHA256SUMS release/release-set-rc.json "${tag_args[@]}" --prerelease --title "RC MetaStudio ${{ inputs.version }}" --notes $'**Signing status:** Unsigned community builds.\n\nWindows x64 and Apple silicon macOS artifacts were built once on native runners, package-smoke tested, SBOM inventoried, checksummed, and provenance-attested. The immutable unsigned artifacts are suitable inputs for a future no-rebuild signing stage.'

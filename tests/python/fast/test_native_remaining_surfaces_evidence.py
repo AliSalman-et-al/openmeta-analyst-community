@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Behavioral contracts for native Qt surface evidence."""
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ from pathlib import Path
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -355,7 +356,7 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
     qapp.processEvents()
     try:
         observation = native_smoke._observe_focus_traversal(
-            qapp, dialog, QtCore, QtGui, QtWidgets
+            qapp, dialog
         )
     finally:
         dialog.close()
@@ -367,24 +368,15 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
 
 
 def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp):
-    from rc_metastudio import r_backend
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
-    # Do not replace a backend already shared by modules collected earlier in
-    # this process. The isolated test still installs the stub on hosts without
-    # an initialized R backend.
-    if r_backend._registered_backend() is None:
-        r_backend.install_stub_r_bridge()
     from rc_metastudio import main_wizard
 
     actions = native_smoke._observe_actions(
         qapp,
         lambda: main_wizard.MainWizard(path="new_dataset"),
         "main-wizard",
-        QtCore,
-        QtWidgets,
-        QTest,
     )
 
     assert actions == {

@@ -1,24 +1,29 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
+import os
 import sys
 import time
 from pathlib import Path
+
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QSplashScreen
 
-import os
-
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 
-from rc_metastudio import meta_globals, r_backend
-
-r_backend.install_r_backend()
-from rc_metastudio import adaptive_window, app_error_handler, qt6_resources, settings
+from rc_metastudio import (
+    adaptive_window,
+    app_error_handler,
+    meta_globals,
+    qt6_resources,
+    r_backend,
+    settings,
+)
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
@@ -109,8 +114,6 @@ def _startup_project_path(argv):
     index = 1
     while index < len(args):
         arg = args[index]
-        if arg in ("--automation-smoke", "--automation-native-smoke"):
-            return None
         if arg in {
             "--automation-startup-completion-marker",
             "--automation-pid-file",
@@ -160,6 +163,7 @@ def _emit_automation_phase(phase_callback, phase):
 
 def load_R_libraries(app, splash=None, phase_callback=None):
     """Loads the R libraries while updating the splash screen"""
+    r_backend.install_r_backend()
     from rc_metastudio import r_bridge
 
     def _status(message):
@@ -184,66 +188,90 @@ def load_R_libraries(app, splash=None, phase_callback=None):
     rloader.load_rcmetar()
     _emit_automation_phase(phase_callback, "r-library:RCMetaR:complete")
 
-    _status("Loading igraph\n............")
-    _emit_automation_phase(phase_callback, "r-library:igraph:start")
-    rloader.load_igraph()
-    _emit_automation_phase(phase_callback, "r-library:igraph:complete")
-
     _status("Loading grid\n................")
     _emit_automation_phase(phase_callback, "r-library:grid:start")
     rloader.load_grid()
     _emit_automation_phase(phase_callback, "r-library:grid:complete")
 
-    from rc_metastudio import main_window
 
-    if not main_window.NETWORK_ANALYSIS_DISABLED:
-        _status("Loading gemtc\n...................")
-        rloader.load_gemtc()
+def _write_automation_pid(startup_argv):
+    pid_path = _argument_value(startup_argv, "--automation-pid-file") or os.environ.get(
+        "RCMS_AUTOMATION_PID_FILE"
+    )
+    if pid_path:
+        Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
+
+
+def _is_automation_command(startup_argv):
+    return (
+        len(startup_argv) > 1
+        and startup_argv[1].startswith("--automation-")
+        and startup_argv[1] != "--automation-startup-project-smoke"
+    )
+
+
+def _open_startup_project(app, meta, project_path, startup_argv):
+    opened = meta.open(project_path)
+    smoke_requested = (
+        os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
+        or "--automation-startup-project-smoke" in startup_argv
+    )
+    if not smoke_requested:
+        return False, None
+
+    return True, _finish_startup_project(
+        app,
+        meta,
+        project_path,
+        opened,
+        completion_marker=_argument_value(
+            startup_argv, "--automation-startup-completion-marker"
+        ),
+    )
+
+
+def _finish_startup_project(app, window, project_path, opened, *, completion_marker=None):
+    """Finish the positional startup path and optionally write its marker."""
+    if not opened or window.tableView.model().rowCount() < 1:
+        raise SystemExit("startup project did not open: %s" % project_path)
+    if completion_marker:
+        Path(completion_marker).write_text(
+            json.dumps({"project": Path(project_path).name}) + "\n", encoding="utf-8"
+        )
+    _mark_startup_workspace_saved(window)
+    window.close()
+    app.processEvents()
+    app.quit()
+    return 0
+
+
+def _mark_startup_workspace_saved(window):
+    workspace = getattr(window, "workspace", None)
+    if workspace is not None and workspace.document is not None:
+        workspace.mark_saved()
 
 
 def start():
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
-    pid_path = os.environ.get("RCMS_AUTOMATION_PID_FILE")
     startup_argv = _resolve_startup_argv()
-    pid_path = _argument_value(startup_argv, "--automation-pid-file") or pid_path
-    if pid_path:
-        Path(pid_path).write_text(str(os.getpid()) + "\n", encoding="utf-8")
-    if (
-        len(startup_argv) > 1
-        and startup_argv[1].startswith("--automation-")
-        and startup_argv[1] != "--automation-startup-project-smoke"
-    ):
+    _write_automation_pid(startup_argv)
+    if _is_automation_command(startup_argv):
         from rc_metastudio import automation
 
         return automation.dispatch(startup_argv)
     startup_project_path = _startup_project_path(startup_argv)
-    main_window = _import_main_window()
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    _configure_application(app)
     baseline_ids = _top_level_ids(app)
+    meta = None
     try:
-        settings.setup_directories()
-        meta = _create_interactive_shell(app, main_window.MainWindow, load_R_libraries)
+        app, meta = compose_application(app=app, interactive=True)
         if startup_project_path:
-            opened = meta.open(startup_project_path)
-            if (
-                os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1"
-                or "--automation-startup-project-smoke" in startup_argv
-            ):
-                from rc_metastudio.automation import (
-                    assert_opened_project_for_startup_smoke,
-                )
-
-                return assert_opened_project_for_startup_smoke(
-                    app,
-                    meta,
-                    startup_project_path,
-                    opened,
-                    completion_marker=_argument_value(
-                        startup_argv, "--automation-startup-completion-marker"
-                    ),
-                )
+            handled, result = _open_startup_project(
+                app, meta, startup_project_path, startup_argv
+            )
+            if handled:
+                return result
         else:
             if os.environ.get("RCMS_STARTUP_PROJECT_SMOKE") == "1":
                 raise SystemExit(
@@ -252,31 +280,80 @@ def start():
             meta.start()
         return app.exec()
     finally:
-        _dispose_new_top_levels(app, baseline_ids)
+        if app is not None:
+            _dispose_new_top_levels(app, baseline_ids, (meta,) if meta is not None else ())
 
 
-def _create_interactive_shell(app, meta_factory, r_loader):
-    """Create splash and shell with fail-closed ownership transfer."""
+def compose_application(
+    *, app=None, phase_callback=None, interactive=False,
+    main_window_loader=None, r_loader=None
+):
+    """Compose the application shell used by startup and qualification hooks."""
+    qt6_resources.ensure_application_resources()
+    app_error_handler.install_global_exception_handler()
+    app, main_window = _prepare_composition(app, main_window_loader)
+    _emit_automation_phase(phase_callback, "application:configured")
     baseline_ids = _top_level_ids(app)
     splash = None
     try:
-        splash = create_startup_splash()
-        splash.show()
-        splash_starttime = time.time()
-        r_loader(app, splash)
-
-        time_elapsed = time.time() - splash_starttime
-        if time_elapsed < SPLASH_DISPLAY_TIME:
-            QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
-
-        meta = meta_factory()
-        splash.finish(meta)
-        _show_main_window(meta)
-        _dispose_qobjects(app, (splash,))
-        return meta
+        settings.setup_directories()
+        splash = _load_composition_runtime(
+            app,
+            interactive=interactive,
+            phase_callback=phase_callback,
+            r_loader=r_loader,
+        )
+        meta = _finish_composition(app, main_window, splash=splash)
+        return app, meta
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids, (splash,))
         raise
+
+
+def _prepare_composition(app, main_window_loader):
+    r_backend.install_r_backend()
+    main_window = main_window_loader or _import_main_window()
+    if app is None:
+        app = app_error_handler.get_or_create_application(sys.argv)
+    configure_application(app)
+    return app, main_window
+
+
+def _load_composition_runtime(
+    app, *, interactive, phase_callback, r_loader
+):
+    loader = r_loader or load_R_libraries
+    if not interactive:
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            _invoke_r_loader(loader, app, None, phase_callback)
+        return None
+
+    splash = create_startup_splash()
+    splash.show()
+    splash_starttime = time.time()
+    _invoke_r_loader(loader, app, splash, phase_callback)
+    time_elapsed = time.time() - splash_starttime
+    if time_elapsed < SPLASH_DISPLAY_TIME:
+        QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
+    return splash
+
+
+def _invoke_r_loader(loader, app, splash, phase_callback):
+    if phase_callback is None:
+        loader(app, splash)
+    else:
+        loader(app, splash, phase_callback=phase_callback)
+
+
+def _finish_composition(app, main_window, *, splash):
+    meta = main_window.MainWindow()
+    if splash is not None:
+        splash.finish(meta)
+    meta.workspace.mark_saved()
+    _show_main_window(meta)
+    if splash is not None:
+        dispose_qobjects(app, (splash,))
+    return meta
 
 
 def _top_level_ids(app):
@@ -288,10 +365,10 @@ def _dispose_new_top_levels(app, baseline_ids, known=()):
     owned.extend(
         widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
     )
-    _dispose_qobjects(app, owned)
+    dispose_qobjects(app, owned)
 
 
-def _dispose_qobjects(app, objects):
+def dispose_qobjects(app, objects):
     """Hide and delete owned Qt objects without invoking user close prompts."""
     unique = {id(obj): obj for obj in objects if obj is not None}
     for obj in unique.values():
@@ -320,7 +397,7 @@ def _set_application_icon(app):
     app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
 
 
-def _configure_application(app):
+def configure_application(app):
     """Apply the complete process-wide application identity exactly once."""
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setApplicationDisplayName(meta_globals.APPLICATION_DISPLAY_NAME)

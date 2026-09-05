@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import faulthandler
-import json
 import hashlib
+import json
 import math
 import os
-from pathlib import Path
-from pathlib import PurePosixPath
 import sys
-from typing import Any, Callable, TextIO
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
+from typing import Protocol, TextIO
 
 from rc_metastudio import automation
 
@@ -20,16 +21,23 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from rc_metastudio.qt6_resources import ensure_application_resources
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from rc_metastudio.runtime_types import required
+from rc_metastudio.workspace_session import WorkspaceSession
+
+
+class AutomationWindow(Protocol):
+    workspace: WorkspaceSession
+
+    def close(self) -> bool: ...
 
 
 def _phase(name: str) -> None:
     print("RCMS_NATIVE_CALCULATOR_PHASE " + name, flush=True)
 
 
-def _install_backend_stub(
+def _install_backend_test_double(
     backend: object, name: str, implementation: Callable[..., object]
 ) -> None:
-    """Install a deliberate runtime test double at the R backend seam."""
+    """Patch one explicitly selected R bridge operation for this smoke test."""
     setattr(backend, name, implementation)
 
 
@@ -102,13 +110,11 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
     encoded.save(path, format="PNG")
 
 
-def install_native_stub_backend() -> Any:
-    """Install and verify the calculator smoke's non-R backend boundary."""
-    from rc_metastudio import r_backend
+def install_native_test_backend() -> SimpleNamespace:
+    """Create the calculator smoke's explicit local test backend."""
+    from local_r_test_backend import create
 
-    backend = r_backend.install_stub_r_bridge()
-    if getattr(backend, "_rcms_stub_backend", False) is not True:
-        raise RuntimeError("native calculator smoke did not install the stub backend")
+    backend = create()
     if "rpy2.rinterface" in sys.modules:
         raise RuntimeError(
             "rpy2.rinterface loaded before native calculator GUI imports"
@@ -118,13 +124,14 @@ def install_native_stub_backend() -> Any:
 
 
 def close_automation_window(
-    app: QtWidgets.QApplication, window: QtWidgets.QWidget
+    app: QtWidgets.QApplication, window: AutomationWindow
 ) -> None:
     """Close without triggering last-window quit or pumping teardown events."""
     previous_auto_quit = app.quitOnLastWindowClosed()
     app.setQuitOnLastWindowClosed(False)
     try:
-        setattr(window, "current_data_unsaved", False)
+        workspace = window.workspace
+        workspace.mark_saved()
         _phase("close-entry")
         window.close()
         _phase("close-return")
@@ -197,103 +204,108 @@ def _run_main() -> int:
     prepare_generated_ui_imports()
     ensure_application_resources()
     repo_root = Path(__file__).resolve().parents[1]
-    install_native_stub_backend()
+    backend = install_native_test_backend()
 
     from rc_metastudio import (
+        app_error_handler,
         binary_data_dialog,
         continuous_data_dialog,
-        diagnostic_data_dialog,
         dataset_table_model,
+        diagnostic_data_dialog,
+        r_bridge,
     )
 
-    _install_backend_stub(
-        binary_data_dialog.r_bridge,
+    for name, implementation in vars(backend).items():
+        setattr(r_bridge, name, implementation)
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
+    _install_backend_test_double(
+        r_bridge,
         "get_confidence_multiplier_from_r",
         lambda _level: 1.96,
     )
     setattr(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
-        binary_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "impute_binary_data",
         lambda _data: {"FAIL": True},
     )
-    _install_backend_stub(
-        binary_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
     )
     setattr(
-        binary_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     setattr(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
-        continuous_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "impute_continuous_data",
         lambda _data, _alpha: {
             "succeeded": False,
             "comment": "complete input",
         },
     )
-    _install_backend_stub(
-        continuous_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "continuous_effect_for_study",
         lambda *_args, **_kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
     )
     setattr(
-        continuous_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
-    _install_backend_stub(
-        continuous_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "back_calculate_continuous_data",
         lambda *_args, **_kwargs: {"FAIL": True},
     )
     setattr(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
-    _install_backend_stub(
-        diagnostic_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "impute_diagnostic_data",
         lambda _data: {"TP": None, "FP": None, "FN": None, "TN": None},
     )
-    _install_backend_stub(
-        diagnostic_data_dialog.r_bridge,
+    _install_backend_test_double(
+        r_bridge,
         "diagnostic_effects_for_study",
         lambda *_args, metrics, **_kwargs: {
             metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
         },
     )
     setattr(
-        diagnostic_data_dialog.r_bridge,
+        r_bridge,
         "effect_triplet",
         lambda result, scale, metric=None: result[scale],
     )
     setattr(diagnostic_data_dialog.QMessageBox, "warning", lambda *args, **kwargs: None)
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "binary_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "continuous_convert_scale",
         lambda value, *args, **kwargs: value,
     )
     setattr(
-        dataset_table_model.r_bridge,
+        r_bridge,
         "diagnostic_convert_scale",
         lambda value, *args, **kwargs: value,
     )
@@ -338,9 +350,9 @@ def _run_main() -> int:
             else:
                 unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
             before = list(unit.get_raw_data_for_group(model.current_groups[0]))
-            table_view.undoStack.clear()
-            table_view.undoStack.setClean()
-            window.current_data_unsaved = False
+            window.workspace.mark_saved()
+            baseline_can_undo = window.workspace.can_undo
+            baseline_digest = window.workspace.runtime_digest
             captured: list[dict[str, object]] = []
             callback_errors: list[BaseException] = []
 
@@ -480,17 +492,35 @@ def _run_main() -> int:
             if data_type == "diagnostic" and after != before:
                 raise RuntimeError("diagnostic cancel mutated the model")
             accepted = data_type != "diagnostic"
-            if table_view.undoStack.count() != int(accepted):
+            expected_can_undo = True if accepted else baseline_can_undo
+            if window.workspace.can_undo is not expected_can_undo:
                 raise RuntimeError(
                     "calculator transaction created the wrong undo state"
                 )
-            if window.current_data_unsaved is not accepted:
+            if window.workspace.is_dirty is not accepted:
                 raise RuntimeError(
                     "calculator transaction created the wrong dirty state"
                 )
+            if accepted:
+                accepted_digest = window.workspace.runtime_digest
+                if not window.workspace.undo():
+                    raise RuntimeError("calculator undo did not execute")
+                if window.workspace.runtime_digest != baseline_digest:
+                    raise RuntimeError("calculator undo did not restore the workspace")
+                if (
+                    window.workspace.can_undo is not baseline_can_undo
+                    or not window.workspace.can_redo
+                ):
+                    raise RuntimeError("calculator undo state is incorrect")
+                if not window.workspace.redo():
+                    raise RuntimeError("calculator redo did not execute")
+                if window.workspace.runtime_digest != accepted_digest:
+                    raise RuntimeError("calculator redo did not restore the edit")
+                if not window.workspace.can_undo or window.workspace.can_redo:
+                    raise RuntimeError("calculator redo state is incorrect")
             captured[0]["model_after"] = list(after)
             captured[0]["model_nonmutation"] = not accepted
-            captured[0]["undo_commands"] = table_view.undoStack.count()
+            captured[0]["undo_available"] = window.workspace.can_undo
             evidence.extend(captured)
     except BaseException as error:
         evidence.append(
@@ -512,7 +542,6 @@ def _run_main() -> int:
 
 
 def main() -> int:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
     faulthandler.enable()
     faulthandler.dump_traceback_later(30, repeat=True)
     try:

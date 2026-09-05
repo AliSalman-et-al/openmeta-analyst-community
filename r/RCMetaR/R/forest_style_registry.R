@@ -30,20 +30,33 @@ rcmetar.forest.style <- function(params) {
 
 rcmetar.metafor.style.helper <- function(style, suffix) {
     style <- gsub("[^[:alnum:]_]+", "_", as.character(style))
-    name <- paste0("rcmetar.", style, ".", suffix)
-    if (exists(name, mode="function")) {
-        return(get(name, mode="function"))
-    }
-    NULL
+    registry <- list(
+        default = list(
+            ilab.for.data = rcmetar.default.ilab.for.data,
+            decorate.bundle = identity
+        ),
+        revman = list(
+            ilab.for.data = rcmetar.revman.ilab.for.data,
+            decorate.bundle = rcmetar.revman.decorate.bundle
+        ),
+        bmj = list(
+            ilab.for.data = rcmetar.bmj.ilab.for.data,
+            decorate.bundle = rcmetar.bmj.decorate.bundle
+        )
+    )
+    style_registry <- registry[[style]]
+    if (is.null(style_registry)) return(NULL)
+    style_registry[[suffix]]
 }
 
 rcmetar.metafor.style.renderer <- function(style) {
     style <- gsub("[^[:alnum:]_]+", "_", as.character(style))
-    name <- paste0("rcmetar.draw.", style, ".forest")
-    if (exists(name, mode="function")) {
-        return(get(name, mode="function"))
-    }
-    NULL
+    registry <- list(
+        default = rcmetar.draw.default.forest,
+        revman = rcmetar.draw.revman.forest,
+        bmj = rcmetar.draw.bmj.forest
+    )
+    registry[[style]]
 }
 
 rcmetar.param.is.true <- function(params, name, default=TRUE) {

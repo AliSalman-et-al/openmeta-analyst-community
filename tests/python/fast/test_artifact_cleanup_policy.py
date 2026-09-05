@@ -148,8 +148,8 @@ def test_gitattributes_normalizes_text_and_keeps_rcms_fixtures_binary():
 def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("RCMS_ANALYSIS_SCRATCH_DIR", str(tmp_path / "scratch"))
 
-    from rc_metastudio import golden_analysis
-    from rc_metastudio import headless_analysis
+    from tests.analysis_regression.golden.support import golden_analysis
+    from tests.analysis_regression.golden.support import headless_analysis
     from rc_metastudio import analysis_adapter
 
     created = []
@@ -177,21 +177,20 @@ def test_headless_and_golden_analysis_use_managed_scratch_paths(monkeypatch, tmp
             },
         )(),
     )
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "dataset_to_simple_binary_r_object",
-        lambda _model, **_kwargs: None,
-    )
+    def fake_versioned_request(request):
+        captured_params.append(request["params"])
+        return {"version": 1, "texts": {}, "images": {}, "sections": []}
 
-    def fake_run_binary_analysis(_method, params):
-        captured_params.append(params)
-        return {"texts": {}, "images": {}}
+    class FakeBinaryBridge:
+        @staticmethod
+        def dataset_to_simple_binary_r_object(_model, **_kwargs):
+            return None
 
-    monkeypatch.setattr(
-        analysis_adapter.r_bridge,
-        "run_binary_analysis",
-        fake_run_binary_analysis,
-    )
+        @staticmethod
+        def run_versioned_analysis_request(request):
+            return fake_versioned_request(request)
+
+    monkeypatch.setattr(analysis_adapter, "r_bridge", FakeBinaryBridge())
 
     bundle = golden_analysis.curated_golden_bundles(root_dir=ROOT)[0]
     case = headless_analysis.HeadlessAnalysisCase(

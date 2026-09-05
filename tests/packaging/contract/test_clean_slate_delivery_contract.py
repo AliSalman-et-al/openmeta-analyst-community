@@ -43,7 +43,7 @@ def test_clean_slate_delivery_state_machine(tmp_path):
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="unsigned-community",
-            target=["windows-x64"],
+            target=["windows-x64", "macos-arm64"],
             output=str(manifest_path),
         )
     )
@@ -65,7 +65,7 @@ def test_clean_slate_delivery_state_machine(tmp_path):
         ".github/workflows/macos-trusted-release-candidate.yml"
         in delivery.POLICY_INPUTS
     )
-    assert manifest["release_targets"] == ["windows-x64"]
+    assert manifest["release_targets"] == ["windows-x64", "macos-arm64"]
     for target in manifest["release_targets"]:
         previous = delivery.release_identity_digest(manifest)
         for stage in delivery.required_stages(manifest, target):
@@ -115,7 +115,7 @@ def test_clean_slate_delivery_state_machine(tmp_path):
             commit=commit,
             repository="AliSalman-et-al/rc-metastudio",
             trust_profile="macos-trusted",
-            target=["windows-x64", "macos-x64", "macos-arm64"],
+            target=["windows-x64", "macos-arm64"],
             output=str(trusted_manifest_path),
         )
     )
@@ -204,7 +204,7 @@ def test_release_workflows_have_immutable_structured_topology():
     assert {
         item["target"]
         for item in candidate["jobs"]["build"]["strategy"]["matrix"]["include"]
-    } == {"windows-x64", "macos-x64", "macos-arm64"}
+    } == {"windows-x64", "macos-arm64"}
 
     assert community["permissions"] == {"contents": "read", "actions": "read"}
     assert community["jobs"]["attest"]["needs"] == "qualify"

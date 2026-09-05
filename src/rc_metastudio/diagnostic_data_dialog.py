@@ -8,7 +8,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, QSignalBlocker, QTimer, Qt
-from PyQt6.QtGui import QAction, QKeySequence, QPalette, QUndoStack
+from PyQt6.QtGui import QAction, QKeySequence, QPalette
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
 )
 
-from rc_metastudio import r_bridge
+from rc_metastudio.calculator_service import CalculatorService
 from rc_metastudio import app_error_handler
 from rc_metastudio import adaptive_window
 from rc_metastudio import tabular_data
@@ -54,6 +54,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         current_groups,
         group_comparison,
         confidence_level=None,
+        calculator: CalculatorService | None = None,
         parent=None,
     ):
         super(DiagnosticDataDialog, self).__init__(parent)
@@ -68,7 +69,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         if confidence_level is None:
             raise ValueError("Confidence level must be specified")
         self.confidence_level = confidence_level
-        self.confidence_multiplier = r_bridge.get_confidence_multiplier_from_r(
+        self.calculator = calculator or CalculatorService()
+        self.confidence_multiplier = self.calculator.get_confidence_multiplier(
             self.confidence_level
         )
         self.current_item_data: int | None = None
@@ -98,7 +100,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         )
         self.initialize_form()
         self.setup_back_calculation_feedback()
-        self.undoStack = QUndoStack(self)
+        self._field_history = calc_fncs.TransientEditHistory()
 
         self._update_raw_data()  # analysis_unit -> table
         self._populate_effect_cmbo_box()  # make cmbo box entries for effects
@@ -453,7 +455,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         new_prevalence = self._get_prevalence_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table, old_prevalence),
@@ -461,7 +463,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         )
 
     def restore_analysis_unit(self, old_analysis_unit):
-        self.analysis_unit.__dict__ = copy.deepcopy(old_analysis_unit.__dict__)
+        self.analysis_unit = copy.deepcopy(old_analysis_unit)
 
         self.initialize_form()
         self._update_raw_data()
@@ -533,7 +535,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             can_calculate_spec = False
             tn, fp = 0, 0
 
-        ests_and_cis = r_bridge.diagnostic_effects_for_study(
+        ests_and_cis = self.calculator.diagnostic_effects_for_study(
             tp,
             fn,
             fp,
@@ -548,7 +550,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             elif metric.lower() == "spec" and not can_calculate_spec:
                 continue
 
-            est, lower, upper = r_bridge.effect_triplet(
+            est, lower, upper = self.calculator.effect_triplet(
                 ests_and_cis[metric],
                 "calc_scale",
                 metric=metric,
@@ -621,43 +623,40 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         return d
 
     def _text_box_value_is_between_bounds(self, val_str, new_text):
-        display_scale_val = ""
-
-        get_disp_scale_val_if_valid = partial(
-            calc_fncs.evaluate,
-            new_text=new_text,
-            analysis_unit=self.analysis_unit,
-            current_effect=self.current_effect,
-            group_comparison=self.group_comparison,
-            conv_to_disp_scale=partial(
-                r_bridge.diagnostic_convert_scale,
-                metric_name=self.current_effect,
-                convert_to="display.scale",
-            ),
-            parent=self,
-            confidence_multiplier=self.confidence_multiplier,
-        )
-
-        with ExitStack() as signal_blockers:
-            for widget in self.entry_widgets:
-                signal_blockers.enter_context(QSignalBlocker(widget))
-            try:
-                if val_str == "est" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="est")
-                elif val_str == "lower" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="low")
-                elif val_str == "upper" and not is_empty(new_text):
-                    display_scale_val = get_disp_scale_val_if_valid(ci_param="high")
-                elif val_str == "prevalence" and not is_empty(new_text):
-                    get_disp_scale_val_if_valid(
-                        opt_cmp_fn=lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
-                        opt_cmp_msg="Prevalence must be between 0 and 1.",
-                    )
-            # Scale conversion crosses the optional R backend boundary. Any
-            # backend failure makes the user-entered value invalid here.
-            except Exception:
-                return False, False
-        return True, display_scale_val
+        if is_empty(new_text):
+            return True, ""
+        ci_param = {"est": "est", "lower": "low", "upper": "high"}.get(val_str)
+        is_prevalence = val_str == "prevalence"
+        if ci_param is None and not is_prevalence:
+            return True, ""
+        try:
+            with ExitStack() as signal_blockers:
+                for widget in self.entry_widgets:
+                    signal_blockers.enter_context(QSignalBlocker(widget))
+                options = {}
+                if is_prevalence:
+                    options = {
+                        "opt_cmp_fn": lambda x: 0 <= calc_fncs.numeric_value(x) <= 1,
+                        "opt_cmp_msg": "Prevalence must be between 0 and 1.",
+                    }
+                display_scale_val = calc_fncs.evaluate(
+                    new_text=new_text,
+                    analysis_unit=self.analysis_unit,
+                    current_effect=self.current_effect,
+                    group_comparison=self.group_comparison,
+                    conv_to_disp_scale=partial(
+                        self.calculator.diagnostic_convert_scale,
+                        metric_name=self.current_effect,
+                        convert_to="display.scale",
+                    ),
+                    parent=self,
+                    confidence_multiplier=self.confidence_multiplier,
+                    ci_param=ci_param,
+                    **options,
+                )
+        except Exception:
+            return False, False
+        return True, "" if is_prevalence else display_scale_val
 
     def _text_from_value(self, value):
         if value == "est":
@@ -712,7 +711,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             # Ignore incomplete numeric input while the user is still editing.
             return None
 
-        calculation_scale_value = r_bridge.diagnostic_convert_scale(
+        calculation_scale_value = self.calculator.diagnostic_convert_scale(
             display_scale_val, self.current_effect, convert_to="calc.scale"
         )
 
@@ -739,7 +738,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         new_prevalence = self._get_prevalence_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table, old_prevalence),
@@ -868,13 +867,8 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         self._update_analysis_unit()
 
         for metric in DIAGNOSTIC_METRICS:
-            self.analysis_unit.set_effect_and_ci(
-                metric,
-                self.group_comparison,
-                None,
-                None,
-                None,
-                confidence_multiplier=self.confidence_multiplier,
+            self.analysis_unit.set_effect_for_source(
+                "entered", metric, self.group_comparison, None, None, None
             )
 
         # clear line edits
@@ -894,7 +888,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         new_prevalence = self._get_prevalence_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table, old_prevalence),
@@ -914,12 +908,12 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             d = {}
 
             for effect in BACK_CALCULATABLE_DIAGNOSTIC_EFFECTS:
-                est, lower, upper = self.analysis_unit.get_effect_and_ci(
-                    effect, self.group_comparison, self.confidence_multiplier
+                est, lower, upper = self.analysis_unit.get_effect_and_ci_for_source(
+                    "entered", effect, self.group_comparison, self.confidence_multiplier
                 )
 
                 def conv_to_disp_scale(x):
-                    return r_bridge.diagnostic_convert_scale(
+                    return self.calculator.diagnostic_convert_scale(
                         x, effect, convert_to="display.scale"
                     )
 
@@ -977,7 +971,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
 
         diagnostic_data = build_dict()
 
-        imputed = r_bridge.impute_diagnostic_data(diagnostic_data)
+        imputed = self.calculator.impute_diagnostic_data(diagnostic_data)
 
         # Leave if nothing was imputed
         if not (imputed["TP"] or imputed["TN"] or imputed["FP"] or imputed["FN"]):
@@ -1004,7 +998,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         new_prevalence = self._get_prevalence_str()
 
         calc_fncs.push_field_edit(
-            self.undoStack,
+            self._field_history,
             owner=self,
             restore_state=self.restore_analysis_unit_and_table,
             old_state=(old_analysis_unit, old_table, old_prevalence),
@@ -1012,7 +1006,7 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
         )
 
     def undo(self):
-        self.undoStack.undo()
+        self._field_history.undo()
 
     def redo(self):
-        self.undoStack.redo()
+        self._field_history.redo()

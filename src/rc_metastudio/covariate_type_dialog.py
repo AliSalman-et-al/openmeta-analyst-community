@@ -33,6 +33,14 @@ def _to_double(value):
         return 0.0, False
 
 
+def _new_covariate_value(covariate, value):
+    if covariate.data_type == FACTOR:
+        return _to_native_text(value), True
+    if _to_native_text(value).strip() == "":
+        return None, True
+    return _to_double(value)
+
+
 class CovariateTypeDialog(QDialog, _ui_covariate_type_dialog.Ui_CovariateTypeDialog):
     def __init__(self, dataset, cov, parent=None):
         super(CovariateTypeDialog, self).__init__(parent)
@@ -209,21 +217,14 @@ class CovariateTypeModel(QAbstractTableModel):
             if column == self.NEW_VAL:
                 # then a (new) covariate value has been edited.
                 study = self.included_studies[index.row()]  # associated study
-                covariate_name = self.new_covariate.name
-                new_value = None
-                if self.new_covariate.data_type == FACTOR:
-                    new_value = _to_native_text(value)
-                else:
-                    # continuous
-                    if _to_native_text(value).strip() == "":
-                        new_value = None
-                    else:
-                        new_value, converted_ok = _to_double(value)
-                        if not converted_ok:
-                            return self.reject_edit(
-                                "Covariate values for continuous covariates need to be numeric."
-                            )
-                study.covariate_values[covariate_name] = new_value
+                new_value, converted_ok = _new_covariate_value(
+                    self.new_covariate, value
+                )
+                if not converted_ok:
+                    return self.reject_edit(
+                        "Covariate values for continuous covariates need to be numeric."
+                    )
+                study.set_covariate_value(self.new_covariate, new_value)
                 self.refresh_covariate_values()
                 return True
         return self.reject_edit("Cannot edit that cell.")

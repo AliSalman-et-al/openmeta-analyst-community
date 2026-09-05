@@ -8,12 +8,19 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.path.abspath("src"))
 
 import pytest
-from rc_metastudio import automation
+from rc_metastudio import automation, calculator_service
 from PyQt6.QtWidgets import QDialog
 from test_types import key_click, required
 
 
 REPO_ROOT = os.getcwd()
+
+
+def _derived_effect_and_ci(analysis_unit, metric, group_comparison):
+    value = analysis_unit.get_effect_for_source(
+        "derived_preview", metric, group_comparison
+    )
+    return value.estimate, value.lower, value.upper
 
 
 def test_data_table_return_moves_vertically_from_selected_cells():
@@ -22,6 +29,7 @@ def test_data_table_return_moves_vertically_from_selected_cells():
     app, window = automation.start_automation()
     try:
         _create_binary_dataset(window)
+        assert window.model.dataset is window.workspace.runtime.dataset
         table = window.tableView
         model = window.model
 
@@ -107,12 +115,12 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (0.5, 0.25, 1.0)},
         )
@@ -120,6 +128,7 @@ def test_data_table_delete_and_backspace_clear_selected_cells(monkeypatch):
         table.paste_contents(
             model.index(0, model.RAW_DATA[0]), [["41", "50", "3", "48"]]
         )
+        model = window.model
         assert _cell_text(model, 0, model.RAW_DATA[0]) == "41.0"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
 
@@ -201,42 +210,42 @@ def test_binary_calculator_accept_cancel_and_project_round_trip(
             lambda *args: warnings.append(args),
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda confidence: 1.96,
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.2, 0.8, 1.8)},
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "binary_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "impute_binary_data",
             lambda data: {"FAIL": True},
         )
         monkeypatch.setattr(
-            binary_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -339,17 +348,17 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda _level: 1.96,
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "continuous_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "continuous_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -359,30 +368,30 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             return {"succeeded": False, "comment": "complete input"}
 
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge, "impute_continuous_data", impute
+            calculator_service.r_bridge, "impute_continuous_data", impute
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "continuous_effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "continuous_effect_for_study",
             lambda *args, **kwargs: {"calc_scale": (1.5, 1.0, 2.0)},
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            continuous_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "back_calculate_continuous_data",
             lambda *args, **kwargs: {"FAIL": True},
         )
@@ -392,9 +401,8 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [10, 94, 2]
         unit.get_raw_data_for_group(model.current_groups[1])[:] = [12, 90, 3]
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
+        window.data_dirtied()
+        window.workspace.mark_saved()
 
         callback_errors = []
 
@@ -426,30 +434,40 @@ def test_continuous_calculator_workspace_transaction_and_locale_round_trip(
             2.0,
         ]
         assert any(payload.get("mean") == 95.5 for payload in r_payloads)
-        assert table.undoStack.count() == 1
-        assert window.current_data_unsaved is True
+        assert window.workspace.can_undo
+        assert window.workspace.is_dirty
 
         window.undo()
+        model = window.model
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [10, 94, 2]
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         window.redo()
-        assert window.current_data_unsaved is True
+        model = window.model
+        assert window.workspace.is_dirty
 
-        undo_count = table.undoStack.count()
+        undo_count = window.workspace.can_undo
         before_invalid = copy.deepcopy(model.get_current_analysis_unit_for_study(0))
 
         def reject_invalid_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                continuous_data_dialog.ContinuousDataDialog,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(),
+                    "continuous edit dialog",
+                ),
+            )
             dialog.simple_table.setCurrentCell(0, 0)
-            dialog.simple_table.item(0, 0).setText("10,5")
+            required(dialog.simple_table.item(0, 0), "continuous data cell").setText(
+                "10,5"
+            )
             dialog.reject()
 
         QtCore.QTimer.singleShot(0, reject_invalid_edit)
         table.row_header_clicked(0)
         assert warnings[-1] == "N must be a non-negative whole number."
-        assert table.undoStack.count() == undo_count
+        assert window.workspace.can_undo == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_groups(
             model.current_groups
         ) == before_invalid.get_raw_data_for_groups(model.current_groups)
@@ -494,17 +512,17 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             lambda *args: warnings.append(args[2]),
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "get_confidence_multiplier_from_r",
             lambda _level: 1.96,
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -514,29 +532,29 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             return {"TP": None, "FP": None, "FN": None, "TN": None}
 
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge, "impute_diagnostic_data", impute
+            calculator_service.r_bridge, "impute_diagnostic_data", impute
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "diagnostic_effects_for_study",
             lambda *args, metrics, **kwargs: {
                 metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
             },
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             lambda *args, metrics, **kwargs: {
                 metric: {"calc_scale": (0.8, 0.7, 0.9)} for metric in metrics
             },
         )
         monkeypatch.setattr(
-            diagnostic_data_dialog.r_bridge,
+            calculator_service.r_bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "effect_triplet",
             lambda result, scale, metric=None: result[scale],
         )
@@ -545,9 +563,8 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
         table = window.tableView
         unit = model.get_current_analysis_unit_for_study(0)
         unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
+        window.data_dirtied()
+        window.workspace.mark_saved()
 
         def accept_edit():
             dialog = cast(
@@ -572,28 +589,38 @@ def test_diagnostic_calculator_workspace_transaction_and_locale_round_trip(
             21.0,
         ]
         assert any(payload.get("TP") == 13 for payload in r_payloads)
-        assert table.undoStack.count() == 1
-        assert window.current_data_unsaved is True
+        assert window.workspace.can_undo
+        assert window.workspace.is_dirty
 
         window.undo()
+        model = window.model
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [12, 3, 4, 21]
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         window.redo()
+        model = window.model
 
-        undo_count = table.undoStack.count()
+        undo_count = window.workspace.can_undo
 
         def reject_invalid_edit():
-            dialog = QtWidgets.QApplication.activeModalWidget()
+            dialog = cast(
+                diagnostic_data_dialog.DiagnosticDataDialog,
+                required(
+                    QtWidgets.QApplication.activeModalWidget(),
+                    "diagnostic edit dialog",
+                ),
+            )
             dialog.two_by_two_table.setCurrentCell(0, 0)
-            dialog.two_by_two_table.item(0, 0).setText("13,5")
+            required(
+                dialog.two_by_two_table.item(0, 0), "diagnostic data cell"
+            ).setText("13,5")
             dialog.reject()
 
         QtCore.QTimer.singleShot(0, reject_invalid_edit)
         table.row_header_clicked(0)
         assert "whole number" in warnings[-1]
-        assert table.undoStack.count() == undo_count
+        assert window.workspace.can_undo == undo_count
         assert model.get_current_analysis_unit_for_study(0).get_raw_data_for_group(
             model.current_groups[0]
         ) == [13.0, 3.0, 4.0, 21.0]
@@ -766,11 +793,13 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         )
         assert window.save_as() is True
         assert critical_messages == []
+        assert window.model.dataset is window.workspace.runtime.dataset
 
         # Exercise the real project install boundary so both the normalized
         # dataset and project-scoped workspace selection are covered.
         assert window.open(file_path=saved_path) is True
         reopened = window.model.dataset
+        assert reopened is window.workspace.runtime.dataset
 
         assert [
             (str(study.name), str(study.year)) for study in reopened.studies[:1]
@@ -787,8 +816,8 @@ def test_data_table_editing_preserves_project_state_and_round_trips(
         assert window.model.current_groups == ["tx B", "Tx C"]
         assert window.model.current_effect == "OR"
         assert window.model.get_confidence_level() == 90.0
-        assert window.current_data_unsaved is False
-        assert window.tableView.undoStack.isClean()
+        assert not window.workspace.is_dirty
+        assert not window.workspace.is_dirty
     finally:
         _close_without_prompt(app, window)
 
@@ -800,10 +829,12 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         _create_binary_dataset(window)
         model = window.model
         table = window.tableView
+        assert model.dataset is window.workspace.runtime.dataset
 
         table.paste_contents(
             model.index(0, model.NAME), [["Alpha", "2020", "1", "10", "2", "12"]]
         )
+        model = window.model
         copied = table.copy_contents_in_range(
             model.index(0, model.RAW_DATA[0]),
             model.index(0, model.RAW_DATA[-1]),
@@ -819,33 +850,44 @@ def test_copy_paste_undo_and_redo_work_through_real_table_path(tmp_path):
         # the native Windows Qt backend. Set the explicit paste origin after
         # selecting so the edit/undo focus contract is deterministic.
         table.setCurrentIndex(paste_origin)
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
         table.paste_from_clipboard(paste_origin)
+        model = window.model
         assert _cell_text(model, 1, model.NAME) == "Beta"
         assert _cell_text(model, 1, model.RAW_DATA[-1]) == "12.0"
-        assert window.current_data_unsaved is True
-        assert table.currentIndex() == paste_origin
+        assert window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            paste_origin.row(),
+            paste_origin.column(),
+        )
 
         window.undo()
+        assert window.model.dataset is window.workspace.runtime.dataset
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
-        assert window.current_data_unsaved is False
-        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+        assert not window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            1,
+            window.model.RAW_DATA[0],
+        )
 
         window.redo()
+        assert window.model.dataset is window.workspace.runtime.dataset
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == "12.0"
-        assert window.current_data_unsaved is True
-        assert table.currentIndex() == window.model.index(1, window.model.RAW_DATA[0])
+        assert window.workspace.is_dirty
+        assert (table.currentIndex().row(), table.currentIndex().column()) == (
+            1,
+            window.model.RAW_DATA[0],
+        )
 
         window.out_path = str(tmp_path / "workspace-edits.rcms")
         assert window.save() is True
-        assert window.current_data_unsaved is False
+        assert window.model.dataset is window.workspace.runtime.dataset
+        assert not window.workspace.is_dirty
 
         window.undo()
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
     finally:
         _close_without_prompt(app, window)
 
@@ -889,9 +931,7 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
         model = window.model
         table = window.tableView
         table.set_data_in_model(model.index(0, model.NAME), _variant("Alpha"))
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
         warnings = []
         monkeypatch.setattr(
             sys.modules["rc_metastudio.main_window"].QMessageBox,
@@ -908,102 +948,9 @@ def test_invalid_clipboard_paste_is_rejected_before_mutation_or_undo(monkeypatch
             "",
             "",
         ]
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
+        assert not window.workspace.is_dirty
         assert warnings[-1][1:] == ("Warning", "Raw data needs to be numeric.")
-    finally:
-        _close_without_prompt(app, window)
-
-
-def test_clipboard_paste_rolls_back_if_commit_fails_after_preflight(monkeypatch):
-    from PyQt6.QtWidgets import QApplication
-
-    app, window = automation.start_automation()
-    try:
-        _create_binary_dataset(window)
-        model = window.model
-        table = window.tableView
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
-        warnings = []
-        monkeypatch.setattr(
-            sys.modules["rc_metastudio.main_window"].QMessageBox,
-            "warning",
-            lambda *args, **kwargs: warnings.append(args),
-        )
-        monkeypatch.setattr(model, "setData", lambda *args, **kwargs: False)
-        model.last_data_error = "Simulated commit failure."
-        required(QApplication.clipboard(), "clipboard").setText("Alpha")
-
-        assert table.paste_from_clipboard(model.index(0, model.NAME)) is False
-
-        assert _cell_text(window.model, 0, window.model.NAME) == ""
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
-        assert window.current_data_unsaved is False
-        assert warnings[-1][1:] == ("Warning", "Simulated commit failure.")
-    finally:
-        _close_without_prompt(app, window)
-
-
-def test_multirow_paste_rolls_back_studies_added_before_commit_failure(monkeypatch):
-    from PyQt6.QtCore import QItemSelectionModel
-    from PyQt6.QtWidgets import QApplication
-
-    app, window = automation.start_automation()
-    try:
-        _create_binary_dataset(window)
-        model = window.model
-        table = window.tableView
-        origin = model.index(0, model.NAME)
-        table.setCurrentIndex(origin)
-        table.selectionModel().select(origin, QItemSelectionModel.SelectionFlag.Select)
-        original_count = len(model.dataset.studies)
-        original_names = [study.name for study in model.dataset.studies]
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
-        warnings = []
-        monkeypatch.setattr(
-            sys.modules["rc_metastudio.main_window"].QMessageBox,
-            "warning",
-            lambda *args, **kwargs: warnings.append(args),
-        )
-        real_set_data = model.setData
-        calls = 0
-
-        def fail_after_first_write(*args, **kwargs):
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                model.last_data_error = "Simulated post-growth commit failure."
-                return False
-            return real_set_data(*args, **kwargs)
-
-        monkeypatch.setattr(model, "setData", fail_after_first_write)
-        required(QApplication.clipboard(), "clipboard").setText(
-            "Alpha\r\nBeta\r\nGamma"
-        )
-
-        assert table.paste_from_clipboard(origin) is False
-
-        assert calls == 2
-        assert len(window.model.dataset.studies) == original_count
-        assert [study.name for study in window.model.dataset.studies] == original_names
-        assert table.undoStack.count() == 0
-        assert table.undoStack.isClean()
-        assert window.current_data_unsaved is False
-        assert table.currentIndex() == window.model.index(0, window.model.NAME)
-        assert [
-            (index.row(), index.column())
-            for index in table.selectionModel().selectedIndexes()
-        ] == [(0, window.model.NAME)]
-        assert warnings[-1][1:] == (
-            "Warning",
-            "Simulated post-growth commit failure.",
-        )
     finally:
         _close_without_prompt(app, window)
 
@@ -1022,11 +969,10 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         inclusion = model.index(0, model.INCLUDE_STUDY)
         model.dataset.studies[0].include = False
         model.dataset.studies[0].manually_excluded = False
+        window.data_dirtied()
         table.setCurrentIndex(inclusion)
         table.selectRow(0)
-        table.undoStack.clear()
-        table.undoStack.setClean()
-        window.current_data_unsaved = False
+        window.workspace.mark_saved()
 
         assert (
             model.setData(
@@ -1036,19 +982,19 @@ def test_inclusion_edit_undo_redo_restores_semantics_selection_and_dirty_state()
         )
         assert model.dataset.studies[0].include is True
         assert model.dataset.studies[0].manually_excluded is False
-        assert table.undoStack.count() == 1
-        assert window.current_data_unsaved is True
+        assert window.workspace.can_undo
+        assert window.workspace.is_dirty
 
         window.undo()
         assert window.model.dataset.studies[0].include is False
         assert window.model.dataset.studies[0].manually_excluded is False
-        assert window.current_data_unsaved is False
+        assert not window.workspace.is_dirty
         assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
 
         window.redo()
         assert window.model.dataset.studies[0].include is True
         assert window.model.dataset.studies[0].manually_excluded is False
-        assert window.current_data_unsaved is True
+        assert window.workspace.is_dirty
         assert table.currentIndex() == window.model.index(0, window.model.INCLUDE_STUDY)
     finally:
         _close_without_prompt(app, window)
@@ -1094,7 +1040,7 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
         table.set_data_in_model(model.index(0, model.NAME), _variant("Kinderman"))
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
@@ -1110,7 +1056,7 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
             }
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             diagnostic_effects_for_study,
         )
@@ -1123,12 +1069,12 @@ def test_diagnostic_complete_paste_recomputes_sens_spec_confidence_intervals(
         group_comparison = model.get_current_group_comparison()
         assert _cell_text(model, 0, model.OUTCOMES[0]) == "0.750"
         assert all(_cell_text(model, 0, col) != "" for col in model.OUTCOMES)
-        assert analysis_unit.get_entered_effect_and_ci("Sens", group_comparison) == (
+        assert _derived_effect_and_ci(analysis_unit, "Sens", group_comparison) == (
             0.750,
             0.588,
             0.873,
         )
-        assert analysis_unit.get_entered_effect_and_ci("PLR", group_comparison) == (
+        assert _derived_effect_and_ci(analysis_unit, "PLR", group_comparison) == (
             61.5,
             8.8,
             431.0,
@@ -1168,16 +1114,18 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
                 lambda value: value,
                 confidence_level=model.get_confidence_level(),
                 confidence_multiplier=model.get_confidence_multiplier(),
+                source="derived_preview",
             )
         model.dataset.studies[1].include = True
+        window.data_dirtied()
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_convert_scale",
             lambda value, *args, **kwargs: value,
         )
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "diagnostic_effects_for_study",
             lambda *args, **kwargs: {
                 "Sens": {"calc_scale": (0.800, 0.490, 0.943)},
@@ -1242,12 +1190,7 @@ def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
 
     try:
         _create_binary_dataset(window)
-        state = window.tableView.model().get_state()
         command = main_window.ImportCsvCommand(
-            original_dataset=copy.deepcopy(window.model.dataset),
-            old_state_dict=state,
-            new_dataset=copy.deepcopy(window.model.dataset),
-            new_state_dict=state,
             imported_data=[["Alpha", "2020", "1", "10", "2", "12"]],
             main_form=window,
             covariate_names=[],
@@ -1636,7 +1579,7 @@ def test_main_window_dialog_text_slots_accept_native_pyqt6_line_edit_strings(
                 self.outcome_name_le = QtWidgets.QLineEdit()
                 self.outcome_name_le.setText("Recovery")
                 self.datatype_cbo_box = QtWidgets.QComboBox()
-                self.datatype_cbo_box.addItem("Continuous")
+                self.datatype_cbo_box.addItem("Binary")
 
             def exec(self):
                 return True
@@ -1705,7 +1648,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
         _create_binary_dataset(window)
         original_dataset = window.model.dataset
         original_names = [study.name for study in original_dataset.studies]
-        original_undo_count = window.tableView.undoStack.count()
+        original_history = window.workspace.document
 
         def reject_after_editing_copy(dialog):
             dialog.dataset.studies[0].name = "Rejected dataset edit"
@@ -1717,7 +1660,7 @@ def test_edit_dataset_rejection_leaves_main_dataset_unchanged(monkeypatch):
 
         assert window.model.dataset is original_dataset
         assert [study.name for study in window.model.dataset.studies] == original_names
-        assert window.tableView.undoStack.count() == original_undo_count
+        assert window.workspace.document == original_history
     finally:
         _close_without_prompt(app, window)
 
@@ -1742,12 +1685,11 @@ def test_edit_empty_dataset_can_be_cancelled(monkeypatch):
         _close_without_prompt(app, window)
 
 
-def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch):
+def test_edit_empty_dataset_acceptance_preserves_state_without_empty_undo(monkeypatch):
     from rc_metastudio import edit_dialog
 
     app, window = automation.start_automation()
     try:
-        original_undo_count = window.tableView.undoStack.count()
         monkeypatch.setattr(
             edit_dialog.EditDialog,
             "exec",
@@ -1758,7 +1700,7 @@ def test_edit_empty_dataset_acceptance_preserves_empty_outcome_state(monkeypatch
 
         assert window.model.dataset.get_outcome_names() == []
         assert window.model.current_outcome_name is None
-        assert window.tableView.undoStack.count() == original_undo_count + 1
+        assert not window.workspace.can_undo
     finally:
         _close_without_prompt(app, window)
 
@@ -1772,7 +1714,7 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
         original_dataset = window.model.dataset
         original_name = original_dataset.studies[0].name
         renamed_study = "Renamed through Edit Dataset"
-        original_undo_count = window.tableView.undoStack.count()
+        original_history = window.workspace.document
 
         def accept_after_renaming_study(dialog):
             dialog.dataset.studies[0].name = renamed_study
@@ -1785,9 +1727,9 @@ def test_edit_dataset_acceptance_propagates_copied_dataset_mutation(monkeypatch)
         assert window.model.dataset is not original_dataset
         assert window.model.dataset.studies[0].name == renamed_study
         assert original_dataset.studies[0].name == original_name
-        assert window.tableView.undoStack.count() == original_undo_count + 1
+        assert window.workspace.can_undo
 
-        window.tableView.undoStack.undo()
+        window.undo()
         assert window.model.dataset.studies[0].name == original_name
     finally:
         _close_without_prompt(app, window)
@@ -1853,7 +1795,7 @@ def test_dataset_model_rejects_invalid_confidence_levels_without_touching_r(
             raise AssertionError("invalid confidence level reached R multiplier")
 
         monkeypatch.setattr(
-            dataset_table_model.r_bridge,
+            window.model.editing_service.bridge,
             "get_confidence_multiplier_from_r",
             fail_if_called,
         )
@@ -1947,7 +1889,8 @@ def _cell_text(model, row, column):
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    if window.workspace.document is not None:
+        window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

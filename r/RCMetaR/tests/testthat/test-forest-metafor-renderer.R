@@ -219,6 +219,8 @@ test_that("binary Default Forest Style builds a self-contained metafor render bu
   expect_equal(bundle$render_engine, "metafor")
   expect_equal(bundle$data_type, "binary")
   expect_equal(bundle$fp_style, "default")
+  expect_true("effect_display" %in% names(bundle))
+  expect_false("legacy_plot_data" %in% names(bundle))
   expect_equal(bundle$ilab$headers, c("Events", "Non-events", "Events", "Non-events"))
   expect_equal(unname(bundle$ilab$matrix[1, ]), c("4", "119", "11", "128"))
   expect_equal(bundle$ilab$groups, c("Intervention", "Control"))
@@ -592,8 +594,7 @@ test_that("Forest Layout Preflight records sparse and compact RevMan templates w
       list(b = fixture$data@y[[2]], ci.lb = fixture$data@y[[2]] - fixture$data@SE[[2]], ci.ub = fixture$data@y[[2]] + fixture$data@SE[[2]], se = fixture$data@SE[[2]])
     ),
     "cumulative",
-    labels = c("Entered Binary 1", "+ Entered Binary 2"),
-    legacy.plot.data = list(plot.range = NULL, changed.params = fixture$params)
+    labels = c("Entered Binary 1", "+ Entered Binary 2")
   )
   compact.plan <- rcmetar.forest.layout.preflight(sequential.bundle, style = "revman")
 
@@ -738,7 +739,7 @@ test_that("continuous RevMan Forest Style builds mean SD total columns", {
   expect_gt(file.info(png_path)$size, 5000)
 })
 
-test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric axis", {
+test_that("diagnostic RevMan Forest Style uses DTA columns and a probability-scale metric axis", {
   fixture <- metafor_diagnostic_fixture(measure = "Sens")
   fixture$params$fp_style <- "revman"
   res <- rma.uni(
@@ -758,7 +759,7 @@ test_that("diagnostic RevMan Forest Style uses DTA columns and a plain metric ax
   expect_equal(bundle$style_blocks$favours_left, "")
   expect_equal(bundle$style_blocks$favours_right, "")
   expect_equal(bundle$style_blocks$axis_label, "Sensitivity")
-  expect_equal(rcmetar.metafor.xlab(bundle), "Sensitivity")
+  expect_equal(rcmetar.metafor.xlab(bundle), "Sensitivity (probability scale)")
   expect_match(bundle$style_blocks$heterogeneity, "Heterogeneity: Tau²")
 
   png_path <- tempfile(fileext = ".png")
@@ -1494,6 +1495,22 @@ test_that("diagnostic Default Forest Style builds and renders count columns on t
   expect_gte(png_size[["height"]], 500)
 })
 
+test_that("diagnostic extraction keeps image order aligned with semantic forest keys", {
+  fit <- list(
+    Summary = list(),
+    images = c("forest.png" = "forest.png"),
+    plot_params_paths = c("Forest Plot" = "forest.rds"),
+    image_order = "Forest Plot"
+  )
+
+  extracted <- rcmetar.diagnostic.extract(fit, list(measure = "Sens"))
+
+  expect_identical(names(extracted$images), "diagnostic.Sens.forest")
+  expect_identical(names(extracted$plot.paths), "diagnostic.Sens.forest")
+  expect_identical(extracted$image.order, "diagnostic.Sens.forest")
+  expect_identical(extracted$sections[[2]]$title, "Sensitivity Forest Plot")
+})
+
 test_that("diagnostic multi-metric workflows save independent metafor forest plots", {
   fixture <- metafor_diagnostic_fixture(measure = "Sens")
   run_metrics <- function(measures) {
@@ -1505,23 +1522,35 @@ test_that("diagnostic multi-metric workflows save independent metafor forest plo
     result <- rcmetar.run.diagnostic.analyses(
       fixture$data,
       rep("diagnostic.random", length(measures)),
-      params
+      params,
+      request.version=1
     )
-    expected_names <- paste(
+    expected_titles <- paste(
       vapply(measures, pretty.metric.name, character(1)),
       "Forest Plot"
     )
+    expected_keys <- paste0("diagnostic.", measures, ".forest")
 
-    expect_true(all(expected_names %in% names(result$images)))
-    expect_true(all(expected_names %in% names(result$plot_params_paths)))
-    expect_true(all(expected_names %in% result$image_order))
+    expect_identical(names(result$images), expected_keys)
+    expect_identical(names(result$plot_params_paths), expected_keys)
+    expect_identical(result$image_order, expected_keys)
     expect_false(any(grepl(" and ", names(result$images), fixed = TRUE)))
 
+    image.sections <- Filter(function(section) identical(section$kind, "image"), result$sections)
+    expect_identical(
+      vapply(image.sections, function(section) section$source_key, character(1)),
+      expected_keys
+    )
+    expect_identical(
+      vapply(image.sections, function(section) section$title, character(1)),
+      expected_titles
+    )
+
     for (measure in measures) {
-      title <- paste(pretty.metric.name(measure), "Forest Plot")
-      image_path <- unname(result$images[[title]])
+      key <- paste0("diagnostic.", measure, ".forest")
+      image_path <- unname(result$images[[key]])
       plot_data <- load_saved_plot_data(
-        unname(result$plot_params_paths[[title]])
+        unname(result$plot_params_paths[[key]])
       )
 
       expect_true(rcmetar.is.metafor.forest.bundle(plot_data))
@@ -1563,7 +1592,8 @@ test_that("repeated diagnostic workflows keep metric forest plots independent", 
       fixture$data,
       rep("diagnostic.random", length(measures)),
       params,
-      workflow = workflow
+      workflow = workflow,
+      request.version=1
     )
     expected_names <- paste(
       vapply(measures, pretty.metric.name, character(1)),

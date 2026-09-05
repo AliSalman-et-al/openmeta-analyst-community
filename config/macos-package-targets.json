@@ -3,17 +3,6 @@
   "r_version": "4.6.1",
   "minimum_macos": "14.0",
   "targets": {
-    "x64": {
-      "delivery_target": "macos-x64",
-      "machine": "x86_64",
-      "runner": "macos-15-intel",
-      "artifact": "RCMetaStudio-macos-x64",
-      "qt_arch": "x64",
-      "qt_sdk_arch": "clang_64",
-      "r_component_identifier": "org.R-project.x86_64.R.fw.pkg",
-      "r_url": "https://cloud.r-project.org/bin/macosx/big-sur-x86_64/base/R-4.6.1-x86_64.pkg",
-      "r_sha256": "612bb00cb4c627721d6d80b0f5224227c0fcdefb4a5b6c917511480361c16571"
-    },
     "arm64": {
       "delivery_target": "macos-arm64",
       "machine": "arm64",

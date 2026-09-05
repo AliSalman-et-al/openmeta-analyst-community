@@ -9,12 +9,14 @@ important: a request is serialized once and cannot change while R is running.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal, TypeAlias, TypeVar
 
-from rc_metastudio.analysis_results import AnalysisResult, parse_analysis_result
+from rc_metastudio.analysis_results import AnalysisResult
 
 
 class CorrectionPolicy(str, Enum):
@@ -222,6 +224,16 @@ def _text(value: object, field_name: str) -> str:
     return value.strip()
 
 
+def _analysis_family(value: str) -> AnalysisFamily:
+    if value == "binary":
+        return "binary"
+    if value == "continuous":
+        return "continuous"
+    if value == "diagnostic":
+        return "diagnostic"
+    raise ValueError(f"unsupported small-study effects data family: {value!r}")
+
+
 def _string_key_mapping(
     value: Mapping[_MappingKey, object], field_name: str
 ) -> dict[str, object]:
@@ -277,6 +289,69 @@ def _text_values(value: object, field_name: str) -> tuple[object, ...]:
     raise ValueError(f"{field_name} must be a sequence or scalar text value")
 
 
+_PLOT_WIRE_FIELDS = (
+    ("funnels", "kind"),
+    ("funnel.conf.levels", "confidence_level"),
+    ("funnel.show.reference", "reference_line_visible"),
+    ("funnel.sampling.region.visible", "show_sampling_region"),
+    ("funnel.reverse.se.axis", "reverse_standard_error_axis"),
+    ("funnel.label.policy", "label_policy"),
+    ("funnel.sampling.conf.level", "sampling_confidence_level"),
+    ("funnel.include.tau2", "include_tau2"),
+    ("funnel.point.size", "point_size"),
+    ("funnel.reference.visible", "reference_line_visible"),
+    ("funnel.pooled.overlay.visible", "pooled_overlay_visible"),
+    ("funnel.style", "style"),
+    ("funnel.point.symbol", "point_symbol"),
+    ("funnel.point.color", "point_color"),
+    ("funnel.reference.color", "reference_color"),
+    ("funnel.region.color", "region_color"),
+    ("funnel.background.color", "background_color"),
+)
+
+
+def _plot_wire_value(spec: FunnelPlotSpec, field: str) -> object:
+    value = getattr(spec, field)
+    return value.value if isinstance(value, Enum) else value
+
+
+def _plot_wire_mapping(
+    specs: tuple[FunnelPlotSpec, ...],
+) -> dict[str, object]:
+    result = {
+        wire_name: [_plot_wire_value(spec, field) for spec in specs]
+        for wire_name, field in _PLOT_WIRE_FIELDS
+    }
+    result["funnel.contour.levels"] = [
+        ",".join(format(level, "g") for level in spec.contour_levels)
+        for spec in specs
+    ]
+    return result
+
+
+def _sensitivity_wire_mapping(
+    specs: tuple[SensitivitySpec, ...],
+) -> dict[str, object]:
+    enabled = next((spec for spec in specs if spec.trim_and_fill), None)
+    return {
+        "trim.and.fill": enabled is not None,
+        "trim.and.fill.side": (
+            enabled.side.value if enabled is not None else TrimAndFillSide.AUTO.value
+        ),
+        "trim.and.fill.estimator": (
+            enabled.estimator.value
+            if enabled is not None
+            else TrimAndFillEstimator.L0.value
+        ),
+        "trim.and.fill.model": (
+            enabled.model.value
+            if enabled is not None
+            else TrimAndFillModel.RANDOM.value
+        ),
+        "extrapolation": any(spec.extrapolation for spec in specs),
+    }
+
+
 @dataclass(frozen=True)
 class SmallStudyEffectsRequest:
     """One complete serialized small-study effects execution request."""
@@ -289,8 +364,13 @@ class SmallStudyEffectsRequest:
     test_specs: tuple[AsymmetryTestSpec, ...] = ()
     sensitivity_specs: tuple[SensitivitySpec, ...] = ()
     pooled_display: PooledDisplaySpec = PooledDisplaySpec()
+    version: int = 1
 
     def __post_init__(self) -> None:
+        if type(self.version) is not int or self.version != 1:
+            raise ValueError(
+                "unsupported small-study effects request version: %s" % self.version
+            )
         if self.data_type not in ("binary", "continuous", "diagnostic"):
             raise ValueError(
                 f"unsupported small-study effects data family: {self.data_type!r}"
@@ -401,7 +481,7 @@ class SmallStudyEffectsRequest:
             ),
         )
         return cls(
-            data_type=data_type,  # type: ignore[arg-type]
+            data_type=_analysis_family(data_type),
             metric=_text(metric, "metric"),
             confidence_level=float(confidence_level),
             correction_policy=policy,
@@ -414,81 +494,28 @@ class SmallStudyEffectsRequest:
     def to_mapping(self) -> dict[str, object]:
         """Return the stable wire representation sent to RCMetaR."""
         result: dict[str, object] = {
+            "version": self.version,
             "data.type": self.data_type,
             "metric": self.metric,
             "conf.level": self.confidence_level,
             "tests": [spec.method.value for spec in self.test_specs],
-            "funnels": [spec.kind.value for spec in self.plot_specs],
-            "funnel.conf.levels": [spec.confidence_level for spec in self.plot_specs],
-            "funnel.show.reference": [
-                spec.reference_line_visible for spec in self.plot_specs
-            ],
-            "funnel.sampling.region.visible": [
-                spec.show_sampling_region for spec in self.plot_specs
-            ],
-            "funnel.reverse.se.axis": [
-                spec.reverse_standard_error_axis for spec in self.plot_specs
-            ],
-            "funnel.label.policy": [
-                spec.label_policy.value for spec in self.plot_specs
-            ],
-            "funnel.sampling.conf.level": [
-                spec.sampling_confidence_level for spec in self.plot_specs
-            ],
-            "funnel.include.tau2": [spec.include_tau2 for spec in self.plot_specs],
-            "funnel.point.size": [spec.point_size for spec in self.plot_specs],
-            "funnel.reference.visible": [
-                spec.reference_line_visible for spec in self.plot_specs
-            ],
-            "funnel.contour.levels": [
-                ",".join(format(level, "g") for level in spec.contour_levels)
-                for spec in self.plot_specs
-            ],
-            "funnel.pooled.overlay.visible": [
-                spec.pooled_overlay_visible for spec in self.plot_specs
-            ],
-            "funnel.style": [spec.style.value for spec in self.plot_specs],
-            "funnel.point.symbol": [spec.point_symbol for spec in self.plot_specs],
-            "funnel.point.color": [spec.point_color for spec in self.plot_specs],
-            "funnel.reference.color": [
-                spec.reference_color for spec in self.plot_specs
-            ],
-            "funnel.region.color": [spec.region_color for spec in self.plot_specs],
-            "funnel.background.color": [
-                spec.background_color for spec in self.plot_specs
-            ],
-            "trim.and.fill": any(spec.trim_and_fill for spec in self.sensitivity_specs),
-            "trim.and.fill.side": next(
-                (
-                    spec.side.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillSide.AUTO.value,
-            ),
-            "trim.and.fill.estimator": next(
-                (
-                    spec.estimator.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillEstimator.L0.value,
-            ),
-            "trim.and.fill.model": next(
-                (
-                    spec.model.value
-                    for spec in self.sensitivity_specs
-                    if spec.trim_and_fill
-                ),
-                TrimAndFillModel.RANDOM.value,
-            ),
-            "extrapolation": any(spec.extrapolation for spec in self.sensitivity_specs),
-            "pooled.display.model": self.pooled_display.model.value,
-            "pooled.display.tau": self.pooled_display.method_tau,
         }
+        result.update(_plot_wire_mapping(self.plot_specs))
+        result.update(_sensitivity_wire_mapping(self.sensitivity_specs))
+        result["pooled.display.model"] = self.pooled_display.model.value
+        result["pooled.display.tau"] = self.pooled_display.method_tau
         if self.correction_policy is not None:
             result["correction.policy"] = self.correction_policy.value
         return result
+
+    @property
+    def semantic_id(self) -> str:
+        """Stable identity for the statistical request, independent of titles."""
+        return hashlib.sha256(
+            json.dumps(
+                self.to_mapping(), sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -679,7 +706,28 @@ def execute_small_study_effects(
     from rc_metastudio import r_bridge
 
     result = r_bridge.run_small_study_effects(model, request.to_mapping())
-    return parse_analysis_result(result)
+    if not isinstance(result, AnalysisResult):
+        raise TypeError("small-study effects execution returned an invalid result")
+    return result
+
+
+class SmallStudyEffectsService:
+    """Own the R boundary used by the small-study effects dialog."""
+
+    def preview(
+        self, model: object, request: SmallStudyEffectsRequest
+    ) -> EligibilityReport:
+        from rc_metastudio import r_bridge
+
+        value = r_bridge.run_small_study_effects(
+            model, request.to_mapping(), preview=True
+        )
+        return parse_eligibility_report(value)
+
+    def execute(
+        self, model: object, request: SmallStudyEffectsRequest
+    ) -> AnalysisResult:
+        return execute_small_study_effects(model, request)
 
 
 def regenerate_small_study_effects_funnel(

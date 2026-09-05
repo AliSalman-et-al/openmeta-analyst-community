@@ -11,7 +11,7 @@ from typing import Protocol
 
 from rc_metastudio import analysis_dataset
 from rc_metastudio import analysis_unit
-from rc_metastudio import two_way_dict
+from rc_metastudio.project_domain import validate_project_semantics
 from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
@@ -29,6 +29,54 @@ class RuntimeProject:
     dataset: analysis_dataset.Dataset
     model_state: JsonObject
     restored_selection: bool
+
+
+def runtime_project_to_document(runtime: RuntimeProject) -> ProjectDocument:
+    """Serialize the live runtime graph at a project-format boundary."""
+    dataset = runtime.dataset
+    model_state = runtime.model_state
+    outcome, follow_up, groups, model_effect = _runtime_selection(dataset, model_state)
+    raw_confidence = model_state.get("confidence_level", 95.0)
+    confidence = (
+        float(raw_confidence) if isinstance(raw_confidence, (int, float)) else 95.0
+    )
+    state: JsonObject = {
+        "schema_version": 1,
+        "active_outcome": outcome if isinstance(outcome, str) else None,
+        "active_follow_up": follow_up,
+        "active_groups": groups,
+        "active_effect": model_effect if isinstance(model_effect, str) else None,
+        "confidence_level": confidence,
+    }
+    return ProjectDocument(1, dataset_to_project(dataset), state)
+
+
+def _runtime_selection(
+    dataset: analysis_dataset.Dataset, model_state: JsonObject
+) -> tuple[str | None, str | None, list[str], str | None]:
+    outcome = model_state.get("current_outcome_name")
+    follow_up = _runtime_follow_up(
+        dataset, outcome, model_state.get("current_follow_up_index")
+    )
+    groups = _runtime_groups(model_state.get("current_groups"))
+    if not dataset.get_outcome_names():
+        return None, None, [], None
+    raw_effect = model_state.get("current_effect")
+    effect = raw_effect if isinstance(raw_effect, str) else None
+    return outcome if isinstance(outcome, str) else None, follow_up, groups, effect
+
+
+def _runtime_follow_up(dataset, outcome, follow_up_index) -> str | None:
+    if not isinstance(outcome, str) or not isinstance(follow_up_index, int):
+        return None
+    candidate = dataset.follow_ups_by_outcome.get(outcome, {}).get(follow_up_index)
+    return candidate if isinstance(candidate, str) else None
+
+
+def _runtime_groups(raw_groups) -> list[str]:
+    if not isinstance(raw_groups, list):
+        return []
+    return [item for item in raw_groups if isinstance(item, str)]
 
 
 class ProjectStateModel(Protocol):
@@ -84,22 +132,23 @@ def _entered_effects(
     return result
 
 
-def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
-    """Return latest-version project data for an application dataset."""
+def _project_outcomes(
+    dataset: analysis_dataset.Dataset,
+) -> tuple[list[JsonValue], set[str]]:
     outcomes: list[JsonValue] = []
     families = set()
-    for name in dataset.get_outcome_names():
-        outcome = dataset.get_outcome_obj(name)
+    canonical_outcomes = tuple(getattr(dataset, "outcomes_by_id", {}).values())
+    for outcome in canonical_outcomes:
+        name = outcome.name
         if outcome is None:
             raise ProjectAdapterError(f"outcome {name!r} has no definition")
         families.add(outcome.data_type)
         follow_ups = [
-            value
-            for _, value in sorted(
-                dataset.follow_ups_by_outcome[name].items(),
-                key=lambda pair: pair[0],
-            )
-            if value is not None
+            follow_up.label
+            for follow_up in dataset.follow_ups_by_outcome_id[
+                outcome.stable_id
+            ].values()
+            if follow_up.label is not None
         ]
         outcomes.append(
             {
@@ -109,34 +158,44 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                 "follow_ups": follow_ups,
             }
         )
-    if len(families) != 1 or next(iter(families), None) not in _FAMILY_NAMES:
+    if len(families) > 1 or next(iter(families), 0) not in _FAMILY_NAMES:
         raise ProjectAdapterError(
             "a project must contain outcomes from exactly one supported analysis family"
         )
+    return outcomes, families
 
+
+def _project_studies(dataset: analysis_dataset.Dataset) -> list[JsonValue]:
     studies: list[JsonValue] = []
     for study in dataset.studies:
         units: list[JsonValue] = []
-        for outcome_name in sorted(study.analysis_units_by_outcome):
-            for follow_up, unit in sorted(
-                study.analysis_units_by_outcome[outcome_name].items(),
-                key=lambda pair: (pair[0] is not None, str(pair[0])),
-            ):
-                units.append(
-                    {
-                        "outcome": str(outcome_name),
-                        "follow_up": follow_up,
-                        "groups": [
-                            {
-                                "id": group.id,
-                                "name": str(name),
-                                "raw_data": _portable_value(group.raw_data),
-                            }
-                            for name, group in sorted(unit.groups.items())
-                        ],
-                        "entered_effects": _entered_effects(unit.effects),
-                    }
-                )
+        canonical_units = getattr(study, "analysis_units", ())
+        for unit in canonical_units:
+            follow_up = next(
+                (
+                    label
+                    for label, identity in dataset.follow_up_stable_ids_by_outcome.get(
+                        unit.outcome.name, {}
+                    ).items()
+                    if identity == getattr(unit, "follow_up_id", None)
+                ),
+                None,
+            )
+            units.append(
+                {
+                    "outcome": str(unit.outcome.name),
+                    "follow_up": follow_up,
+                    "groups": [
+                        {
+                            "id": group.id,
+                            "name": str(name),
+                            "raw_data": _portable_value(group.raw_data),
+                        }
+                        for name, group in sorted(unit.groups.items())
+                    ],
+                    "entered_effects": _entered_effects(unit.entered_effects),
+                }
+            )
         studies.append(
             {
                 "id": study.id,
@@ -150,8 +209,14 @@ def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
                 "analysis_units": units,
             }
         )
+    return studies
 
-    family = _FAMILY_NAMES[next(iter(families))]
+
+def dataset_to_project(dataset: analysis_dataset.Dataset) -> JsonObject:
+    """Return latest-version project data for an application dataset."""
+    outcomes, families = _project_outcomes(dataset)
+    studies = _project_studies(dataset)
+    family = _FAMILY_NAMES[next(iter(families), 2 if dataset.is_diagnostic else 0)]
     return {
         "schema_version": 1,
         "dataset": {
@@ -246,23 +311,39 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
     outcome_items = [
         _object(item, "outcome") for item in _array(source["outcomes"], "outcomes")
     ]
-    outcomes = {
-        _text(item["name"], "outcome name"): analysis_dataset.Outcome(
-            _text(item["name"], "outcome name"),
+    outcomes = {}
+    for index, item in enumerate(outcome_items):
+        outcome_name = _text(item["name"], "outcome name")
+        outcomes[outcome_name] = analysis_dataset.Outcome(
+            outcome_name,
             _integer(item["data_type"], "outcome data type"),
             sub_type=_optional_text(item["sub_type"], "outcome subtype"),
+            stable_id=f"outcome:{index}",
         )
-        for item in outcome_items
-    }
-    dataset.follow_ups_by_outcome = {}
+        dataset.outcomes_by_id[outcomes[outcome_name].stable_id] = outcomes[
+            outcome_name
+        ]
     for item in outcome_items:
         outcome_name = _text(item["name"], "outcome name")
-        mapping = two_way_dict.TwoWayDict()
-        for index, follow_up in enumerate(
-            _array(item["follow_ups"], "outcome follow-ups")
-        ):
-            mapping[index] = _optional_text(follow_up, "follow-up")
-        dataset.follow_ups_by_outcome[outcome_name] = mapping
+        follow_up_labels = [
+            _optional_text(follow_up, "follow-up")
+            for follow_up in _array(item["follow_ups"], "outcome follow-ups")
+        ]
+        outcome_id = outcomes[outcome_name].stable_id
+        follow_up_ids = [
+            f"{outcome_id}:follow-up:{index}" for index in range(len(follow_up_labels))
+        ]
+        follow_up_ids_by_label = {
+            follow_up: stable_id
+            for follow_up, stable_id in zip(
+                follow_up_labels, follow_up_ids, strict=True
+            )
+            if follow_up is not None and stable_id is not None
+        }
+        dataset.follow_ups_by_outcome_id[outcomes[outcome_name].stable_id] = {
+            stable_id: analysis_dataset.FollowUp(stable_id, follow_up)
+            for follow_up, stable_id in follow_up_ids_by_label.items()
+        }
 
     covariate_items = [
         _object(item, "covariate")
@@ -274,30 +355,31 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             "continuous"
             if _integer(item["data_type"], "covariate data type") == 1
             else "factor",
-            stable_id=_optional_text(item["stable_id"], "covariate stable id"),
+            stable_id=(
+                _optional_text(item["stable_id"], "covariate stable id")
+                or f"covariate:{index}"
+            ),
         )
-        for item in covariate_items
+        for index, item in enumerate(covariate_items)
     ]
-    for covariate, item in zip(dataset.covariates, covariate_items, strict=True):
-        covariate.stable_id = _optional_text(item["stable_id"], "covariate stable id")
 
-    for study_value in _array(source["studies"], "studies"):
+    for study_index, study_value in enumerate(_array(source["studies"], "studies")):
         item = _object(study_value, "study")
         study = analysis_dataset.Study(
             _integer(item["id"], "study id"),
             _text(item["name"], "study name"),
             _optional_integer(item["year"], "study year"),
             include=_boolean(item["include"], "study inclusion"),
+            stable_id=f"study:{study_index}",
         )
         study.sample_size = copy.deepcopy(item["sample_size"])
         study.notes = _text(item["notes"], "study notes")
         study.manually_excluded = _boolean(
             item["manually_excluded"], "manual exclusion"
         )
-        study.covariate_values = copy.deepcopy(
-            _object(item["covariates"], "study covariates")
-        )
-        study.outcomes = [outcomes[name] for name in outcomes]
+        study_covariates = _object(item["covariates"], "study covariates")
+        for covariate in dataset.covariates:
+            study.register_covariate(covariate, study_covariates[covariate.name])
         for unit_value in _array(item["analysis_units"], "analysis units"):
             unit_data = _object(unit_value, "analysis unit")
             outcome_name = _text(unit_data["outcome"], "analysis unit outcome")
@@ -313,10 +395,25 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
                 copy.deepcopy(_array(group["raw_data"], "group raw data"))
                 for group in group_items
             ]
-            unit = analysis_unit.AnalysisUnit(
-                outcome, raw_data=raw_data, group_names=group_names
+            follow_up = _optional_text(unit_data["follow_up"], "unit follow-up")
+            follow_up_id = dataset.follow_up_stable_ids_by_outcome[outcome_name].get(
+                follow_up
             )
-            for group_data in group_items:
+            unit_id = f"{outcome.stable_id}:{follow_up_id or 'default'}"
+            group_stable_ids = [
+                f"{unit_id}:group:{group_index}"
+                for group_index in range(len(group_items))
+            ]
+            unit = analysis_unit.AnalysisUnit(
+                outcome,
+                raw_data=raw_data,
+                group_names=group_names,
+                stable_id=unit_id,
+                group_stable_ids=group_stable_ids,
+            )
+            unit.follow_up_id = follow_up_id
+            unit.follow_up_label = follow_up
+            for group_index, group_data in enumerate(group_items):
                 group_name = _text(group_data["name"], "analysis group name")
                 unit.groups[group_name].id = _integer(
                     group_data["id"], "analysis group id"
@@ -325,16 +422,15 @@ def project_to_dataset(project: JsonObject) -> analysis_dataset.Dataset:
             for metric, comparisons_value in entered_effects.items():
                 comparisons = _object(comparisons_value, "effect comparisons")
                 for comparison, values_value in comparisons.items():
-                    if comparison not in unit.effects[metric]:
+                    if comparison not in unit.entered_effects.get(metric, {}):
                         raise ProjectAdapterError(
                             f"unknown effect comparison {comparison!r} for {metric}"
                         )
                     values = _object(values_value, "effect values")
-                    unit.effects[metric][comparison].update(copy.deepcopy(values))
-            follow_up = _optional_text(unit_data["follow_up"], "unit follow-up")
-            study.analysis_units_by_outcome.setdefault(outcome_name, {})[follow_up] = (
-                unit
-            )
+                    unit.entered_effects[metric][comparison].update(
+                        copy.deepcopy(values)
+                    )
+            study.add_analysis_unit(unit)
         dataset.studies.append(study)
     return dataset
 
@@ -383,6 +479,7 @@ def state_to_model_state(
 
 def document_to_runtime_project(document: ProjectDocument) -> RuntimeProject:
     """Reconstruct the application dataset and durable state from a document."""
+    validate_project_semantics(document.project, document.state)
     dataset = project_to_dataset(document.project)
     model_state = state_to_model_state(dataset, document.state)
     return RuntimeProject(

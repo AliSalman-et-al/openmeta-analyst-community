@@ -19,47 +19,13 @@ def _text(*parts):
     return ROOT.joinpath(*parts).read_text(encoding="utf-8")
 
 
-def test_packagers_retain_opt_in_controlled_adaptive_layout_evidence():
+def test_packagers_do_not_invoke_test_only_adaptive_layout_evidence():
     windows = _text("scripts", "build-windows-package.ps1")
     macos = _text("scripts", "build-macos-package.sh")
 
-    assert "Invoke-PackagedAdaptiveLayoutEvidence" in windows
-    assert '"--automation-adaptive-layout-evidence"' in windows
-    assert "$quotedOutputDir" in windows
-    assert "$quotedSamplePath" in windows
-    assert (
-        'QT_QPA_PLATFORM = "offscreen"'
-        not in windows[
-            windows.index(
-                "function Invoke-PackagedAdaptiveLayoutEvidence"
-            ) : windows.index("function Invoke-PackagedWizardLayoutSmokeTest")
-        ]
-    )
-    evidence_block = windows[
-        windows.index("function Invoke-PackagedAdaptiveLayoutEvidence") : windows.index(
-            "function Invoke-PackagedWizardLayoutSmokeTest"
-        )
-    ]
-    assert "-WindowStyle Hidden" not in evidence_block
-    assert "validate_adaptive_layout_evidence.py" in evidence_block
-    assert "[switch]$CaptureAdaptiveLayoutEvidence" in windows
-    assert "if ($CaptureAdaptiveLayoutEvidence)" in windows
-    assert windows.index("if (-not $SkipSmoke)") < windows.index(
-        "if ($CaptureAdaptiveLayoutEvidence)"
-    )
-    assert 'for scale in "1.0" "1.5"' in macos
-    assert "--automation-adaptive-layout-evidence" in macos
-    assert "validate_adaptive_layout_evidence.py" in macos
-    assert "--capture-adaptive-layout-evidence" in macos
-    assert 'if [ "$capture_adaptive_layout_evidence" -eq 1 ]' in macos
-    assert (
-        "QT_QPA_PLATFORM="
-        not in macos[
-            macos.index("run_adaptive_layout_evidence()") : macos.index(
-                'if [ "$skip_smoke" -eq 0 ]'
-            )
-        ]
-    )
+    for script in (windows, macos):
+        assert "adaptive-layout-evidence" not in script
+        assert "automation-adaptive-layout-evidence" not in script
 
 
 def test_hosted_package_workflow_does_not_require_native_layout_evidence():
@@ -76,7 +42,7 @@ def test_hosted_package_workflow_does_not_require_native_layout_evidence():
         == "./.github/workflows/package-target.yml"
     )
     targets = target["jobs"]["package"]["strategy"]["matrix"]["include"]
-    assert {item["target"] for item in targets} == {"macos-x64", "macos-arm64"}
+    assert {item["target"] for item in targets} == {"macos-arm64"}
     steps = target["jobs"]["package"]["steps"] + windows["jobs"]["package"]["steps"]
     assert not any(
         "adaptive-layout-evidence" in str(step) or "evidence_path" in str(step)
@@ -88,7 +54,7 @@ def test_hosted_package_workflow_does_not_require_native_layout_evidence():
 
 
 def test_native_evidence_runner_covers_the_release_review_contract():
-    runner = _text("src", "rc_metastudio", "adaptive_layout_evidence.py")
+    runner = _text("scripts", "adaptive_layout_evidence.py")
 
     for archetype in ("workspace", "workflow", "transactional", "transient"):
         assert f'"{archetype}"' in runner
@@ -119,19 +85,6 @@ def test_native_evidence_runner_covers_the_release_review_contract():
     assert "isExposed" in runner
     assert "frame_matches" in runner
     assert "pixel-diff" in runner
-
-
-def test_windows_adaptive_evidence_scales_from_native_dpr():
-    windows = _text("scripts", "build-windows-package.ps1")
-    evidence = windows.split(
-        "function Invoke-PackagedAdaptiveLayoutEvidence", 1
-    )[1].split("function Invoke-PackagedWizardLayoutSmokeTest", 1)[0]
-
-    assert "RCMS_ADAPTIVE_LAYOUT_SCALE = $env:RCMS_ADAPTIVE_LAYOUT_SCALE" in evidence
-    assert "runtimeProbePath" in evidence
-    assert "$baselineDpr" in evidence
-    assert "/ [double]$baselineDpr" in evidence
-    assert "$env:RCMS_ADAPTIVE_LAYOUT_SCALE = $scale.Value" in evidence
 
 
 def _load_validator():
@@ -340,9 +293,10 @@ def test_native_evidence_validator_rejects_semantic_contract_mutations(
         validator.validate_evidence(tmp_path, "windows", "1.0")
 
 
-def test_launch_exposes_native_evidence_as_an_explicit_automation_mode():
+def test_launch_exposes_native_evidence_through_the_raw_open_report_mode():
     launch = _text("src", "rc_metastudio", "automation.py")
 
-    assert '"--automation-adaptive-layout-evidence"' in launch
-    assert "start_adaptive_layout_evidence" in launch
-    assert "RCMS_ADAPTIVE_LAYOUT_EVIDENCE_LOG" in launch
+    assert '"--automation-package-open-report"' in launch
+    assert "start_package_open_report" in launch
+    assert "adaptive_layout" not in launch
+

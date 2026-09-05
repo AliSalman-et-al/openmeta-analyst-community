@@ -6,9 +6,9 @@ import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, cast
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 import pytest
 from rc_metastudio import automation
+from tests.python.gui.support import automation_scenarios
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QHeaderView
 
@@ -25,13 +25,18 @@ if TYPE_CHECKING:
 else:
     from rc_metastudio.forms.ui_analysis_setup_dialog import Ui_AnalysisSetupDialog
 
-from rc_metastudio import plot_editor_dialog, results_window
+from rc_metastudio import plot_editor_dialog, plot_service, results_window
 
 REPO_ROOT = os.getcwd()
 
 
 def _sample_project_path(name):
     return os.path.join(REPO_ROOT, "sample_projects", name)
+
+
+def _mark_workspace_saved(window):
+    if window.workspace.document is not None:
+        window.workspace.mark_saved()
 
 
 def _window_archetype(widget):
@@ -81,9 +86,59 @@ def _plot_capability(
     }
 
 
+def _plot_capability_model(**overrides):
+    from rc_metastudio.analysis_results import PlotCapability
+
+    values = _plot_capability(**overrides)
+    return PlotCapability(
+        plot_kind=values["plot_kind"],
+        editable=values["editable"],
+        styleable=values["styleable"],
+        composition=values["composition"],
+        regenerator=values["regenerator"],
+    )
+
+
 def _analysis_result(payload):
     """Build the complete result contract used by ResultsWindow fixtures."""
+    payload = dict(payload)
+    payload.setdefault("version", 1)
+    if "sections" not in payload:
+        sections = [
+            {
+                "id": f"fixture.text.{index}",
+                "kind": "text",
+                "order": index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(payload.get("texts", {}))
+        ]
+        sections.extend(
+            {
+                "id": f"fixture.image.{index}",
+                "kind": "image",
+                "order": len(sections) + index,
+                "title": title,
+                "source_key": title,
+            }
+            for index, title in enumerate(payload.get("images", {}))
+        )
+        payload["sections"] = sections
     return parse_analysis_result(payload)
+
+
+def _result_sections(*items):
+    return [
+        {
+            "id": f"fixture.{kind}.{index}",
+            "kind": kind,
+            "order": index,
+            "title": title,
+            "source_key": source_key,
+        }
+        for index, (kind, title, source_key) in enumerate(items)
+    ]
 
 
 def _assert_compact_table_fits_visible_cells(table):
@@ -291,7 +346,7 @@ def test_full_app_import_pads_ragged_csv_rows_into_dataset():
         assert _cell_text(window.model, 1, window.model.NAME) == "Beta"
         assert _cell_text(window.model, 1, window.model.RAW_DATA[-1]) == ""
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -320,7 +375,7 @@ def test_automation_launch_shows_main_window_maximized():
         assert window.isMaximized()
     finally:
         # This test owns window state, not the interactive save prompt.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -330,15 +385,14 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
     monkeypatch,
 ):
     from rc_metastudio import dataset_table_model
-    from rc_metastudio import project_adapter
-    from rc_metastudio import project_format
+    from rc_metastudio import project_adapter, project_format
 
     app, window = automation.start_automation()
-    recalculations = []
+    hydrations = []
     monkeypatch.setattr(
         dataset_table_model.DatasetTableModel,
-        "try_to_update_outcomes",
-        lambda model: recalculations.append(model),
+        "hydrate_derived_previews",
+        lambda model: hydrations.append(model),
     )
     main_window = sys.modules["rc_metastudio.main_window"]
     critical_messages = []
@@ -363,9 +417,12 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
         # The automation shell begins with an empty unsaved dataset. This test is
         # about replacing that dataset in the same window, so authorize the open
         # without driving the separate interactive save-confirmation contract.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         project_path = _sample_project_path("amino.rcms")
-        expected_dataset = project_format.load_project(project_path).project["dataset"]
+        project = project_format.load_project(project_path).project
+        expected_dataset = project_adapter.dataset_to_project(
+            project_adapter.project_to_dataset(project)
+        )["dataset"]
         assert window.open(project_path) is True, critical_messages
         app.processEvents()
 
@@ -378,14 +435,118 @@ def test_open_project_preserves_main_window_state_without_duplicate_windows(
         assert window.isMaximized()
         assert window.tableView.model() is window.model
         assert window.model.rowCount() >= 20
-        assert recalculations == []
+        assert hydrations == [window.model]
         observed_dataset = project_adapter.dataset_to_project(window.model.dataset)[
             "dataset"
         ]
         assert observed_dataset == expected_dataset
     finally:
         # This test owns window identity, not the interactive save prompt.
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+@pytest.mark.parametrize(
+    "project_name", ["amino.rcms", "continuous.rcms", "lymph.rcms"]
+)
+def test_open_project_hydrates_raw_effects_without_dirtying_or_rewriting_inclusion(
+    project_name,
+):
+    from rc_metastudio import project_adapter
+    from rc_metastudio import project_format
+
+    app, window = automation.start_automation()
+    try:
+        project = project_format.load_project(
+            _sample_project_path(project_name)
+        ).project
+        expected_dataset = project_adapter.project_to_dataset(project)
+        expected_inclusion = [study.include for study in expected_dataset.studies]
+        assert window.open(_sample_project_path(project_name)) is True
+        model = window.model
+        row = next(
+            index
+            for index in range(len(model.dataset.studies))
+            if model.raw_data_is_complete_for_study(index)
+        )
+
+        assert all(_cell_text(model, row, column) != "" for column in model.OUTCOMES)
+        assert [study.include for study in model.dataset.studies] == expected_inclusion
+        assert window.workspace.is_dirty is False
+
+        incomplete_study = model.dataset.studies[row]
+        incomplete_unit = model.get_current_analysis_unit_for_study(row)
+        incomplete_study.include = False
+        incomplete_unit.groups[model.current_groups[0]].raw_data[-1] = ""
+        model.hydrate_derived_previews()
+        assert incomplete_study.include is False
+        assert all(_cell_text(model, row, column) == "" for column in model.OUTCOMES)
+
+        # Hydration must leave entered-only effects available when no raw data
+        # exists for the active analysis unit.
+        if project_name == "amino.rcms":
+            unit = model.get_analysis_unit(
+                study_index=0,
+                outcome=model.current_outcome_name,
+                follow_up=model.get_current_follow_up_name(),
+                groups=model.current_groups,
+            )
+            for group in unit.groups.values():
+                group.raw_data[:] = [""] * len(group.raw_data)
+            comparison = model.get_current_group_comparison()
+            unit.set_effect_for_source("entered", "OR", comparison, 1.25, 0.8, 2.0)
+            for setter, value in (
+                (unit.set_display_effect_for_source, 1.25),
+                (unit.set_display_lower_for_source, 0.8),
+                (unit.set_display_upper_for_source, 2.0),
+            ):
+                setter("entered", "OR", comparison, value)
+            model.hydrate_derived_previews()
+            model.reset_model()
+            assert _cell_text(model, 0, model.OUTCOMES[0]) == "1.25"
+            entered_effect = unit.get_effect_for_source("entered", "OR", comparison)
+            assert entered_effect.estimate == 1.25
+    finally:
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+        os.chdir(REPO_ROOT)
+
+
+def test_csv_raw_rows_remain_included_when_derived_columns_are_blank():
+    from rc_metastudio import main_window
+
+    app, window = automation.start_automation()
+    try:
+        window._handle_wizard_results(
+            {
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "two",
+                    "data_type": "binary",
+                    "sub_type": "proportions",
+                    "effect": "OR",
+                    "metric_choices": [],
+                    "name": "Mortality",
+                },
+                "csv_data": None,
+                "selected_dataset": None,
+            }
+        )
+        csv_row = ["Alpha", "2020", "6", "27", "9", "27", "", "", ""]
+        main_window.ImportCsvCommand(
+            imported_data=[csv_row], main_form=window
+        ).redo()
+
+        assert window.model.dataset.studies[0].include is True
+        assert all(
+            _cell_text(window.model, 0, column) != ""
+            for column in window.model.OUTCOMES
+        )
+    finally:
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -474,7 +635,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
             )
 
     assert family_counts == {
-        "icons/actions": 23,
+        "icons/actions": 22,
         "icons/analyses": 6,
         "icons/analyses/compact": 6,
         "icons/dataset-types": 8,
@@ -482,7 +643,7 @@ def test_functional_icon_set_is_embedded_and_renders_at_supported_sizes():
         "icons/dataset-types/light": 8,
         "icons/table": 1,
     }
-    assert len(resources) == 60
+    assert len(resources) == 59
 
     wide_dataset_icon_sizes = {
         ":/icons/dataset-types/generic-effect-size.svg": (54, 40),
@@ -799,7 +960,7 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
         assert _dataset_summary(window.model.dataset) == loaded_summary
         assert window.current_outcome_label.text() == loaded_outcome
         assert window.current_follow_up_label.text() == loaded_follow_up
-        assert window.tableView.undoStack.canRedo() is False
+        assert window.workspace.can_redo is False
 
         model = window.model
         original_name = _cell_text(model, 0, model.NAME)
@@ -809,7 +970,7 @@ def test_undo_immediately_after_open_does_not_clear_loaded_project(
         window.undo()
         assert _cell_text(window.model, 0, window.model.NAME) == original_name
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -846,6 +1007,51 @@ def test_frozen_startup_argv_keeps_existing_project_argument():
     assert launch._startup_project_path(argv) == sample_project
 
 
+def test_composition_configures_r_before_importing_main_window(monkeypatch, qapp):
+    from rc_metastudio import launch
+
+    events = []
+    monkeypatch.setattr(
+        launch.r_backend,
+        "install_r_backend",
+        lambda: events.append("r-runtime"),
+    )
+    monkeypatch.setattr(
+        launch,
+        "_import_main_window",
+        lambda: events.append("main-window") or object(),
+    )
+
+    app, main_window = launch._prepare_composition(qapp, None)
+
+    assert app is qapp
+    assert main_window is not None
+    assert events == ["r-runtime", "main-window"]
+
+
+def test_interactive_composition_starts_clean_and_real_edit_becomes_dirty(qapp):
+    from rc_metastudio import launch
+
+    app, window = launch.compose_application(
+        app=qapp,
+        interactive=True,
+        r_loader=lambda _app, _splash: None,
+    )
+    try:
+        assert window.workspace.is_dirty is False
+        assert window.open(_sample_project_path("amino.rcms")) is True
+        assert window.workspace.is_dirty is False
+
+        index = window.model.index(0, window.model.NAME)
+        window.tableView.set_data_in_model(index, "Edited study")
+
+        assert window.workspace.is_dirty is True
+    finally:
+        _mark_workspace_saved(window)
+        window.close()
+        app.processEvents()
+
+
 def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_path):
     from rc_metastudio import automation
     from rc_metastudio import launch
@@ -856,15 +1062,34 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     opened = []
     started = []
     closed = []
+    startup_events = []
+
+    class Workspace:
+        document = object()
+
+        def __init__(self):
+            self.saved = False
+
+        def mark_saved(self):
+            self.saved = True
+            startup_events.append("workspace-marked-saved")
 
     class Window:
         def __init__(self):
             self.tableView = self
+            self.workspace = Workspace()
 
         def show(self):
             pass
 
+        def hide(self):
+            pass
+
+        def deleteLater(self):
+            pass
+
         def open(self, project_path):
+            assert self.workspace.saved
             opened.append(project_path)
             return True
 
@@ -910,24 +1135,39 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     monkeypatch.setattr(
         launch,
         "_import_main_window",
-        lambda: type("MainWindowModule", (), {"MainWindow": Window}),
+        lambda: startup_events.append("main-window-import")
+        or type("MainWindowModule", (), {"MainWindow": Window}),
+    )
+    monkeypatch.setattr(
+        launch.r_backend,
+        "install_r_backend",
+        lambda: startup_events.append("r-runtime-ready"),
     )
     monkeypatch.setattr(launch.QtWidgets, "QApplication", lambda argv: app)
     monkeypatch.setattr(launch, "QPixmap", lambda path: object())
     monkeypatch.setattr(launch, "QSplashScreen", Splash)
     monkeypatch.setattr(launch, "create_startup_splash", lambda: Splash(object()))
-    monkeypatch.setattr(launch, "load_R_libraries", lambda app, splash: None)
+    monkeypatch.setattr(
+        launch,
+        "load_R_libraries",
+        lambda app, splash: startup_events.append("r-backend-ready"),
+    )
     monkeypatch.setattr(
         automation,
         "dispatch",
         lambda *_: pytest.fail("startup project smoke must not dispatch"),
     )
-    monkeypatch.setattr(automation, "_force_table_paint", lambda app, meta: None)
-
     assert launch.start() == 0
     assert opened == [sample_project]
     assert started == []
     assert closed == [True]
+    assert startup_events == [
+        "r-runtime-ready",
+        "main-window-import",
+        "r-backend-ready",
+        "workspace-marked-saved",
+        "workspace-marked-saved",
+    ]
     marker = json.loads(completion_marker.read_text(encoding="utf-8"))
     assert marker["project"] == "amino.rcms"
     os.chdir(REPO_ROOT)
@@ -937,7 +1177,7 @@ def test_meantime_sample_project_loads_native_factor_covariate():
     from rc_metastudio import r_backend
 
     r_backend.install_r_backend()
-    from rc_metastudio import headless_analysis
+    from tests.analysis_regression.golden.support import headless_analysis
 
     model = headless_analysis.load_dataset_model(_sample_project_path("meantime.rcms"))
     dataset = model.dataset
@@ -1205,6 +1445,7 @@ def test_edit_list_models_return_native_values_and_accept_native_edits():
         assert covariates_model.setData(covariates_model.index(0, 0), "") is False
         assert errors == ["Covariate names cannot be empty."]
     finally:
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1312,7 +1553,7 @@ def test_change_covariate_type_model_returns_native_values_and_accepts_native_ed
         finally:
             dialog.close()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1343,7 +1584,7 @@ def test_factor_covariate_edits_render_as_native_paint_text():
         delegate.initStyleOption(option, factor_index)
         assert option.text == "North"
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -1357,7 +1598,12 @@ def test_sequential_analysis_actions_open_real_specs_dialog(monkeypatch):
 
     class SpecsDialog(object):
         def __init__(
-            self, model, analysis_type=None, parent=None, confidence_level=None
+            self,
+            model,
+            analysis_type=None,
+            parent=None,
+            confidence_level=None,
+            analysis_service=None,
         ):
             calls.append(
                 (
@@ -1408,9 +1654,11 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             def show(self):
                 shown.append("shown")
 
-        def run(method, params, _method=method_name):
-            calls.append(method)
-            return {"texts": {"Summary": "%s model" % _method}, "images": {}}
+        def run(request):
+            calls.append(request["method"])
+            return _analysis_result(
+                {"texts": {"Summary": "%s model" % request["method"]}, "images": {}}
+            )
 
         app, window = automation.start_automation()
         main_window = sys.modules["rc_metastudio.main_window"]
@@ -1443,8 +1691,7 @@ def test_standard_meta_analysis_opens_specs_and_runs_through_backend(monkeypatch
             lambda model, **kwargs: None,
             raising=False,
         )
-        monkeypatch.setattr(r_bridge, "run_binary_analysis", run, raising=False)
-        monkeypatch.setattr(r_bridge, "run_continuous_analysis", run, raising=False)
+        monkeypatch.setattr(r_bridge, "run_versioned_analysis_request", run)
 
         try:
             assert window.open(_sample_project_path(name)) is True
@@ -1986,6 +2233,7 @@ def test_required_advanced_analysis_actions_open_real_gui_dialogs(monkeypatch):
                 ("subgroup", window, outcome_type),
             ]
         finally:
+            _mark_workspace_saved(window)
             window.close()
             app.processEvents()
             os.chdir(REPO_ROOT)
@@ -2113,7 +2361,7 @@ def test_advanced_analysis_actions_require_dataset_readiness_and_covariates():
         assert window.action_meta_regression.isEnabled()
         assert window.action_subgroup_ma.isEnabled()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2136,13 +2384,13 @@ def test_deleting_last_covariate_refreshes_advanced_analysis_actions():
         assert window.action_meta_regression.isEnabled() is False
         assert window.action_subgroup_ma.isEnabled() is False
 
-        window.tableView.undoStack.undo()
+        window.undo()
 
         assert [cov.name for cov in window.model.dataset.covariates] == ["region"]
         assert window.action_meta_regression.isEnabled()
         assert window.action_subgroup_ma.isEnabled()
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2192,7 +2440,7 @@ def test_subgroup_dialog_disables_ok_and_does_not_run_without_factor_covariates(
             "Select a factor covariate before running subgroup analysis.",
         )
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2220,7 +2468,7 @@ def test_subgroup_covariate_dialog_constructs_with_factor_covariate():
             for index in range(form.covariate_combo_box.count())
         ] == ["region"]
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
         os.chdir(REPO_ROOT)
@@ -2344,7 +2592,7 @@ def test_results_window_renders_summary_text_and_plot_navigation(tmp_path):
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot"]
+        assert nav_titles == ["Summary", "Forest Plot"]
         assert not hasattr(window, "psuedo_console")
         assert window.findChild(QtWidgets.QTextEdit, "psuedo_console") is None
         assert any(
@@ -2401,6 +2649,11 @@ def test_results_window_refits_svg_plots_and_reflows_sections_on_resize(tmp_path
                         plot_kind="cumulative_forest", editable=False
                     ),
                 },
+                "sections": _result_sections(
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("image", "Cumulative Forest Plot", "Cumulative Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -2646,6 +2899,11 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
         )
 
     write_svg(400, 200)
+    sections = _result_sections(
+        ("text", "Summary", "Summary"),
+        ("image", "Forest Plot", "Forest Plot"),
+        ("text", "Weights", "Weights"),
+    )
     window = results_window.ResultsWindow(
         _analysis_result(
             {
@@ -2658,6 +2916,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
                 "plot_capabilities": {
                     "Forest Plot": _plot_capability(editable=False),
                 },
+                "sections": sections,
             }
         )
     )
@@ -2732,6 +2991,7 @@ def test_results_window_refits_svg_plot_after_in_place_regenerate(tmp_path):
                     "plot_capabilities": {
                         "Forest Plot": _plot_capability(editable=False),
                     },
+                    "sections": sections,
                 }
             )
         )
@@ -2785,6 +3045,11 @@ def test_results_window_reflows_sections_after_raster_plot_regenerate(tmp_path):
                 "plot_capabilities": {
                     "Forest Plot": _plot_capability(editable=False),
                 },
+                "sections": _result_sections(
+                    ("text", "Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "Weights", "Weights"),
+                ),
             }
         )
     )
@@ -2849,6 +3114,11 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
                 "image_params_paths": {"Forest Plot": str(tmp_path / "forest_params")},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability()},
+                "sections": _result_sections(
+                    ("text", "Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -2861,7 +3131,7 @@ def test_results_window_places_references_after_images_and_wraps_them(tmp_path):
             required(window.nav_tree.topLevelItem(index), "navigation item").text(0)
             for index in range(window.nav_tree.topLevelItemCount())
         ]
-        assert nav_titles == ["Meta-Analysis Summary", "Forest Plot", "References"]
+        assert nav_titles == ["Summary", "Forest Plot", "References"]
 
         sections = {
             item.toPlainText(): item
@@ -3118,7 +3388,7 @@ def test_results_window_figure_context_menus_offer_edit_for_regenerable_forest_p
             artifact = results_window.PlotArtifact(
                 title,
                 "missing.png",
-                _plot_capability(
+                _plot_capability_model(
                     plot_kind=plot_kind,
                     editable=editable,
                     styleable=plot_kind not in ("other", "roc", "sroc"),
@@ -3206,25 +3476,25 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
         )
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda *a, **k: None,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_plot_data",
         lambda: None,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: image_path.write_text(
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800">'
@@ -3235,7 +3505,7 @@ def test_results_window_applies_forest_edits_to_selected_variant_artifact(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: None,
         raising=False,
@@ -3290,18 +3560,18 @@ def test_results_window_save_handler_regenerates_cumulative_forest_as_single_pan
     artifact = results_window.PlotArtifact(
         "Cumulative Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(plot_kind="cumulative_forest", editable=False),
+        _plot_capability_model(plot_kind="cumulative_forest", editable=False),
         params_path=str(tmp_path / "forest_params"),
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3346,18 +3616,18 @@ def test_results_window_save_handler_accepts_backend_export_formats(
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest_params"),
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3401,18 +3671,18 @@ def test_results_window_save_handler_preserves_requested_format_when_extension_i
     artifact = results_window.PlotArtifact(
         "Forest Plot",
         str(tmp_path / "forest.png"),
-        _plot_capability(),
+        _plot_capability_model(),
         params_path=str(tmp_path / "forest_params"),
     )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_in_r",
         lambda path: calls.append(("load", path)),
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         lambda path: calls.append(("forest", path)),
         raising=False,
@@ -3774,7 +4044,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
             }
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda params, write_them_out=False, outpath=None: calls.append(
             ("update", params, write_them_out, outpath)
@@ -3782,7 +4052,7 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_regression_plot_data",
         lambda: calls.append(("regenerate",)),
         raising=False,
@@ -3799,13 +4069,13 @@ def test_apply_regression_plot_edits_rebuilds_and_redraws_bubble_plot(
         )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_reg_plot",
         generate_reg_plot,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: calls.append(("write", path)),
         raising=False,
@@ -4082,9 +4352,20 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
         show_legend: QtWidgets.QCheckBox
         plot_tab: QtWidgets.QWidget
         selected: list[object]
+        analysis_service: analysis_setup_dialog.analysis_adapter.AnalysisService
 
         def _selected_covariates(self):
             return [covariate]
+
+        def _meta_regression_metric(self):
+            return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_metric(
+                cast(analysis_setup_dialog.AnalysisSetupDialog, self)
+            )
+
+        def _meta_regression_request(self):
+            return analysis_setup_dialog.AnalysisSetupDialog._meta_regression_request(
+                cast(analysis_setup_dialog.AnalysisSetupDialog, self)
+            )
 
         def parent(self):
             return self._parent
@@ -4130,23 +4411,23 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     form.show_prediction_interval.setChecked(True)
     form.show_legend = QtWidgets.QCheckBox()
     form.show_legend.setChecked(True)
+    form.analysis_service = analysis_setup_dialog.analysis_adapter.AnalysisService()
 
+    r_bridge = analysis_setup_dialog.analysis_adapter.r_bridge
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
+        r_bridge,
         "dataset_to_simple_binary_r_object",
         lambda *args, **kwargs: calls.append(("prepare", args, kwargs)),
-        raising=False,
     )
 
-    def run_meta_regression(*args, **kwargs):
-        calls.append(("run", args, kwargs))
-        return {"texts": {"Summary": "meta-regression"}, "images": {}}
+    def run_meta_regression(request):
+        calls.append(("run", request))
+        return _analysis_result({"texts": {"Summary": "meta-regression"}, "images": {}})
 
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
-        "run_meta_regression",
+        r_bridge,
+        "run_versioned_analysis_request",
         run_meta_regression,
-        raising=False,
     )
 
     analysis_setup_dialog.AnalysisSetupDialog.run_meta_regression(
@@ -4155,13 +4436,18 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
 
     assert calls[0][0] == "prepare"
     assert calls[1][0] == "run"
-    assert calls[1][1][1:4] == (studies, [covariate], "OR")
-    assert calls[1][2]["fixed_effects"] is True
-    assert calls[1][2]["confidence_level"] == 90.0
-    assert calls[1][2]["params"]["rm.method"] == "SJ"
-    assert calls[1][2]["params"]["digits"] == 4
-    assert calls[1][2]["params"]["bp_style"] == "revman"
-    assert calls[1][2]["params"]["bp_outpath"] == "bubble.png"
+    assert calls[0][2] == {
+        "covs_to_include": (covariate,),
+        "studies": tuple(studies),
+    }
+    request = calls[1][1]
+    assert request["workflow"] == "meta-regression"
+    assert request["metric"] == "OR"
+    assert request["params"]["rm.method"] == "FE"
+    assert request["params"]["conf.level"] == 90.0
+    assert request["params"]["digits"] == 4
+    assert request["params"]["bp_style"] == "revman"
+    assert request["params"]["bp_outpath"] == "bubble.png"
     assert calls[-2][0] == "analysis"
     assert calls[-1] == ("accepted",)
     app.processEvents()
@@ -4321,13 +4607,13 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
             return dict(self._params)
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "load_vars_for_plot",
         lambda path, return_params_dict=False: {"fp_col1_str": "Study"},
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "update_plot_params",
         lambda updated_params, write_them_out=False, outpath=None: calls.append(
             ("update", updated_params, write_them_out, outpath)
@@ -4335,7 +4621,7 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_plot_data",
         lambda: calls.append(("regenerate",)),
         raising=False,
@@ -4352,13 +4638,13 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
         )
 
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "generate_forest_plot",
         generate_forest_plot,
         raising=False,
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "write_out_plot_data",
         lambda path: calls.append(("write", path)),
         raising=False,
@@ -4378,6 +4664,10 @@ def test_edit_plot_apply_regenerates_plot_without_accepting_dialog(
                 "image_params_paths": {"Forest Plot": params_path},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability()},
+                "sections": _result_sections(
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "References", "References"),
+                ),
             }
         )
     )
@@ -4458,7 +4748,7 @@ def test_results_window_ignores_missing_image_order_entries():
             for index in range(window.nav_tree.topLevelItemCount())
         ]
 
-        assert nav_titles == ["Meta-Analysis Summary"]
+        assert nav_titles == ["Summary"]
         assert not any(
             isinstance(item, results_window.QGraphicsPixmapItem)
             for item in window.scene.items()
@@ -4493,6 +4783,11 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                 "images": {"Forest Plot": plot_paths["forest"]},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": _plot_capability(editable=False)},
+                "sections": _result_sections(
+                    ("text", "Meta-Analysis Summary", "Summary"),
+                    ("image", "Forest Plot", "Forest Plot"),
+                    ("text", "Weights", "Weights"),
+                ),
             }
         )
     )
@@ -4529,14 +4824,20 @@ def test_results_window_uses_reader_oriented_section_names_and_order(tmp_path):
                         regenerator="none",
                     ),
                 },
+                "sections": _result_sections(
+                    ("text", "Summary operating point", "Summary operating point"),
+                    ("text", "Marginal prediction", "Marginal prediction"),
+                    ("text", "Model information", "Model information"),
+                    ("image", "Summary ROC Plot", "SROC"),
+                ),
             }
         )
     )
     try:
         nav_titles = [
-            required(reitsma_window.nav_tree.topLevelItem(index), "navigation item").text(
-                0
-            )
+            required(
+                reitsma_window.nav_tree.topLevelItem(index), "navigation item"
+            ).text(0)
             for index in range(reitsma_window.nav_tree.topLevelItemCount())
         ]
 
@@ -4569,11 +4870,12 @@ def test_main_window_save_as_round_trips_representative_projects(tmp_path, monke
 
             window.save_as()
             assert os.path.exists(saved_path)
-            assert window.current_data_unsaved is False
-            main_window = sys.modules["rc_metastudio.main_window"]
-            reopened, _state, _restored_selection = (
-                main_window._load_structured_project(saved_path)
-            )
+            assert window.workspace.is_dirty is False
+            from rc_metastudio import project_adapter
+            from rc_metastudio.workspace_session import WorkspaceSession
+
+            document = WorkspaceSession().open(saved_path)
+            reopened = project_adapter.project_to_dataset(document.project)
             assert _dataset_summary(reopened) == expected
             if name == "meantime.rcms":
                 values = [
@@ -4746,6 +5048,7 @@ def test_startup_wizard_cancel_preserves_loaded_dataset(monkeypatch):
     main_window = launch._import_main_window()
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = main_window.MainWindow()
+    _mark_workspace_saved(window)
     sample_project = _sample_project_path("amino.rcms")
 
     class RejectedWizard(QtCore.QObject):
@@ -4830,7 +5133,7 @@ def test_startup_wizard_opens_after_event_loop_and_reactivates_main_window(monke
         assert events[3:] == ["deleted", "shown", "raised", "activated"]
         assert window._startup_wizard is None
     finally:
-        window.current_data_unsaved = False
+        _mark_workspace_saved(window)
         window.close()
         app.processEvents()
 
@@ -4893,8 +5196,10 @@ def test_data_type_page_reflows_buttons_without_horizontal_overflow():
 def test_data_type_page_buttons_center_icons_inside_declared_slots():
     from PyQt6 import QtWidgets
     from rc_metastudio import main_wizard
+    from rc_metastudio.qt6_resources import ensure_application_resources
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    ensure_application_resources()
     wizard = main_wizard.MainWizard(path="new_dataset")
     try:
         wizard.restart()
@@ -4979,7 +5284,7 @@ def test_wizard_layout_smoke_renders_core_wizard_pages():
         QtWidgets.QApplication.instance() or QtWidgets.QApplication([]),
     )
 
-    assert automation.start_wizard_layout_smoke() == 0
+    assert automation_scenarios.start_wizard_layout_smoke() == 0
     assert [
         widget
         for widget in app.topLevelWidgets()
@@ -5374,11 +5679,8 @@ def test_about_legal_and_welcome_links_show_current_project_information():
         os.chdir(REPO_ROOT)
 
 
-def test_load_r_libraries_runs_against_stub_bridge():
-    # Regression: the frozen maintained build has no Qt4 binding, so r_backend.install_r_backend()
-    # plants the stub r_bridge used as the milestone-1 R bridge. The real launch
-    # path (start -> load_R_libraries) calls get_r_library_paths() + RLibraryLoader, which
-    # must all exist on the stub or the app crashes before the GUI ever shows.
+def test_load_r_libraries_runs_against_explicit_test_bridge():
+    # The test bridge is installed explicitly at this narrow integration seam.
     from rc_metastudio import launch
     from rc_metastudio import r_backend
 
@@ -5401,18 +5703,14 @@ def test_load_r_libraries_runs_against_stub_bridge():
         "r-library:metafor:complete",
         "r-library:RCMetaR:start",
         "r-library:RCMetaR:complete",
-        "r-library:igraph:start",
-        "r-library:igraph:complete",
         "r-library:grid:start",
         "r-library:grid:complete",
     ]
 
 
-def test_stub_backend_exposes_data_entry_imputation_methods():
-    # Regression for GitHub #48: the maintained PyQt6 path plants a stub r_bridge,
-    # and data-entry dialogs call these methods during construction. The no-R
-    # stub must expose them, returning a benign "couldn't impute" result rather
-    # than crashing.
+def test_explicit_test_backend_exposes_data_entry_imputation_methods():
+    # The narrow test backend seam must expose the data-entry methods used by
+    # dialogs without replacing the production rpy2 module.
     from rc_metastudio import r_backend
 
     r_backend.install_r_backend()
@@ -5444,10 +5742,9 @@ def test_stub_backend_exposes_data_entry_imputation_methods():
     )
 
 
-def test_data_entry_dialogs_construct_with_stub_backend(monkeypatch):
-    # Regression for GitHub #48: opening these dialogs from a study row used to
-    # crash when the stubbed r_bridge lacked imputation entry points. With the
-    # pure-Python no-R stub they must still construct without a live backend.
+def test_data_entry_dialogs_construct_with_explicit_test_backend(monkeypatch):
+    # Dialog construction uses the explicitly injected test backend seam and
+    # does not require a live R installation.
     import copy
 
     app, window = automation.start_automation()
@@ -5560,6 +5857,7 @@ def test_analysis_dialog_family_declares_migrated_transactional_surfaces(monkeyp
             ]
         )
 
+        _mark_workspace_saved(window)
         assert window.open(_sample_project_path("continuous.rcms")) is True
         model = window.model
         dialogs.append(

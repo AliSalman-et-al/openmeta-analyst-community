@@ -2,6 +2,28 @@
 
 All notable RC MetaStudio changes will be recorded in this file.
 
+## 0.4.0 - 2026-09-05
+
+### Added
+
+- Added deterministic code-health checks for Python and R, including complexity, coupling, typing, and change hotspots.
+
+### Changed
+
+- Separated domain data, workspace editing and persistence, Qt presentation, and R analysis responsibilities. Project identities remain stable when labels change.
+- Made R startup explicit and introduced a versioned Python–R analysis contract.
+- Unified ordinary startup and packaged automation, with bundled-R configuration applied before GUI imports.
+- Moved automation sequencing and evidence assembly to external qualification scripts while keeping production hooks narrow and atomic.
+- Limited future release packaging to Windows x64 and Apple silicon macOS.
+
+### Fixed
+
+- Removed the false save prompt when opening a project from an untouched startup workspace.
+- Restored calculated estimates and confidence bounds when opening binary, continuous, and diagnostic projects, without changing saved inclusion choices or entered estimates.
+- Kept complete imported studies included when their CSV contains blank calculated-effect columns.
+- Fixed packaged startup without developer R settings and isolated package qualification from inherited runtime settings.
+- Updated native and release qualification scripts to the current workspace and analysis contracts, and replaced obsolete shell commands with real lifecycle checks.
+
 ## 0.3.1 - 2026-09-03
 
 ### Added

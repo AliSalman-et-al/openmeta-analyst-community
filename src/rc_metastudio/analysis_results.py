@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Literal, TypedDict
 
 
@@ -26,17 +28,20 @@ PlotComposition = Literal["single"]
 PlotRegenerator = Literal["forest", "regression", "funnel", "sroc", "none"]
 
 
-class PlotCapability(TypedDict):
+@dataclass(frozen=True, slots=True)
+class PlotCapability:
+    """Immutable capability data attached to one semantic plot artifact."""
+
     plot_kind: PlotKind
     editable: bool
     styleable: bool
     composition: PlotComposition
     regenerator: PlotRegenerator
 
-
 class RawAnalysisResult(TypedDict, total=False):
     """Untrusted result shape accepted at the application boundary."""
 
+    version: int
     texts: dict[str, str]
     images: dict[str, str]
     display_images: dict[str, str]
@@ -44,30 +49,158 @@ class RawAnalysisResult(TypedDict, total=False):
     image_params_paths: dict[str, str]
     image_order: list[str] | None
     plot_capabilities: dict[str, dict[str, object]]
+    sections: list[dict[str, object]]
 
 
-class AnalysisResult(TypedDict):
-    """Validated result shape consumed by result rendering and merging."""
+@dataclass(frozen=True, slots=True)
+class ResultSection:
+    """Stable result identity and stored display/regeneration data."""
 
-    texts: dict[str, str]
-    images: dict[str, str]
-    display_images: dict[str, str]
-    image_var_names: dict[str, str]
-    image_params_paths: dict[str, str]
-    image_order: list[str] | None
-    plot_capabilities: dict[str, PlotCapability]
+    semantic_id: str
+    kind: Literal["text", "image"]
+    order: int
+    title: str
+    value: str
+    source_key: str
+    plot_kind: PlotKind | None = None
+    plot_data: str | None = None
+    capability: PlotCapability | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisResult:
+    """Validated immutable result contract consumed by application adapters."""
+
+    version: int
+    texts: Mapping[str, str]
+    images: Mapping[str, str]
+    display_images: Mapping[str, str]
+    image_var_names: Mapping[str, str]
+    image_params_paths: Mapping[str, str]
+    image_order: tuple[str, ...] | None
+    plot_capabilities: Mapping[str, PlotCapability]
+    sections: tuple[ResultSection, ...]
+
+def _sections(
+    texts: Mapping[str, str],
+    images: Mapping[str, str],
+    image_params_paths: Mapping[str, str],
+    capabilities: Mapping[str, PlotCapability],
+    metadata: Iterable[Mapping[str, object]],
+) -> tuple[ResultSection, ...]:
+    result: list[ResultSection] = []
+    seen_ids: set[str] = set()
+    seen_orders: set[int] = set()
+    seen_values: set[tuple[str, str]] = set()
+    for item in metadata:
+        section = _result_section(item, texts, images, image_params_paths, capabilities)
+        semantic_id = section.semantic_id
+        order = section.order
+        value_key = (section.kind, section.source_key)
+        if semantic_id in seen_ids or order in seen_orders:
+            raise ValueError(
+                "analysis result section identity and order must be unique"
+            )
+        if value_key in seen_values:
+            raise ValueError("analysis result values must have exactly one section")
+        seen_ids.add(semantic_id)
+        seen_orders.add(order)
+        seen_values.add(value_key)
+        result.append(section)
+    expected_values = {("text", key) for key in texts} | {
+        ("image", key) for key in images
+    }
+    if seen_values != expected_values:
+        raise ValueError("analysis result sections must cover every text and image")
+    return tuple(result)
+
+
+def _result_section(
+    item: Mapping[str, object],
+    texts: Mapping[str, str],
+    images: Mapping[str, str],
+    image_params_paths: Mapping[str, str],
+    capabilities: Mapping[str, PlotCapability],
+) -> ResultSection:
+    semantic_id, kind, order, title, source_key = _section_fields(item)
+    values = texts if kind == "text" else images
+    value = values.get(source_key)
+    if value is None:
+        raise ValueError("analysis result section references missing value")
+    if kind == "text":
+        return ResultSection(semantic_id, kind, order, title, value, source_key)
+    capability = capabilities.get(source_key)
+    if capability is None:
+        raise ValueError("analysis result image has no plot capability")
+    return ResultSection(
+        semantic_id,
+        kind,
+        order,
+        title,
+        value,
+        source_key,
+        capability.plot_kind,
+        image_params_paths.get(source_key),
+        capability,
+    )
+
+
+def _section_fields(
+    item: Mapping[str, object],
+) -> tuple[str, Literal["text", "image"], int, str, str]:
+    semantic_id = _required_section_text(item, "id")
+    source_key = _required_section_text(item, "source_key")
+    title = _required_section_text(item, "title")
+    kind = item.get("kind")
+    if kind == "text":
+        typed_kind: Literal["text", "image"] = "text"
+    elif kind == "image":
+        typed_kind = "image"
+    else:
+        raise ValueError("analysis result section kind is invalid")
+    order = item.get("order")
+    if type(order) is not int:
+        raise ValueError("analysis result section order must be a non-negative integer")
+    if order < 0:
+        raise ValueError("analysis result section order must be a non-negative integer")
+    return semantic_id, typed_kind, order, title, source_key
+
+
+def _required_section_text(item: Mapping[str, object], field: str) -> str:
+    value = item.get(field)
+    if isinstance(value, str) and value:
+        return value
+    label = field.replace("_", " ")
+    raise ValueError(f"analysis result section {label} must be non-empty text")
+
+
+def _freeze_result(
+    texts: Mapping[str, str],
+    images: Mapping[str, str],
+    display_images: Mapping[str, str],
+    image_var_names: Mapping[str, str],
+    image_params_paths: Mapping[str, str],
+    image_order: Iterable[str] | None,
+    plot_capabilities: Mapping[str, PlotCapability],
+    metadata: Iterable[Mapping[str, object]] = (),
+) -> AnalysisResult:
+    return AnalysisResult(
+        version=1,
+        texts=MappingProxyType(dict(texts)),
+        images=MappingProxyType(dict(images)),
+        display_images=MappingProxyType(dict(display_images)),
+        image_var_names=MappingProxyType(dict(image_var_names)),
+        image_params_paths=MappingProxyType(dict(image_params_paths)),
+        image_order=None if image_order is None else tuple(image_order),
+        plot_capabilities=MappingProxyType(dict(plot_capabilities)),
+        sections=_sections(
+            texts, images, image_params_paths, plot_capabilities, metadata
+        ),
+    )
 
 
 def empty_analysis_result() -> AnalysisResult:
-    return {
-        "texts": {},
-        "images": {},
-        "display_images": {},
-        "image_var_names": {},
-        "image_params_paths": {},
-        "image_order": None,
-        "plot_capabilities": {},
-    }
+    return _freeze_result({}, {}, {}, {}, {}, None, {})
 
 
 def parse_analysis_result(value: object) -> AnalysisResult:
@@ -80,6 +213,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
             raise ValueError("analysis result field names must be text")
         source[key] = item
     raw: RawAnalysisResult = {
+        "version": _result_version(source.get("version")),
         "texts": _string_mapping(source.get("texts"), "texts"),
         "images": _string_mapping(source.get("images"), "images"),
         "display_images": _string_mapping(
@@ -95,6 +229,7 @@ def parse_analysis_result(value: object) -> AnalysisResult:
         "plot_capabilities": _object_mapping(
             source.get("plot_capabilities"), "plot_capabilities"
         ),
+        "sections": _section_metadata(source.get("sections")),
     }
 
     # Local import avoids a module cycle: plot_capabilities owns descriptor
@@ -108,15 +243,22 @@ def parse_analysis_result(value: object) -> AnalysisResult:
             "Display artifacts have no matching plot artifact: %s"
             % ", ".join(extra_display_images)
         )
-    return {
-        "texts": raw["texts"],
-        "images": raw["images"],
-        "display_images": raw["display_images"],
-        "image_var_names": raw["image_var_names"],
-        "image_params_paths": raw["image_params_paths"],
-        "image_order": raw["image_order"],
-        "plot_capabilities": capabilities,
-    }
+    return _freeze_result(
+        raw["texts"],
+        raw["images"],
+        raw["display_images"],
+        raw["image_var_names"],
+        raw["image_params_paths"],
+        raw["image_order"],
+        capabilities,
+        raw["sections"],
+    )
+
+
+def _result_version(value: object) -> int:
+    if type(value) is not int or value != 1:
+        raise ValueError(f"unsupported analysis result version: {value!r}")
+    return value
 
 
 def _string_mapping(value: object, label: str) -> dict[str, str]:
@@ -161,3 +303,16 @@ def _optional_string_list(value: object, label: str) -> list[str] | None:
             raise ValueError(f"{label} must be a list of text values or null")
         result.append(item)
     return result
+
+
+def _section_metadata(value: object) -> list[dict[str, object]]:
+    if value is None:
+        raise ValueError("analysis result sections are required")
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("sections must be a list")
+    metadata: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError("sections entries must be mappings")
+        metadata.append({str(key): field for key, field in item.items()})
+    return metadata

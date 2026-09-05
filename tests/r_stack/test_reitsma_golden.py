@@ -157,7 +157,6 @@ _DRIVER = textwrap.dedent(
 
 def test_reitsma_release_values_match_public_mada_with_portable_tolerances():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     run_r_driver(_DRIVER)
 
 
@@ -166,7 +165,6 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
     import os, re, sys
 
     repo_root = __REPO_ROOT__
-    os.environ.pop("RCMS_STUB_BACKEND", None)
     os.environ["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("RCMS_QT6_BUILD_ROOT", os.path.join(repo_root, "build", "qt6-verification"))
@@ -174,7 +172,8 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
     from rc_metastudio import r_backend
     r_backend.install_r_backend()
     try:
-        from rc_metastudio import headless_analysis, meta_globals, r_bridge
+        from tests.analysis_regression.golden.support import headless_analysis
+        from rc_metastudio import meta_globals, r_bridge
         try:
             r_bridge.RLibraryLoader().load_rcmetar()
         except Exception:
@@ -200,10 +199,10 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
         data_type=meta_globals.DIAGNOSTIC,
     )
     standard = headless_analysis.run_headless_analysis(case)
-    point = standard["texts"]["Summary operating point"]
+    point = standard.texts["Summary operating point"]
     assert "Sensitivity" in point and "Specificity" in point, point
     assert "Lower bound" in point and "Upper bound" in point, point
-    assert "Model information" in standard["texts"]
+    assert "Model information" in standard.texts
 
     # Build the comparison fit through mada's public API.  The expected
     # values are derived independently from the public fit, not from any
@@ -279,8 +278,8 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
         ],
     )
     regression = headless_analysis.run_headless_analysis(regression_case)
-    sens_text = regression["texts"]["Sensitivity coefficients"]
-    spec_text = regression["texts"]["Specificity coefficients"]
+    sens_text = regression.texts["Sensitivity coefficients"]
+    spec_text = regression.texts["Specificity coefficients"]
     assert "quality = A (reference)" in sens_text and "quality = A (reference)" in spec_text
     assert "Odds Ratio" in sens_text and "Odds Ratio" in spec_text
 
@@ -335,6 +334,5 @@ _HEADLESS_ADAPTER_DRIVER = textwrap.dedent(
 
 def test_reitsma_headless_adapter_standard_and_meta_regression_match_public_mada():
     env = dict(os.environ)
-    env.pop("RCMS_STUB_BACKEND", None)
     env["RCMS_REQUIRE_IN_PROCESS_RPY2"] = "1"
     run_python_driver(_HEADLESS_ADAPTER_DRIVER, env=env)

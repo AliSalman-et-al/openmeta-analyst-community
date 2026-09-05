@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture and validate the remaining native Qt6 top-level surfaces."""
 
 from __future__ import annotations
@@ -7,10 +9,11 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path, PurePosixPath
 import subprocess
 import sys
-from typing import Any, cast
+from collections.abc import Callable, Collection
+from pathlib import Path, PurePosixPath
+from typing import Protocol, TypeAlias, TypeGuard
 
 
 SCALE_FACTORS = (1.0, 1.5)
@@ -18,6 +21,8 @@ TOLERANCE = 0.02
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_ROOT = ROOT / "build/qt6-verification/native-remaining-surfaces"
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build/qt6-verification"))
+
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 ACTION_CONTRACTS = {
     "about-legal": "close",
@@ -43,6 +48,16 @@ SPECIAL_OVERFLOW = {
     "main-wizard": "page-scroll-area",
     "startup-splash": "screen-bounded-pixmap",
 }
+
+SurfaceFactory: TypeAlias = Callable[[], QtWidgets.QWidget]
+
+
+class _ZeroArgumentFactory(Protocol):
+    def __call__(self) -> object: ...
+
+
+def _is_zero_argument_factory(value: object) -> TypeGuard[_ZeroArgumentFactory]:
+    return callable(value)
 
 
 def _slug(scale: float) -> str:
@@ -76,7 +91,11 @@ def _surface_capture_order() -> tuple[str, ...]:
     return ("main-wizard", *sorted(surfaces - {"main-wizard"}))
 
 
-def _qt_message_handler(message_type: Any, context: Any, message: str | None) -> None:
+def _qt_message_handler(
+    message_type: QtCore.QtMsgType,
+    context: QtCore.QMessageLogContext,
+    message: str | None,
+) -> None:
     """Keep native Qt diagnostics visible even when a warning is fatal."""
     location = ""
     if context.file:
@@ -85,7 +104,7 @@ def _qt_message_handler(message_type: Any, context: Any, message: str | None) ->
     os.write(2, payload.encode("utf-8", errors="backslashreplace"))
 
 
-def _rect(rect: Any) -> dict[str, int]:
+def _rect(rect: QtCore.QRect) -> dict[str, int]:
     return {
         "x": rect.x(),
         "y": rect.y(),
@@ -94,7 +113,7 @@ def _rect(rect: Any) -> dict[str, int]:
     }
 
 
-def _has_variation(image: Any) -> bool:
+def _has_variation(image: QtGui.QImage) -> bool:
     converted = image.convertToFormat(image.Format.Format_ARGB32)
     if converted.isNull():
         return False
@@ -152,21 +171,44 @@ def _canonical_member(root: Path, value: object) -> Path:
 
 
 def _number(value: object, label: str) -> float:
-    if type(value) not in (int, float):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("remaining-surface evidence %s is not finite" % label)
-    result = float(cast(int | float, value))
+    result = float(value)
     if not math.isfinite(result):
         raise ValueError("remaining-surface evidence %s is not finite" % label)
     return result
 
 
-def _validated_rect(value: object, label: str) -> dict[str, int]:
-    if not isinstance(value, dict) or set(value) != {"x", "y", "width", "height"}:
+def _object_dict(value: object, label: str) -> dict[str, object]:
+    if not isinstance(value, dict):
         raise ValueError("remaining-surface evidence %s is malformed" % label)
-    mapping = cast(dict[str, object], value)
-    if any(type(item) is not int for item in mapping.values()):
+    result: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ValueError("remaining-surface evidence %s has a non-text key" % label)
+        result[key] = item
+    return result
+
+
+def _validated_integral_fields(
+    mapping: dict[str, object], label: str
+) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for key, item in mapping.items():
+        if type(item) is not int:
+            raise ValueError("remaining-surface evidence %s is not integral" % label)
+        result[key] = item
+    return result
+
+
+def _validated_rect(value: object, label: str) -> dict[str, int]:
+    if not isinstance(value, dict):
+        raise ValueError("remaining-surface evidence %s is malformed" % label)
+    mapping = _object_dict(value, label)
+    required = {"x", "y", "width", "height"}
+    if set(mapping) != required:
         raise ValueError("remaining-surface evidence %s is not integral" % label)
-    result = {key: cast(int, mapping[key]) for key in ("x", "y", "width", "height")}
+    result = _validated_integral_fields(mapping, label)
     if result["width"] < 1 or result["height"] < 1:
         raise ValueError("remaining-surface evidence %s is empty" % label)
     return result
@@ -262,7 +304,6 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
             expected_first_use = {
                 "EDIT_DATASET": "screen_fraction",
                 "MAIN": "maximized",
-                "NETWORK_VIEW": "screen_fraction",
                 "RESULTS": "maximized",
             }.get(surface["role"], "content_preferred")
             if surface["first_use_behavior"] != expected_first_use:
@@ -340,8 +381,8 @@ def validate_evidence(root: Path = DEFAULT_EVIDENCE_ROOT) -> list[dict[str, obje
     return records
 
 
-def _validate_focus_observation(surface_id: str, observation: object) -> None:
-    if not isinstance(observation, dict) or set(observation) != {
+_FOCUS_FIELDS = frozenset(
+    {
         "after_tab",
         "after_tab_descendant",
         "after_tab_focusable",
@@ -354,110 +395,220 @@ def _validate_focus_observation(surface_id: str, observation: object) -> None:
         "moved",
         "steps",
         "traversed",
+    }
+)
+_FOCUS_EXEMPT_SURFACES = frozenset(
+    {"import-progress", "shared-progress", "startup-splash"}
+)
+
+
+def _focus_failure(surface_id: str) -> ValueError:
+    return ValueError(
+        "remaining-surface %s focus traversal was not observed" % surface_id
+    )
+
+
+def _require_focus_values(
+    surface_id: str,
+    focus: dict[str, object],
+    keys: tuple[str, ...],
+    expected: object,
+) -> None:
+    for key in keys:
+        if focus[key] != expected:
+            raise ValueError("remaining-surface %s focus exemption is malformed" % surface_id)
+
+
+def _validate_focus_exemption(surface_id: str, focus: dict[str, object]) -> None:
+    if surface_id not in _FOCUS_EXEMPT_SURFACES:
+        raise ValueError(
+            "remaining-surface %s unexpectedly lacks focus traversal" % surface_id
+        )
+    _require_focus_values(
+        surface_id, focus, ("after_tab", "attempts", "initial"), None
+    )
+    _require_focus_values(
+        surface_id,
+        focus,
+        ("after_tab_descendant", "after_tab_focusable", "initial_descendant", "moved"),
+        False,
+    )
+    _require_focus_values(surface_id, focus, ("focusable_count",), 0)
+    _require_focus_values(surface_id, focus, ("focusables", "steps", "traversed"), [])
+
+
+def _focus_strings(
+    focus: dict[str, object], key: str, surface_id: str
+) -> list[str]:
+    value = focus[key]
+    if not isinstance(value, list):
+        raise _focus_failure(surface_id)
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item:
+            raise _focus_failure(surface_id)
+        result.append(item)
+    return result
+
+
+def _focus_objects(focus: dict[str, object], key: str, surface_id: str) -> list[object]:
+    value = focus[key]
+    if not isinstance(value, list):
+        raise _focus_failure(surface_id)
+    result: list[object] = []
+    result.extend(value)
+    return result
+
+
+def _focus_text(focus: dict[str, object], key: str, surface_id: str) -> str:
+    value = focus[key]
+    if not isinstance(value, str) or not value:
+        raise _focus_failure(surface_id)
+    return value
+
+
+def _focus_count(focus: dict[str, object], key: str, surface_id: str) -> int:
+    value = focus[key]
+    if type(value) is not int or value < 1:
+        raise _focus_failure(surface_id)
+    return value
+
+
+def _require_focus_true(focus: dict[str, object], key: str, surface_id: str) -> None:
+    if focus[key] is not True:
+        raise _focus_failure(surface_id)
+
+
+def _validate_focus_summary(
+    surface_id: str,
+    focus: dict[str, object],
+    focusables: list[str],
+    traversed: list[str],
+) -> int:
+    initial = _focus_text(focus, "initial", surface_id)
+    after_tab = _focus_text(focus, "after_tab", surface_id)
+    if initial == after_tab:
+        raise _focus_failure(surface_id)
+    attempts = _focus_count(focus, "attempts", surface_id)
+    count = _focus_count(focus, "focusable_count", surface_id)
+    _validate_focus_counts(surface_id, count, attempts, focusables)
+    _validate_focus_flags(surface_id, focus)
+    _validate_focus_path(surface_id, initial, after_tab, attempts, focusables, traversed)
+    return attempts
+
+
+def _validate_focus_counts(
+    surface_id: str, count: int, attempts: int, focusables: list[str]
+) -> None:
+    if count < 2 or len(focusables) != count:
+        raise _focus_failure(surface_id)
+    if len(set(focusables)) != count or attempts > count * 2:
+        raise _focus_failure(surface_id)
+
+
+def _validate_focus_flags(surface_id: str, focus: dict[str, object]) -> None:
+    for key in ("initial_descendant", "after_tab_descendant", "after_tab_focusable", "moved"):
+        _require_focus_true(focus, key, surface_id)
+
+
+def _validate_focus_path(
+    surface_id: str,
+    initial: str,
+    after_tab: str,
+    attempts: int,
+    focusables: list[str],
+    traversed: list[str],
+) -> None:
+    if len(traversed) != attempts + 1:
+        raise _focus_failure(surface_id)
+    if traversed[0] != initial or traversed[-1] != after_tab:
+        raise _focus_failure(surface_id)
+    if any(item not in focusables for item in traversed):
+        raise _focus_failure(surface_id)
+
+
+def _validate_focus_step_fields(
+    surface_id: str, step: dict[str, object], expected_direction: str
+) -> None:
+    if step["direction"] != expected_direction:
+        raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+    if step["kind"] != "key-event" or step["returned"] is not None:
+        raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+
+
+def _validate_focus_step_transition(
+    surface_id: str,
+    step: dict[str, object],
+    index: int,
+    steps: list[object],
+    focusables: list[str],
+    traversed: list[str],
+) -> None:
+    if step["focus"] != traversed[index + 1] or step["focus"] not in focusables:
+        raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+    if (step["focus"] != traversed[index]) != (index == len(steps) - 1):
+        raise ValueError("remaining-surface %s key traversal protocol drifted" % surface_id)
+
+
+def _validate_focus_step(
+    surface_id: str,
+    raw_step: object,
+    index: int,
+    steps: list[object],
+    focusables: list[str],
+    traversed: list[str],
+) -> None:
+    if not isinstance(raw_step, dict) or set(raw_step) != {
+        "direction", "focus", "kind", "returned"
     }:
+        raise ValueError("remaining-surface %s focus traversal step drifted" % surface_id)
+    step = _object_dict(raw_step, "focus traversal step")
+    expected_direction = "forward" if index % 2 == 0 else "backward"
+    _validate_focus_step_fields(surface_id, step, expected_direction)
+    _validate_focus_step_transition(
+        surface_id, step, index, steps, focusables, traversed
+    )
+
+
+def _validate_focus_steps(
+    surface_id: str,
+    focus: dict[str, object],
+    focusables: list[str],
+    traversed: list[str],
+    attempts: int,
+) -> None:
+    steps = _focus_objects(focus, "steps", surface_id)
+    if len(steps) != attempts:
+        raise _focus_failure(surface_id)
+    for index, raw_step in enumerate(steps):
+        _validate_focus_step(surface_id, raw_step, index, steps, focusables, traversed)
+
+
+def _validate_focus_traversal(surface_id: str, focus: dict[str, object]) -> None:
+    focusables = _focus_strings(focus, "focusables", surface_id)
+    traversed = _focus_strings(focus, "traversed", surface_id)
+    attempts = _validate_focus_summary(surface_id, focus, focusables, traversed)
+    _validate_focus_steps(surface_id, focus, focusables, traversed, attempts)
+
+
+def _validate_focus_observation(surface_id: str, observation: object) -> None:
+    if not isinstance(observation, dict) or set(observation) != _FOCUS_FIELDS:
         raise ValueError("remaining-surface %s focus observation drifted" % surface_id)
-    focus = cast(dict[str, object], observation)
+    focus = _object_dict(observation, "focus observation")
     applicable = focus["applicable"]
     if applicable is False:
-        if surface_id not in {
-            "import-progress",
-            "shared-progress",
-            "startup-splash",
-        }:
-            raise ValueError(
-                "remaining-surface %s unexpectedly lacks focus traversal" % surface_id
-            )
-        if (
-            any(focus[key] is not None for key in ("after_tab", "attempts", "initial"))
-            or any(
-                focus[key] is not False
-                for key in (
-                    "after_tab_descendant",
-                    "after_tab_focusable",
-                    "initial_descendant",
-                    "moved",
-                )
-            )
-            or focus["focusable_count"] != 0
-            or focus["focusables"] != []
-            or focus["steps"] != []
-            or focus["traversed"] != []
-        ):
-            raise ValueError(
-                "remaining-surface %s focus exemption is malformed" % surface_id
-            )
+        _validate_focus_exemption(surface_id, focus)
         return
     if applicable is not True:
-        raise ValueError(
-            "remaining-surface %s focus applicability is invalid" % surface_id
-        )
-    if (
-        not isinstance(focus["initial"], str)
-        or not focus["initial"]
-        or not isinstance(focus["after_tab"], str)
-        or not focus["after_tab"]
-        or type(focus["attempts"]) is not int
-        or focus["attempts"] < 1
-        or type(focus["focusable_count"]) is not int
-        or focus["focusable_count"] < 2
-        or not isinstance(focus["focusables"], list)
-        or len(focus["focusables"]) != focus["focusable_count"]
-        or any(not isinstance(item, str) or not item for item in focus["focusables"])
-        or len(set(focus["focusables"])) != focus["focusable_count"]
-        or focus["attempts"] > focus["focusable_count"] * 2
-        or focus["initial_descendant"] is not True
-        or focus["after_tab_descendant"] is not True
-        or focus["after_tab_focusable"] is not True
-        or focus["moved"] is not True
-        or focus["initial"] == focus["after_tab"]
-        or not isinstance(focus["steps"], list)
-        or len(focus["steps"]) != focus["attempts"]
-        or not isinstance(focus["traversed"], list)
-        or len(focus["traversed"]) != focus["attempts"] + 1
-        or focus["traversed"][0] != focus["initial"]
-        or focus["traversed"][-1] != focus["after_tab"]
-        or any(not isinstance(item, str) or not item for item in focus["traversed"])
-        or any(item not in focus["focusables"] for item in focus["traversed"])
-    ):
-        raise ValueError(
-            "remaining-surface %s focus traversal was not observed" % surface_id
-        )
-    steps = cast(list[object], focus["steps"])
-    traversed = cast(list[str], focus["traversed"])
-    for index, raw_step in enumerate(steps):
-        if not isinstance(raw_step, dict) or set(raw_step) != {
-            "direction",
-            "focus",
-            "kind",
-            "returned",
-        }:
-            raise ValueError(
-                "remaining-surface %s focus traversal step drifted" % surface_id
-            )
-        step = cast(dict[str, object], raw_step)
-        expected_direction = "forward" if index % 2 == 0 else "backward"
-        if (
-            step["direction"] != expected_direction
-            or step["focus"] != traversed[index + 1]
-            or step["focus"] not in focus["focusables"]
-            or step["kind"] != "key-event"
-            or step["returned"] is not None
-        ):
-            raise ValueError(
-                "remaining-surface %s focus traversal step drifted" % surface_id
-            )
-        changed = step["focus"] != traversed[index]
-        if changed != (index == len(steps) - 1):
-            raise ValueError(
-                "remaining-surface %s key traversal protocol drifted" % surface_id
-            )
+        raise ValueError("remaining-surface %s focus applicability is invalid" % surface_id)
+    _validate_focus_traversal(surface_id, focus)
 
 
 def _validate_action_observation(surface_id: str, observation: object) -> None:
     contract = ACTION_CONTRACTS[surface_id]
     if not isinstance(observation, dict):
         raise ValueError("remaining-surface %s action contract drifted" % surface_id)
-    actions = cast(dict[str, object], observation)
+    actions = _object_dict(observation, "action observation")
     if actions.get("contract") != contract:
         raise ValueError("remaining-surface %s action contract drifted" % surface_id)
     expected_fields = {
@@ -489,9 +640,7 @@ def _validate_action_observation(surface_id: str, observation: object) -> None:
             )
 
 
-def _surface_factories() -> dict[str, Any]:
-    from PyQt6 import QtCore, QtGui
-
+def _surface_factories() -> dict[str, SurfaceFactory]:
     from rc_metastudio import (
         about_legal_dialog,
         add_new_dialogs,
@@ -507,35 +656,57 @@ def _surface_factories() -> dict[str, Any]:
     class PreviewModel(QtGui.QStandardItemModel):
         dataError = QtCore.pyqtSignal(str)
 
-        def __init__(self, _dataset: Any, _covariate: Any) -> None:
+        def __init__(self, _dataset: object, _covariate: object) -> None:
             super().__init__(2, 3)
 
     setattr(covariate_type_dialog, "CovariateTypeModel", PreviewModel)
+
+    def checked_factory(candidate: object, name: str) -> SurfaceFactory:
+        if not _is_zero_argument_factory(candidate):
+            raise RuntimeError("native surface %s factory is not callable" % name)
+
+        def factory() -> QtWidgets.QWidget:
+            result = candidate()
+            if not isinstance(result, QtWidgets.QWidget):
+                raise RuntimeError("native surface %s factory returned a non-widget" % name)
+            return result
+
+        return factory
+
     return {
-        "about-legal": about_legal_dialog.AboutLegalDialog,
-        "change-covariate-type": lambda: covariate_type_dialog.CovariateTypeDialog(
+        "about-legal": checked_factory(about_legal_dialog.AboutLegalDialog, "about-legal"),
+        "change-covariate-type": checked_factory(
+            lambda: covariate_type_dialog.CovariateTypeDialog(
             object(), object()
+            ),
+            "change-covariate-type",
         ),
-        "edit-group-name": lambda: edit_name_dialogs.EditGroupNameDialog(
-            "Treatment group"
+        "edit-group-name": checked_factory(
+            lambda: edit_name_dialogs.EditGroupNameDialog("Treatment group"),
+            "edit-group-name",
         ),
-        "edit-covariate-name": lambda: edit_name_dialogs.EditCovariateNameDialog(
-            "Baseline risk"
+        "edit-covariate-name": checked_factory(
+            lambda: edit_name_dialogs.EditCovariateNameDialog("Baseline risk"),
+            "edit-covariate-name",
         ),
-        "main-wizard": lambda: main_wizard.MainWizard(path="new_dataset"),
-        "confidence-level": confidence_level_dialog.ConfidenceLevelDialog,
-        "add-covariate": add_new_dialogs.AddCovariateDialog,
-        "add-follow-up": add_new_dialogs.AddFollowUpDialog,
-        "add-group": add_new_dialogs.AddGroupDialog,
-        "add-outcome": add_new_dialogs.AddOutcomeDialog,
-        "add-study": add_new_dialogs.AddStudyDialog,
-        "import-progress": main_window.ImportProgressDialog,
-        "shared-progress": progress_dialog.AnalysisProgressDialog,
-        "startup-splash": launch.create_startup_splash,
+        "main-wizard": checked_factory(
+            lambda: main_wizard.MainWizard(path="new_dataset"), "main-wizard"
+        ),
+        "confidence-level": checked_factory(
+            confidence_level_dialog.ConfidenceLevelDialog, "confidence-level"
+        ),
+        "add-covariate": checked_factory(add_new_dialogs.AddCovariateDialog, "add-covariate"),
+        "add-follow-up": checked_factory(add_new_dialogs.AddFollowUpDialog, "add-follow-up"),
+        "add-group": checked_factory(add_new_dialogs.AddGroupDialog, "add-group"),
+        "add-outcome": checked_factory(add_new_dialogs.AddOutcomeDialog, "add-outcome"),
+        "add-study": checked_factory(add_new_dialogs.AddStudyDialog, "add-study"),
+        "import-progress": checked_factory(main_window.ImportProgressDialog, "import-progress"),
+        "shared-progress": checked_factory(progress_dialog.AnalysisProgressDialog, "shared-progress"),
+        "startup-splash": checked_factory(launch.create_startup_splash, "startup-splash"),
     }
 
 
-def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, object]:
+def _capture(window: QtWidgets.QWidget, destination: Path, evidence_root: Path) -> dict[str, object]:
     # QWidget.grab() synchronously paints the real hosted widget without
     # depending on desktop/screen-recording permissions in macOS CI.
     pixmap = window.grab()
@@ -553,31 +724,35 @@ def _capture(window: Any, destination: Path, evidence_root: Path) -> dict[str, o
     }
 
 
+def _process_events(app: QtWidgets.QApplication) -> None:
+    for _ in range(3):
+        app.processEvents()
+
+
+def _prepare_wizard(app: QtWidgets.QApplication, wizard: QtWidgets.QWizard) -> None:
+    visible_choices = [
+        button
+        for button in wizard.findChildren(QtWidgets.QAbstractButton)
+        if button.isVisible() and button.isEnabled() and button.isCheckable()
+    ]
+    if not visible_choices:
+        raise RuntimeError("native wizard has no enabled data-type choice")
+    visible_choices[0].click()
+    _process_events(app)
+
+
 def _show_and_prepare(
-    app: Any, window: Any, QtCore: Any, QtWidgets: Any, QTest: Any
+    app: QtWidgets.QApplication, window: QtWidgets.QWidget
 ) -> None:
     window.show()
     window.activateWindow()
     window.raise_()
-    for _ in range(3):
-        app.processEvents()
+    _process_events(app)
     if isinstance(window, QtWidgets.QWizard):
-        visible_choices = [
-            button
-            for button in window.findChildren(QtWidgets.QAbstractButton)
-            if button.isVisible() and button.isEnabled() and button.isCheckable()
-        ]
-        if not visible_choices:
-            raise RuntimeError("native wizard has no enabled data-type choice")
-        QTest.mouseClick(
-            cast(QtWidgets.QWidget, visible_choices[0]),
-            QtCore.Qt.MouseButton.LeftButton,
-        )
-        for _ in range(3):
-            app.processEvents()
+        _prepare_wizard(app, window)
 
 
-def _widget_identity(window: Any, widget: Any) -> str:
+def _widget_identity(window: QtWidgets.QWidget, widget: QtWidgets.QWidget | None) -> str:
     if widget is None or widget is window or not window.isAncestorOf(widget):
         return ""
     if widget.objectName():
@@ -587,31 +762,12 @@ def _widget_identity(window: Any, widget: Any) -> str:
 
 
 def _observe_focus_traversal(
-    app: Any, window: Any, QtCore: Any, QtGui: Any, QtWidgets: Any
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
 ) -> dict[str, object]:
-    tab_focus = QtCore.Qt.FocusPolicy.TabFocus
-    focusables = [
-        widget
-        for widget in window.findChildren(QtWidgets.QWidget)
-        if widget.focusPolicy() & tab_focus
-        and widget.isVisible()
-        and widget.isEnabled()
-    ]
+    focusables = _focusable_widgets(window)
     if not focusables:
-        return {
-            "after_tab": None,
-            "after_tab_descendant": False,
-            "after_tab_focusable": False,
-            "applicable": False,
-            "attempts": None,
-            "focusable_count": 0,
-            "focusables": [],
-            "initial": None,
-            "initial_descendant": False,
-            "moved": False,
-            "steps": [],
-            "traversed": [],
-        }
+        return _no_focus_observation()
     window.raise_()
     window.activateWindow()
     focusables[0].setFocus(QtCore.Qt.FocusReason.TabFocusReason)
@@ -619,12 +775,89 @@ def _observe_focus_traversal(
     initial_widget = app.focusWidget()
     focusable_identities = [_widget_identity(window, widget) for widget in focusables]
     initial = _widget_identity(window, initial_widget)
-    initial_descendant = bool(initial)
+    current, after, attempts, steps, traversed = _walk_focus_traversal(
+        app, window, initial_widget, focusables, initial
+    )
+    return {
+        "after_tab": after or None,
+        "after_tab_descendant": bool(after),
+        "after_tab_focusable": current in focusables,
+        "applicable": True,
+        "attempts": attempts,
+        "focusable_count": len(focusables),
+        "focusables": focusable_identities,
+        "initial": initial or None,
+        "initial_descendant": bool(initial),
+        "moved": bool(after) and current is not initial_widget,
+        "steps": steps,
+        "traversed": traversed,
+    }
+
+
+def _focusable_widgets(window: QtWidgets.QWidget) -> list[QtWidgets.QWidget]:
+    tab_focus = QtCore.Qt.FocusPolicy.TabFocus
+    return [
+        widget
+        for widget in window.findChildren(QtWidgets.QWidget)
+        if widget.focusPolicy() & tab_focus
+        and widget.isVisible()
+        and widget.isEnabled()
+    ]
+
+
+def _no_focus_observation() -> dict[str, object]:
+    return {
+        "after_tab": None,
+        "after_tab_descendant": False,
+        "after_tab_focusable": False,
+        "applicable": False,
+        "attempts": None,
+        "focusable_count": 0,
+        "focusables": [],
+        "initial": None,
+        "initial_descendant": False,
+        "moved": False,
+        "steps": [],
+        "traversed": [],
+    }
+
+
+def _send_focus_key(
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
+    key: QtCore.Qt.Key,
+    modifiers: QtCore.Qt.KeyboardModifier,
+) -> QtWidgets.QWidget | None:
+    for event_type in (
+        QtCore.QEvent.Type.KeyPress,
+        QtCore.QEvent.Type.KeyRelease,
+    ):
+        event = QtGui.QKeyEvent(event_type, key, modifiers)
+        # Deliver at the top-level surface so Cocoa cannot consume Tab in a
+        # native child editor before QWidget's focus-chain handling sees it.
+        QtCore.QCoreApplication.sendEvent(window, event)
+    app.processEvents()
+    return app.focusWidget()
+
+
+def _walk_focus_traversal(
+    app: QtWidgets.QApplication,
+    window: QtWidgets.QWidget,
+    initial_widget: QtWidgets.QWidget | None,
+    focusables: list[QtWidgets.QWidget],
+    initial: str,
+) -> tuple[
+    QtWidgets.QWidget | None,
+    str,
+    int,
+    list[dict[str, object]],
+    list[str],
+]:
     current = initial_widget
     after = ""
     attempts = 0
     traversed = [initial] if initial else []
-    steps = []
+    steps: list[dict[str, object]] = []
     keys = (
         (QtCore.Qt.Key.Key_Tab, QtCore.Qt.KeyboardModifier.NoModifier),
         (QtCore.Qt.Key.Key_Backtab, QtCore.Qt.KeyboardModifier.ShiftModifier),
@@ -632,16 +865,7 @@ def _observe_focus_traversal(
     for attempts in range(1, len(focusables) * 2 + 1):
         key, modifiers = keys[(attempts - 1) % len(keys)]
         direction = "forward" if (attempts - 1) % len(keys) == 0 else "backward"
-        for event_type in (
-            QtCore.QEvent.Type.KeyPress,
-            QtCore.QEvent.Type.KeyRelease,
-        ):
-            event = QtGui.QKeyEvent(event_type, key, modifiers)
-            # Deliver at the top-level surface so Cocoa cannot consume Tab in a
-            # native child editor before QWidget's focus-chain handling sees it.
-            QtCore.QCoreApplication.sendEvent(window, event)
-        app.processEvents()
-        current = app.focusWidget()
+        current = _send_focus_key(app, window, key, modifiers)
         after = _widget_identity(window, current)
         traversed.append(after)
         steps.append(
@@ -654,208 +878,264 @@ def _observe_focus_traversal(
         )
         if after and current is not initial_widget:
             break
-    return {
-        "after_tab": after or None,
-        "after_tab_descendant": bool(after),
-        "after_tab_focusable": current in focusables,
-        "applicable": True,
-        "attempts": attempts,
-        "focusable_count": len(focusables),
-        "focusables": focusable_identities,
-        "initial": initial or None,
-        "initial_descendant": initial_descendant,
-        "moved": bool(after) and current is not initial_widget,
-        "steps": steps,
-        "traversed": traversed,
-    }
+    return current, after, attempts, steps, traversed
 
 
-def _snapshot_edit_state(window: Any, QtWidgets: Any) -> tuple[Any, ...]:
-    return (
-        tuple(
-            (editor.objectName(), editor.text())
-            for editor in window.findChildren(QtWidgets.QLineEdit)
-        ),
-        tuple(
-            (combo.objectName(), combo.currentIndex(), combo.currentText())
-            for combo in window.findChildren(QtWidgets.QComboBox)
-        ),
-        tuple(
-            (spin.objectName(), spin.value())
-            for spin in window.findChildren(QtWidgets.QAbstractSpinBox)
-            if hasattr(spin, "value")
-        ),
-        tuple(
-            (
-                view.objectName(),
-                view.model().rowCount(),
-                view.model().columnCount(),
-            )
-            for view in window.findChildren(QtWidgets.QAbstractItemView)
-            if view.model() is not None
-        ),
+def _snapshot_edit_state(window: QtWidgets.QWidget) -> tuple[tuple[object, ...], ...]:
+    editors = tuple(
+        (editor.objectName(), editor.text())
+        for editor in window.findChildren(QtWidgets.QLineEdit)
     )
+    combos = tuple(
+        (combo.objectName(), combo.currentIndex(), combo.currentText())
+        for combo in window.findChildren(QtWidgets.QComboBox)
+    )
+    spins = tuple(
+        (spin.objectName(), spin.value())
+        for spin in window.findChildren(QtWidgets.QAbstractSpinBox)
+        if isinstance(spin, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox))
+    )
+    views: list[tuple[str, int, int]] = []
+    for view in window.findChildren(QtWidgets.QAbstractItemView):
+        model = view.model()
+        if model is not None:
+            views.append((view.objectName(), model.rowCount(), model.columnCount()))
+    return (editors, combos, spins, tuple(views))
 
 
-def _delete_window(app: Any, window: Any, QtCore: Any, QtWidgets: Any) -> None:
+def _delete_window(app: QtWidgets.QApplication, window: QtWidgets.QWidget) -> None:
     window.close()
     window.deleteLater()
     QtWidgets.QApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
-def _button_for_roles(box: Any, roles: Any) -> Any:
+def _button_for_roles(
+    box: QtWidgets.QDialogButtonBox,
+    roles: Collection[QtWidgets.QDialogButtonBox.ButtonRole],
+) -> QtWidgets.QAbstractButton | None:
     return next(
         (button for button in box.buttons() if box.buttonRole(button) in roles),
         None,
     )
 
 
-def _observe_actions(
-    app: Any, factory: Any, surface_id: str, QtCore: Any, QtWidgets: Any, QTest: Any
-) -> dict[str, object]:
-    contract = ACTION_CONTRACTS[surface_id]
-    if contract == "none":
-        return {"contract": contract, "not_applicable": True}
-    if contract == "close":
-        dialog = factory()
-        try:
-            _show_and_prepare(app, dialog, QtCore, QtWidgets, QTest)
-            box = dialog.findChild(QtWidgets.QDialogButtonBox)
-            if box is None:
-                raise RuntimeError("close surface has no button box")
-            close_button = box.button(QtWidgets.QDialogButtonBox.StandardButton.Close)
-            rejected = []
-            dialog.rejected.connect(lambda: rejected.append(True))
-            visible_enabled = close_button.isVisible() and close_button.isEnabled()
-            QTest.mouseClick(close_button, QtCore.Qt.MouseButton.LeftButton)
-            app.processEvents()
-            return {
-                "close_visible_enabled": visible_enabled,
-                "contract": contract,
-                "rejected_observed": rejected == [True] and not dialog.isVisible(),
-            }
-        finally:
-            _delete_window(app, dialog, QtCore, QtWidgets)
-    if contract == "wizard-next-cancel":
-        wizard = factory()
-        try:
-            _show_and_prepare(app, wizard, QtCore, QtWidgets, QTest)
-            next_button = wizard.button(QtWidgets.QWizard.WizardButton.NextButton)
-            before_page = wizard.currentId()
-            default_next = (
-                next_button.isVisible()
-                and next_button.isEnabled()
-                and next_button.isDefault()
-            )
-            return_target = app.focusWidget()
-            if return_target is None or not wizard.isAncestorOf(return_target):
-                raise RuntimeError("native wizard Return target is not a descendant")
-            QTest.keyClick(return_target, QtCore.Qt.Key.Key_Return)
-            app.processEvents()
-            transitioned = wizard.currentId() != before_page
-        finally:
-            _delete_window(app, wizard, QtCore, QtWidgets)
-        reject_wizard = factory()
-        try:
-            _show_and_prepare(app, reject_wizard, QtCore, QtWidgets, QTest)
-            cancel = reject_wizard.button(QtWidgets.QWizard.WizardButton.CancelButton)
-            rejected = []
-            reject_wizard.rejected.connect(lambda: rejected.append(True))
-            before = _snapshot_edit_state(reject_wizard, QtWidgets)
-            cancel_visible = cancel.isVisible() and cancel.isEnabled()
-            QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
-            app.processEvents()
-            return {
-                "cancel_visible_enabled": cancel_visible,
-                "contract": contract,
-                "default_next_visible_enabled": default_next,
-                "next_transition_observed": transitioned,
-                "reject_nonmutation": before
-                == _snapshot_edit_state(reject_wizard, QtWidgets),
-                "rejected_observed": rejected == [True]
-                and not reject_wizard.isVisible(),
-            }
-        finally:
-            _delete_window(app, reject_wizard, QtCore, QtWidgets)
+def _dialog_box(dialog: QtWidgets.QDialog, label: str) -> QtWidgets.QDialogButtonBox:
+    box = dialog.findChild(QtWidgets.QDialogButtonBox)
+    if box is None:
+        raise RuntimeError("%s surface has no button box" % label)
+    return box
 
-    accept_dialog = factory()
+
+def _is_default_button(button: QtWidgets.QAbstractButton) -> bool:
+    return isinstance(button, QtWidgets.QPushButton) and button.isDefault()
+
+
+def _observe_close_action(
+    app: QtWidgets.QApplication, factory: SurfaceFactory
+) -> dict[str, object]:
+    dialog = factory()
+    if not isinstance(dialog, QtWidgets.QDialog):
+        raise RuntimeError("close surface factory did not return a dialog")
     try:
-        _show_and_prepare(app, accept_dialog, QtCore, QtWidgets, QTest)
-        box = accept_dialog.findChild(QtWidgets.QDialogButtonBox)
-        if box is None:
-            raise RuntimeError("accept-cancel surface has no button box")
+        _show_and_prepare(app, dialog)
+        close_button = _dialog_box(dialog, "close").button(
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
+        if close_button is None:
+            raise RuntimeError("close surface has no close action")
+        rejected: list[bool] = []
+        dialog.rejected.connect(lambda: rejected.append(True))
+        visible_enabled = close_button.isVisible() and close_button.isEnabled()
+        close_button.click()
+        app.processEvents()
+        return {
+            "close_visible_enabled": visible_enabled,
+            "contract": "close",
+            "rejected_observed": rejected == [True] and not dialog.isVisible(),
+        }
+    finally:
+        _delete_window(app, dialog)
+
+
+def _observe_wizard_next(
+    app: QtWidgets.QApplication, wizard: QtWidgets.QWizard
+) -> tuple[bool, bool]:
+    _show_and_prepare(app, wizard)
+    next_button = wizard.button(QtWidgets.QWizard.WizardButton.NextButton)
+    if next_button is None:
+        raise RuntimeError("wizard surface has no next action")
+    before_page = wizard.currentId()
+    default_next = (
+        next_button.isVisible()
+        and next_button.isEnabled()
+        and _is_default_button(next_button)
+    )
+    return_target = app.focusWidget()
+    if return_target is None or not wizard.isAncestorOf(return_target):
+        raise RuntimeError("native wizard Return target is not a descendant")
+    for event_type in (QtCore.QEvent.Type.KeyPress, QtCore.QEvent.Type.KeyRelease):
+        QtCore.QCoreApplication.sendEvent(
+            wizard,
+            QtGui.QKeyEvent(
+                event_type,
+                QtCore.Qt.Key.Key_Return,
+                QtCore.Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+    app.processEvents()
+    return default_next, wizard.currentId() != before_page
+
+
+def _observe_wizard_cancel(
+    app: QtWidgets.QApplication, wizard: QtWidgets.QWizard, default_next: bool, transitioned: bool
+) -> dict[str, object]:
+    _show_and_prepare(app, wizard)
+    cancel = wizard.button(QtWidgets.QWizard.WizardButton.CancelButton)
+    if cancel is None:
+        raise RuntimeError("wizard surface has no cancel action")
+    rejected: list[bool] = []
+    wizard.rejected.connect(lambda: rejected.append(True))
+    before = _snapshot_edit_state(wizard)
+    cancel_visible = cancel.isVisible() and cancel.isEnabled()
+    cancel.click()
+    app.processEvents()
+    return {
+        "cancel_visible_enabled": cancel_visible,
+        "contract": "wizard-next-cancel",
+        "default_next_visible_enabled": default_next,
+        "next_transition_observed": transitioned,
+        "reject_nonmutation": before == _snapshot_edit_state(wizard),
+        "rejected_observed": rejected == [True] and not wizard.isVisible(),
+    }
+
+
+def _observe_wizard_actions(
+    app: QtWidgets.QApplication, factory: SurfaceFactory
+) -> dict[str, object]:
+    wizard = factory()
+    if not isinstance(wizard, QtWidgets.QWizard):
+        raise RuntimeError("wizard surface factory did not return a wizard")
+    try:
+        default_next, transitioned = _observe_wizard_next(app, wizard)
+    finally:
+        _delete_window(app, wizard)
+    reject_wizard = factory()
+    if not isinstance(reject_wizard, QtWidgets.QWizard):
+        raise RuntimeError("wizard surface factory did not return a wizard")
+    try:
+        return _observe_wizard_cancel(app, reject_wizard, default_next, transitioned)
+    finally:
+        _delete_window(app, reject_wizard)
+
+
+def _observe_accept_action(
+    app: QtWidgets.QApplication, factory: SurfaceFactory
+) -> tuple[bool, bool]:
+    accept_dialog = factory()
+    if not isinstance(accept_dialog, QtWidgets.QDialog):
+        raise RuntimeError("accept surface factory did not return a dialog")
+    try:
+        _show_and_prepare(app, accept_dialog)
         accept = _button_for_roles(
-            box,
+            _dialog_box(accept_dialog, "accept-cancel"),
             {
                 QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole,
                 QtWidgets.QDialogButtonBox.ButtonRole.YesRole,
             },
         )
-        if accept is None:
+        if not isinstance(accept, QtWidgets.QPushButton):
             raise RuntimeError("accept-cancel surface has no accept action")
-        accepted = []
+        accepted: list[bool] = []
         accept_dialog.accepted.connect(lambda: accepted.append(True))
-        default_accept = (
-            accept.isVisible() and accept.isEnabled() and accept.isDefault()
-        )
-        QTest.mouseClick(accept, QtCore.Qt.MouseButton.LeftButton)
+        default_accept = accept.isVisible() and accept.isEnabled() and accept.isDefault()
+        accept.click()
         app.processEvents()
         accepted_observed = accepted == [True] and not accept_dialog.isVisible()
     finally:
-        _delete_window(app, accept_dialog, QtCore, QtWidgets)
+        _delete_window(app, accept_dialog)
+    return default_accept, accepted_observed
+
+
+def _observe_cancel_action(
+    app: QtWidgets.QApplication,
+    factory: SurfaceFactory,
+    accepted_observed: bool,
+    default_accept: bool,
+) -> dict[str, object]:
     reject_dialog = factory()
+    if not isinstance(reject_dialog, QtWidgets.QDialog):
+        raise RuntimeError("cancel surface factory did not return a dialog")
     try:
-        _show_and_prepare(app, reject_dialog, QtCore, QtWidgets, QTest)
-        box = reject_dialog.findChild(QtWidgets.QDialogButtonBox)
-        if box is None:
-            raise RuntimeError("accept-cancel surface has no button box")
+        _show_and_prepare(app, reject_dialog)
         cancel = _button_for_roles(
-            box,
+            _dialog_box(reject_dialog, "accept-cancel"),
             {
                 QtWidgets.QDialogButtonBox.ButtonRole.NoRole,
                 QtWidgets.QDialogButtonBox.ButtonRole.RejectRole,
             },
         )
-        if cancel is None:
+        if not isinstance(cancel, QtWidgets.QPushButton):
             raise RuntimeError("accept-cancel surface has no cancel action")
-        rejected = []
+        rejected: list[bool] = []
         reject_dialog.rejected.connect(lambda: rejected.append(True))
-        before = _snapshot_edit_state(reject_dialog, QtWidgets)
+        before = _snapshot_edit_state(reject_dialog)
         cancel_visible = cancel.isVisible() and cancel.isEnabled()
-        QTest.mouseClick(cancel, QtCore.Qt.MouseButton.LeftButton)
+        cancel.click()
         app.processEvents()
         return {
             "accepted_observed": accepted_observed,
             "cancel_visible_enabled": cancel_visible,
-            "contract": contract,
+            "contract": "accept-cancel",
             "default_accept_visible_enabled": default_accept,
-            "reject_nonmutation": before
-            == _snapshot_edit_state(reject_dialog, QtWidgets),
+            "reject_nonmutation": before == _snapshot_edit_state(reject_dialog),
             "rejected_observed": rejected == [True] and not reject_dialog.isVisible(),
         }
     finally:
-        _delete_window(app, reject_dialog, QtCore, QtWidgets)
+        _delete_window(app, reject_dialog)
 
 
-def _observe_overflow(window: Any, QtWidgets: Any) -> str:
+def _observe_accept_cancel_actions(
+    app: QtWidgets.QApplication, factory: SurfaceFactory
+) -> dict[str, object]:
+    default_accept, accepted_observed = _observe_accept_action(app, factory)
+    return _observe_cancel_action(app, factory, accepted_observed, default_accept)
+
+
+def _observe_actions(
+    app: QtWidgets.QApplication,
+    factory: SurfaceFactory,
+    surface_id: str,
+) -> dict[str, object]:
+    contract = ACTION_CONTRACTS[surface_id]
+    if contract == "none":
+        return {"contract": contract, "not_applicable": True}
+    if contract == "close":
+        return _observe_close_action(app, factory)
+    if contract == "wizard-next-cancel":
+        return _observe_wizard_actions(app, factory)
+    return _observe_accept_cancel_actions(app, factory)
+
+
+def _has_visible_descendant(
+    window: QtWidgets.QWidget,
+    widget_type: type[QtWidgets.QWidget],
+) -> bool:
+    return any(view.isVisible() for view in window.findChildren(widget_type))
+
+
+def _observe_overflow(window: QtWidgets.QWidget) -> str:
     if isinstance(window, QtWidgets.QSplashScreen):
         if window.pixmap().isNull():
             raise RuntimeError("splash overflow evidence has no pixmap")
         return "screen-bounded-pixmap"
-    visible_text = [
-        view for view in window.findChildren(QtWidgets.QTextBrowser) if view.isVisible()
-    ]
-    if visible_text:
-        return "text-browser"
-    visible_tables = [
-        view for view in window.findChildren(QtWidgets.QTableView) if view.isVisible()
-    ]
-    if visible_tables:
-        return "bounded-table"
-    visible_scrolls = [
-        area for area in window.findChildren(QtWidgets.QScrollArea) if area.isVisible()
-    ]
+    for widget_type, overflow in (
+        (QtWidgets.QTextBrowser, "text-browser"),
+        (QtWidgets.QTableView, "bounded-table"),
+    ):
+        if _has_visible_descendant(window, widget_type):
+            return overflow
+    visible_scrolls = _has_visible_descendant(window, QtWidgets.QScrollArea)
     if isinstance(window, QtWidgets.QWizard) and visible_scrolls:
         return "page-scroll-area"
     if not visible_scrolls:
@@ -863,7 +1143,9 @@ def _observe_overflow(window: Any, QtWidgets: Any) -> str:
     raise RuntimeError("remaining surface overflow behavior is not classified")
 
 
-def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, object]:
+def _observe_window_contract(window: QtWidgets.QWidget) -> dict[str, object]:
+    from rc_metastudio import adaptive_window
+
     controller = getattr(window, "_adaptive_window_controller", None)
     if not isinstance(controller, adaptive_window.AdaptiveWindowController):
         raise RuntimeError("remaining surface has no live adaptive controller")
@@ -887,18 +1169,17 @@ def _observe_window_contract(window: Any, adaptive_window: Any) -> dict[str, obj
 
 
 def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None:
-    os.environ.setdefault("RCMS_STUB_BACKEND", "1")
-    from PyQt6 import QtCore, QtGui, QtWidgets
-    from PyQt6.QtTest import QTest
     from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
     prepare_generated_ui_imports()
     QtCore.qInstallMessageHandler(_qt_message_handler)
-    from rc_metastudio import r_backend, qt6_resources
-
-    r_backend.install_stub_r_bridge()
+    from local_r_test_backend import create
+    backend_fake = create()
+    from rc_metastudio import r_bridge, qt6_resources
+    for name, implementation in vars(backend_fake).items():
+        setattr(r_bridge, name, implementation)
     qt6_resources.ensure_application_resources()
-    from rc_metastudio import adaptive_window, app_error_handler
+    from rc_metastudio import app_error_handler
 
     app = app_error_handler.get_or_create_application([])
     # Evidence failures must terminate the gate, never block behind the app's
@@ -924,12 +1205,15 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
         print("capturing %s at %s" % (surface_id, scale), flush=True)
         window = factory()
         try:
-            _show_and_prepare(app, window, QtCore, QtWidgets, QTest)
+            _show_and_prepare(app, window)
             frame = window.frameGeometry()
-            screen = window.screen().availableGeometry()
-            observed_contract = _observe_window_contract(window, adaptive_window)
-            observed_overflow = _observe_overflow(window, QtWidgets)
-            focus = _observe_focus_traversal(app, window, QtCore, QtGui, QtWidgets)
+            screen_object = window.screen()
+            if screen_object is None:
+                raise RuntimeError("remaining surface has no screen")
+            screen = screen_object.availableGeometry()
+            observed_contract = _observe_window_contract(window)
+            observed_overflow = _observe_overflow(window)
+            focus = _observe_focus_traversal(app, window)
             accessible = True
             for view in window.findChildren(QtWidgets.QAbstractItemView):
                 if (
@@ -964,7 +1248,7 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
             # native fast-fail (0xC0000409) despite each evidence surface already
             # having its own process.
             actions = _observe_actions(
-                app, factory, surface_id, QtCore, QtWidgets, QTest
+                app, factory, surface_id
             )
             records[surface_id] = {
                 "accessibility": accessible,

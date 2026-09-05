@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Apply RC MetaStudio's explicit non-X11 product profile to CRAN R.framework.
 
 The official macOS R distribution contains optional Tcl/Tk and X11 loadable
@@ -479,29 +481,6 @@ def finalize(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-
-
-def profile(
-    resources: Path,
-    evidence: Path,
-    manifest_path: Path,
-    r_version: str,
-    architecture: str,
-    source_resources: Path | None = None,
-    *,
-    official_framework_layout: bool = False,
-) -> None:
-    """Backward-compatible one-shot profile for existing fixtures."""
-    quarantine_path = evidence.with_suffix(evidence.suffix + ".quarantine")
-    quarantine(
-        resources,
-        quarantine_path,
-        r_version,
-        architecture,
-        source_resources,
-        official_framework_layout=official_framework_layout,
-    )
-    finalize(resources, evidence, manifest_path, quarantine_path)
 
 
 def main() -> int:

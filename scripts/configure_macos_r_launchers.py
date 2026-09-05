@@ -32,28 +32,21 @@ CONFIG_MARKERS = {
     "    --ldflags)": 1,
     'echo "${MAIN_LDFLAGS} ${LDFLAGS} ${LIBR} ${LIBS}"': 1,
 }
-UPSTREAM_X64_LDFLAGS = (
-    "-Wl,-headerpad_max_install_names -L/opt/R/x86_64/lib "
+UPSTREAM_ARM64_LDFLAGS = (
+    "-Wl,-headerpad_max_install_names -L/opt/R/arm64/lib "
     "-F/Library/Frameworks/R.framework/.. -framework R "
-    "-L/opt/R/x86_64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
+    "-L/opt/R/arm64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
 )
 
 
 def private_config(architecture: str) -> str:
-    if architecture not in {"x86_64", "arm64"}:
+    if architecture != "arm64":
         raise RuntimeError(f"unsupported R build architecture: {architecture}")
-    exact_guard = (
-        f"""expected='{UPSTREAM_X64_LDFLAGS}'
+    exact_guard = f"""expected='{UPSTREAM_ARM64_LDFLAGS}'
       if [ "$upstream" != "$expected" ]; then
         echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2
         exit 1
       fi"""
-        if architecture == "x86_64"
-        else """case "$upstream" in
-        *"/opt/R/arm64/lib"*"-framework R"*) ;;
-        *) echo "Unexpected upstream R CMD config --ldflags output: $upstream" >&2; exit 1 ;;
-      esac"""
-    )
     return f"""#!/bin/sh
 set -eu
 # RCMS_PRIVATE_R_CONFIG_V1
@@ -85,7 +78,7 @@ exec "$real" "$@"
 """
 
 
-PRIVATE_CONFIG = private_config("x86_64")
+PRIVATE_CONFIG = private_config("arm64")
 
 
 def _safe_file(path: Path) -> None:
@@ -119,16 +112,9 @@ def _validate_official_config(path: Path) -> None:
         )
 
 
-def configure(
-    resources: Path, *, configure_build: bool = True, architecture: str = "x86_64"
-) -> None:
-    # R.framework/Resources is normally a Versions/Current symlink.  Resolve
-    # that framework-level link, then reject links in the launcher payload.
-    root = resources.resolve(strict=True)
-    binary, rscript = root / "bin/R", root / "bin/Rscript"
+def _configure_build_files(root, configure_build, configured_wrapper):
     config = root / "bin/config"
     real_config = root / "bin/config.real"
-    configured_wrapper = private_config(architecture)
     if configure_build:
         if real_config.exists() or real_config.is_symlink():
             _validate_official_config(real_config)
@@ -142,6 +128,9 @@ def configure(
                 )
         else:
             _validate_official_config(config)
+
+
+def _rewrite_r_launcher(binary):
     _require_executable(binary, "official R launcher bin/R")
     text = binary.read_text(encoding="utf-8")
     if all(value in text for value in OFFICIAL):
@@ -156,27 +145,54 @@ def configure(
         encoding="utf-8"
     ):
         raise RuntimeError("relocated R launcher retains an absolute framework path")
-    _safe_file(rscript) if rscript.exists() else None
+
+
+def _rewrite_rscript(root):
+    rscript = root / "bin/Rscript"
+    if rscript.exists():
+        _safe_file(rscript)
     real_rscript = root / "bin/Rscript.real"
+    _install_real_rscript(rscript, real_rscript)
+    _write_rscript_wrapper(rscript)
+
+
+def _install_real_rscript(rscript, real_rscript):
     if real_rscript.exists():
         _safe_file(real_rscript)
-        if not real_rscript.is_file() or (
-            os.name != "nt" and not (real_rscript.stat().st_mode & 0o111)
-        ):
-            raise RuntimeError("existing Rscript.real is not a regular executable")
-    else:
-        if not rscript.is_file():
-            raise RuntimeError("official Rscript is missing")
-        rscript.rename(real_rscript)
-        if not real_rscript.is_file() or (
-            os.name != "nt" and not (real_rscript.stat().st_mode & 0o111)
-        ):
-            raise RuntimeError("official Rscript is not a regular executable")
+        _require_regular_executable(real_rscript, "existing Rscript.real")
+        real_rscript.chmod(0o755)
+        return
+    if not rscript.is_file():
+        raise RuntimeError("official Rscript is missing")
+    rscript.rename(real_rscript)
+    _require_regular_executable(real_rscript, "official Rscript")
     real_rscript.chmod(0o755)
+
+
+def _require_regular_executable(path, label):
+    if not path.is_file() or (os.name != "nt" and not (path.stat().st_mode & 0o111)):
+        raise RuntimeError(f"{label} is not a regular executable")
+
+
+def _write_rscript_wrapper(rscript):
     if rscript.exists() or rscript.is_symlink():
         rscript.unlink()
     rscript.write_text(RELATIVE, encoding="utf-8")
     rscript.chmod(0o755)
+
+
+def configure(
+    resources: Path, *, configure_build: bool = True, architecture: str = "arm64"
+) -> None:
+    # R.framework/Resources is normally a Versions/Current symlink.  Resolve
+    # that framework-level link, then reject links in the launcher payload.
+    root = resources.resolve(strict=True)
+    configured_wrapper = private_config(architecture)
+    _configure_build_files(root, configure_build, configured_wrapper)
+    _rewrite_r_launcher(root / "bin/R")
+    _rewrite_rscript(root)
+    config = root / "bin/config"
+    real_config = root / "bin/config.real"
     if configure_build and not real_config.exists():
         config.rename(real_config)
         real_config.chmod(0o755)
@@ -187,7 +203,7 @@ def configure(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--resources", type=Path, required=True)
-    parser.add_argument("--architecture", choices=("x86_64", "arm64"), default="x86_64")
+    parser.add_argument("--architecture", choices=("arm64",), default="arm64")
     parser.add_argument(
         "--runtime-only",
         action="store_true",

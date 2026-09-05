@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build and exercise the first native Qt6 vertical slice.
 
 The generated form and binary resource live below ``build/``.  They are build
@@ -22,104 +24,11 @@ import urllib.request
 
 import py7zr
 from PyQt6 import QtCore, QtGui, QtWidgets
-from rc_metastudio.qt6_macos_feasibility import (
-    validate_macos_rcc as _validate_macos_rcc,
-)
+from scripts import qt6_macos_feasibility_impl
+from rc_metastudio.ui_form_manifest import CANONICAL_FORMS
 
 
-ROOT = Path(__file__).resolve().parents[2]
-CANONICAL_FORMS = {
-    Path("src/rc_metastudio/forms/about_legal.ui"): Path(
-        "rc_metastudio/forms/ui_about_legal.py"
-    ),
-    Path("src/rc_metastudio/forms/binary_data_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_binary_data_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/covariate_type_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_covariate_type_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/edit_name_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_edit_name_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/binary_back_calculation_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_binary_back_calculation_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/choose_metric_page.ui"): Path(
-        "rc_metastudio/forms/ui_choose_metric_page.py"
-    ),
-    Path("src/rc_metastudio/forms/confidence_level_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_confidence_level_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/continuous_back_calculation_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_continuous_back_calculation_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/continuous_data_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_continuous_data_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/publication_bias_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_publication_bias_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/subgroup_analysis_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_subgroup_analysis_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/csv_import_page.ui"): Path(
-        "rc_metastudio/forms/ui_csv_import_page.py"
-    ),
-    Path("src/rc_metastudio/forms/data_type_page.ui"): Path(
-        "rc_metastudio/forms/ui_data_type_page.py"
-    ),
-    Path("src/rc_metastudio/forms/diagnostic_data_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_diagnostic_data_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/diagnostic_metrics_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_diagnostic_metrics_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/edit_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_edit_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/edit_plot_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_edit_plot_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/funnel_plot_editor_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_funnel_plot_editor_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/analysis_setup_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_analysis_setup_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/main_window.ui"): Path(
-        "rc_metastudio/ui_main_window.py"
-    ),
-    Path("src/rc_metastudio/forms/network_view_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_network_view_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/new_covariate_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_new_covariate_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/new_follow_up_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_new_follow_up_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/new_group_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_new_group_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/new_outcome_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_new_outcome_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/new_study_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_new_study_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/outcome_name_page.ui"): Path(
-        "rc_metastudio/forms/ui_outcome_name_page.py"
-    ),
-    Path("src/rc_metastudio/forms/results_window.ui"): Path(
-        "rc_metastudio/ui_results_window.py"
-    ),
-    Path("src/rc_metastudio/forms/progress_dialog.ui"): Path(
-        "rc_metastudio/forms/ui_progress_dialog.py"
-    ),
-    Path("src/rc_metastudio/forms/welcome_page.ui"): Path(
-        "rc_metastudio/forms/ui_welcome_page.py"
-    ),
-}
+ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_RESOURCE = Path("src/rc_metastudio/images/icons.qrc")
 DEFAULT_BUILD_ROOT = ROOT / "build" / "qt6"
 
@@ -141,18 +50,6 @@ QT_RCC_PACKAGE_SHA256 = (
 QT_RCC_SHA256 = "912f4565e9486243200517be9e7e8dddc76ea63cd426278e944ba36ad8ff14e7"
 QT_RCC_CORE_SHA256 = "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
 WINDOWS_X64_PE_MACHINE = 0x8664
-
-
-def validate_macos_rcc(
-    rcc: Path, *, expected_version: str = QT_RCC_VERSION
-) -> list[str]:
-    """Compatibility re-export using this module's historically patched seams."""
-    return _validate_macos_rcc(
-        rcc,
-        expected_version=expected_version,
-        command_runner=subprocess.run,
-        host_machine=platform.machine,
-    )
 
 
 def validate_form_manifest(
@@ -361,7 +258,7 @@ def _resolve_rcc() -> Path:
         if not rcc.is_file():
             raise RuntimeError(f"RCMS_QT6_RCC does not name a file: {rcc}")
         if sys.platform == "darwin":
-            validate_macos_rcc(rcc)
+            qt6_macos_feasibility_impl.validate_macos_rcc(rcc)
         else:
             validate_rcc(rcc)
         return rcc
@@ -472,22 +369,15 @@ def _smoke_inputs(build_root: Path) -> tuple[Path, Path]:
     return generate(build_root)
 
 
-def smoke(
-    build_root: Path,
-    exit_after_ms: int,
-    *,
-    expected_qpa: str | None = None,
-) -> dict[str, str | bool]:
-    """Launch a visible native Qt6 form and return user-observable evidence."""
-    module_path, resource_path = _smoke_inputs(build_root)
-    if not QtCore.QResource.registerResource(str(resource_path)):
-        raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
-
+def _smoke_application() -> tuple[QtWidgets.QApplication, bool]:
     application = cast(QtWidgets.QApplication | None, QtWidgets.QApplication.instance())
     owns_application = application is None
     if application is None:
         application = QtWidgets.QApplication(["rc-metastudio-qt6-smoke"])
-    qpa = application.platformName()
+    return application, owns_application
+
+
+def _validate_smoke_platform(qpa: str, expected_qpa: str | None) -> None:
     if expected_qpa is not None and qpa != expected_qpa:
         raise RuntimeError(f"Qt QPA mismatch: expected {expected_qpa!r}, got {qpa!r}")
     architecture = platform.machine().lower()
@@ -495,25 +385,37 @@ def smoke(
         raise RuntimeError(
             f"Native Windows smoke requires x64 Python, got {platform.machine()!r}"
         )
-    if expected_qpa == "cocoa" and architecture not in {"x86_64", "arm64"}:
+    if expected_qpa == "cocoa" and architecture != "arm64":
         raise RuntimeError(
-            f"Native macOS smoke requires x86_64 or arm64 Python, got {platform.machine()!r}"
+            f"Native macOS smoke requires Apple silicon Python, got {platform.machine()!r}"
         )
 
+
+def _smoke_dialog(
+    module_path: Path,
+) -> tuple[QtWidgets.QDialog, QtGui.QIcon, QtGui.QPixmap, QtGui.QPixmap]:
     dialog = QtWidgets.QDialog()
-    form_type = _load_generated_form(module_path)
-    form = form_type()
+    form = _load_generated_form(module_path)()
     form.setupUi(dialog)
     app_icon = QtGui.QIcon(":/misc/meta.png")
-    svg_icon = QtGui.QIcon(":/icons/actions/about-legal.svg")
     app_icon_pixmap = app_icon.pixmap(QtCore.QSize(32, 32))
-    svg_icon_pixmap = svg_icon.pixmap(QtCore.QSize(24, 24))
+    svg_icon_pixmap = QtGui.QIcon(":/icons/actions/about-legal.svg").pixmap(
+        QtCore.QSize(24, 24)
+    )
     if app_icon_pixmap.isNull() or svg_icon_pixmap.isNull():
         raise RuntimeError(
             "The registered binary resource did not expose required icons"
         )
-    application.setWindowIcon(app_icon)
     dialog.setWindowIcon(app_icon)
+    return dialog, app_icon, app_icon_pixmap, svg_icon_pixmap
+
+
+def _run_smoke_dialog(
+    application: QtWidgets.QApplication,
+    dialog: QtWidgets.QDialog,
+    resource_path: Path,
+    exit_after_ms: int,
+) -> bool:
     dialog.show()
     application.processEvents()
     visible = dialog.isVisible()
@@ -528,9 +430,27 @@ def smoke(
             f"Qt6 smoke did not shut down cleanly: exit={exit_code}, "
             f"resource_unregistered={unregistered}"
         )
+    return visible
 
-    # QApplication cannot be recreated in a process; this flag documents why
-    # the smoke command is intentionally a standalone process.
+
+def smoke(
+    build_root: Path,
+    exit_after_ms: int,
+    *,
+    expected_qpa: str | None = None,
+) -> dict[str, str | bool]:
+    """Launch a visible native Qt6 form and return user-observable evidence."""
+    module_path, resource_path = _smoke_inputs(build_root)
+    if not QtCore.QResource.registerResource(str(resource_path)):
+        raise RuntimeError(f"Qt refused to register binary resource {resource_path}")
+
+    application, owns_application = _smoke_application()
+    qpa = application.platformName()
+    _validate_smoke_platform(qpa, expected_qpa)
+    dialog, app_icon, app_icon_pixmap, svg_icon_pixmap = _smoke_dialog(module_path)
+    application.setWindowIcon(app_icon)
+    visible = _run_smoke_dialog(application, dialog, resource_path, exit_after_ms)
+
     if not owns_application:
         raise RuntimeError("Qt6 smoke requires ownership of its QApplication")
     return {

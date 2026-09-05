@@ -9,7 +9,6 @@ import pytest
 from rc_metastudio import automation
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 sys.path.insert(0, os.path.abspath("src"))
 
 
@@ -52,19 +51,17 @@ def test_diagnostic_backend_dispatch_preserves_standard_and_workflow_calls(monke
     from rc_metastudio import analysis_setup_dialog
 
     calls = []
+    def run_requests(requests):
+        workflow = requests[0]["workflow"]
+        methods = [request["method"] for request in requests]
+        params = [request["params"] for request in requests]
+        calls.append((workflow, methods, params))
+        return workflow
+
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
-        "run_diagnostic_multi",
-        lambda methods, params: (
-            calls.append(("standard", methods, params)) or "standard"
-        ),
-    )
-    monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
-        "run_diagnostic_workflow",
-        lambda workflow, methods, params: (
-            calls.append((workflow, methods, params)) or workflow
-        ),
+        analysis_setup_dialog.analysis_adapter.r_bridge,
+        "run_versioned_analysis_requests",
+        run_requests,
     )
 
     assert (
@@ -134,7 +131,7 @@ def test_diagnostic_method_dialog_builds_with_working_backend(monkeypatch):
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -201,7 +198,7 @@ def test_diagnostic_method_dialog_opens_without_multiple_metrics_note(monkeypatc
     from rc_metastudio import diagnostic_metrics_dialog
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -271,7 +268,7 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -279,7 +276,7 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
             "get_params",
             "get_method_description",
             "dataset_to_simple_diagnostic_r_object",
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             "reset_r_working_directory",
         )
     }
@@ -317,7 +314,7 @@ def test_diagnostic_backend_failure_does_not_open_empty_results(monkeypatch):
         _set_backend(
             monkeypatch,
             backend,
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             lambda *args, **kwargs: (_ for _ in ()).throw(
                 RuntimeError("simulated diagnostic failure")
             ),
@@ -351,7 +348,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -359,7 +356,7 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
             "get_params",
             "get_method_description",
             "dataset_to_simple_diagnostic_r_object",
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             "reset_r_working_directory",
         )
     }
@@ -397,16 +394,19 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
         )
         _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
 
-        def run_metric(method_names, param_vals):
+        def run_metric(requests):
+            param_vals = [request["params"] for request in requests]
             if len(param_vals) > 1:
                 raise DiagnosticExecutionError("combined diagnostic failure")
             metric = param_vals[0]["measure"]
             if metric == "Sens":
                 raise DiagnosticExecutionError("Reitsma bivariate model failed to converge")
             title = "%s Forest plot" % metric
+            summary = "%s Summary" % metric
             return {
+                "version": 1,
                 "texts": {
-                    "%s Summary" % metric: "%s ok" % metric,
+                    summary: "%s ok" % metric,
                 },
                 "images": {
                     title: "%s.png" % metric.lower(),
@@ -424,9 +424,27 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
                         "regenerator": "forest",
                     }
                 },
+                "sections": [
+                    {
+                        "id": "diagnostic.%s.summary" % metric.lower(),
+                        "kind": "text",
+                        "order": 0,
+                        "title": summary,
+                        "source_key": summary,
+                    },
+                    {
+                        "id": "diagnostic.%s.forest" % metric.lower(),
+                        "kind": "image",
+                        "order": 1,
+                        "title": title,
+                        "source_key": title,
+                    },
+                ],
             }
 
-        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
+        _set_backend(
+            monkeypatch, backend, "run_versioned_analysis_requests", run_metric
+        )
         monkeypatch.setattr(
             analysis_setup_dialog.QMessageBox,
             "critical",
@@ -451,15 +469,15 @@ def test_diagnostic_multi_metric_failure_keeps_independent_results(monkeypatch):
 
         assert shown == []
         assert len(results) == 1
-        assert results[0]["texts"]["Sens Error"] == "Reitsma bivariate model failed to converge"
-        assert results[0]["texts"]["DOR Summary"] == "DOR ok"
-        assert results[0]["texts"]["PLR Summary"] == "PLR ok"
-        assert results[0]["texts"]["NLR Summary"] == "NLR ok"
-        assert results[0]["image_order"] == [
+        assert results[0].texts["Sens Error"] == "Reitsma bivariate model failed to converge"
+        assert results[0].texts["DOR Summary"] == "DOR ok"
+        assert results[0].texts["PLR Summary"] == "PLR ok"
+        assert results[0].texts["NLR Summary"] == "NLR ok"
+        assert results[0].image_order == (
             "NLR Forest plot",
             "PLR Forest plot",
             "DOR Forest plot",
-        ]
+        )
     finally:
         for name, value in saved.items():
             setattr(backend, name, value)
@@ -472,7 +490,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
     from rc_metastudio import analysis_setup_dialog
     from rc_metastudio import app_error_handler
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -480,7 +498,7 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
             "get_params",
             "get_method_description",
             "dataset_to_simple_diagnostic_r_object",
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             "reset_r_working_directory",
         )
     }
@@ -565,14 +583,23 @@ def test_combined_diagnostic_metrics_use_one_method_dialog(monkeypatch):
         def run_diagnostic(*args, **kwargs):
             run_calls.append(args)
             return {
+                "version": 1,
                 "texts": {},
                 "images": {},
+                "display_images": {},
                 "image_var_names": {},
                 "image_params_paths": {},
                 "image_order": [],
+                "plot_capabilities": {},
+                "sections": [],
             }
 
-        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_diagnostic)
+        _set_backend(
+            monkeypatch,
+            backend,
+            "run_versioned_analysis_requests",
+            run_diagnostic,
+        )
         _set_backend(monkeypatch, backend, "reset_r_working_directory", lambda: None)
         monkeypatch.setattr(
             app_error_handler,
@@ -663,8 +690,10 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
             )
         metric = parameter_values[0]["measure"]
         title = "%s Forest Plot" % metric
+        summary = "%s Summary" % metric
         return {
-            "texts": {"%s Summary" % metric: "%s ok" % metric},
+            "version": 1,
+            "texts": {summary: "%s ok" % metric},
             "images": {title: "%s.png" % metric.lower()},
             "display_images": {title: "%s.display.svg" % metric.lower()},
             "image_var_names": {},
@@ -679,6 +708,22 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
                 }
             },
             "image_order": [title],
+            "sections": [
+                {
+                    "id": "diagnostic.%s.summary" % metric.lower(),
+                    "kind": "text",
+                    "order": 0,
+                    "title": summary,
+                    "source_key": summary,
+                },
+                {
+                    "id": "diagnostic.%s.forest" % metric.lower(),
+                    "kind": "image",
+                    "order": 1,
+                    "title": title,
+                    "source_key": title,
+                },
+            ],
         }
 
     monkeypatch.setattr(analysis_adapter, "_run_diagnostic_backend", run_backend)
@@ -707,7 +752,7 @@ def test_per_metric_diagnostic_merge_preserves_display_artifacts(monkeypatch):
     )()
     result = analysis_adapter.execute_analysis_requests(model, requests)
 
-    assert result["display_images"] == {
+    assert result.display_images == {
         "Sens Forest Plot": "sens.display.svg",
         "Spec Forest Plot": "spec.display.svg",
     }
@@ -758,7 +803,7 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
     from rc_metastudio import analysis_adapter
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -766,7 +811,7 @@ def test_combined_diagnostic_configuration_returns_typed_analysis_requests(monke
             "get_params",
             "get_method_description",
             "dataset_to_simple_diagnostic_r_object",
-            "run_diagnostic_multi",
+            "run_versioned_analysis_requests",
             "reset_r_working_directory",
         )
     }
@@ -837,7 +882,7 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name, None)
         for name in (
@@ -845,8 +890,7 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
             "get_params",
             "get_method_description",
             "dataset_to_simple_diagnostic_r_object",
-            "run_diagnostic_multi",
-            "run_diagnostic_multi_for_entered_effects",
+            "run_versioned_analysis_requests",
         )
     }
     built_metrics = []
@@ -888,16 +932,32 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
         def build_metric(model, **kwargs):
             built_metrics.append(kwargs.get("metric", "Sens"))
 
-        def run_metric(method_names, param_vals):
+        def run_metric(requests):
+            method_names = [request["method"] for request in requests]
+            param_vals = [request["params"] for request in requests]
             multi_calls.append((list(method_names), [dict(p) for p in param_vals]))
+            metric = param_vals[0]["measure"]
+            summary = "%s Summary" % metric
             return {
+                "version": 1,
                 "texts": {
-                    "%s Summary" % param_vals[0]["measure"]: "ok",
+                    summary: "ok",
                 },
                 "images": {},
+                "display_images": {},
                 "image_var_names": {},
                 "image_params_paths": {},
                 "image_order": None,
+                "plot_capabilities": {},
+                "sections": [
+                    {
+                        "id": "diagnostic.%s.summary" % metric.lower(),
+                        "kind": "text",
+                        "order": 0,
+                        "title": summary,
+                        "source_key": summary,
+                    }
+                ],
             }
 
         _set_backend(
@@ -906,7 +966,9 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
             "dataset_to_simple_diagnostic_r_object",
             build_metric,
         )
-        _set_backend(monkeypatch, backend, "run_diagnostic_multi", run_metric)
+        _set_backend(
+            monkeypatch, backend, "run_versioned_analysis_requests", run_metric
+        )
         monkeypatch.setattr(window, "analysis", lambda result: results.append(result))
 
         form = window._build_analysis_specs_dialog(
@@ -919,7 +981,7 @@ def test_diagnostic_direct_effects_build_analysis_data_per_metric(monkeypatch):
 
         assert built_metrics == ["Sens", "Spec"]
         assert [call[1][0]["measure"] for call in multi_calls] == ["Sens", "Spec"]
-        assert results and sorted(results[0]["texts"]) == [
+        assert results and sorted(results[0].texts) == [
             "Sens Summary",
             "Spec Summary",
         ]
@@ -1075,7 +1137,7 @@ def test_diagnostic_direct_effects_do_not_offer_count_based_methods(monkeypatch)
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -1155,7 +1217,9 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
     app, window = automation.start_automation()
     from rc_metastudio import analysis_setup_dialog
 
-    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    backend = sys.modules.get(
+        "rc_metastudio.r_bridge", analysis_setup_dialog.analysis_adapter.r_bridge
+    )
     saved = {
         name: getattr(backend, name)
         for name in (
@@ -1256,7 +1320,7 @@ def test_diagnostic_method_selector_exposes_full_choices_without_root_cap(monkey
 
 
 def _close_without_prompt(app, window):
-    window.current_data_unsaved = False
+    window.workspace.mark_saved()
     window.close()
     app.processEvents()
     os.chdir(REPO_ROOT)

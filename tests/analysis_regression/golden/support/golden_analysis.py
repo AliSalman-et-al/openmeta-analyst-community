@@ -1,6 +1,7 @@
 import json
 import datetime
 import hashlib
+from collections.abc import Mapping
 from importlib import metadata
 import os
 import platform
@@ -11,9 +12,10 @@ import sys
 import traceback
 import zipfile
 
-from rc_metastudio import headless_analysis
+from tests.analysis_regression.golden.support import headless_analysis
 from rc_metastudio import meta_globals
 from rc_metastudio import r_bridge
+from rc_metastudio.analysis_results import AnalysisResult
 from rc_metastudio.plot_defaults import FOREST_ARM_LABELS
 
 
@@ -125,7 +127,7 @@ def write_comprehensive_golden_baseline_manifest(report_path, root_dir=None):
 
 def curated_golden_bundles(root_dir=None):
     root_dir = root_dir or os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..")
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
     )
 
     def sample(name):
@@ -520,9 +522,9 @@ def curated_golden_bundles(root_dir=None):
     ]
 
 
-def parsed_numeric_sections(result):
+def parsed_numeric_sections(result: AnalysisResult):
     parsed = {}
-    for name, text in result.get("texts", {}).items():
+    for name, text in _public_texts(result).items():
         values = _parse_summary(text)
         values.update(_parse_result_table(text))
         values.update(_parse_weights(text))
@@ -531,8 +533,18 @@ def parsed_numeric_sections(result):
     return parsed
 
 
-def compare_bundle(bundle, result):
+def _public_texts(result: AnalysisResult):
+    """Expose typed text sections by their public titles for the oracle."""
+    return {
+        section.title: result.texts[section.source_key]
+        for section in result.sections
+        if section.kind == "text"
+    }
+
+
+def compare_bundle(bundle, result: AnalysisResult):
     actual = parsed_numeric_sections(result)
+    public_texts = _public_texts(result)
     comparisons = []
     for section, expected_values in bundle["expected"].items():
         if not expected_values:
@@ -541,10 +553,10 @@ def compare_bundle(bundle, result):
                     "section": section,
                     "metric": "text_present",
                     "expected": True,
-                    "observed": section in result.get("texts", {}),
+                    "observed": section in public_texts,
                     "tolerance": None,
                     "drift": None,
-                    "passed": section in result.get("texts", {}),
+                    "passed": section in public_texts,
                 }
             )
         for metric, expected in expected_values.items():
@@ -566,9 +578,9 @@ def compare_bundle(bundle, result):
     return comparisons
 
 
-def _compare_artifacts(bundle, result):
+def _compare_artifacts(bundle, result: AnalysisResult):
     comparisons = []
-    images = result.get("images", {})
+    images = result.images
     for label in sorted(bundle.get("artifacts", {})):
         image_label = _matching_key(images, label)
         path = images.get(image_label) if image_label is not None else None
@@ -597,6 +609,17 @@ def _matching_key(mapping, expected):
     return None
 
 
+def _artifact_source_key(result: AnalysisResult, label, images):
+    for section in result.sections:
+        if (
+            section.kind == "image"
+            and section.title.casefold() == str(label).casefold()
+            and section.source_key in images
+        ):
+            return section.source_key
+    return _matching_key(images, label)
+
+
 def run_curated_golden_set(report_path=None):
     r_bridge.RLibraryLoader().load_rcmetar()
     reports = []
@@ -610,7 +633,7 @@ def run_curated_golden_set(report_path=None):
                 "metric": bundle["metric"],
                 "parameters": bundle["parameters"],
                 "tolerances": bundle["tolerances"],
-                "artifacts": result.get("images", {}),
+                "artifacts": result.images,
                 "comparisons": compare_bundle(bundle, result),
             }
         )
@@ -621,7 +644,7 @@ def run_curated_golden_set(report_path=None):
     }
     if report_path:
         with open(report_path, "w") as f:
-            json.dump(report, f, indent=2, sort_keys=True)
+            json.dump(_json_compatible(report), f, indent=2, sort_keys=True)
     return report
 
 
@@ -676,7 +699,7 @@ def capture_bundle(
             {
                 "status": "success",
                 "outputs": parsed_numeric_sections(result),
-                "texts": result.get("texts", {}),
+                "texts": _public_texts(result),
                 "artifacts": _capture_artifacts(bundle, result),
                 "plot_descriptors": _capture_plot_descriptors(bundle, result),
             }
@@ -697,7 +720,7 @@ def capture_curated_binary_bundle(report_path=None):
     capture = capture_bundle(curated_golden_bundles()[0])
     if report_path:
         with open(report_path, "w") as f:
-            json.dump(capture, f, indent=2, sort_keys=True)
+            json.dump(_json_compatible(capture), f, indent=2, sort_keys=True)
     return capture
 
 
@@ -755,8 +778,8 @@ def capture_comprehensive_golden_baseline(
     return manifest
 
 
-def _capture_artifacts(bundle, result):
-    images = result.get("images", {})
+def _capture_artifacts(bundle, result: AnalysisResult):
+    images = result.images
     artifacts = []
     for label, expected_path in sorted(bundle.get("artifacts", {}).items()):
         path = images.get(label, expected_path)
@@ -770,26 +793,39 @@ def _capture_artifacts(bundle, result):
     return artifacts
 
 
-def _capture_plot_descriptors(bundle, result):
-    displays = result.get("display_images", {})
-    capabilities = result.get("plot_capabilities", {})
+def _capture_plot_descriptors(bundle, result: AnalysisResult):
+    displays = result.display_images
+    capabilities = result.plot_capabilities
     descriptors = []
     for label in sorted(bundle.get("artifacts", {})):
-        display_label = _matching_key(displays, label)
+        image_key = _artifact_source_key(result, label, result.images)
+        display_label = (
+            image_key if image_key in displays else _matching_key(displays, label)
+        )
         display_path = (
             displays.get(display_label) if display_label is not None else None
         )
-        capability_label = _matching_key(capabilities, label)
+        display_identity = next(
+            (
+                section.title
+                for section in result.sections
+                if section.kind == "image" and section.source_key == image_key
+            ),
+            label if display_label is not None else None,
+        )
+        capability_label = (
+            image_key if image_key in capabilities else _matching_key(capabilities, label)
+        )
         capability = (
-            capabilities.get(capability_label, {})
+            capabilities.get(capability_label)
             if capability_label is not None
-            else {}
+            else None
         )
         descriptors.append(
             {
                 "artifact_label": label,
                 "display": {
-                    "identity": display_label,
+                    "identity": display_identity if display_path else None,
                     "name": os.path.basename(display_path) if display_path else None,
                     "type": (
                         os.path.splitext(display_path)[1].lower().lstrip(".")
@@ -803,11 +839,11 @@ def _capture_plot_descriptors(bundle, result):
                     ),
                 },
                 "capability": {
-                    "kind": capability.get("plot_kind"),
-                    "editable": capability.get("editable"),
-                    "styleable": capability.get("styleable"),
-                    "composition": capability.get("composition"),
-                    "regeneration": capability.get("regenerator"),
+                    "kind": capability.plot_kind if capability else None,
+                    "editable": capability.editable if capability else None,
+                    "styleable": capability.styleable if capability else None,
+                    "composition": capability.composition if capability else None,
+                    "regeneration": capability.regenerator if capability else None,
                 },
             }
         )
@@ -830,7 +866,15 @@ def _preserve_capture_artifacts(capture, bundle_id, artifacts_dir):
 def _write_json(path, data):
     _ensure_dir(os.path.dirname(path))
     with open(path, "w") as f:
-        json.dump(data, f, indent=2, sort_keys=True)
+        json.dump(_json_compatible(data), f, indent=2, sort_keys=True)
+
+
+def _json_compatible(value):
+    if isinstance(value, Mapping):
+        return {key: _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_compatible(item) for item in value]
+    return value
 
 
 def _ensure_dir(path):

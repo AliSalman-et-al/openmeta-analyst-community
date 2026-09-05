@@ -8,7 +8,8 @@ from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 
-from rc_metastudio import funnel_plot_editor_dialog, results_window
+from rc_metastudio import funnel_plot_editor_dialog, plot_service, results_window
+from rc_metastudio.analysis_results import PlotCapability, empty_analysis_result
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 
 
@@ -22,6 +23,10 @@ def _params(kind):
         "funnel.point.size": 1.0,
         "funnel.label.policy": "none",
     }
+
+
+def _funnel_capability():
+    return PlotCapability("funnel", True, True, "single", "funnel")
 
 
 def test_funnel_editor_preserves_statistical_params_and_updates_presentation(qapp):
@@ -232,11 +237,10 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
     artifact = results_window.PlotArtifact(
         "Ordinary Funnel Plot",
         str(image_path),
-        {"plot_kind": "funnel", "regenerator": "funnel"},
+        _funnel_capability(),
         params_path=str(base),
     )
-    window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
-    window._refresh_plot_item = lambda *args: None
+    window = results_window.ResultsWindow(empty_analysis_result())
     regenerate_count = [0]
 
     def write_params(params, **kwargs):
@@ -253,10 +257,10 @@ def test_funnel_editor_failed_second_apply_preserves_last_good_artifacts(
         raise RuntimeError("render failed")
 
     monkeypatch.setattr(
-        results_window.r_bridge, "update_plot_params", write_params, raising=False
+        plot_service.r_bridge, "update_plot_params", write_params, raising=False
     )
     monkeypatch.setattr(
-        results_window.r_bridge,
+        plot_service.r_bridge,
         "regenerate_small_study_effects_funnel",
         regenerate,
         raising=False,
@@ -286,10 +290,10 @@ def test_funnel_editor_rejects_svgz_output_path(qapp):
     artifact = results_window.PlotArtifact(
         "Ordinary Funnel Plot",
         "funnel.png",
-        {"plot_kind": "funnel", "regenerator": "funnel"},
+        _funnel_capability(),
         params_path="funnel",
     )
-    window = results_window.ResultsWindow.__new__(results_window.ResultsWindow)
+    window = results_window.ResultsWindow(empty_analysis_result())
 
     class Dialog:
         def plot_params(self):

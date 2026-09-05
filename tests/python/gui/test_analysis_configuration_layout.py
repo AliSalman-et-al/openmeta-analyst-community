@@ -13,7 +13,6 @@ from rc_metastudio import analysis_dataset
 
 ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("RCMS_STUB_BACKEND", "1")
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 from test_types import key_click, required, wait
@@ -72,12 +71,11 @@ def _install_analysis_backend(monkeypatch, analysis_setup_dialog):
         "digits": 2,
         "label": "complete editable value",
     }
-    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
-    monkeypatch.setattr(analysis_setup_dialog, "r_bridge", backend)
+    backend = analysis_setup_dialog.analysis_adapter.AnalysisService
     monkeypatch.setattr(
         backend,
-        "get_available_methods",
-        lambda **kwargs: (
+        "available_methods",
+        lambda _self, **kwargs: (
             diagnostic_methods
             if kwargs.get("for_data_type") == "diagnostic"
             else methods
@@ -85,8 +83,8 @@ def _install_analysis_backend(monkeypatch, analysis_setup_dialog):
     )
     monkeypatch.setattr(
         backend,
-        "get_params",
-        lambda method: (
+        "parameters",
+        lambda _self, method: (
             {
                 name: definition
                 for name, definition in parameters.items()
@@ -107,19 +105,19 @@ def _install_analysis_backend(monkeypatch, analysis_setup_dialog):
     )
     monkeypatch.setattr(
         backend,
-        "get_method_description",
-        lambda method: ("A long method description that wraps locally. " * 8) + method,
+        "method_description",
+        lambda _self, method: (
+            "A long method description that wraps locally. " * 8
+        )
+        + method,
     )
-    for name in (
-        "dataset_to_simple_binary_r_object",
-        "dataset_to_simple_continuous_r_object",
-        "dataset_to_simple_diagnostic_r_object",
-    ):
-        monkeypatch.setattr(backend, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        backend, "prepare_method_dataset", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         backend,
-        "get_analysis_plot_capabilities",
-        lambda _data_type, method, **_kwargs: (
+        "plot_capabilities",
+        lambda _self, _data_type, method, **_kwargs: (
             [{"plot_kind": "forest", "styleable": True}]
             if str(method).endswith("fixed")
             else []
@@ -217,7 +215,7 @@ def test_diagnostic_reitsma_method_layout_and_meta_regression_uses_joint_mode(
 
     covariate = SimpleNamespace(name="quality", data_type=4)
     model = _AnalysisModel("diagnostic", (covariate,))
-    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    backend = analysis_adapter.r_bridge
     monkeypatch.setattr(
         backend,
         "dataset_to_simple_diagnostic_r_object",
@@ -362,7 +360,7 @@ def test_diagnostic_reitsma_meta_regression_hides_legacy_controls_for_factor_and
     continuous = SimpleNamespace(name="threshold", data_type=0)
     factor = SimpleNamespace(name="reader", data_type=1)
     model = _AnalysisModel("diagnostic", (continuous, factor))
-    backend = sys.modules.get("rc_metastudio.r_bridge", analysis_setup_dialog.r_bridge)
+    backend = analysis_setup_dialog.analysis_adapter.r_bridge
     monkeypatch.setattr(
         backend,
         "dataset_to_simple_diagnostic_r_object",
@@ -988,7 +986,7 @@ class Model:
     def included_studies_have_raw_data(self):
         return True
 
-backend = analysis_setup_dialog.r_bridge
+backend = analysis_adapter.r_bridge
 data_calls = []
 backend.dataset_to_simple_binary_r_object = lambda *args, **kwargs: data_calls.append("binary")
 backend.get_available_methods = lambda **kwargs: {"Random": "binary.random"}
@@ -1002,9 +1000,9 @@ app = app_error_handler.get_or_create_application([])
 observed = []
 backend_calls = []
 execution_data_calls = []
-backend.run_binary_analysis = lambda method, params: backend_calls.append(
-    [method, params["conf.level"]]
-) or {"texts": {}}
+backend.run_versioned_analysis_request = lambda request: backend_calls.append(
+    [request["method"], request["params"]["conf.level"]]
+) or {"version": 1, "texts": {}, "sections": []}
 for locale, text in (
     (QtCore.QLocale(QtCore.QLocale.Language.English), "90.5"),
     (QtCore.QLocale(QtCore.QLocale.Language.German), "90,5"),
@@ -1033,7 +1031,6 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
 """
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
-    environment["RCMS_STUB_BACKEND"] = "1"
     environment["RCMS_QT6_BUILD_ROOT"] = str(ROOT / "build" / "qt6-verification")
     environment["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src")])
     completed = subprocess.run(
@@ -1060,17 +1057,17 @@ print("LOCALE_ANALYSIS_REQUESTS=" + json.dumps({
 
 def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
     cases = [
-        ("binary", "standard", "run_binary_analysis"),
-        ("binary", "cumulative", "run_workflow_analysis"),
-        ("continuous", "standard", "run_continuous_analysis"),
-        ("continuous", "leave-one-out", "run_workflow_analysis"),
-        ("diagnostic", "standard", "run_diagnostic_multi"),
-        ("diagnostic", "subgroup", "run_diagnostic_workflow"),
+        ("binary", "standard"),
+        ("binary", "cumulative"),
+        ("continuous", "standard"),
+        ("continuous", "leave-one-out"),
+        ("diagnostic", "standard"),
+        ("diagnostic", "subgroup"),
     ]
     from rc_metastudio import analysis_adapter
     from rc_metastudio import analysis_setup_dialog
 
-    backend = analysis_setup_dialog.r_bridge
+    backend = analysis_adapter.r_bridge
     for converter in (
         "dataset_to_simple_binary_r_object",
         "dataset_to_simple_continuous_r_object",
@@ -1078,14 +1075,32 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
     ):
         monkeypatch.setattr(backend, converter, lambda *_args, **_kwargs: None)
 
-    for data_type, workflow, backend_name in cases:
+    for data_type, workflow in cases:
         calls = []
 
         def capture(*args):
             calls.append(args)
-            return {"texts": {"Summary": "ok"}, "images": {}}
+            return {
+                "version": 1,
+                "texts": {"Summary": "ok"},
+                "images": {},
+                "sections": [
+                    {
+                        "id": "result.summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Summary",
+                        "source_key": "Summary",
+                    }
+                ],
+            }
 
-        monkeypatch.setattr(backend, backend_name, capture)
+        runner = (
+            "run_versioned_analysis_requests"
+            if data_type == "diagnostic"
+            else "run_versioned_analysis_request"
+        )
+        monkeypatch.setattr(backend, runner, capture)
         metric = {
             "binary": "OR",
             "continuous": "SMD",
@@ -1111,7 +1126,7 @@ def test_backend_execution_uses_only_frozen_analysis_requests(monkeypatch):
         rendered = repr(calls)
         assert "90.5" in rendered
         assert "MUTATED" not in rendered
-        assert (workflow in rendered) is (workflow != "standard")
+        assert workflow in rendered
 
 
 def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
@@ -1130,14 +1145,15 @@ def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
     )
     parameters["conf.level"] = 1.0
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
+        analysis_adapter.r_bridge,
         "dataset_to_simple_continuous_r_object",
         lambda model, **kwargs: calls.append(("data", kwargs)),
     )
     monkeypatch.setattr(
-        analysis_setup_dialog.r_bridge,
-        "run_meta_regression",
-        lambda *args, **kwargs: calls.append(("backend", args, kwargs)) or {},
+        analysis_adapter.r_bridge,
+        "run_versioned_analysis_request",
+        lambda *args, **kwargs: calls.append(("backend", args, kwargs))
+        or {"version": 1, "texts": {}, "sections": []},
     )
 
     analysis_adapter.execute_meta_regression_request(

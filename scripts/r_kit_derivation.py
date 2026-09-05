@@ -5,22 +5,17 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
-from typing import Any, Callable, cast
 
 
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
-verify = cast(
-    Callable[..., dict[str, Any]],
-    importlib.import_module("scripts.r_integration_kit").verify,
-)
+from scripts.r_integration_kit import verify
 
 
 def sha256(path: Path) -> str:
@@ -32,7 +27,7 @@ def sha256(path: Path) -> str:
 
 
 def record(
-    path: Path, root: Path, signing: dict[str, Any] | None = None
+    path: Path, root: Path, signing: dict[str, object] | None = None
 ) -> dict[str, object]:
     resolved = path.resolve(strict=True)
     relative = Path(os.path.relpath(resolved, root.resolve())).as_posix()
@@ -90,7 +85,7 @@ def record(
 def kit_r_shared_library(kit: Path, target: str) -> Path:
     if target == "windows-x64":
         return (kit / "runtime" / "bin" / "x64" / "R.dll").resolve(strict=True)
-    if target in {"macos-x64", "macos-arm64"}:
+    if target == "macos-arm64":
         return (kit / "runtime" / "R").resolve(strict=True)
     raise ValueError(f"unsupported R integration-kit target: {target}")
 

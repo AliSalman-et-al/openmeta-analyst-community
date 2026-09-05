@@ -4,10 +4,7 @@
 
 import gzip
 import re
-import shutil
-import tempfile
 from collections import namedtuple
-from pathlib import Path
 from typing import TYPE_CHECKING
 from PyQt6.QtCore import (
     QByteArray,
@@ -51,12 +48,15 @@ from rc_metastudio import (
     adaptive_window,
     app_error_handler,
     plot_capabilities,
-    r_bridge,
-    result_sections,
 )
-from rc_metastudio.analysis_results import AnalysisResult
+from rc_metastudio.analysis_results import (
+    AnalysisResult,
+    PlotCapability,
+    parse_analysis_result,
+)
 from rc_metastudio.funnel_plot_editor_dialog import FunnelPlotEditorDialog
 from rc_metastudio.plot_editor_dialog import EditPlotDialog
+from rc_metastudio.plot_service import PlotService
 from rc_metastudio.qt_geometry import logical_extent_to_physical_pixels
 from rc_metastudio.settings import (
     restore_results_window_state,
@@ -143,13 +143,18 @@ def _path_with_export_extension(file_path, export_format, *, allow_svgz=True):
 
 class PlotArtifact(object):
     def __init__(
-        self, title, image_path, capability, params_path=None, display_path=None
+        self,
+        title,
+        image_path,
+        capability: PlotCapability,
+        params_path=None,
+        display_path=None,
     ):
         self.title = title
         self.image_path = str(image_path)
         self.params_path = params_path
-        self.capability = dict(capability)
-        self.plot_kind = self.capability["plot_kind"]
+        self.capability = capability
+        self.plot_kind = capability.plot_kind
         self.display_image_path = str(display_path or self.image_path)
 
     def display_path(self):
@@ -242,7 +247,12 @@ def _pixmap_device_independent_size(pixmap):
 
 
 class ResultsWindow(QMainWindow, Ui_ResultsWindow):
-    def __init__(self, results: AnalysisResult, parent=None):
+    def __init__(
+        self,
+        results: AnalysisResult,
+        parent=None,
+        plot_service: PlotService | None = None,
+    ):
 
         super(ResultsWindow, self).__init__(parent)
         self._svg_plot_items = []
@@ -268,6 +278,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.buffer_size = 2
         self.borders = []
         self._active_text_context_menu = None
+        self.plot_service = plot_service or PlotService()
 
         self.nav_tree.itemClicked.connect(
             app_error_handler.safe_slot(self.item_clicked, parent=self)
@@ -300,23 +311,24 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self.scene = QGraphicsScene(self)
 
         results = _normalize_results(results)
+        self.results = results
 
-        self.images = results["images"]
-        self.display_images = results["display_images"]
-        self.image_order = None
-        if "image_order" in results:
-            self.image_order = results["image_order"]
-
-        self.params_paths = {}
-        if "image_params_paths" in results:
-            self.params_paths = results["image_params_paths"]
-        self.plot_capabilities = results["plot_capabilities"]
+        self.images = results.images
+        self.display_images = results.display_images
+        self.image_order = results.image_order
+        self.params_paths = results.image_params_paths
+        self.plot_capabilities = results.plot_capabilities
 
         self.items_to_coords = {}
         self._wrapped_text_items = []
-        self.texts = results["texts"]
-        self.texts, self.references_text = result_sections.pop_references_section(
-            self.texts
+        self.texts = results.texts
+        self.references_text = next(
+            (
+                section.value
+                for section in results.sections
+                if section.semantic_id == "text:references"
+            ),
+            None,
         )
 
         self.add_result_sections()
@@ -332,19 +344,15 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         self._apply_restored_splitter_proportions()
 
     def add_result_sections(self):
-        ordered_sections = result_sections.order_display_sections(
-            texts=list(self.texts.items()),
-            images=list(self.images.items()),
-            explicit_image_order=self.image_order,
-        )
-
-        for section in ordered_sections:
+        # Ordering and plot capabilities come from the immutable result
+        # contract.  The title is used only when painting display text.
+        for section in sorted(self.results.sections, key=lambda item: item.order):
+            if section.semantic_id == "text:references":
+                continue
             if section.kind == "text":
-                self.add_text_section(section.key, section.display_title, section.value)
+                self.add_text_section(section.source_key, section.title, section.value)
             elif section.kind == "image":
-                self.add_image_section(
-                    section.key, section.display_title, section.value
-                )
+                self.add_image_section(section.source_key, section.title, section.value)
 
     def add_image_section(self, title, display_title, image):
         params_path = None
@@ -452,7 +460,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         if self.references_text is None:
             return
 
-        qt_item = self.add_title(result_sections.REFERENCE_SECTION_TITLE)
+        qt_item = self.add_title("References")
         text_item_rect, pos = self.create_text_item(
             str(self.references_text), self.position(), wrap=True
         )
@@ -628,6 +636,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 self._viewport_width_override = self._layout_viewport_width()
             try:
                 self._refit_viewport_items()
+                self._relayout_sections()
             finally:
                 self._viewport_width_override = None
 
@@ -848,7 +857,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 menu.addAction(action)
 
             context_menu = QMenu(self)
-            if artifact.capability["editable"]:
+            if artifact.capability.editable:
                 if plot_capabilities.option_groups(artifact.plot_kind):
                     action = QAction("Edit Plot", self)
                     action.triggered.connect(
@@ -868,7 +877,7 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         return _graphics_item_context_menu
 
     def edit_plot(self, artifact, plot_item):
-        regenerator = artifact.capability["regenerator"]
+        regenerator = artifact.capability.regenerator
         if regenerator == "forest":
             self._edit_forest_plot(artifact, plot_item)
         elif regenerator == "regression":
@@ -879,10 +888,8 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             self._edit_sroc_plot(artifact, plot_item)
 
     def _edit_sroc_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self.plot_service.load_params(artifact.params_path)
+        if plot_params is None:
             return
         dialog = EditPlotDialog(
             plot_params, artifact.image_path, parent=self, plot_type="sroc"
@@ -898,21 +905,17 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_sroc_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("fp_outpath") or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self.plot_service.apply_edits(
+            regenerator="sroc",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_plot_data()
-        r_bridge.generate_sroc_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _edit_funnel_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self.plot_service.load_params(artifact.params_path)
+        if plot_params is None:
             return
         dialog = FunnelPlotEditorDialog(
             plot_params, artifact.image_path, parent=self, plot_type=artifact.plot_kind
@@ -928,64 +931,26 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_funnel_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params.get("funnel.outpath") or artifact.image_path
-        target_path = Path(outpath)
-        if target_path.suffix.lower() == ".svgz":
+        if str(outpath).lower().endswith(".svgz"):
             raise ValueError(
                 "SVGZ output is not supported when editing funnel plots; use SVG instead."
             )
-        transaction_dir = Path(
-            tempfile.mkdtemp(prefix=".rcms-funnel-", dir=str(target_path.parent))
-        )
-        temporary_base = transaction_dir / "plot"
-        temporary_output = transaction_dir / ("render" + (target_path.suffix or ".png"))
-        persisted_params = Path("%s.params" % artifact.params_path)
-        persisted_backup = transaction_dir / "params.backup"
-        had_persisted_params = persisted_params.exists()
         try:
-            for suffix in ("data", "res"):
-                source = Path("%s.%s" % (artifact.params_path, suffix))
-                shutil.copyfile(source, "%s.%s" % (temporary_base, suffix))
-            r_bridge.update_plot_params(
-                updated_params,
-                plot_params_name="params",
-                write_them_out=True,
-                outpath="%s.params" % temporary_base,
+            self.plot_service.apply_edits(
+                regenerator="funnel",
+                params_path=artifact.params_path,
+                updated_params=updated_params,
+                output_path=outpath,
             )
-            if had_persisted_params:
-                shutil.copyfile(persisted_params, persisted_backup)
-            r_bridge.regenerate_small_study_effects_funnel(
-                str(temporary_base), output_path=str(temporary_output)
-            )
-            r_bridge.update_plot_params(
-                updated_params,
-                plot_params_name="params",
-                write_them_out=True,
-                outpath=str(persisted_params),
-            )
-            os.replace(str(temporary_output), str(target_path))
         except Exception:
             dialog.mark_commit_failed()
-            if had_persisted_params and persisted_backup.exists():
-                try:
-                    shutil.copyfile(persisted_backup, persisted_params)
-                except Exception:
-                    pass
-            elif not had_persisted_params and persisted_params.exists():
-                try:
-                    persisted_params.unlink()
-                except OSError:
-                    pass
             raise
-        finally:
-            shutil.rmtree(transaction_dir, ignore_errors=True)
         self._refresh_plot_item(plot_item, artifact, outpath)
         dialog.mark_commit_succeeded()
 
     def _edit_forest_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self.plot_service.load_params(artifact.params_path)
+        if plot_params is None:
             return
 
         dialog = EditPlotDialog(plot_params, artifact.image_path, parent=self)
@@ -998,10 +963,8 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
         dialog.exec()
 
     def edit_regression_plot(self, artifact, plot_item):
-        plot_params = r_bridge.load_vars_for_plot(
-            artifact.params_path, return_params_dict=True
-        )
-        if plot_params is False:
+        plot_params = self.plot_service.load_params(artifact.params_path)
+        if plot_params is None:
             return
 
         dialog = EditPlotDialog(
@@ -1018,27 +981,23 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
     def _apply_regression_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["bp_outpath"] or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self.plot_service.apply_edits(
+            regenerator="regression",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_regression_plot_data()
-        r_bridge.generate_reg_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
         self._refresh_plot_item(plot_item, artifact, outpath)
 
     def _apply_forest_plot_edits(self, dialog, artifact, plot_item):
         updated_params = dialog.plot_params()
         outpath = updated_params["fp_outpath"] or artifact.image_path
-        r_bridge.update_plot_params(
-            updated_params,
-            write_them_out=True,
-            outpath="%s.params" % artifact.params_path,
+        self.plot_service.apply_edits(
+            regenerator="forest",
+            params_path=artifact.params_path,
+            updated_params=updated_params,
+            output_path=outpath,
         )
-        r_bridge.regenerate_plot_data()
-        r_bridge.generate_forest_plot(outpath)
-        r_bridge.write_out_plot_data(artifact.params_path)
 
         self._refresh_plot_item(plot_item, artifact, outpath)
 
@@ -1076,10 +1035,10 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
             raise Exception("Invalid format, needs to be one of: %s!" % valid_formats)
 
         export_format = PLOT_EXPORT_FORMATS_BY_EXTENSION[format]
-        allow_svgz = artifact.capability.get("regenerator") != "funnel"
+        allow_svgz = artifact.capability.regenerator != "funnel"
 
         if not unscaled_image:
-            regenerator = artifact.capability["regenerator"]
+            regenerator = artifact.capability.regenerator
             default_path = {
                 "forest": "forest_plot",
                 "regression": "regression",
@@ -1100,15 +1059,11 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
                 file_path = _path_with_export_extension(
                     file_path, export_format, allow_svgz=allow_svgz
                 )
-                if regenerator == "funnel":
-                    r_bridge.load_vars_for_plot(artifact.params_path)
-                else:
-                    # Loading the artifact exposes its conventional ``plot.data`` object.
-                    r_bridge.load_in_r("%s.plotdata" % artifact.params_path)
-                function_name = plot_capabilities.regenerator_name(regenerator)
-                if function_name is None:
-                    raise ValueError("Plot is not regeneratable: %s" % artifact.title)
-                getattr(r_bridge, function_name)(file_path)
+                self.plot_service.export(
+                    regenerator=regenerator,
+                    params_path=artifact.params_path,
+                    output_path=file_path,
+                )
         else:
             default_path = ".".join([artifact.title.replace(" ", "_"), "png"])
             file_path, _selected_filter = QFileDialog.getSaveFileName(
@@ -1133,22 +1088,44 @@ class ResultsWindow(QMainWindow, Ui_ResultsWindow):
 
 
 def _normalize_results(results: AnalysisResult) -> AnalysisResult:
-    normalized: AnalysisResult = {
-        "texts": dict(results["texts"]),
-        "images": dict(results["images"]),
-        "display_images": dict(results["display_images"]),
-        "image_var_names": dict(results["image_var_names"]),
-        "image_params_paths": dict(results["image_params_paths"]),
-        "image_order": (
-            None if results["image_order"] is None else list(results["image_order"])
-        ),
-        "plot_capabilities": dict(results["plot_capabilities"]),
+    if results.texts or results.images:
+        return results
+    normalized: dict[str, object] = {
+        "version": results.version,
+        "texts": dict(results.texts),
+        "images": dict(results.images),
+        "display_images": dict(results.display_images),
+        "image_var_names": dict(results.image_var_names),
+        "image_params_paths": dict(results.image_params_paths),
+        "image_order": None
+        if results.image_order is None
+        else list(results.image_order),
+        "plot_capabilities": {},
+        "sections": [
+            {
+                "id": section.semantic_id,
+                "kind": section.kind,
+                "order": section.order,
+                "title": section.title,
+                "source_key": section.source_key,
+            }
+            for section in results.sections
+        ],
     }
 
     if not normalized["texts"] and not normalized["images"]:
         normalized["texts"]["No Results"] = NO_RESULTS_MESSAGE
+        normalized["sections"].append(
+            {
+                "id": "result.none",
+                "kind": "text",
+                "order": 0,
+                "title": "No Results",
+                "source_key": "No Results",
+            }
+        )
 
-    return normalized
+    return parse_analysis_result(normalized)
 
 
 if __name__ == "__main__":
@@ -1156,7 +1133,17 @@ if __name__ == "__main__":
     from rc_metastudio import settings
     from rc_metastudio.analysis_results import empty_analysis_result
 
-    test_results = empty_analysis_result()
+    test_results: dict[str, object] = {
+        "version": 1,
+        "images": {},
+        "texts": {},
+        "display_images": {},
+        "image_var_names": {},
+        "image_params_paths": {},
+        "image_order": None,
+        "plot_capabilities": {},
+        "sections": [],
+    }
     test_results["images"] = {
         "Forest Plot": settings.analysis_output_path("forest.png")
     }
@@ -1164,6 +1151,29 @@ if __name__ == "__main__":
         "Weights": "Study names        Weights\nGonzalez       1993  7.3%\nPrins          1993  6.2%\nGiamarellou    1991  2.1%\nMaller         1993 10.7%\nSturm          1989  2.0%\nMarik          1991 12.2%\nMuijsken       1988  7.5%\nVigano         1992  1.8%\nHansen         1988  5.3%\nDe Vries       1990  6.1%\nMauracher      1989  2.2%\nNordstrom      1990  5.3%\nRozdzinski     1993 10.3%\nTer Braak      1990  8.7%\nTulkens        1988  1.2%\nVan der Auwera 1991  2.0%\nKlastersky     1977  6.0%\nVanhaeverbeek  1993  1.2%\nHollender      1989  1.8%\n",
         "Summary": "Binary Random-Effects Model\n\nMetric: Odds Ratio\n\nModel Results\n Estimate  Lower bound  Upper bound  p-value\n 0.770           0.485        1.222    0.267\n\nHeterogeneity\n    τ²  Q(df=18)  Het. p-value       I²\n 0.378    33.360         0.015  46.000%\n\nCalculation scale: log - estimate: -0.262, lower: -0.724, upper: 0.200, std. error: 0.236\n",
     }
+    test_results["sections"] = [
+        {
+            "id": "result.weights",
+            "kind": "text",
+            "order": 0,
+            "title": "Weights",
+            "source_key": "Weights",
+        },
+        {
+            "id": "result.summary",
+            "kind": "text",
+            "order": 1,
+            "title": "Summary",
+            "source_key": "Summary",
+        },
+        {
+            "id": "plot.forest",
+            "kind": "image",
+            "order": 2,
+            "title": "Forest Plot",
+            "source_key": "Forest Plot",
+        },
+    ]
     test_results["image_var_names"] = {"forest plot": "forest_plot"}
     test_results["image_params_paths"] = {
         "Forest Plot": settings.analysis_output_path("1369769105.72079")
@@ -1171,6 +1181,6 @@ if __name__ == "__main__":
     test_results["image_order"] = None
 
     app = app_error_handler.get_or_create_application(sys.argv)
-    resultswindow = ResultsWindow(test_results)
+    resultswindow = ResultsWindow(parse_analysis_result(test_results))
     resultswindow.show()
     sys.exit(app.exec())
