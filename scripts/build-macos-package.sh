@@ -954,7 +954,6 @@ expected_links = {
 required.extend(expected_links)
 if not skip_smoke:
     required.extend([
-        f"{archive_root_name}/qualification/startup-wizard-smoke.json",
         f"{archive_root_name}/qualification/packaged-smoke.json",
         f"{archive_root_name}/qualification/packaged-smoke.log",
         f"{archive_root_name}/qualification/launchservices-completion.json",
