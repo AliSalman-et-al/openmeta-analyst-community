@@ -18,6 +18,8 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 ### Fixed
 
+- Preserved incomplete entered effects and estimate/SE pairs through undo and project saving, and allowed one-arm workspaces to retain their selectable groups.
+- Included complete entered-effect CSV rows consistently, including the first row, while preserving raw-data import inclusion rules.
 - Removed the false save prompt when opening a project from an untouched startup workspace.
 - Restored calculated estimates and confidence bounds when opening binary, continuous, and diagnostic projects, without changing saved inclusion choices or entered estimates.
 - Kept complete imported studies included when their CSV contains blank calculated-effect columns.

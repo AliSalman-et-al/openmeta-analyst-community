@@ -211,10 +211,12 @@ def _validate_effect(effect: dict[str, object], location: str) -> None:
                 f"{location}/{key}: standard error cannot be negative"
             )
     for prefix in ("", "display_"):
-        lower = _finite(effect[f"{prefix}lower"], location)
-        estimate = _finite(effect[f"{prefix}est"], location)
-        upper = _finite(effect[f"{prefix}upper"], location)
-        if not lower <= estimate <= upper:
+        ordered_values = [
+            _finite(effect[f"{prefix}{key}"], location)
+            for key in ("lower", "est", "upper")
+            if f"{prefix}{key}" in effect
+        ]
+        if ordered_values != sorted(ordered_values):
             raise ProjectSemanticError(
                 f"{location}: interval does not contain estimate"
             )
@@ -351,13 +353,15 @@ def validate_project_semantics(
             subtype = outcome_by_name[outcome_name]["sub_type"]
             exact_groups = None
             minimum_groups = None
-            if family == "diagnostic" or subtype in {
+            if family == "diagnostic":
+                exact_groups = 1
+            elif subtype in {
                 "proportion",
                 "mean",
                 "reg_coef",
                 "generic_effect",
             }:
-                exact_groups = 1
+                minimum_groups = 1
             elif subtype in {"proportions", "means", "smd"}:
                 # These subtypes select pairwise/two-arm analysis semantics, but a
                 # project may contain more than two treatment groups.  Each

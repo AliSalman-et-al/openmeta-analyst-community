@@ -1153,6 +1153,36 @@ def test_diagnostic_partial_paste_clears_stale_sens_spec_confidence_intervals(
         _close_without_prompt(app, window)
 
 
+@pytest.mark.parametrize("entered_only", [False, True])
+def test_csv_import_includes_complete_rows_from_the_first_row(entered_only):
+    from rc_metastudio.main_window import ImportCsvCommand
+
+    app, window = automation.start_automation()
+    try:
+        if entered_only:
+            window._handle_wizard_results({
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "one", "data_type": "continuous",
+                    "sub_type": "generic_effect", "effect": "TX Mean",
+                    "metric_choices": ["TX Mean"], "name": "Entered",
+                },
+                "csv_data": None, "selected_dataset": None,
+            })
+            values = ["1.5", "0.2"]
+        else:
+            _create_binary_dataset(window)
+            values = ["1", "10", "2", "12", "", "", ""]
+        command = ImportCsvCommand(
+            imported_data=[[name, "2020", *values] for name in ("Alpha", "Beta")],
+            main_form=window, covariate_names=[], covariate_types=[],
+        )
+        command._import_data_into_new_dataset()
+        assert [study.include for study in window.model.dataset.studies] == [True, True]
+    finally:
+        _close_without_prompt(app, window)
+
+
 def test_csv_import_progress_dialog_closes_when_model_write_raises(monkeypatch):
     from rc_metastudio import dataset_table_model
     from rc_metastudio import main_window

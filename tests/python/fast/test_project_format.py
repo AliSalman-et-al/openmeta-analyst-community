@@ -316,15 +316,17 @@ def test_semantic_validation_rejects_invalid_domain_relationships(
     ("family", "subtype", "raw_values"),
     [
         ("binary", "proportions", [[1, 10], [2, 20], [3, 30]]),
+        ("binary", "proportion", [[1, 10], [2, 20]]),
+        ("continuous", "generic_effect", [["", "", ""], ["", "", ""]]),
         (
             "continuous",
             "means",
             [[10, 1.0, 0.5], [20, 2.0, 0.75], [30, 3.0, 1.0]],
         ),
     ],
-    ids=["binary-three-arm", "continuous-three-arm"],
+    ids=["binary-three-arm", "one-arm-group-selection", "generic-default-groups", "continuous-three-arm"],
 )
-def test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units(
+def test_subtypes_preserve_valid_multi_group_analysis_units(
     tmp_path: Path,
     family: str,
     subtype: str,
@@ -342,10 +344,10 @@ def test_pairwise_subtypes_preserve_valid_multi_arm_analysis_units(
     ("family", "subtype", "raw_values"),
     [
         ("binary", "proportions", [[1, 10]]),
-        ("binary", "proportion", [[1, 10], [2, 20]]),
+        ("binary", "proportion", []),
         ("diagnostic", None, [[1, 2, 3, 4], [5, 6, 7, 8]]),
     ],
-    ids=["two-arm-needs-two", "one-arm-stays-exact", "diagnostic-stays-exact"],
+    ids=["two-arm-needs-two", "one-arm-needs-one", "diagnostic-stays-exact"],
 )
 def test_group_subtype_contract_rejects_too_few_or_forbidden_extra_groups(
     tmp_path: Path,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,7 @@ from rc_metastudio.project_format import JsonObject, JsonValue, ProjectDocument
 
 
 from rc_metastudio import project_adapter
+from rc_metastudio.workspace_session import WorkspaceSession
 
 
 def _multi_arm_project(family: str) -> JsonObject:
@@ -151,7 +153,13 @@ def test_adapter_does_not_write_internal_identities_to_v1() -> None:
     assert "stable_id" not in group
 
 
-def test_generic_effect_round_trip_uses_entered_values_only() -> None:
+@pytest.mark.parametrize("values", [
+    {"est": 1.5},
+    {"est": 1.5, "SE": 0.25, "display_est": 1.5, "display_se": 0.25},
+    {"est": 1.5, "lower": 1.0, "upper": 2.0, "SE": 0.25,
+     "display_est": 1.5, "display_lower": 1.0, "display_upper": 2.0},
+])
+def test_generic_effect_round_trip_uses_entered_values_only(values) -> None:
     project = _multi_arm_project("continuous")
     dataset_data = _object(project["dataset"])
     outcomes = _objects(dataset_data["outcomes"])
@@ -163,15 +171,7 @@ def test_generic_effect_round_trip_uses_entered_values_only() -> None:
     unit["groups"] = [groups[0]]
     unit["entered_effects"] = {
         "TX Mean": {
-            "Tx 1": {
-                "est": 1.5,
-                "lower": 1.0,
-                "upper": 2.0,
-                "SE": 0.25,
-                "display_est": 1.5,
-                "display_lower": 1.0,
-                "display_upper": 2.0,
-            }
+            "Tx 1": values
         }
     }
 
@@ -185,9 +185,59 @@ def test_generic_effect_round_trip_uses_entered_values_only() -> None:
     reopened_unit = dataset.studies[0].get_analysis_unit("Outcome", "first")
     assert reopened_unit.get_entered_effect_and_ci("TX Mean", "Tx 1") == (
         1.5,
-        1.0,
-        2.0,
+        values.get("lower"),
+        values.get("upper"),
     )
+
+
+def test_entered_effect_edits_survive_history_and_save(tmp_path: Path) -> None:
+    project = _multi_arm_project("continuous")
+    dataset_data = _object(project["dataset"])
+    _objects(dataset_data["outcomes"])[0]["sub_type"] = "generic_effect"
+    unit_data = _objects(_objects(dataset_data["studies"])[0]["analysis_units"])[0]
+    for group in _objects(unit_data["groups"]):
+        group["raw_data"] = ["", "", ""]
+    state: JsonObject = {
+        "schema_version": 1,
+        "active_outcome": "Outcome",
+        "active_follow_up": "first",
+        "active_groups": ["Tx 1", "Tx 2"],
+        "active_effect": "TX Mean",
+        "confidence_level": 95.0,
+    }
+    session = WorkspaceSession(ProjectDocument(1, project, state))
+    runtime = session.runtime
+    assert runtime is not None
+    unit = runtime.dataset.studies[0].get_analysis_unit("Outcome", "first")
+    unit.set_effect_for_source("entered", "TX Mean", "Tx 1", 1.5, None, None)
+    session.checkpoint()
+    assert session.is_dirty
+    assert session.can_undo
+    unit.set_effect_for_source("entered", "TX Mean", "Tx 1", 1.5, None, None, 0.2)
+    session.checkpoint()
+    runtime.dataset.studies[0].include = False
+    session.checkpoint()
+
+    assert session.undo()
+    assert session.runtime is not None
+    restored = session.runtime.dataset.studies[0].get_analysis_unit("Outcome", "first")
+    assert restored.get_effect_for_source("entered", "TX Mean", "Tx 1").standard_error == 0.2
+    assert session.undo()
+    assert session.runtime is not None
+    restored = session.runtime.dataset.studies[0].get_analysis_unit("Outcome", "first")
+    effect = restored.get_effect_for_source("entered", "TX Mean", "Tx 1")
+    assert effect.estimate == 1.5
+    assert effect.standard_error is None
+    assert session.redo()
+    destination = tmp_path / "entered.rcms"
+    session.save(destination)
+    reopened = WorkspaceSession()
+    reopened.open(destination)
+    assert reopened.runtime is not None
+    restored = reopened.runtime.dataset.studies[0].get_analysis_unit("Outcome", "first")
+    effect = restored.get_effect_for_source("entered", "TX Mean", "Tx 1")
+    assert effect.estimate == 1.5
+    assert effect.standard_error == 0.2
 
 
 def test_adapter_derives_repeatable_identities_for_legacy_projects() -> None:
