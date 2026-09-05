@@ -46,6 +46,8 @@ workflow does) and use the PR or push base separately for changed-code gates.
 CI passes the recorded baseline artifact with `--baseline`; this makes the
 final report compare directly with the evidence that was emitted for that
 baseline, rather than relying on a branch name or an implicit merge base.
+The evidence records the requested names and their resolved commit SHAs; all
+snapshot measurements use those SHAs, so a dirty worktree cannot alter them.
 Use the same commit for `--base` and `--head` to capture a baseline snapshot.
 The report records rename-aware 30-, 90-, and 180-day line churn. Hotspots are
 ranked as normalized 180-day churn multiplied by cyclomatic complexity density;

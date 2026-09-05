@@ -115,6 +115,14 @@ def run_git(root: Path, *args: str) -> str:
     return result.stdout
 
 
+def resolve_revision(root: Path, revision: str) -> str:
+    """Resolve a user-supplied Git name to one immutable commit SHA."""
+    try:
+        return run_git(root, "rev-parse", "--verify", f"{revision}^{{commit}}").strip()
+    except CodeHealthError as exc:
+        raise CodeHealthError(f"cannot resolve revision {revision!r}") from exc
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -777,7 +785,7 @@ def runtime_changed_function_keys(
     changed: dict[str, set[int]],
 ) -> set[tuple[str, str, int, int]]:
     """Return changed functions whose normalized executable bodies differ."""
-    base_revision, head_revision = _measurement_revisions(root, base, head)
+    base_revision, head_revision = _measurement_revisions(base, head)
     paths = {metric.path for metric in metrics if metric.path.endswith(".py")}
     baseline_bodies = _bodies_for_paths(root, paths, base_revision)
     head_bodies = _bodies_for_paths(root, paths, head_revision)
@@ -788,12 +796,8 @@ def runtime_changed_function_keys(
     return result
 
 
-def _measurement_revisions(root: Path, base: str, head: str) -> tuple[str | None, str | None]:
-    current = run_git(root, "rev-parse", "HEAD").strip()
-    return (
-        None if base in {"HEAD", current} else base,
-        None if head in {"HEAD", current} else head,
-    )
+def _measurement_revisions(base: str, head: str) -> tuple[str, str]:
+    return base, head
 
 
 def _bodies_for_paths(root: Path, paths: set[str], revision: str | None) -> dict[str, dict[str, list[str]]]:
@@ -1099,17 +1103,18 @@ def build_evidence(
     config: HealthConfig,
     baseline: Path | None = None,
 ) -> dict[str, object]:
+    requested_base = base
+    requested_head = head
+    base = resolve_revision(root, base)
+    head = resolve_revision(root, head)
     baseline_data = load_baseline(baseline) if baseline is not None else None
-    current_revision = run_git(root, "rev-parse", "HEAD").strip()
-    head_revision = None if head in {"HEAD", current_revision} else head
-    paths = tracked_paths(root, config, head_revision or current_revision)
-    functions = python_metrics(root, paths, head_revision)
-    functions.extend(r_function_metrics(root, paths, head_revision))
-    graph, forbidden = python_import_graph(root, paths, config, head_revision)
+    paths = tracked_paths(root, config, head)
+    functions = python_metrics(root, paths, head)
+    functions.extend(r_function_metrics(root, paths, head))
+    graph, forbidden = python_import_graph(root, paths, config, head)
     cycle_list = cycles(graph)
-    baseline_revision = None if base in {"HEAD", current_revision} else base
-    baseline_paths = tracked_paths(root, config, baseline_revision or current_revision)
-    baseline_graph, baseline_forbidden = python_import_graph(root, baseline_paths, config, baseline_revision)
+    baseline_paths = tracked_paths(root, config, base)
+    baseline_graph, baseline_forbidden = python_import_graph(root, baseline_paths, config, base)
     baseline_cycle_list = cycles(baseline_graph)
     gate_baseline_cycles = baseline_cycle_list
     gate_baseline_forbidden = baseline_forbidden
@@ -1125,7 +1130,7 @@ def build_evidence(
     file_metrics = []
     for path in paths:
         try:
-            source = run_git(root, "show", f"{head}:{path}") if head_revision else (root / path).read_text(encoding="utf-8")
+            source = run_git(root, "show", f"{head}:{path}")
         except CodeHealthError:
             source = ""
         line_count = len(source.splitlines())
@@ -1145,7 +1150,7 @@ def build_evidence(
             "defect_history": defect_count,
         })
     file_metrics.sort(key=lambda item: (-item["hotspot_score"], item["path"]))
-    tooling = grimp_evidence(root, head_revision)
+    tooling = grimp_evidence(root, head)
     typing = typing_measurement(root, paths, head)
     changed = changed_lines(root, base, head)
     runtime_changed = runtime_changed_function_keys(root, base, head, functions, changed)
@@ -1154,6 +1159,8 @@ def build_evidence(
         "generated_at": as_of.isoformat(),
         "base": base,
         "head": head,
+        "requested_base": requested_base,
+        "requested_head": requested_head,
         "scope": paths,
         "files": file_metrics,
         "functions": [metric.as_dict() for metric in functions],

@@ -9,6 +9,7 @@ from pathlib import Path
 from complexipy import code_complexity
 
 from scripts.code_health import (
+    build_evidence,
     changed_lines,
     compare_to_baseline,
     gate,
@@ -72,7 +73,8 @@ def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) 
     assert "hotspot_score" in payload["files"][0]
     assert {"coupling", "cycles", "cognitive_complexity", "maintainability", "defect_history", "gate"} <= payload.keys()
     assert payload["typing"]["tool"] == "ast"
-    assert payload["typing"]["revision"] == "HEAD"
+    assert payload["typing"]["revision"] == payload["head"]
+    assert payload["requested_head"] == "HEAD"
     assert {
         "total_parameters",
         "total_functions",
@@ -199,6 +201,79 @@ def test_typing_measurement_reads_the_named_revision(tmp_path: Path) -> None:
     assert after["any_annotations"] == 2
     assert after["type_ignore_directives"] == 1
     assert after["cast_to_any"] == 1
+
+
+def test_head_evidence_ignores_dirty_tracked_source(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "config").mkdir()
+    (tmp_path / "src/rc_metastudio").mkdir(parents=True)
+    (tmp_path / "config/code-health.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_roots": ["src/rc_metastudio"],
+                "python_suffixes": [".py"],
+                "r_suffixes": [],
+                "exclude_globs": [],
+                "forbidden_imports": {},
+                "complexity_exceptions": {},
+                "gates": {
+                    "max_changed_cyclomatic": 15,
+                    "max_changed_cognitive": 20,
+                    "max_changed_nesting": 4,
+                    "block_new_cycles": True,
+                    "block_forbidden_imports": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "src/rc_metastudio/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/rc_metastudio/dep.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "src/rc_metastudio/extra.py").write_text("VALUE = 2\n", encoding="utf-8")
+    source = tmp_path / "src/rc_metastudio/pkg.py"
+    source.write_text(
+        "from .dep import VALUE\n\n"
+        "def measure(value: int) -> int:\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    commit_env = os.environ | {
+        "GIT_AUTHOR_NAME": "Code Health Test",
+        "GIT_AUTHOR_EMAIL": "code-health@example.test",
+        "GIT_COMMITTER_NAME": "Code Health Test",
+        "GIT_COMMITTER_EMAIL": "code-health@example.test",
+        "GIT_AUTHOR_DATE": "2025-01-01T00:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2025-01-01T00:00:00+00:00",
+    }
+    subprocess.run(
+        ["git", "commit", "-m", "Add package"],
+        cwd=tmp_path,
+        check=True,
+        env=commit_env,
+        capture_output=True,
+    )
+    commit = _git(tmp_path, "rev-parse", "HEAD")
+    config = load_config(tmp_path)
+    clean = build_evidence(tmp_path, "HEAD", "HEAD", git_as_of(tmp_path, None, "HEAD"), config)
+
+    source.write_text(
+        "from .extra import VALUE\n\n"
+        "def measure(value):\n"
+        "    if value:\n"
+        "        return value\n"
+        "    return VALUE\n",
+        encoding="utf-8",
+    )
+    dirty = build_evidence(tmp_path, "HEAD", "HEAD", git_as_of(tmp_path, None, "HEAD"), config)
+
+    assert clean["head"] == commit
+    assert dirty["head"] == commit
+    assert dirty["requested_head"] == "HEAD"
+    assert dirty["functions"] == clean["functions"]
+    assert dirty["coupling"] == clean["coupling"]
+    assert dirty["typing"] == clean["typing"]
 
 
 def test_gate_ignores_annotation_only_function_changes(tmp_path: Path) -> None:
