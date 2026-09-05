@@ -184,6 +184,7 @@ def test_arm64_launcher_adapter_rejects_intel_build_metadata():
     spec.loader.exec_module(launchers)
 
     wrapper = launchers.private_config("arm64")
-    assert "/opt/R/arm64/lib" in wrapper
+    assert wrapper.count("-L/opt/R/arm64/lib") == 1
+    assert "-framework R -lpcre2-8" in wrapper
     assert "/opt/R/x86_64/lib" not in wrapper
 

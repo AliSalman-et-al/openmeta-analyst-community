@@ -35,7 +35,7 @@ CONFIG_MARKERS = {
 UPSTREAM_ARM64_LDFLAGS = (
     "-Wl,-headerpad_max_install_names -L/opt/R/arm64/lib "
     "-F/Library/Frameworks/R.framework/.. -framework R "
-    "-L/opt/R/arm64/lib -lbz2 -lz -licucore -ldl -lm -liconv"
+    "-lpcre2-8 -lbz2 -lz -licucore -ldl -lm -liconv"
 )
 
 
