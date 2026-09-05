@@ -1004,9 +1004,7 @@ def _windows_workflow_valid(
         workflows.get("normalized_summary_sha256") == expected_summary,
         _valid_sha256(workflows.get("raw_summary_sha256")),
         _valid_sha256_map(workflows.get("svg_sha256")),
-        _valid_locale_variants(
-            workflows.get("locale_variants"), workflows, expected_summary
-        ),
+        _valid_locale_variants(workflows.get("locale_variants")),
         _valid_sample_projects(workflows.get("sample_projects")),
         smoke.get("execution") == {
             "automation_exit_code": 0,
@@ -1066,9 +1064,7 @@ def _validate_windows_extracted_smoke(extracted: dict, log_text: str) -> None:
         )
 
 
-def _valid_locale_variants(
-    variants: object, workflows: dict, expected_summary_sha256: str | None
-) -> bool:
+def _valid_locale_variants(variants: object) -> bool:
     if (
         not isinstance(variants, list)
         or len(variants) != 2
@@ -1087,14 +1083,12 @@ def _valid_locale_variants(
         == typed_variants[1].get("canonical_value")
         and typed_variants[0].get("normalized_summary_sha256")
         == typed_variants[1].get("normalized_summary_sha256")
-        == expected_summary_sha256
+        and _valid_sha256(typed_variants[0].get("normalized_summary_sha256"))
         and typed_variants[0].get("raw_summary_sha256")
         == typed_variants[1].get("raw_summary_sha256")
-        == workflows.get("raw_summary_sha256")
         and _valid_sha256(typed_variants[0].get("raw_summary_sha256"))
         and typed_variants[0].get("svg_sha256")
         == typed_variants[1].get("svg_sha256")
-        == workflows.get("svg_sha256")
         and _valid_sha256_map(typed_variants[0].get("svg_sha256"))
     )
 

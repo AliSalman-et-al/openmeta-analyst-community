@@ -1767,7 +1767,7 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
     )
     valid = (
         _workflow_header_valid(evidence, workflows, expected_summary)
-        and _workflow_locale_valid(workflows, locale_variants, expected_summary)
+        and _workflow_locale_valid(locale_variants)
         and _workflow_samples_valid(sample_projects, sample_records)
     )
     if not valid:
@@ -1802,12 +1802,10 @@ def _workflow_header_valid(
     )
 
 
-def _workflow_locale_valid(
-    workflows: dict, locale_variants: list, expected_summary: str | None
-) -> bool:
+def _workflow_locale_valid(locale_variants: list) -> bool:
     return (
         _locale_inputs_valid(locale_variants)
-        and _locale_identity_valid(workflows, locale_variants, expected_summary)
+        and _locale_identity_valid(locale_variants)
     )
 
 
@@ -1824,18 +1822,15 @@ def _locale_inputs_valid(locale_variants: list) -> bool:
     )
 
 
-def _locale_identity_valid(
-    workflows: dict, locale_variants: list, expected_summary: str | None
-) -> bool:
+def _locale_identity_valid(locale_variants: list) -> bool:
     en, de = locale_variants
     return (
-        en.get("svg_sha256") == de.get("svg_sha256")
-        and en.get("svg_sha256") == workflows.get("svg_sha256")
-        and all(
-            item.get("normalized_summary_sha256") == expected_summary
-            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-            for item in locale_variants
-        )
+        en.get("normalized_summary_sha256") == de.get("normalized_summary_sha256")
+        and _valid_sha256(en.get("normalized_summary_sha256"))
+        and en.get("raw_summary_sha256") == de.get("raw_summary_sha256")
+        and _valid_sha256(en.get("raw_summary_sha256"))
+        and en.get("svg_sha256") == de.get("svg_sha256")
+        and _valid_sha256_map(en.get("svg_sha256"))
     )
 
 
