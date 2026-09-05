@@ -19,28 +19,32 @@ from typing import Any, cast
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtGui import QIcon, QPixmap
 
-from rc_metastudio import adaptive_window, app_error_handler, meta_globals
-from rc_metastudio import qt6_resources, settings
+from rc_metastudio import (
+    adaptive_window,
+    app_error_handler,
+    meta_globals,
+    qt6_resources,
+    settings,
+)
 from rc_metastudio.cocoa_accessibility import (
     bounded_error_message,
     find_accessibility_element,
 )
-from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
-from rc_metastudio.r_call_serialization import serialized_r_call
-
 from rc_metastudio.launch import (
-    configure_application,
-    _create_interactive_shell,
+    _argument_value,
     _dispose_new_top_levels,
-    dispose_qobjects,
     _emit_automation_phase,
     _import_main_window,
-    _argument_value,
+    _set_application_icon,
     _show_main_window,
     _top_level_ids,
-    _set_application_icon,
+    compose_application,
+    configure_application,
+    dispose_qobjects,
     load_R_libraries,
 )
+from rc_metastudio.r_call_serialization import serialized_r_call
+from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
 
 PACKAGED_SUMMARY_SHA256_BY_SAMPLE = {
     "amino.rcms": "d37d0aa920c9ae2397b1c44d3fbe9f91d5d89b61fad43ced991148f2e51245d0",
@@ -1485,7 +1489,12 @@ def start_shell_failure_smoke(stage):
         return type("MainWindowModule", (), {"MainWindow": meta_factory})
 
     try:
-        _create_interactive_shell(app, main_window_loader, r_loader)
+        compose_application(
+            app=app,
+            interactive=True,
+            main_window_loader=main_window_loader(),
+            r_loader=r_loader,
+        )
     except _InjectedStartupFailure:
         pass
     else:
@@ -1709,7 +1718,12 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
 
     try:
         settings.setup_directories()
-        meta = _create_interactive_shell(app, _import_main_window, load_R_libraries)
+        _app, meta = compose_application(
+            app=app,
+            interactive=True,
+            main_window_loader=_import_main_window(),
+            r_loader=load_R_libraries,
+        )
 
         def complete_wizard():
             wizard = getattr(meta, "_startup_wizard", None)

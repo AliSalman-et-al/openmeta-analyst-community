@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -132,12 +132,54 @@ def test_automation_delegates_application_composition_to_launch(monkeypatch):
     calls = []
     monkeypatch.setattr(
         launch,
-        "compose_automation_application",
+        "compose_application",
         lambda **kwargs: calls.append(kwargs) or expected,
     )
 
     assert automation.start_automation() == expected
     assert calls == [{"phase_callback": None}]
+
+
+def test_atomic_project_hooks_report_failed_open_without_using_blank_workspace(
+    monkeypatch,
+):
+    from rc_metastudio import automation
+
+    class Window:
+        def open(self, *_args, **_kwargs):
+            return False
+
+        @property
+        def tableView(self):
+            raise AssertionError("a failed open must not edit the blank workspace")
+
+        def save(self):
+            raise AssertionError("a failed open must not save the blank workspace")
+
+    written = {}
+    monkeypatch.setattr(automation, "start_automation", lambda: (object(), Window()))
+    monkeypatch.setattr(automation, "_configure_package_locale", lambda: None)
+    monkeypatch.setattr(
+        automation,
+        "_close_automation_window",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        automation,
+        "_write_json",
+        lambda path, value: written.setdefault(path, value),
+    )
+
+    assert automation.start_package_edit_save(
+        "edit.json", "missing.rcms", "destination.rcms", "name", "Edited"
+    ) == 0
+    assert automation.start_package_analyze(
+        "analysis.json", "missing.rcms", "binary.random"
+    ) == 0
+    assert written["edit.json"]["opened"] is False
+    assert written["edit.json"]["edited"] is False
+    assert written["edit.json"]["saved"] is False
+    assert written["analysis.json"]["opened"] is False
 
 
 def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(

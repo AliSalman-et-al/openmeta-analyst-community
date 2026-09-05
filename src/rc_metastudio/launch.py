@@ -2,23 +2,28 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
+
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QSplashScreen
 
-import os
-
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
 
 prepare_generated_ui_imports()
 
-from rc_metastudio import meta_globals, r_backend
-
-from rc_metastudio import adaptive_window, app_error_handler, qt6_resources, settings
+from rc_metastudio import (
+    adaptive_window,
+    app_error_handler,
+    meta_globals,
+    qt6_resources,
+    r_backend,
+    settings,
+)
 
 SPLASH_DISPLAY_TIME = 0  # Keep startup smoke tests fast; packaged builds may override.
 APPLICATION_ICON_PATH = ":/misc/meta.png"
@@ -283,11 +288,6 @@ def start():
             _dispose_new_top_levels(app, baseline_ids, (meta,) if meta is not None else ())
 
 
-def compose_automation_application(phase_callback=None):
-    """Compose the ordinary main window for a hidden qualification hook."""
-    return compose_application(phase_callback=phase_callback)
-
-
 def compose_application(
     *, app=None, phase_callback=None, interactive=False,
     main_window_loader=None, r_loader=None
@@ -333,17 +333,6 @@ def compose_application(
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids, (splash,))
         raise
-
-
-def _create_interactive_shell(app, main_window_loader, r_loader):
-    """Compatibility seam for test scenarios using explicit loaders."""
-    _app, window = compose_application(
-        app=app,
-        interactive=True,
-        main_window_loader=main_window_loader(),
-        r_loader=r_loader,
-    )
-    return window
 
 
 def _top_level_ids(app):

@@ -20,9 +20,9 @@ def _mark_workspace_saved(window) -> None:
 
 def start_automation(phase_callback=None):
     """Construct the ordinary application composition for tests and packaging."""
-    from rc_metastudio.launch import compose_automation_application
+    from rc_metastudio.launch import compose_application
 
-    return compose_automation_application(phase_callback=phase_callback)
+    return compose_application(phase_callback=phase_callback)
 
 
 def _close_automation_window(app, window) -> None:
@@ -66,19 +66,23 @@ def start_package_edit_save(
     _configure_package_locale()
     app, window = start_automation()
     try:
-        window.open(os.path.abspath(project_path), raise_on_error=True)
-        model = window.tableView.model()
-        index = model.index(0, _model_column(model, column))
-        edited = model.setData(index, value)
+        opened = bool(window.open(os.path.abspath(project_path), raise_on_error=True))
+        edited = saved = False
         destination = Path(destination_path)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        window.out_path = str(destination)
-        saved = bool(edited and window.save() is True)
+        display_value = ""
+        if opened:
+            model = window.tableView.model()
+            index = model.index(0, _model_column(model, column))
+            edited = bool(model.setData(index, value))
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            window.out_path = str(destination)
+            saved = bool(edited and window.save() is True)
+            display_value = str(model.data(index))
         _write_json(output_path, {
             "project": os.path.abspath(project_path), "destination": str(destination),
             "column": column, "value": value,
-            "display_value": str(model.data(index)),
-            "edited": bool(edited), "saved": saved,
+            "opened": opened, "display_value": display_value,
+            "edited": edited, "saved": saved,
         })
         return 0
     finally:
@@ -90,7 +94,16 @@ def start_package_analyze(output_path: str, project_path: str, analysis_method: 
     _configure_package_locale()
     app, window = start_automation()
     try:
-        window.open(os.path.abspath(project_path), raise_on_error=True)
+        opened = bool(window.open(os.path.abspath(project_path), raise_on_error=True))
+        if not opened:
+            _write_json(output_path, {
+                "project": os.path.abspath(project_path),
+                "analysis_method": analysis_method,
+                "opened": False,
+                "texts": {},
+                "display_images": {},
+            })
+            return 0
         from rc_metastudio import main_window
 
         result = _run_analysis(window, main_window, analysis_method)
@@ -98,6 +111,7 @@ def start_package_analyze(output_path: str, project_path: str, analysis_method: 
             raise RuntimeError("analysis produced no result")
         _write_json(output_path, {
             "project": os.path.abspath(project_path), "analysis_method": analysis_method,
+            "opened": True,
             "texts": dict(result.texts), "display_images": dict(result.display_images),
         })
         return 0

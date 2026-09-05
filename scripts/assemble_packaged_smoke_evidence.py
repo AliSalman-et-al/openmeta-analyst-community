@@ -128,7 +128,7 @@ def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
         "svg_paths": analysis["display_images"],
         "edit_observed": observations["edit"]["edited"] and observations["edit"]["saved"],
         "analysis_observed": bool(analysis_summary),
-        "reopen_observed": bool(observations["edit"]["saved"]),
+        "reopen_observed": bool(observations["save_reopen"].get("opened")),
         "analysis_after_reopen_observed": bool(observations["save_reopen"]["texts"].get("Summary", "")),
         "locale_inputs": [
             {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
