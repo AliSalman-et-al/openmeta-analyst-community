@@ -234,13 +234,25 @@ def _finish_startup_project(app, window, project_path, opened, *, completion_mar
     """Finish the positional startup path and optionally write its marker."""
     if not opened or window.tableView.model().rowCount() < 1:
         raise SystemExit("startup project did not open: %s" % project_path)
-    if completion_marker:
-        Path(completion_marker).write_text(
-            json.dumps({"project": Path(project_path).name}) + "\n", encoding="utf-8"
-        )
     _mark_startup_workspace_saved(window)
     window.close()
     app.processEvents()
+    if completion_marker:
+        Path(completion_marker).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "pid": os.getpid(),
+                    "platform_plugin": app.platformName().lower(),
+                    "project": Path(project_path).name,
+                    "post_close": True,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     app.quit()
     return 0
 

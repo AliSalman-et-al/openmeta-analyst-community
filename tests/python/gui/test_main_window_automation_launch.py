@@ -1103,6 +1103,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
             return 1
 
         def close(self):
+            assert not completion_marker.exists()
             closed.append(True)
 
     class Splash:
@@ -1169,7 +1170,13 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
         "workspace-marked-saved",
     ]
     marker = json.loads(completion_marker.read_text(encoding="utf-8"))
-    assert marker["project"] == "amino.rcms"
+    assert marker == {
+        "schema_version": 1,
+        "pid": os.getpid(),
+        "platform_plugin": app.platformName().lower(),
+        "project": "amino.rcms",
+        "post_close": True,
+    }
     os.chdir(REPO_ROOT)
 
 
