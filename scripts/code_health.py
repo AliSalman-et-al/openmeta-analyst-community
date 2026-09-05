@@ -14,6 +14,7 @@ import copy
 import fnmatch
 import io
 import json
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -76,6 +77,14 @@ class HealthConfig(TypedDict):
     gates: GateConfig
 
 
+def _relative_artifact_path(root: Path, path: Path) -> str:
+    """Return a stable repository-relative path when the artifact is inside it."""
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def run_git(root: Path, *args: str) -> str:
     try:
         result = subprocess.run(
@@ -103,6 +112,16 @@ def load_config(root: Path) -> HealthConfig:
     if not isinstance(config, dict) or config.get("schema_version") != 1:
         raise CodeHealthError("code-health config schema_version must be 1")
     return cast(HealthConfig, config)
+
+
+def load_baseline(path: Path) -> dict[str, object]:
+    try:
+        baseline = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CodeHealthError(f"invalid code-health baseline: {path}") from exc
+    if not isinstance(baseline, dict) or baseline.get("schema_version") != 1:
+        raise CodeHealthError("code-health baseline schema_version must be 1")
+    return baseline
 
 
 def tracked_paths(root: Path, config: HealthConfig, revision: str | None = None) -> list[str]:
@@ -300,6 +319,38 @@ def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None
                     )
                 )
     return metrics
+
+
+def strict_typing_evidence(root: Path) -> dict[str, object]:
+    """Run the locked strict type checker for the code-health command itself."""
+    if shutil.which("ty") is None:
+        raise CodeHealthError("strict typing requires the locked 'ty' executable")
+    command = ["ty", "check", "--output-format", "concise", "scripts/code_health.py"]
+    result = subprocess.run(
+        command,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    diagnostics = (
+        [
+            line
+            for stream in (result.stdout, result.stderr)
+            for line in stream.splitlines()
+            if line.strip()
+        ]
+        if result.returncode
+        else []
+    )
+    return {
+        "tool": "ty",
+        "command": " ".join(command),
+        "passed": result.returncode == 0,
+        "exit_code": result.returncode,
+        "diagnostic_count": len(diagnostics),
+        "diagnostics": diagnostics,
+    }
 
 
 def module_name(path: str) -> str:
@@ -798,6 +849,7 @@ def gate(
     forbidden: list[str],
     baseline_forbidden: list[str],
     runtime_changed: set[tuple[str, str, int, int]] | None = None,
+    typing: dict[str, object] | None = None,
 ) -> dict[str, object]:
     limits = config["gates"]
     changed_functions = [metric for metric in metrics if any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set()))]
@@ -821,6 +873,8 @@ def gate(
         failures.append("forbidden imports")
     if violations:
         failures.append("changed-code complexity")
+    if typing is not None and not bool(typing["passed"]):
+        failures.append("strict typing")
     return {
         "passed": not failures,
         "failures": failures,
@@ -836,7 +890,67 @@ def gate(
     }
 
 
-def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: HealthConfig) -> dict[str, object]:
+def _comparison_metrics(evidence: dict[str, object]) -> dict[str, object]:
+    files = cast(list[dict[str, object]], evidence["files"])
+    coupling = cast(dict[str, object], evidence["coupling"])
+    cycles_found = cast(list[list[str]], evidence["cycles"])
+    cognitive = cast(dict[str, object], evidence["cognitive_complexity"])
+    maintainability = cast(dict[str, object], evidence["maintainability"])
+    defects = cast(dict[str, object], evidence["defect_history"])
+    typing = cast(dict[str, object], evidence["typing"])
+    return {
+        "scope.files": len(cast(list[str], evidence["scope"])),
+        "coupling.modules": coupling["modules"],
+        "coupling.edges": coupling["edges"],
+        "cycles": cycles_found,
+        "cognitive_complexity.total": cognitive["total"],
+        "cognitive_complexity.maximum": cognitive["maximum"],
+        "maintainability.mean_function_lines": maintainability["mean_function_lines"],
+        "defect_history.commits": defects["commits"],
+        "typing.passed": typing["passed"],
+        "typing.diagnostic_count": typing["diagnostic_count"],
+        "hotspots.top5": [
+            {"path": item["path"], "score": item["hotspot_score"]}
+            for item in files[:5]
+        ],
+    }
+
+
+def compare_to_baseline(
+    evidence: dict[str, object], baseline: dict[str, object], baseline_path: str
+) -> dict[str, object]:
+    """Compare deterministic measurements with the recorded baseline artifact."""
+    current_metrics = _comparison_metrics(evidence)
+    baseline_metrics = _comparison_metrics(baseline)
+    metrics: dict[str, dict[str, object]] = {}
+    for name in sorted(current_metrics):
+        current = current_metrics[name]
+        recorded = baseline_metrics.get(name)
+        item: dict[str, object] = {"baseline": recorded, "current": current}
+        if (
+            isinstance(recorded, (int, float))
+            and not isinstance(recorded, bool)
+            and isinstance(current, (int, float))
+            and not isinstance(current, bool)
+        ):
+            item["delta"] = current - recorded
+        metrics[name] = item
+    return {
+        "path": baseline_path,
+        "baseline_head": baseline.get("head"),
+        "metrics": metrics,
+    }
+
+
+def build_evidence(
+    root: Path,
+    base: str,
+    head: str,
+    as_of: datetime,
+    config: HealthConfig,
+    baseline: Path | None = None,
+) -> dict[str, object]:
+    baseline_data = load_baseline(baseline) if baseline is not None else None
     current_revision = run_git(root, "rev-parse", "HEAD").strip()
     head_revision = None if head in {"HEAD", current_revision} else head
     paths = tracked_paths(root, config, head_revision or current_revision)
@@ -848,6 +962,17 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
     baseline_paths = tracked_paths(root, config, baseline_revision or current_revision)
     baseline_graph, baseline_forbidden = python_import_graph(root, baseline_paths, config, baseline_revision)
     baseline_cycle_list = cycles(baseline_graph)
+    gate_baseline_cycles = baseline_cycle_list
+    gate_baseline_forbidden = baseline_forbidden
+    if baseline_data is not None:
+        recorded_cycles = baseline_data.get("cycles")
+        if isinstance(recorded_cycles, list):
+            gate_baseline_cycles = cast(list[list[str]], recorded_cycles)
+        recorded_gate = baseline_data.get("gate")
+        if isinstance(recorded_gate, dict):
+            recorded_forbidden = cast(dict[str, object], recorded_gate).get("forbidden_imports")
+            if isinstance(recorded_forbidden, list):
+                gate_baseline_forbidden = cast(list[str], recorded_forbidden)
     file_metrics = []
     for path in paths:
         try:
@@ -872,9 +997,10 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
         })
     file_metrics.sort(key=lambda item: (-item["hotspot_score"], item["path"]))
     tooling = grimp_evidence(root, head_revision)
+    typing = strict_typing_evidence(root)
     changed = changed_lines(root, base, head)
     runtime_changed = runtime_changed_function_keys(root, base, head, functions, changed)
-    return {
+    evidence: dict[str, object] = {
         "schema_version": 1,
         "generated_at": as_of.isoformat(),
         "base": base,
@@ -885,11 +1011,29 @@ def build_evidence(root: Path, base: str, head: str, as_of: datetime, config: He
         "coupling": {"modules": len(graph), "edges": sum(len(edges) for edges in graph.values()), "out_degree": {key: len(value) for key, value in sorted(graph.items())}},
         "dependency_tooling": tooling,
         "cycles": cycle_list,
+        "typing": typing,
         "cognitive_complexity": {"functions": len(functions), "total": sum(metric.cognitive for metric in functions), "maximum": max((metric.cognitive for metric in functions), default=0)},
         "maintainability": {"note": "trend indicator; not a merge gate", "mean_function_lines": sum(metric.lines for metric in functions) / max(len(functions), 1)},
         "defect_history": {"files_with_defect_fixes": sum(1 for item in file_metrics if item["defect_history"]), "commits": sum(int(item["defect_history"]) for item in file_metrics)},
-        "gate": gate(functions, changed, config, cycle_list, baseline_cycle_list, forbidden, baseline_forbidden, runtime_changed),
+        "gate": gate(
+            functions,
+            changed,
+            config,
+            cycle_list,
+            gate_baseline_cycles,
+            forbidden,
+            gate_baseline_forbidden,
+            runtime_changed,
+            typing,
+        ),
     }
+    if baseline_data is not None:
+        evidence["baseline_comparison"] = compare_to_baseline(
+            evidence,
+            baseline_data,
+            _relative_artifact_path(root, baseline or Path("baseline.json")),
+        )
+    return evidence
 
 
 def text_report(evidence: dict[str, object]) -> str:
@@ -899,6 +1043,7 @@ def text_report(evidence: dict[str, object]) -> str:
     cycles_found = cast(list[list[str]], evidence["cycles"])
     cognitive = cast(dict[str, int], evidence["cognitive_complexity"])
     defects = cast(dict[str, int], evidence["defect_history"])
+    typing = cast(dict[str, object], evidence["typing"])
     result_gate = cast(dict[str, object], evidence["gate"])
     failures = cast(list[str], result_gate["failures"])
     lines = [
@@ -907,7 +1052,18 @@ def text_report(evidence: dict[str, object]) -> str:
     ]
     lines.append(f"Coupling: {coupling['modules']} modules, {coupling['edges']} edges")
     lines.append(f"Cycles: {len(cycles_found)}; cognitive complexity total/max: {cognitive['total']}/{cognitive['maximum']}")
+    lines.append(
+        f"Strict typing: {'PASS' if typing['passed'] else 'FAIL'} "
+        f"({typing['diagnostic_count']} diagnostics via {typing['tool']})"
+    )
     lines.append(f"Defect history: {defects['commits']} matching commits across {defects['files_with_defect_fixes']} files")
+    comparison = evidence.get("baseline_comparison")
+    if isinstance(comparison, dict):
+        comparison_data = cast(dict[str, object], comparison)
+        lines.append(
+            f"Baseline comparison: {comparison_data['path']} "
+            f"(recorded head {comparison_data['baseline_head']})"
+        )
     lines.append(f"Gate: {'PASS' if result_gate['passed'] else 'FAIL (' + ', '.join(failures) + ')'}")
     lines.append("Hotspots (180-day normalized churn × complexity density):")
     lines.extend(f"  {item['path']}: {cast(float, item['hotspot_score']):.4f}" for item in files)
@@ -921,11 +1077,26 @@ def main() -> int:
     parser.add_argument("--as-of")
     parser.add_argument("--output", type=Path, default=Path("artifacts/code-health/evidence.json"))
     parser.add_argument("--report", type=Path, default=Path("artifacts/code-health/report.txt"))
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="compare final measurements with a recorded baseline evidence JSON",
+    )
     parser.add_argument("--allow-fail", action="store_true", help="emit evidence without returning a gate failure")
     args = parser.parse_args()
     root = repo_root()
     config = load_config(root)
-    evidence = build_evidence(root, args.base, args.head, git_as_of(root, args.as_of, args.head), config)
+    baseline = None
+    if args.baseline is not None:
+        baseline = (root / args.baseline).resolve() if not args.baseline.is_absolute() else args.baseline
+    evidence = build_evidence(
+        root,
+        args.base,
+        args.head,
+        git_as_of(root, args.as_of, args.head),
+        config,
+        baseline,
+    )
     output = (root / args.output).resolve() if not args.output.is_absolute() else args.output
     report = (root / args.report).resolve() if not args.report.is_absolute() else args.report
     output.parent.mkdir(parents=True, exist_ok=True)

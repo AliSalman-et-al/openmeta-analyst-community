@@ -58,6 +58,7 @@ jobs:
           uv run --no-sync python scripts/code_health.py
           --base "${{ steps.base.outputs.sha }}"
           --head "$GITHUB_SHA"
+          --baseline artifacts/code-health/baseline.json
           --output artifacts/code-health/final.json
           --report artifacts/code-health/final.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

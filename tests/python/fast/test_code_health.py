@@ -10,6 +10,7 @@ from complexipy import code_complexity
 
 from scripts.code_health import (
     changed_lines,
+    compare_to_baseline,
     gate,
     git_as_of,
     history_for_path,
@@ -69,9 +70,39 @@ def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) 
     assert set(payload["files"][0]["churn"]) == {"30", "90", "180"}
     assert "hotspot_score" in payload["files"][0]
     assert {"coupling", "cycles", "cognitive_complexity", "maintainability", "defect_history", "gate"} <= payload.keys()
+    assert payload["typing"]["tool"] == "ty"
+    assert payload["typing"]["passed"] is True
     assert payload["dependency_tooling"]["tool"] == "grimp"
     assert "Code health" in report.read_text(encoding="utf-8")
     assert "Code health" in result.stdout
+
+
+def test_baseline_comparison_uses_recorded_artifact_measurements() -> None:
+    def snapshot(edges: int) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "head": "recorded-head",
+            "scope": ["src/pkg.py"],
+            "files": [{"path": "src/pkg.py", "hotspot_score": 0.25}],
+            "coupling": {"modules": 1, "edges": edges},
+            "cycles": [],
+            "cognitive_complexity": {"total": 2, "maximum": 2},
+            "maintainability": {"mean_function_lines": 4.0},
+            "defect_history": {"commits": 1},
+            "typing": {"passed": True, "diagnostic_count": 0},
+        }
+
+    comparison = compare_to_baseline(
+        snapshot(3), snapshot(1), "artifacts/code-health/baseline.json"
+    )
+
+    assert comparison["path"] == "artifacts/code-health/baseline.json"
+    assert comparison["baseline_head"] == "recorded-head"
+    assert comparison["metrics"]["coupling.edges"] == {
+        "baseline": 1,
+        "current": 3,
+        "delta": 2,
+    }
 
 
 def test_history_for_path_stops_at_measured_revision(tmp_path: Path) -> None:
