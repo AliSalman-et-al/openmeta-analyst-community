@@ -114,7 +114,7 @@ try {
             "--build-root", $BuildRoot, "--exit-after-ms", "100"
         )
         Invoke-NativeSmokeCommand -Label "Native RC MetaStudio Qt6 shell smoke" -Command @(
-            "uv", "run", "rc-metastudio", "--automation-native-shell-smoke"
+            "uv", "run", "python", "scripts/native_shell_smoke.py", "--native"
         )
         Invoke-NativeSmokeCommand -Label "Native Qt6 calculator smoke" -Command @(
             "uv", "run", "python", "scripts/native_calculator_smoke.py"
@@ -133,10 +133,10 @@ try {
         )
         if ($Section -eq "Full") { Invoke-NativeRemainingSurfaceSmoke }
         Invoke-NativeSmokeCommand -Label "Native R-load teardown smoke" -Command @(
-            "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "r-load"
+            "uv", "run", "python", "scripts/native_shell_smoke.py", "--failure-stage", "r-load"
         )
         Invoke-NativeSmokeCommand -Label "Native MainWindow teardown smoke" -Command @(
-            "uv", "run", "rc-metastudio", "--automation-shell-failure-smoke", "meta-form"
+            "uv", "run", "python", "scripts/native_shell_smoke.py", "--failure-stage", "meta-form"
         )
     }
     finally {

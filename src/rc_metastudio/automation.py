@@ -299,13 +299,6 @@ def _surface_display_facts(QtGui, QtNetwork, QtWidgets, window):
 
 def dispatch(startup_argv: list[str]) -> int:
     """Dispatch only narrow, raw qualification observations."""
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-smoke":
-        print("Application shell smoke passed with Qt platform offscreen.")
-        return 0
-    if len(startup_argv) > 1 and startup_argv[1] == "--automation-shell-failure-smoke":
-        stage = startup_argv[2] if len(startup_argv) > 2 else "unknown"
-        print("Application shell failure teardown passed at %s." % stage)
-        return 0
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-runtime-probe":
         if len(startup_argv) != 3:
             raise SystemExit("--automation-package-runtime-probe requires an output path.")

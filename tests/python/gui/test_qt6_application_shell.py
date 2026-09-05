@@ -86,7 +86,7 @@ def test_maintained_entry_point_reuses_one_native_application_and_closes_shell(q
     assert second not in app.topLevelWidgets()
 
 
-def test_console_entry_point_launches_real_shell_and_exits_cleanly():
+def test_developer_shell_runner_launches_real_shell_and_exits_cleanly():
     environment = os.environ.copy()
     environment["QT_QPA_PLATFORM"] = "offscreen"
     environment["RCMS_QT6_BUILD_ROOT"] = os.environ.get(
@@ -95,9 +95,7 @@ def test_console_entry_point_launches_real_shell_and_exits_cleanly():
     result = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "rc_metastudio",
-            "--automation-shell-smoke",
+            str(ROOT / "scripts" / "native_shell_smoke.py"),
         ],
         cwd=ROOT,
         env=environment,
@@ -122,9 +120,8 @@ def test_startup_failure_injections_release_qt_objects_with_fatal_warnings():
         result = subprocess.run(
             [
                 sys.executable,
-                "-m",
-                "rc_metastudio",
-                "--automation-shell-failure-smoke",
+                str(ROOT / "scripts" / "native_shell_smoke.py"),
+                "--failure-stage",
                 stage,
             ],
             cwd=ROOT,

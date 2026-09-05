@@ -473,6 +473,7 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     for name, implementation in vars(backend_fake).items():
         setattr(r_bridge, name, implementation)
     from rc_metastudio import app_error_handler, results_window
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
     from rc_metastudio.analysis_results import parse_analysis_result
 
     evidence_root.mkdir(parents=True, exist_ok=True)
@@ -506,15 +507,40 @@ def _run_scale(scale: float, repo_root: Path, evidence_root: Path) -> None:
     results = results_window.ResultsWindow(
         parse_analysis_result(
             {
+                "version": 1,
                 "texts": {
                     "Summary": "Random-effects model\nEstimate  Lower bound  Upper bound",
                     "References": "Maintained native Qt6 Results evidence.",
                 },
                 "images": {"Forest Plot": str(svg)},
                 "display_images": {"Forest Plot": str(svg)},
+                "image_var_names": {"Forest Plot": "forest"},
                 "image_params_paths": {"Forest Plot": str(evidence_root / "forest")},
                 "image_order": ["Forest Plot"],
                 "plot_capabilities": {"Forest Plot": capability},
+                "sections": [
+                    {
+                        "id": "summary",
+                        "kind": "text",
+                        "order": 0,
+                        "title": "Meta-Analysis Summary",
+                        "source_key": "Summary",
+                    },
+                    {
+                        "id": "forest-plot",
+                        "kind": "image",
+                        "order": 1,
+                        "title": "Forest Plot",
+                        "source_key": "Forest Plot",
+                    },
+                    {
+                        "id": "text:references",
+                        "kind": "text",
+                        "order": 2,
+                        "title": "References",
+                        "source_key": "References",
+                    },
+                ],
             }
         )
     )

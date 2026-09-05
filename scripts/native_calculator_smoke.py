@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import faulthandler
-import json
 import hashlib
+import json
 import math
 import os
-from pathlib import Path
-from pathlib import PurePosixPath
 import sys
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
-from typing import Callable, Protocol, TextIO
+from typing import Protocol, TextIO
 
 from rc_metastudio import automation
 
@@ -26,7 +26,6 @@ from rc_metastudio.workspace_session import WorkspaceSession
 
 class AutomationWindow(Protocol):
     workspace: WorkspaceSession
-    workspace_is_dirty: bool
 
     def close(self) -> bool: ...
 
@@ -133,7 +132,6 @@ def close_automation_window(
     try:
         workspace = window.workspace
         workspace.mark_saved()
-        window.workspace_is_dirty = False
         _phase("close-entry")
         window.close()
         _phase("close-return")
@@ -209,15 +207,17 @@ def _run_main() -> int:
     backend = install_native_test_backend()
 
     from rc_metastudio import (
+        app_error_handler,
         binary_data_dialog,
         continuous_data_dialog,
-        diagnostic_data_dialog,
         dataset_table_model,
+        diagnostic_data_dialog,
         r_bridge,
     )
 
     for name, implementation in vars(backend).items():
         setattr(r_bridge, name, implementation)
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
     _install_backend_test_double(
         r_bridge,
         "get_confidence_multiplier_from_r",
@@ -350,10 +350,9 @@ def _run_main() -> int:
             else:
                 unit.get_raw_data_for_group(model.current_groups[0])[:] = [12, 3, 4, 21]
             before = list(unit.get_raw_data_for_group(model.current_groups[0]))
-            table_view.undoStack.clear()
-            table_view.undoStack.setClean()
             window.workspace.mark_saved()
-            window.workspace_is_dirty = False
+            baseline_can_undo = window.workspace.can_undo
+            baseline_digest = window.workspace.runtime_digest
             captured: list[dict[str, object]] = []
             callback_errors: list[BaseException] = []
 
@@ -493,7 +492,8 @@ def _run_main() -> int:
             if data_type == "diagnostic" and after != before:
                 raise RuntimeError("diagnostic cancel mutated the model")
             accepted = data_type != "diagnostic"
-            if table_view.undoStack.count() != int(accepted):
+            expected_can_undo = True if accepted else baseline_can_undo
+            if window.workspace.can_undo is not expected_can_undo:
                 raise RuntimeError(
                     "calculator transaction created the wrong undo state"
                 )
@@ -501,9 +501,26 @@ def _run_main() -> int:
                 raise RuntimeError(
                     "calculator transaction created the wrong dirty state"
                 )
+            if accepted:
+                accepted_digest = window.workspace.runtime_digest
+                if not window.workspace.undo():
+                    raise RuntimeError("calculator undo did not execute")
+                if window.workspace.runtime_digest != baseline_digest:
+                    raise RuntimeError("calculator undo did not restore the workspace")
+                if (
+                    window.workspace.can_undo is not baseline_can_undo
+                    or not window.workspace.can_redo
+                ):
+                    raise RuntimeError("calculator undo state is incorrect")
+                if not window.workspace.redo():
+                    raise RuntimeError("calculator redo did not execute")
+                if window.workspace.runtime_digest != accepted_digest:
+                    raise RuntimeError("calculator redo did not restore the edit")
+                if not window.workspace.can_undo or window.workspace.can_redo:
+                    raise RuntimeError("calculator redo state is incorrect")
             captured[0]["model_after"] = list(after)
             captured[0]["model_nonmutation"] = not accepted
-            captured[0]["undo_commands"] = table_view.undoStack.count()
+            captured[0]["undo_available"] = window.workspace.can_undo
             evidence.extend(captured)
     except BaseException as error:
         evidence.append(

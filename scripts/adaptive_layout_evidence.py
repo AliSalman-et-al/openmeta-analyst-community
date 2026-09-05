@@ -188,6 +188,7 @@ def _create_results_surface(results_window, main_window, output):
                 )
             },
             "images": {"Aspect-Ratio Plot": str(plot_path)},
+            "display_images": {"Aspect-Ratio Plot": str(plot_path)},
             "plot_capabilities": {
                 "Aspect-Ratio Plot": {
                     "plot_kind": "other",

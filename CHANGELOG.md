@@ -22,6 +22,7 @@ All notable RC MetaStudio changes will be recorded in this file.
 - Restored calculated estimates and confidence bounds when opening binary, continuous, and diagnostic projects, without changing saved inclusion choices or entered estimates.
 - Kept complete imported studies included when their CSV contains blank calculated-effect columns.
 - Fixed packaged startup without developer R settings and isolated package qualification from inherited runtime settings.
+- Updated native and release qualification scripts to the current workspace and analysis contracts, and replaced obsolete shell commands with real lifecycle checks.
 
 ## 0.3.1 - 2026-09-03
 

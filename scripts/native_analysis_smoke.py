@@ -67,12 +67,13 @@ def main() -> int:
     from local_r_test_backend import create
 
     backend_fake = create()
-    from rc_metastudio import r_bridge
+    from rc_metastudio import app_error_handler, r_bridge
 
     for name, implementation in vars(backend_fake).items():
         setattr(r_bridge, name, implementation)
     _phase("backend-installed")
-    from rc_metastudio import app_error_handler, analysis_setup_dialog, progress_dialog
+    setattr(app_error_handler, "install_global_exception_handler", lambda: None)
+    from rc_metastudio import analysis_setup_dialog, progress_dialog
 
     progress_class = progress_dialog.AnalysisProgressDialog
     created_progress_dialogs = []
@@ -138,9 +139,27 @@ def main() -> int:
     baseline = len(app.topLevelWidgets())
     calls = []
 
-    def run_backend(method: str, parameters: dict[str, object]) -> dict[str, object]:
-        calls.append({"method": method, "parameters": dict(parameters)})
-        return {"texts": {"Summary": "ok"}, "images": {}}
+    def run_backend(request: dict[str, object]) -> dict[str, object]:
+        calls.append(dict(request))
+        return {
+            "version": 1,
+            "texts": {"Summary": "ok"},
+            "images": {},
+            "display_images": {},
+            "image_var_names": {},
+            "image_params_paths": {},
+            "image_order": [],
+            "plot_capabilities": {},
+            "sections": [
+                {
+                    "id": "summary",
+                    "kind": "text",
+                    "order": 0,
+                    "title": "Summary",
+                    "source_key": "Summary",
+                }
+            ],
+        }
 
     _install_backend_test_double(backend, "run_versioned_analysis_request", run_backend)
     _install_backend_test_double(backend, "reset_r_working_directory", lambda: None)
