@@ -177,4 +177,4 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: echo "All three unsigned candidate artifacts were built once and are ready for the selected trust-profile qualification."
+      - run: echo "Both unsigned candidate artifacts were built once and are ready for the selected trust-profile qualification."

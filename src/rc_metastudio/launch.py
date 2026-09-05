@@ -295,44 +295,71 @@ def compose_application(
     """Compose the application shell used by startup and qualification hooks."""
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
-    main_window = main_window_loader or _import_main_window()
-    if app is None:
-        app = app_error_handler.get_or_create_application(sys.argv)
-    configure_application(app)
+    app, main_window = _prepare_composition(app, main_window_loader)
     _emit_automation_phase(phase_callback, "application:configured")
     baseline_ids = _top_level_ids(app)
     splash = None
     try:
         settings.setup_directories()
-        if interactive:
-            splash = create_startup_splash()
-            splash.show()
-            splash_starttime = time.time()
-            if phase_callback is None:
-                (r_loader or load_R_libraries)(app, splash)
-            else:
-                (r_loader or load_R_libraries)(
-                    app, splash, phase_callback=phase_callback
-                )
-            time_elapsed = time.time() - splash_starttime
-            if time_elapsed < SPLASH_DISPLAY_TIME:
-                QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
-        elif os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
-            (r_loader or load_R_libraries)(
-                app, None, phase_callback=phase_callback
-            )
-        meta = main_window.MainWindow()
-        if splash is not None:
-            splash.finish(meta)
-        if not interactive:
-            meta.workspace.mark_saved()
-        _show_main_window(meta)
-        if splash is not None:
-            dispose_qobjects(app, (splash,))
+        splash = _load_composition_runtime(
+            app,
+            interactive=interactive,
+            phase_callback=phase_callback,
+            r_loader=r_loader,
+        )
+        meta = _finish_composition(
+            app, main_window, splash=splash, interactive=interactive
+        )
         return app, meta
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids, (splash,))
         raise
+
+
+def _prepare_composition(app, main_window_loader):
+    main_window = main_window_loader or _import_main_window()
+    if app is None:
+        app = app_error_handler.get_or_create_application(sys.argv)
+    configure_application(app)
+    return app, main_window
+
+
+def _load_composition_runtime(
+    app, *, interactive, phase_callback, r_loader
+):
+    loader = r_loader or load_R_libraries
+    if not interactive:
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            _invoke_r_loader(loader, app, None, phase_callback)
+        return None
+
+    splash = create_startup_splash()
+    splash.show()
+    splash_starttime = time.time()
+    _invoke_r_loader(loader, app, splash, phase_callback)
+    time_elapsed = time.time() - splash_starttime
+    if time_elapsed < SPLASH_DISPLAY_TIME:
+        QThread.msleep(max(0, round((SPLASH_DISPLAY_TIME - time_elapsed) * 1000)))
+    return splash
+
+
+def _invoke_r_loader(loader, app, splash, phase_callback):
+    if phase_callback is None:
+        loader(app, splash)
+    else:
+        loader(app, splash, phase_callback=phase_callback)
+
+
+def _finish_composition(app, main_window, *, splash, interactive):
+    meta = main_window.MainWindow()
+    if splash is not None:
+        splash.finish(meta)
+    if not interactive:
+        meta.workspace.mark_saved()
+    _show_main_window(meta)
+    if splash is not None:
+        dispose_qobjects(app, (splash,))
+    return meta
 
 
 def _top_level_ids(app):
