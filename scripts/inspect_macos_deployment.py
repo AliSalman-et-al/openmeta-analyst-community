@@ -7,27 +7,26 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import plistlib
 import stat
 import subprocess
 import sys
-from typing import TypeGuard, cast
 import unicodedata
 import zipfile
+from pathlib import Path
+from typing import TypeGuard, cast
 
 from rc_metastudio.macos_macho import (
     MachOError,
     architectures,
     is_macho_candidate,
 )
-from rc_metastudio.r_runtime import macos_r_framework_version
 from rc_metastudio.macos_r_profile_schema import (
     ProfileSchemaError,
     validate_profile_evidence,
 )
-
+from rc_metastudio.r_runtime import macos_r_framework_version
 
 EXPECTED_VERSIONS = {
     "python": "3.11.9",
@@ -1664,7 +1663,7 @@ def finalize_smoke_evidence(
     log_path: Path,
     launchservices_marker: Path | None = None,
     *,
-    require_direct_teardown: bool = False,
+    require_atomic_completion: bool = False,
     persist: bool = True,
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
@@ -1672,23 +1671,25 @@ def finalize_smoke_evidence(
     _validate_smoke_basics(evidence, log_text)
     _validate_launchservices_marker(launchservices_marker)
     validate_packaged_workflow_evidence(evidence)
-    _validate_teardown_trace(log_text, require_direct_teardown)
+    _validate_atomic_completion_trace(log_text, require_atomic_completion)
     scale_records = evidence.get("scales", [])
     executed_scales = [
         str(record.get("requested"))
         for record in scale_records
         if isinstance(record, dict)
     ]
-    if require_direct_teardown:
+    if require_atomic_completion:
         validate_macos_surface_records(scale_records)
-    _validate_surface_gate(executed_scales, launchservices_marker, require_direct_teardown)
+    _validate_surface_gate(
+        executed_scales, launchservices_marker, require_atomic_completion
+    )
     evidence["execution"] = {
         "automation_exit_code": 0,
         "surface_scale_exit_codes": {scale: 0 for scale in executed_scales},
         "post_close_marker": True,
         "launchservices_completion_marker": launchservices_marker is not None,
         "clean_exit": True,
-        "direct_teardown_trace": require_direct_teardown,
+        "atomic_completion_trace": require_atomic_completion,
     }
     if persist:
         path.write_text(
@@ -1725,24 +1726,23 @@ def _validate_launchservices_marker(marker_path: Path | None) -> None:
         )
 
 
-def _validate_teardown_trace(log_text: str, required: bool) -> None:
+def _validate_atomic_completion_trace(log_text: str, required: bool) -> None:
     if not required:
         return
     markers = (
-        "packaged-workflow:teardown:close:start",
-        "packaged-workflow:teardown:close:return",
-        "packaged-workflow:teardown:deferred-delete:complete",
-        "packaged-workflow:teardown:top-level-windows:none",
-        "packaged-workflow:teardown:app-quit:start",
-        "packaged-workflow:teardown:app-quit:return",
+        "packaged-runtime-probe:passed",
+        "packaged-surface:scale-1.25-passed",
+        "packaged-surface:scale-1.50-passed",
+        "packaged-surface:scale-1.75-passed",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:evidence-written",
         "packaged-workflow:post-close",
-        "packaged-workflow:return",
         "packaged-workflow:process-exit:0",
     )
     positions = [log_text.find(marker) for marker in markers]
     if any(position < 0 for position in positions) or positions != sorted(positions):
         raise MacOSDeploymentInspectionError(
-            "direct packaged automation lacks an ordered clean-teardown trace"
+            "packaged automation lacks an ordered atomic-completion trace"
         )
 
 
@@ -2659,7 +2659,7 @@ def _validate_extracted_qualification(
         extracted_smoke_path,
         extracted_smoke_log,
         extracted_marker,
-        require_direct_teardown=True,
+        require_atomic_completion=True,
         persist=False,
     )
     complete = (
@@ -2860,7 +2860,7 @@ def write_qualification_evidence(
         smoke_evidence,
         smoke_log,
         launchservices_marker,
-        require_direct_teardown=True,
+        require_atomic_completion=True,
         persist=False,
     )
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
@@ -3005,7 +3005,7 @@ def _build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--smoke-evidence", type=Path, required=True)
     finalize.add_argument("--smoke-log", type=Path, required=True)
     finalize.add_argument("--launchservices-marker", type=Path)
-    finalize.add_argument("--require-direct-teardown", action="store_true")
+    finalize.add_argument("--require-atomic-completion", action="store_true")
     archive = commands.add_parser("archive")
     archive.add_argument("--archive", type=Path, required=True)
     archive.add_argument("--archive-root-name", required=True)
@@ -3097,7 +3097,7 @@ def _dispatch_finalize(args: argparse.Namespace) -> None:
         args.smoke_evidence,
         args.smoke_log,
         args.launchservices_marker,
-        require_direct_teardown=args.require_direct_teardown,
+        require_atomic_completion=args.require_atomic_completion,
     )
 
 

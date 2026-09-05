@@ -106,6 +106,8 @@ def test_both_native_packages_use_the_positional_startup_transition():
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
     assert "startup-wizard-smoke" not in trust
+    assert "--require-direct-teardown" not in build
+    assert "--require-atomic-completion" in build
 
 
 def test_source_r_packages_link_against_the_private_staged_runtime():
