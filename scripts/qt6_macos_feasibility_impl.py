@@ -198,7 +198,7 @@ def validate_macos_rcc(
         capture_output=True,
         text=True,
     ).stdout.split()
-    supported = {"arm64"}
+    supported = {"arm64", "x86_64"}
     if (
         not architectures
         or len(architectures) != len(set(architectures))
@@ -206,7 +206,7 @@ def validate_macos_rcc(
     ):
         raise RuntimeError(f"rcc has invalid architecture slices: {architectures!r}")
     host = host_machine().lower()
-    if host not in architectures:
+    if host != "arm64" or host not in architectures:
         raise RuntimeError(
             f"rcc architecture mismatch: host {host!r}, slices {architectures!r}"
         )

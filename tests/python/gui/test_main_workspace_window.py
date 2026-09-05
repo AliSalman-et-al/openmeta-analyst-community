@@ -320,6 +320,12 @@ def test_workspace_table_uses_valid_logical_geometry_at_fractional_scale_factors
     script = r"""
 import json
 from rc_metastudio import automation
+from scripts.local_r_test_backend import create
+from rc_metastudio import r_bridge
+
+for name, implementation in vars(create()).items():
+    setattr(r_bridge, name, implementation)
+
 app, window = automation.start_automation()
 try:
     window.showNormal()

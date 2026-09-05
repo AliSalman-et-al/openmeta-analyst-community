@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports

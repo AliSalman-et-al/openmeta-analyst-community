@@ -113,7 +113,7 @@ def encode_capture_png(capture: QtGui.QPixmap | QtGui.QImage, path: Path) -> Non
 
 def install_native_test_backend() -> SimpleNamespace:
     """Create the calculator smoke's explicit local test backend."""
-    from scripts.local_r_test_backend import create
+    from local_r_test_backend import create
 
     backend = create()
     if "rpy2.rinterface" in sys.modules:

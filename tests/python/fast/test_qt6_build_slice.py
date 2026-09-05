@@ -199,6 +199,22 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(tmp_path):
         rcc, command_runner=completed, host_machine=lambda: "arm64"
     )
 
+    responses["architectures"] = "x86_64 arm64"
+    assert macos_feasibility.validate_macos_rcc(
+        rcc, command_runner=completed, host_machine=lambda: "arm64"
+    ) == ["arm64", "x86_64"]
+
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "x86_64"
+        )
+
+    responses["architectures"] = "x86_64"
+    with pytest.raises(RuntimeError, match="architecture mismatch"):
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
+
     responses["version"] = "rcc 6.11.0"
     with pytest.raises(RuntimeError, match="version mismatch"):
         macos_feasibility.validate_macos_rcc(
@@ -206,7 +222,7 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(tmp_path):
         )
 
     responses["version"] = "rcc 6.11.1"
-    responses["architectures"] = "x86_64"
+    responses["architectures"] = "i386"
     with pytest.raises(RuntimeError, match="invalid architecture slices"):
         macos_feasibility.validate_macos_rcc(
             rcc, command_runner=completed, host_machine=lambda: "arm64"

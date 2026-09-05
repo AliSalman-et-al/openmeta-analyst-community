@@ -64,7 +64,7 @@ def _install_backend_test_double(
 def main() -> int:
     prepare_generated_ui_imports()
     repo_root = Path(__file__).resolve().parents[1]
-    from scripts.local_r_test_backend import create
+    from local_r_test_backend import create
 
     backend_fake = create()
     from rc_metastudio import r_bridge

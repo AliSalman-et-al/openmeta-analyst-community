@@ -1173,7 +1173,7 @@ def _capture_surface(scale: float, evidence_root: Path, surface_id: str) -> None
 
     prepare_generated_ui_imports()
     QtCore.qInstallMessageHandler(_qt_message_handler)
-    from scripts.local_r_test_backend import create
+    from local_r_test_backend import create
     backend_fake = create()
     from rc_metastudio import r_bridge, qt6_resources
     for name, implementation in vars(backend_fake).items():
