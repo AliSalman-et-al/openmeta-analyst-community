@@ -1067,7 +1067,7 @@ if [ "$skip_smoke" -eq 0 ]; then
         --automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" finalize-smoke \
     --smoke-evidence "$extracted_smoke" --smoke-log "$extracted_smoke_log" --launchservices-marker "$extracted_marker" \
-    --require-direct-teardown
+    --require-atomic-completion
   rm -f "$extracted_pid"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" inspect \
     --target "macos-$architecture" --app-root "$extracted_app" \
