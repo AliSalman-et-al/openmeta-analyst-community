@@ -78,6 +78,9 @@ class HealthConfig(TypedDict):
     gates: GateConfig
 
 
+TypingCounts = dict[str, int]
+
+
 def _relative_artifact_path(root: Path, path: Path) -> str:
     """Return a stable repository-relative path when the artifact is inside it."""
     try:
@@ -322,21 +325,36 @@ def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None
     return metrics
 
 
+def _typing_module_imports(tree: ast.AST) -> list[ast.alias]:
+    aliases: list[ast.alias] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Import):
+            continue
+        aliases.extend(alias for alias in node.names if alias.name in {"typing", "typing_extensions"})
+    return aliases
+
+
+def _typing_from_imports(tree: ast.AST) -> list[ast.alias]:
+    aliases: list[ast.alias] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in {"typing", "typing_extensions"}:
+            aliases.extend(node.names)
+    return aliases
+
+
 def _typing_aliases(tree: ast.AST) -> tuple[set[str], set[str], set[str]]:
     any_names = {"Any"}
     cast_names = {"cast"}
     typing_names = {"typing", "typing_extensions"}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name in typing_names:
-                    typing_names.add(alias.asname or alias.name.split(".")[0])
-        elif isinstance(node, ast.ImportFrom) and node.module in typing_names:
-            for alias in node.names:
-                if alias.name == "Any":
-                    any_names.add(alias.asname or alias.name)
-                elif alias.name == "cast":
-                    cast_names.add(alias.asname or alias.name)
+    imports = _typing_module_imports(tree)
+    from_imports = _typing_from_imports(tree)
+    for alias in imports:
+        typing_names.add(alias.asname or alias.name.split(".")[0])
+    for alias in from_imports:
+        if alias.name == "Any":
+            any_names.add(alias.asname or alias.name)
+        elif alias.name == "cast":
+            cast_names.add(alias.asname or alias.name)
     return any_names, cast_names, typing_names
 
 
@@ -361,68 +379,110 @@ def _type_ignore_count(source: str) -> int:
     )
 
 
+def _parameter_nodes(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.arg]:
+    parameters = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+    if node.args.vararg is not None:
+        parameters.append(node.args.vararg)
+    if node.args.kwarg is not None:
+        parameters.append(node.args.kwarg)
+    return parameters
+
+
+def _function_typing_counts(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    any_names: set[str],
+    typing_names: set[str],
+) -> TypingCounts:
+    parameters = _parameter_nodes(node)
+    annotated = [parameter.annotation for parameter in parameters if parameter.annotation is not None]
+    any_count = sum(_is_any_annotation(annotation, any_names, typing_names) for annotation in annotated)
+    if node.returns is not None:
+        any_count += _is_any_annotation(node.returns, any_names, typing_names)
+    return {
+        "files": 0,
+        "total_parameters": len(parameters),
+        "total_functions": 1,
+        "annotated_parameters": len(annotated),
+        "annotated_returns": node.returns is not None,
+        "any_annotations": any_count,
+        "type_ignore_directives": 0,
+        "cast_to_any": 0,
+    }
+
+
+def _is_cast_to_any(node: ast.Call, any_names: set[str], cast_names: set[str], typing_names: set[str]) -> bool:
+    function = node.func
+    named_cast = isinstance(function, ast.Name) and function.id in cast_names
+    qualified_cast = (
+        isinstance(function, ast.Attribute)
+        and function.attr == "cast"
+        and isinstance(function.value, ast.Name)
+        and function.value.id in typing_names
+    )
+    return (named_cast or qualified_cast) and bool(node.args) and _is_any_annotation(node.args[0], any_names, typing_names)
+
+
+def _add_typing_counts(target: TypingCounts, source: TypingCounts) -> None:
+    for key in target:
+        target[key] += source[key]
+
+
+def _typing_file_counts(source: str, relative: str) -> TypingCounts:
+    try:
+        tree = ast.parse(source, filename=relative)
+    except SyntaxError as exc:
+        raise CodeHealthError(f"cannot parse {relative}") from exc
+    any_names, cast_names, typing_names = _typing_aliases(tree)
+    counts: TypingCounts = {
+        "files": 1,
+        "total_parameters": 0,
+        "total_functions": 0,
+        "annotated_parameters": 0,
+        "annotated_returns": 0,
+        "any_annotations": 0,
+        "type_ignore_directives": _type_ignore_count(source),
+        "cast_to_any": 0,
+    }
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _add_typing_counts(counts, _function_typing_counts(node, any_names, typing_names))
+    counts["cast_to_any"] = sum(
+        _is_cast_to_any(node, any_names, cast_names, typing_names)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    )
+    return counts
+
+
+def _coverage(annotated: int, total: int) -> float:
+    return annotated / max(total, 1)
+
+
 def typing_measurement(root: Path, paths: Iterable[str], revision: str) -> dict[str, object]:
     """Measure typing signals from the exact Python snapshot being analyzed."""
-    annotated_parameters = 0
-    annotated_returns = 0
-    any_annotations = 0
-    type_ignore_directives = 0
-    cast_to_any = 0
-    total_parameters = 0
-    total_functions = 0
-    files = 0
+    counts: TypingCounts = {
+        "files": 0,
+        "total_parameters": 0,
+        "total_functions": 0,
+        "annotated_parameters": 0,
+        "annotated_returns": 0,
+        "any_annotations": 0,
+        "type_ignore_directives": 0,
+        "cast_to_any": 0,
+    }
     for relative in paths:
         if not relative.endswith(".py"):
             continue
         source = _source_at_revision(root, relative, revision)
         if source is None:
             raise CodeHealthError(f"cannot read {relative} at {revision}")
-        try:
-            tree = ast.parse(source, filename=relative)
-        except SyntaxError as exc:
-            raise CodeHealthError(f"cannot parse {relative}") from exc
-        files += 1
-        any_names, cast_names, typing_names = _typing_aliases(tree)
-        type_ignore_directives += _type_ignore_count(source)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                total_functions += 1
-                parameters = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
-                if node.args.vararg is not None:
-                    parameters.append(node.args.vararg)
-                if node.args.kwarg is not None:
-                    parameters.append(node.args.kwarg)
-                total_parameters += len(parameters)
-                for parameter in parameters:
-                    if parameter is not None and parameter.annotation is not None:
-                        annotated_parameters += 1
-                        any_annotations += _is_any_annotation(parameter.annotation, any_names, typing_names)
-                if node.returns is not None:
-                    annotated_returns += 1
-                    any_annotations += _is_any_annotation(node.returns, any_names, typing_names)
-            elif isinstance(node, ast.Call):
-                function = node.func
-                is_cast = isinstance(function, ast.Name) and function.id in cast_names or (
-                    isinstance(function, ast.Attribute)
-                    and function.attr == "cast"
-                    and isinstance(function.value, ast.Name)
-                    and function.value.id in typing_names
-                )
-                if is_cast and node.args and _is_any_annotation(node.args[0], any_names, typing_names):
-                    cast_to_any += 1
+        _add_typing_counts(counts, _typing_file_counts(source, relative))
     return {
         "tool": "ast",
         "revision": revision,
-        "files": files,
-        "total_parameters": total_parameters,
-        "total_functions": total_functions,
-        "annotated_parameters": annotated_parameters,
-        "annotated_returns": annotated_returns,
-        "parameter_coverage": annotated_parameters / max(total_parameters, 1),
-        "return_coverage": annotated_returns / max(total_functions, 1),
-        "any_annotations": any_annotations,
-        "type_ignore_directives": type_ignore_directives,
-        "cast_to_any": cast_to_any,
+        **counts,
+        "parameter_coverage": _coverage(counts["annotated_parameters"], counts["total_parameters"]),
+        "return_coverage": _coverage(counts["annotated_returns"], counts["total_functions"]),
     }
 
 
