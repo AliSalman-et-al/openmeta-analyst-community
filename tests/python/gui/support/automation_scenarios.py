@@ -14,7 +14,8 @@ import sys
 import tempfile
 import traceback
 from pathlib import Path
-from typing import Any, cast
+from collections.abc import Iterator
+from typing import Protocol, TypedDict, cast
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtGui import QIcon, QPixmap
@@ -43,6 +44,59 @@ from rc_metastudio.launch import (
     dispose_qobjects,
     load_R_libraries,
 )
+
+
+class SampleProject(TypedDict):
+    file: str
+    sha256: str
+    semantic_sha256: str
+
+
+class SampleManifest(TypedDict):
+    projects: list[SampleProject]
+
+
+class RVector(Protocol):
+    def __getitem__(self, index: int) -> object: ...
+
+    def __iter__(self) -> Iterator[object]: ...
+
+
+def _sample_manifest(path: Path) -> SampleManifest:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or not isinstance(value.get("projects"), list):
+        raise RuntimeError("packaged sample manifest has an invalid shape")
+    projects: list[SampleProject] = []
+    for project in value["projects"]:
+        if not isinstance(project, dict):
+            raise RuntimeError("packaged sample manifest has an invalid project")
+        filename = project.get("file")
+        sha256 = project.get("sha256")
+        semantic_sha256 = project.get("semantic_sha256")
+        if not all(
+            isinstance(field, str)
+            for field in (filename, sha256, semantic_sha256)
+        ):
+            raise RuntimeError("packaged sample manifest has an invalid project")
+        projects.append(
+            {
+                "file": filename,
+                "sha256": sha256,
+                "semantic_sha256": semantic_sha256,
+            }
+        )
+    return {"projects": projects}
+
+
+def _dataset_record(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise RuntimeError("project adapter returned an invalid dataset record")
+    record: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise RuntimeError("project adapter returned non-string dataset keys")
+        record[key] = item
+    return record
 from rc_metastudio.r_call_serialization import serialized_r_call
 from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
 
@@ -303,16 +357,14 @@ def _exercise_all_packaged_samples(meta, representative_sample):
 
     sample_root = Path(representative_sample).resolve().parent
     manifest_path = sample_root / "manifest.json"
-    manifest = cast(
-        dict[str, Any], json.loads(manifest_path.read_text(encoding="utf-8"))
-    )
-    manifest_projects = cast(list[dict[str, Any]], manifest["projects"])
-    declared = sorted(cast(str, item["file"]) for item in manifest_projects)
+    manifest = _sample_manifest(manifest_path)
+    manifest_projects = manifest["projects"]
+    declared = sorted(item["file"] for item in manifest_projects)
     packaged = sorted(path.name for path in sample_root.glob("*.rcms"))
     if declared != packaged:
         raise RuntimeError("packaged sample manifest does not match the project set")
 
-    metadata = {cast(str, item["file"]): item for item in manifest_projects}
+    metadata = {item["file"]: item for item in manifest_projects}
     records = []
     for name in declared:
         path = sample_root / name
@@ -325,15 +377,13 @@ def _exercise_all_packaged_samples(meta, representative_sample):
             raise RuntimeError("packaged sample semantic mismatch: %s" % name)
         if not meta.open(str(path), raise_on_error=True):
             raise RuntimeError("packaged application could not open sample: %s" % name)
-        observed = cast(
-            dict[str, Any],
-            project_adapter.dataset_to_project(meta.model.dataset)["dataset"],
+        observed = _dataset_record(
+            project_adapter.dataset_to_project(meta.model.dataset)["dataset"]
         )
-        expected = cast(
-            dict[str, Any],
+        expected = _dataset_record(
             project_adapter.dataset_to_project(
                 project_adapter.project_to_dataset(document.project)
-            )["dataset"],
+            )["dataset"]
         )
         for field in ("title", "analysis_family", "outcomes", "studies"):
             if observed[field] != expected[field]:
@@ -1151,11 +1201,11 @@ def start_package_runtime_probe(output_path):
     if primary is None:
         raise SystemExit("Frozen runtime probe found no primary screen.")
     r_home_values = cast(
-        Any, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)")
+        RVector, robjects.r("normalizePath(R.home(), winslash='/', mustWork=TRUE)")
     )
-    r_version_values = cast(Any, robjects.r("as.character(getRversion())"))
+    r_version_values = cast(RVector, robjects.r("as.character(getRversion())"))
     r_library_values = cast(
-        Any, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")
+        RVector, robjects.r("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")
     )
     r_home = str(r_home_values[0])
     r_version = str(r_version_values[0])
@@ -1168,16 +1218,18 @@ def start_package_runtime_probe(output_path):
     if sys.platform == "darwin":
         tcltk_available = bool(
             cast(
-                Any,
+                RVector,
                 robjects.r("isTRUE(requireNamespace('tcltk', quietly=TRUE))"),
             )[0]
         )
-        tcltk_loaded = bool(cast(Any, robjects.r("'tcltk' %in% loadedNamespaces()"))[0])
-        aqua = bool(cast(Any, robjects.r("capabilities('aqua')"))[0])
-        bitmap_type = str(cast(Any, robjects.r("getOption('bitmapType')"))[0])
+        tcltk_loaded = bool(
+            cast(RVector, robjects.r("'tcltk' %in% loadedNamespaces()"))[0]
+        )
+        aqua = bool(cast(RVector, robjects.r("capabilities('aqua')"))[0])
+        bitmap_type = str(cast(RVector, robjects.r("getOption('bitmapType')"))[0])
         png_path = str(
             cast(
-                Any,
+                RVector,
                 robjects.r(
                     "output <- tempfile(fileext='.png'); grDevices::png(output); "
                     "graphics::plot(1, 1); grDevices::dev.off(); output"
