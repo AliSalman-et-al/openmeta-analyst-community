@@ -19,6 +19,7 @@ All notable RC MetaStudio changes will be recorded in this file.
 ### Fixed
 
 - Kept macOS packaged evidence assembly on the same bundled-R and Qt runtime contract as the probes it repeats.
+- Made normal macOS app-entry evidence record the validated Cocoa process and post-close state.
 - Removed the false save prompt when opening a project from an untouched startup workspace.
 - Restored calculated estimates and confidence bounds when opening binary, continuous, and diagnostic projects, without changing saved inclusion choices or entered estimates.
 - Kept complete imported studies included when their CSV contains blank calculated-effect columns.
