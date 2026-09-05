@@ -2619,9 +2619,22 @@ def _surface_accessibility(accessibility: dict[str, object]) -> bool:
     return "focus_widget" in accessibility
 
 
+def _recorded_scale(value: object) -> float | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
 def _surface_scale_values(item: dict[str, object]) -> bool:
     cleanup = _mapping_or_empty(item.get("cleanup", {}))
     image_formats = _strings_or_empty(item.get("image_formats", []))
+    requested = _recorded_scale(item.get("requested"))
+    qt_scale_factor = _recorded_scale(item.get("qt_scale_factor"))
+    if requested is None or qt_scale_factor is None:
+        return False
     return all(
         (
             cleanup.get("close_accepted") is True,
@@ -2630,13 +2643,12 @@ def _surface_scale_values(item: dict[str, object]) -> bool:
             bool(item.get("active_style")),
             bool(item.get("tls_backends")),
             {"jpeg", "svg"} <= set(image_formats),
-            abs(_float_or_default(item.get("qt_scale_factor"), 0) - _float_or_default(item.get("requested"), -1))
-            < 1e-9,
+            abs(qt_scale_factor - requested) < 1e-9,
             _float_or_default(item.get("baseline_device_pixel_ratio"), 0) > 0,
             abs(
                 _float_or_default(item.get("device_pixel_ratio"), 0)
                 - _float_or_default(item.get("baseline_device_pixel_ratio"), -1)
-                * _float_or_default(item.get("requested"), -1)
+                * requested
             )
             <= 0.05,
         )
