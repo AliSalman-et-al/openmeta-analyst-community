@@ -832,7 +832,12 @@ PY
 
   step "Assembling packaged qualification evidence outside the application"
   mkdir -p "$surface_records_path"
-  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=API \
+    RCMS_R_HOME="$r_home" \
+    RCMS_R_LIBS="$r_lib" \
+    "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
     --workflow-observation "$workflow_observation_path" \
     --surface-records "$surface_records_path" \
     --sample-observations "$sample_observations_path" \
@@ -1035,7 +1040,12 @@ if [ "$skip_smoke" -eq 0 ]; then
       run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-surface-smoke "$extracted_surfaces/surface-$scale.json" "$scale"
   done
   mkdir -p "$extracted_surfaces"
-  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=API \
+    RCMS_R_HOME="$extracted_r_home" \
+    RCMS_R_LIBS="$extracted_r_lib" \
+    "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
     --workflow-observation "$extracted_workflow" \
     --surface-records "$extracted_surfaces" \
     --sample-observations "$extracted_samples" \
