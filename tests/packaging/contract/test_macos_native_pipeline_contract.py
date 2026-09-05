@@ -68,6 +68,24 @@ def test_first_green_gate_uses_the_bcg_packaged_workflow():
     assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in build
 
 
+def test_evidence_assembler_uses_the_packaged_runtime_contract():
+    build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
+    assembler = '"$repo_root/scripts/assemble_packaged_smoke_evidence.py"'
+    prefixes = build.split(assembler)[:-1]
+
+    assert len(prefixes) == 2
+    runtime_paths = (
+        ('RCMS_R_HOME="$r_home"', 'RCMS_R_LIBS="$r_lib"'),
+        ('RCMS_R_HOME="$extracted_r_home"', 'RCMS_R_LIBS="$extracted_r_lib"'),
+    )
+    for prefix, (r_home, r_libs) in zip(prefixes, runtime_paths, strict=True):
+        invocation = prefix.rsplit("env -u QT_QPA_PLATFORM", 1)[1]
+        assert "RCMS_REQUIRE_IN_PROCESS_RPY2=1" in invocation
+        assert "RPY2_CFFI_MODE=API" in invocation
+        assert r_home in invocation
+        assert r_libs in invocation
+
+
 def test_both_native_packages_use_the_positional_startup_transition():
     build = (ROOT / "scripts/build-macos-package.sh").read_text(encoding="utf-8")
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
@@ -187,4 +205,3 @@ def test_arm64_launcher_adapter_rejects_intel_build_metadata():
     assert wrapper.count("-L/opt/R/arm64/lib") == 1
     assert "-framework R -lpcre2-8" in wrapper
     assert "/opt/R/x86_64/lib" not in wrapper
-
