@@ -191,6 +191,8 @@ def test_typing_measurement_reads_the_named_revision(tmp_path: Path) -> None:
     before = typing_measurement(tmp_path, ["src/pkg.py"], baseline)
     after = typing_measurement(tmp_path, ["src/pkg.py"], head)
 
+    assert before["total_parameters"] == 1
+    assert after["total_parameters"] == 1
     assert before["annotated_parameters"] == 0
     assert after["annotated_parameters"] == 1
     assert after["annotated_returns"] == 1

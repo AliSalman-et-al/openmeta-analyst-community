@@ -387,8 +387,11 @@ def typing_measurement(root: Path, paths: Iterable[str], revision: str) -> dict[
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 total_functions += 1
-                parameters = (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
-                parameters += (node.args.vararg, node.args.kwarg)
+                parameters = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+                if node.args.vararg is not None:
+                    parameters.append(node.args.vararg)
+                if node.args.kwarg is not None:
+                    parameters.append(node.args.kwarg)
                 total_parameters += len(parameters)
                 for parameter in parameters:
                     if parameter is not None and parameter.annotation is not None:
