@@ -35,6 +35,78 @@ class AdapterError(RuntimeError):
     """Raised when the narrow embedded-R boundary cannot be proven closed."""
 
 
+def _looks_like_r_entry(destination: str, source: str) -> bool:
+    source_text = source.replace("\\", "/")
+    destination_text = destination.replace("\\", "/")
+    return (
+        "/R.framework/" in source_text
+        or Path(source_text).name in {"R", "libR.dylib"}
+        or destination_text.startswith("R.framework/")
+        or Path(destination_text).name in {"R", "libR.dylib"}
+    )
+
+
+def _staged_library_names(staged_root: Path) -> set[str]:
+    return {
+        path.name
+        for path in (staged_root / "Resources/lib").iterdir()
+        if path.is_file() or path.is_symlink()
+    }
+
+
+def _is_flattened_library(destination: str, library_names: set[str]) -> bool:
+    destination_path = Path(destination.replace("\\", "/"))
+    return (
+        destination_path.parent == Path(".")
+        and destination_path.name in library_names
+    )
+
+
+def _is_staged_member(source: str, staged_root: Path) -> bool:
+    try:
+        Path(source).resolve(strict=True).relative_to(staged_root)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _explicit_framework_owns(
+    entry: tuple[str, str, str], staged_root: Path, library_names: set[str]
+) -> bool:
+    destination, source, _typecode = entry
+    if _is_flattened_library(destination, library_names):
+        return True
+    if _is_staged_member(source, staged_root):
+        return True
+    if _looks_like_r_entry(destination, source):
+        raise AdapterError(
+            f"R-like PyInstaller entry is outside the staged framework: {source}"
+        )
+    return False
+
+
+def filter_pyinstaller_r_binaries(
+    entries: list[tuple[str, str, str]], staged_framework: Path
+) -> list[tuple[str, str, str]]:
+    """Remove R entries owned by the explicit framework TOC."""
+    staged_root = staged_framework.resolve(strict=True)
+    library_names = _staged_library_names(staged_root)
+    retained = []
+    excluded = []
+    for entry in entries:
+        if _explicit_framework_owns(entry, staged_root, library_names):
+            excluded.append(entry)
+        else:
+            retained.append(entry)
+    if excluded:
+        destinations = ", ".join(sorted(item[0] for item in excluded))
+        print(
+            f"[RCMS-PYINSTALLER-FILTER] excluded {len(excluded)} staged-R "
+            f"entries: {destinations}"
+        )
+    return retained
+
+
 def _absolute_link_target(value: str) -> bool:
     return Path(value).is_absolute() or PurePosixPath(value).is_absolute()
 
@@ -622,4 +694,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
