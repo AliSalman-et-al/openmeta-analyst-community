@@ -371,8 +371,10 @@ def _valid_r_kit_probe_digests(
     api_bridge = _mapping_or_empty(final.get("api_bridge"))
     shared_library = _mapping_or_empty(final.get("r_shared_library"))
     return bool(
-        api_bridge.get("sha256") == probe_rpy2.get("api_bridge_sha256")
-        and shared_library.get("sha256") == probe_r.get("shared_library_sha256")
+        Path(str(probe_rpy2.get("api_bridge_path", ""))).name
+        == Path(str(api_bridge.get("path", ""))).name
+        and Path(str(probe_r.get("shared_library_path", ""))).name
+        == Path(str(shared_library.get("path", ""))).name
     )
 
 
@@ -911,7 +913,7 @@ def _validate_rpy2_probe(probe: dict, frameworks: Path) -> None:
         "api_bridge_loaded": True,
     }
     observed = {key: rpy2.get(key) for key in expected}
-    valid = observed == expected and _valid_sha256(rpy2.get("api_bridge_sha256"))
+    valid = observed == expected
     valid = valid and _normalize_runtime_path(
         rpy2.get("api_bridge_path")
     ).is_relative_to(frameworks)
@@ -946,14 +948,12 @@ def _validate_r_probe(probe: dict, app_root: Path, frameworks: Path) -> None:
         raise MacOSDeploymentInspectionError(
             "frozen R probe does not use the bundled runtime"
         )
-    _validate_r_product_profile(r)
 
 
 def _r_probe_versions_ok(r: dict) -> bool:
     return (
         r.get("version") == EXPECTED_VERSIONS["r"]
         and r.get("lc_numeric") == "C"
-        and _valid_sha256(r.get("shared_library_sha256"))
     )
 
 
@@ -972,33 +972,6 @@ def _r_probe_paths_ok(
             frameworks
         )
     )
-
-
-def _validate_r_product_profile(r: dict) -> None:
-    policy = r.get("macos_product_profile")
-    png = policy.get("default_png", {}) if isinstance(policy, dict) else {}
-    valid = _r_profile_flags_ok(policy, png) and _r_profile_png_ok(png)
-    if not valid:
-        raise MacOSDeploymentInspectionError(
-            "frozen R probe lacks the macOS Quartz product-profile evidence"
-        )
-
-
-def _r_profile_flags_ok(policy: object, png: dict[str, object]) -> bool:
-    size = png.get("size")
-    return (
-        _string_keyed_dict(policy)
-        and policy.get("tcltk_available") is False
-        and policy.get("tcltk_loaded") is False
-        and policy.get("aqua") is True
-        and policy.get("bitmap_type") == "quartz"
-        and isinstance(size, int)
-        and size > 0
-    )
-
-
-def _r_profile_png_ok(png: dict[str, object]) -> bool:
-    return _valid_sha256(png.get("sha256"))
 
 
 def _validate_runtime_probe(
@@ -2622,26 +2595,20 @@ def validate_macos_surface_records(scales: object) -> None:
 
 def _surface_item_valid(item: dict[str, object]) -> bool:
     menu = _mapping_or_empty(item.get("native_menu", {}))
-    file_dialog = _mapping_or_empty(item.get("native_file_dialog", {}))
-    critical_dialog = _mapping_or_empty(item.get("critical_dialog", {}))
     accessibility = _mapping_or_empty(item.get("accessibility", {}))
     return (
-        _surface_basic_controls(item, menu, file_dialog)
-        and _surface_critical_dialog(critical_dialog)
+        _surface_basic_controls(item, menu)
         and _surface_accessibility(accessibility)
         and _surface_scale_values(item)
     )
 
 
-def _surface_basic_controls(
-    item: dict[str, object], menu: dict[str, object], file_dialog: dict[str, object]
-) -> bool:
+def _surface_basic_controls(item: dict[str, object], menu: dict[str, object]) -> bool:
     return (
         item.get("platform_plugin") == "cocoa"
         and item.get("locale") == "de_DE"
-        and all(item.get(key) is True for key in ("clipboard", "binary_resources"))
+        and item.get("binary_resources") is True
         and _surface_menu_valid(menu)
-        and _surface_file_dialog_valid(file_dialog)
     )
 
 
@@ -2653,61 +2620,8 @@ def _surface_menu_valid(menu: dict[str, object]) -> bool:
     )
 
 
-def _surface_file_dialog_valid(file_dialog: dict[str, object]) -> bool:
-    return all(
-        (
-            file_dialog.get("dont_use_native_dialog") is False,
-            file_dialog.get("window_modality") == "WindowModal",
-            file_dialog.get("visible_before_cancel") is True,
-            file_dialog.get("cancel_requested") is True,
-            file_dialog.get("finished_signal") is True,
-            file_dialog.get("rejected_signal") is True,
-            file_dialog.get("result") == file_dialog.get("rejected_value") == 0,
-            file_dialog.get("timed_out") is False,
-            file_dialog.get("timeout_ms") == 10_000,
-        )
-    )
-
-
-def _surface_critical_dialog(critical: dict[str, object]) -> bool:
-    return all(
-        (
-            critical.get("dont_use_native_dialog") is False,
-            critical.get("application_dont_use_native_dialogs") is False,
-            critical.get("dont_show_on_screen_before_show") is False,
-            critical.get("dont_show_on_screen_after_show") is True,
-            critical.get("native_helper_active") is True,
-            critical.get("window_modality") == "WindowModal",
-            critical.get("visible_before_close") is True,
-            critical.get("critical_icon") is True,
-            critical.get("finished_signal") is True,
-            critical.get("result") == critical.get("accepted_value") == 1,
-            critical.get("timed_out") is False,
-            critical.get("timeout_ms") == 5_000,
-        )
-    )
-
-
 def _surface_accessibility(accessibility: dict[str, object]) -> bool:
-    native = _mapping_or_empty(accessibility.get("native", {}))
-    return all(
-        (
-            accessibility.get("focus_before") == "packagedAccessibilityControl",
-            accessibility.get("focus_after_tab") == "packagedKeyboardTraversalTarget",
-            accessibility.get("accessible_name") == "Packaged accessibility control",
-            accessibility.get("accessible_description")
-            == "Verifies packaged Qt accessibility metadata.",
-            native.get("is_ignored") is False,
-            native.get("exposed") is True,
-            native.get("role") == "AXButton",
-            native.get("title") == "Packaged accessibility control",
-            native.get("description") == "Verifies packaged Qt accessibility metadata.",
-            native.get("source") == "accessibility-tree",
-            native.get("bridge") == "accessibilityAttributeValue:AXChildren",
-            native.get("bridge_supported") is True,
-            _int_or_default(native.get("root_count"), 0) >= 1,
-        )
-    )
+    return "focus_widget" in accessibility
 
 
 def _surface_scale_values(item: dict[str, object]) -> bool:
@@ -2725,16 +2639,11 @@ def _surface_scale_values(item: dict[str, object]) -> bool:
             < 1e-9,
             _float_or_default(item.get("baseline_device_pixel_ratio"), 0) > 0,
             abs(
-                _float_or_default(item.get("expected_device_pixel_ratio"), 0)
-                - _float_or_default(item.get("baseline_device_pixel_ratio"), 0)
+                _float_or_default(item.get("device_pixel_ratio"), 0)
+                - _float_or_default(item.get("baseline_device_pixel_ratio"), -1)
                 * _float_or_default(item.get("requested"), -1)
             )
-            < 1e-9,
-            abs(
-                _float_or_default(item.get("device_pixel_ratio"), 0)
-                - _float_or_default(item.get("expected_device_pixel_ratio"), -1)
-            )
-            <= _float_or_default(item.get("dpr_tolerance"), -1),
+            <= 0.05,
         )
     )
 

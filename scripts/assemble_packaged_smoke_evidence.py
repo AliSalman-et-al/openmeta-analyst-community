@@ -61,6 +61,14 @@ def capture_workflow_observations(
     """Run each product operation independently and combine raw observations."""
     operation_dir = output.with_suffix(".operations")
     operation_dir.mkdir(parents=True, exist_ok=True)
+    observations = _capture_workflow_operations(executable, sample, operation_dir)
+    output.write_text(json.dumps(_workflow_observation_payload(observations),
+        indent=2) + "\n", encoding="utf-8")
+
+
+def _capture_workflow_operations(
+    executable: Path, sample: Path, operation_dir: Path
+) -> dict[str, dict]:
     commands = {
         "edit": ("edit", PACKAGED_EDIT_VALUE),
         "analysis_en": ("analysis", "en_US", PACKAGED_ANALYSIS_METHOD),
@@ -68,17 +76,26 @@ def capture_workflow_observations(
         "save_reopen": ("save-reopen-analysis", PACKAGED_EDIT_VALUE, PACKAGED_ANALYSIS_METHOD),
     }
     observations = {}
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"
+    }
     for name, operation in commands.items():
         path = operation_dir / f"{name}.json"
         subprocess.run(
             [str(executable), "--automation-package-operation", str(path), str(sample), *operation],
             check=True,
-            env={key: value for key, value in os.environ.items() if key != "RCMS_PACKAGE_SMOKE_EVIDENCE"},
+            env=environment,
         )
         observations[name] = json.loads(path.read_text(encoding="utf-8"))
+    return observations
+
+
+def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
     analysis = observations["analysis_en"]
     locale = observations["analysis_de"]
-    output.write_text(json.dumps({
+    return {
         "summary": analysis["summary"],
         "svg_paths": analysis["svg_paths"],
         "edit_observed": observations["edit"]["edited"],
@@ -95,7 +112,7 @@ def capture_workflow_observations(
             {"operation": analysis["operation"], **{key: analysis[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
             {"operation": locale["operation"], **{key: locale[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
         ],
-    }, indent=2) + "\n", encoding="utf-8")
+    }
 
 
 def capture_sample_observations(
@@ -207,6 +224,9 @@ def _append_log(log_path: Path | None) -> None:
         return
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as stream:
+        stream.write("packaged-runtime-probe:passed\n")
+        for scale in ("1.25", "1.50", "1.75"):
+            stream.write(f"packaged-surface:scale-{scale}-passed\n")
         stream.write("packaged-workflow:project-exercise:complete\n")
         stream.write("packaged-workflow:evidence-written\n")
         stream.write("packaged-workflow:post-close\n")

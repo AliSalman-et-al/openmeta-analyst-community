@@ -61,49 +61,66 @@ def test_packaged_qualification_commands_validate_their_arguments():
         automation.dispatch(["RCMetaStudio", "--automation-package-operation"])
 
 
-def test_surface_focus_observation_traverses_from_window_not_application():
+def test_surface_hook_observes_and_closes_the_composed_main_window(monkeypatch):
     from rc_metastudio import automation
 
     class App:
         def __init__(self):
-            self.current = None
+            self.process_events = 0
+            self.quit_called = False
 
         def processEvents(self):
-            pass
+            self.process_events += 1
 
-        def focusWidget(self):
-            return self.current
-
-    class Control:
-        def __init__(self, app):
-            self.app = app
-
-        def setFocus(self):
-            self.app.current = self
+        def quit(self):
+            self.quit_called = True
 
     class Window:
-        def __init__(self, app, target):
-            self.app = app
-            self.target = target
-            self.calls = []
+        def __init__(self):
+            self.close_calls = 0
+            self.visible = False
 
-        def focusNextPrevChild(self, forward):
-            self.calls.append(forward)
-            self.app.current = self.target
+        def close(self):
+            self.close_calls += 1
             return True
 
-    app = App()
-    target = object()
-    control = Control(app)
-    window = Window(app, target)
+        def isVisible(self):
+            return self.visible
 
-    focus_before, focus_after = automation._observe_surface_focus(
-        app, window, control
+    app, window = App(), Window()
+    written = {}
+    monkeypatch.setattr(automation, "start_automation", lambda: (app, window))
+    monkeypatch.setattr(
+        automation,
+        "_surface_record",
+        lambda *args: {"window_is_composed": args[-2] is window},
+    )
+    monkeypatch.setattr(automation, "_write_json", lambda path, value: written.update({path: value}))
+    monkeypatch.setattr(automation, "dispose_qobjects", lambda *_args: None)
+
+    assert automation.start_package_surface_smoke("surface.json", "1.25") == 0
+    assert written["surface.json"]["window_is_composed"] is True
+    assert written["surface.json"]["cleanup"] == {
+        "close_accepted": True,
+        "window_visible": False,
+    }
+    assert window.close_calls == 2
+    assert app.quit_called is True
+
+
+def test_automation_delegates_application_composition_to_launch(monkeypatch):
+    from rc_metastudio import automation, launch
+
+    expected = (object(), object())
+    calls = []
+    monkeypatch.setattr(
+        launch,
+        "compose_automation_application",
+        lambda **kwargs: calls.append(kwargs) or expected,
     )
 
-    assert focus_before is control
-    assert focus_after is target
-    assert window.calls == [True]
+    assert automation.start_automation() == expected
+    assert calls == [{"phase_callback": None}]
 
 
 def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(

@@ -239,7 +239,7 @@ def start():
         return automation.dispatch(startup_argv)
     startup_project_path = _startup_project_path(startup_argv)
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    _configure_application(app)
+    configure_application(app)
     baseline_ids = _top_level_ids(app)
     try:
         settings.setup_directories()
@@ -265,6 +265,28 @@ def start():
         _dispose_new_top_levels(app, baseline_ids)
 
 
+def compose_automation_application(phase_callback=None):
+    """Compose the ordinary main window for a hidden qualification hook."""
+    qt6_resources.ensure_application_resources()
+    app_error_handler.install_global_exception_handler()
+    main_window = _import_main_window()
+    app = app_error_handler.get_or_create_application(sys.argv)
+    configure_application(app)
+    _emit_automation_phase(phase_callback, "application:configured")
+    baseline_ids = _top_level_ids(app)
+    try:
+        settings.setup_directories()
+        if os.environ.get("RCMS_REQUIRE_IN_PROCESS_RPY2") == "1":
+            load_R_libraries(app, None, phase_callback=phase_callback)
+        meta = main_window.MainWindow()
+        meta.workspace.mark_saved()
+        _show_main_window(meta)
+        return app, meta
+    except BaseException:
+        _dispose_new_top_levels(app, baseline_ids)
+        raise
+
+
 def _create_interactive_shell(app, main_window_loader, r_loader):
     """Load the R backend before importing and constructing the main window."""
     baseline_ids = _top_level_ids(app)
@@ -282,7 +304,7 @@ def _create_interactive_shell(app, main_window_loader, r_loader):
         meta = main_window_loader().MainWindow()
         splash.finish(meta)
         _show_main_window(meta)
-        _dispose_qobjects(app, (splash,))
+        dispose_qobjects(app, (splash,))
         return meta
     except BaseException:
         _dispose_new_top_levels(app, baseline_ids, (splash,))
@@ -298,10 +320,10 @@ def _dispose_new_top_levels(app, baseline_ids, known=()):
     owned.extend(
         widget for widget in app.topLevelWidgets() if id(widget) not in baseline_ids
     )
-    _dispose_qobjects(app, owned)
+    dispose_qobjects(app, owned)
 
 
-def _dispose_qobjects(app, objects):
+def dispose_qobjects(app, objects):
     """Hide and delete owned Qt objects without invoking user close prompts."""
     unique = {id(obj): obj for obj in objects if obj is not None}
     for obj in unique.values():
@@ -330,7 +352,7 @@ def _set_application_icon(app):
     app.setWindowIcon(QIcon(APPLICATION_ICON_PATH))
 
 
-def _configure_application(app):
+def configure_application(app):
     """Apply the complete process-wide application identity exactly once."""
     app.setApplicationName(meta_globals.APPLICATION_NAME)
     app.setApplicationDisplayName(meta_globals.APPLICATION_DISPLAY_NAME)

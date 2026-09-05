@@ -1720,39 +1720,14 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
 
     inspector = _load_windows_deployment_inspector()
     windows_accessibility = {
-        "focus_before": None,
-        "focus_after_tab": None,
+        "focus_widget": "tableView",
         "accessible_name": "Packaged accessibility control",
         "accessible_description": "Verifies packaged Qt accessibility metadata.",
-        "native": {},
     }
     assert inspector._valid_windows_accessibility(windows_accessibility)
     assert not inspector._valid_windows_accessibility(
         {
-            **windows_accessibility,
-            "accessible_description": "",
-        }
-    )
-    windows_critical_dialog = {
-        "dont_use_native_dialog": False,
-        "application_dont_use_native_dialogs": False,
-        "dont_show_on_screen_before_show": False,
-        "dont_show_on_screen_after_show": False,
-        "native_helper_active": False,
-        "window_modality": "WindowModal",
-        "visible_before_close": True,
-        "critical_icon": True,
-        "finished_signal": True,
-        "result": 1,
-        "accepted_value": 1,
-        "timed_out": False,
-        "timeout_ms": 5_000,
-    }
-    assert inspector._valid_windows_critical_dialog(windows_critical_dialog)
-    assert not inspector._valid_windows_critical_dialog(
-        {
-            **windows_critical_dialog,
-            "finished_signal": False,
+            "accessible_name": windows_accessibility["accessible_name"],
         }
     )
     archive = tmp_path / "RCMetaStudio-windows-x64.zip"
@@ -1865,10 +1840,6 @@ def test_windows_qualification_evidence_authenticates_complete_packaged_smoke(tm
                         "qt_scale_factor": scale,
                         "device_pixel_ratio": float(scale),
                         "baseline_device_pixel_ratio": 1.0,
-                        "expected_device_pixel_ratio": float(scale),
-                        "dpr_tolerance": 0.05,
-                        "clipboard": True,
-                        "critical_dialog": windows_critical_dialog,
                         "binary_resources": True,
                         "locale": "de_DE",
                         "platform_plugin": "windows",

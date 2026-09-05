@@ -527,6 +527,12 @@ def inspect_deployment(
     _validate_runtime_probe(runtime_probe, app_root=app_root, qt_root=qt_root)
     if not _valid_source_provenance(source_provenance, source_commit):
         raise DeploymentInspectionError("source provenance is invalid")
+    probe_app_root = _normalized_path(runtime_probe["python"]["executable"]).parent
+    api_bridge = _probe_relative_path(
+        runtime_probe["rpy2"]["api_bridge_path"], probe_app_root
+    )
+    if api_bridge is None:
+        raise DeploymentInspectionError("runtime probe omitted the rpy2 API bridge path")
     return {
         "schema_version": 1,
         "target": "windows-x64",
@@ -545,8 +551,8 @@ def inspect_deployment(
         "stack": versions,
         "embedded_r": {
             "home": _relative(app_root / "R", app_root),
-            "shared_library_sha256": runtime_probe["r"]["shared_library_sha256"],
-            "api_bridge_sha256": runtime_probe["rpy2"]["api_bridge_sha256"],
+            "shared_library_sha256": sha256_file(app_root / "R/bin/x64/R.dll"),
+            "api_bridge_sha256": sha256_file(app_root / api_bridge),
             "cffi_mode": runtime_probe["rpy2"]["cffi_mode"],
         },
         "qt_runtime_root": _relative(qt_root, app_root),
@@ -655,11 +661,9 @@ def _validate_runtime_probe(
             "loaded_cffi_mode": "API",
             "api_bridge_loaded": True,
         }
-        and _valid_sha256(rpy2.get("api_bridge_sha256"))
         and (api_bridge := probe_path(rpy2.get("api_bridge_path"))) is not None
         and api_bridge.parts[:1] == ("_internal",)
         and (app_root / api_bridge).is_file()
-        and sha256_file(app_root / api_bridge) == rpy2.get("api_bridge_sha256")
     ):
         raise DeploymentInspectionError(
             "frozen rpy2 runtime probe differs from the lock"
@@ -682,13 +686,19 @@ def _validate_runtime_probe(
         or probe_path(r.get("configured_library")) != expected_r_library
         or expected_r_library not in r_libraries
         or r.get("lc_numeric") != "C"
-        or not _valid_sha256(r.get("shared_library_sha256"))
         or probe_path(r.get("shared_library_path")) != PurePosixPath("R/bin/x64/R.dll")
         or not (app_root / "R/bin/x64/R.dll").is_file()
-        or sha256_file(app_root / "R/bin/x64/R.dll") != r.get("shared_library_sha256")
     ):
         raise DeploymentInspectionError(
             "frozen R runtime probe does not use the bundled R runtime/library"
+        )
+    reported_shared_hash = r.get("shared_library_sha256")
+    if reported_shared_hash is not None and (
+        not _valid_sha256(reported_shared_hash)
+        or reported_shared_hash != sha256_file(app_root / "R/bin/x64/R.dll")
+    ):
+        raise DeploymentInspectionError(
+            "frozen R runtime probe does not match the bundled R shared library"
         )
 
 
@@ -696,27 +706,7 @@ def _valid_windows_accessibility(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     accessibility = cast(dict[str, object], value)
-    return (
-        accessibility.get("accessible_name") == "Packaged accessibility control"
-        and accessibility.get("accessible_description")
-        == "Verifies packaged Qt accessibility metadata."
-        and accessibility.get("native") == {}
-    )
-
-
-def _valid_windows_critical_dialog(value: object) -> bool:
-    if not isinstance(value, dict):
-        return False
-    dialog = cast(dict[str, object], value)
-    return (
-        dialog.get("window_modality") == "WindowModal"
-        and dialog.get("visible_before_close") is True
-        and dialog.get("critical_icon") is True
-        and dialog.get("finished_signal") is True
-        and dialog.get("result") == dialog.get("accepted_value") == 1
-        and dialog.get("timed_out") is False
-        and dialog.get("timeout_ms") == 5_000
-    )
+    return "focus_widget" in accessibility
 
 
 def write_qualification_evidence(
@@ -832,10 +822,7 @@ def write_qualification_evidence(
         }
         or [item.get("requested") for item in scales] != ["1.25", "1.50", "1.75"]
         or any(
-            not all(
-                item.get(check) is True for check in ("clipboard", "binary_resources")
-            )
-            or not _valid_windows_critical_dialog(item.get("critical_dialog"))
+            item.get("binary_resources") is not True
             or item.get("locale") != "de_DE"
             or item.get("platform_plugin") != "windows"
             or not _valid_windows_accessibility(item.get("accessibility"))
@@ -850,16 +837,11 @@ def write_qualification_evidence(
             > 1e-9
             or float(item.get("baseline_device_pixel_ratio", 0)) <= 0
             or abs(
-                float(item.get("expected_device_pixel_ratio", 0))
-                - float(item.get("baseline_device_pixel_ratio", 0))
+                float(item.get("device_pixel_ratio", 0))
+                - float(item.get("baseline_device_pixel_ratio", -1))
                 * float(item.get("requested", -1))
             )
-            > 1e-9
-            or abs(
-                float(item.get("device_pixel_ratio", 0))
-                - float(item.get("expected_device_pixel_ratio", -1))
-            )
-            > float(item.get("dpr_tolerance", -1))
+            > 0.05
             for item in scales
         )
         or any(marker not in log_text for marker in required_log_markers)

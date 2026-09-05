@@ -26,10 +26,10 @@ from rc_metastudio.result_text_identity import normalize_packaged_summary_identi
 from rc_metastudio.r_call_serialization import serialized_r_call
 
 from rc_metastudio.launch import (
-    _configure_application,
+    configure_application,
     _create_interactive_shell,
     _dispose_new_top_levels,
-    _dispose_qobjects,
+    dispose_qobjects,
     _emit_automation_phase,
     _import_main_window,
     _argument_value,
@@ -162,7 +162,7 @@ def start_automation(phase_callback=None):
     app_error_handler.install_global_exception_handler()
     main_window = _import_main_window()
     app = app_error_handler.get_or_create_application(sys.argv)
-    _configure_application(app)
+    configure_application(app)
     _emit_automation_phase(phase_callback, "application:configured")
     baseline_ids = _top_level_ids(app)
     try:
@@ -265,7 +265,7 @@ def start_automation_smoke(sample_path, require_native_window=False):
                 meta.close()
                 _write_automation_smoke_log("packaged-workflow:teardown:close:return")
                 app.processEvents()
-                _dispose_qobjects(app, (meta,))
+                dispose_qobjects(app, (meta,))
                 _write_automation_smoke_log(
                     "packaged-workflow:teardown:deferred-delete:complete"
                 )
@@ -742,7 +742,7 @@ def start_package_surface_smoke(evidence_path, expected_scale):
     checkpoint("application:create:start")
     app = app_error_handler.get_or_create_application(sys.argv)
     checkpoint("application:create:complete")
-    _configure_application(app)
+    configure_application(app)
     checkpoint("application:configured")
     qt6_resources.ensure_application_resources()
     checkpoint("resources:ready")
@@ -1139,7 +1139,7 @@ def start_package_runtime_probe(output_path):
     from rpy2.rinterface_lib import openrlib
 
     app = app_error_handler.get_or_create_application(sys.argv)
-    _configure_application(app)
+    configure_application(app)
     primary = app.primaryScreen()
     if primary is None:
         raise SystemExit("Frozen runtime probe found no primary screen.")
@@ -1462,7 +1462,7 @@ def start_shell_failure_smoke(stage):
     if stage not in {"r-load", "meta-form"}:
         raise SystemExit("Unknown shell failure stage: %s" % stage)
     app = app_error_handler.get_or_create_application(sys.argv)
-    _configure_application(app)
+    configure_application(app)
     baseline_ids = _top_level_ids(app)
 
     def r_loader(_app, _splash):
@@ -1700,7 +1700,7 @@ def start_startup_wizard_smoke(evidence_path, sample_path):
     qt6_resources.ensure_application_resources()
     app_error_handler.install_global_exception_handler()
     app = app_error_handler.get_or_create_application(list(sys.argv))
-    _configure_application(app)
+    configure_application(app)
     baseline_ids = _top_level_ids(app)
     result = {"completed": False}
 

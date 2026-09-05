@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """R bridge for RCMetaR calls through rpy2."""
 
-import hashlib
 import importlib
 import importlib.metadata
 import locale
@@ -91,7 +90,7 @@ _RFunction = Callable[..., object]
 
 
 @serialized_r_call
-def packaged_runtime_observation(*, include_macos_profile: bool = False) -> dict[str, object]:
+def packaged_runtime_observation() -> dict[str, object]:
     """Return raw facts about the initialized rpy2/R runtime.
 
     Runtime qualification needs these facts from the exact frozen process, but
@@ -111,39 +110,10 @@ def packaged_runtime_observation(*, include_macos_profile: bool = False) -> dict
         )
     ]
     api_bridge_path = Path(str(api_bridge.__file__)).resolve()
-    macos_profile = None
-    if include_macos_profile:
-        png_path = Path(
-            str(
-                _first_dynamic(
-                    _r_eval(
-                        "output <- tempfile(fileext='.png'); "
-                        "grDevices::png(output); graphics::plot(1, 1); "
-                        "grDevices::dev.off(); output"
-                    )
-                )
-            )
-        )
-        macos_profile = {
-            "tcltk_available": bool(
-                _first_dynamic(_r_eval("isTRUE(requireNamespace('tcltk', quietly=TRUE))"))
-            ),
-            "tcltk_loaded": bool(
-                _first_dynamic(_r_eval("'tcltk' %in% loadedNamespaces()"))
-            ),
-            "aqua": bool(_first_dynamic(_r_eval("capabilities('aqua')"))),
-            "bitmap_type": str(_first_dynamic(_r_eval("getOption('bitmapType')"))),
-            "default_png": {
-                "size": png_path.stat().st_size,
-                "sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
-            },
-        }
-        png_path.unlink(missing_ok=True)
     return {
         "r_home": r_home,
         "r_version": r_version,
         "r_library_paths": r_library_paths,
-        "macos_product_profile": macos_profile,
         "rpy2": {
             "distribution_version": importlib.metadata.version("rpy2"),
             "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
@@ -152,7 +122,6 @@ def packaged_runtime_observation(*, include_macos_profile: bool = False) -> dict
             "loaded_cffi_mode": openrlib.cffi_mode.name,
             "api_bridge_loaded": openrlib.cffi_mode.name == "API",
             "api_bridge_path": str(api_bridge_path),
-            "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest(),
         },
     }
 
