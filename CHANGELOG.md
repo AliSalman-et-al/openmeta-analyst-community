@@ -18,6 +18,7 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 ### Fixed
 
+- Parsed recorded macOS Qt scale strings before validating device-pixel ratios.
 - Updated macOS qualification to validate the current atomic workflow completion trace instead of deleted monolithic teardown markers.
 - Removed the obsolete startup-wizard record from the macOS archive contract after qualification moved to normal project startup.
 - Captured the initial macOS packaged workflow logs and initialized its hang trace before provenance assembly.

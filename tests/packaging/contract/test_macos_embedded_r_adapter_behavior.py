@@ -722,6 +722,38 @@ def test_smoke_finalizer_requires_atomic_completion_surface_and_launch(tmp_path)
         )
 
 
+def test_macos_surface_validator_parses_recorded_scale_strings():
+    inspector = load_inspector()
+    records = [
+        {
+            "requested": scale,
+            "qt_scale_factor": scale,
+            "device_pixel_ratio": float(scale),
+            "baseline_device_pixel_ratio": 1.0,
+            "platform_plugin": "cocoa",
+            "locale": "de_DE",
+            "binary_resources": True,
+            "native_menu": {
+                "is_native": True,
+                "menu_count": 6,
+                "action_count": 27,
+            },
+            "accessibility": {"focus_widget": ""},
+            "cleanup": {"close_accepted": True, "window_visible": False},
+            "available_styles": ["macOS"],
+            "active_style": "macos",
+            "tls_backends": ["securetransport"],
+            "image_formats": ["jpeg", "svg"],
+        }
+        for scale in ("1.25", "1.50", "1.75")
+    ]
+
+    inspector.validate_macos_surface_records(records)
+    records[0]["qt_scale_factor"] = "invalid"
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="1.25"):
+        inspector.validate_macos_surface_records(records)
+
+
 @pytest.mark.skipif(
     sys.platform != "darwin", reason="requires native PyInstaller BUNDLE"
 )
@@ -731,4 +763,3 @@ def test_pyinstaller_preserves_miniature_cran_framework_toc():
         / "scripts/verify_macos_r_pyinstaller_toc.py"
     )
     subprocess.run([sys.executable, str(script)], check=True)
-
