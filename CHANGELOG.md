@@ -18,6 +18,7 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 ### Fixed
 
+- Captured the initial macOS packaged workflow logs and initialized its hang trace before provenance assembly.
 - Kept macOS packaged evidence assembly on the same bundled-R and Qt runtime contract as the probes it repeats.
 - Made normal macOS app-entry evidence record the validated Cocoa process and post-close state.
 - Compared locale variants from equivalent edited projects instead of mixing edited and baseline analyses.

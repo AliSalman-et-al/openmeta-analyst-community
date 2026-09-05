@@ -832,6 +832,7 @@ PY
 
   step "Assembling packaged qualification evidence outside the application"
   mkdir -p "$surface_records_path"
+  : > "$hang_trace_path"
   env -u QT_QPA_PLATFORM \
     RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
     RPY2_CFFI_MODE=API \
@@ -845,7 +846,8 @@ PY
     --sample-path "$sample_path" \
     --executable "$app_root/RCMetaStudio" --runtime-probe "$runtime_probe_path" \
     --surface-directory "$surface_records_path" --log-path "$smoke_log_path" \
-    --output "$smoke_evidence_path"
+    --output "$smoke_evidence_path" \
+    > "$smoke_stdout_path" 2> "$smoke_stderr_path"
 
   step "Opening the converted sample through the normal LaunchServices app entry point"
   rm -f "$launchservices_marker_path" "$launchservices_pid_path"
