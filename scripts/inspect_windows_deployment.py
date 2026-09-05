@@ -476,20 +476,35 @@ def _validate_windows_duplicate_plugins(
 ) -> None:
     plugin_names = {path.name.casefold() for path in packaged_plugins}
     plugin_names.update(path.name.casefold() for path in locked_plugins)
-    occurrences: dict[str, list[Path]] = defaultdict(list)
-    for path in all_files:
-        if path.suffix.lower() == ".dll" and path.name.casefold() in plugin_names and path.is_relative_to(qt_root):
-            occurrences[path.name.casefold()].append(path)
-    duplicates = {
-        name: [_relative(path, app_root) for path in paths]
-        for name, paths in occurrences.items()
-        if len(paths) != 1 or not paths[0].is_relative_to(plugins_root)
-    }
+    occurrences = _windows_plugin_occurrences(all_files, qt_root, plugin_names)
+    duplicates = _windows_duplicate_plugin_records(
+        app_root, plugins_root, occurrences
+    )
     if duplicates:
         raise DeploymentInspectionError(
             "Qt plugins must occur exactly once under the authoritative plugin root: "
             + json.dumps(duplicates, sort_keys=True)
         )
+
+
+def _windows_plugin_occurrences(
+    all_files: list[Path], qt_root: Path, plugin_names: set[str]
+) -> dict[str, list[Path]]:
+    occurrences: dict[str, list[Path]] = defaultdict(list)
+    for path in all_files:
+        if path.suffix.lower() == ".dll" and path.name.casefold() in plugin_names and path.is_relative_to(qt_root):
+            occurrences[path.name.casefold()].append(path)
+    return occurrences
+
+
+def _windows_duplicate_plugin_records(
+    app_root: Path, plugins_root: Path, occurrences: dict[str, list[Path]]
+) -> dict[str, list[str]]:
+    return {
+        name: [_relative(path, app_root) for path in paths]
+        for name, paths in occurrences.items()
+        if len(paths) != 1 or not paths[0].is_relative_to(plugins_root)
+    }
 
 
 def _validate_windows_external_plugins(
@@ -547,6 +562,12 @@ def _validate_windows_qt_libraries(
 def _validate_windows_qt_library_layout(
     app_root: Path, qt_root: Path, qt_libraries: dict[str, list[str]]
 ) -> None:
+    _validate_unique_qt_libraries(qt_libraries)
+    _validate_required_qt_libraries(qt_libraries)
+    _validate_qt_library_locations(app_root, qt_root, qt_libraries)
+
+
+def _validate_unique_qt_libraries(qt_libraries: dict[str, list[str]]) -> None:
     duplicates = {
         name: paths for name, paths in qt_libraries.items() if len(paths) != 1
     }
@@ -554,11 +575,19 @@ def _validate_windows_qt_library_layout(
         raise DeploymentInspectionError(
             "duplicate Qt6 libraries found: " + json.dumps(duplicates, sort_keys=True)
         )
+
+
+def _validate_required_qt_libraries(qt_libraries: dict[str, list[str]]) -> None:
     missing = sorted(REQUIRED_QT_LIBRARIES - set(qt_libraries))
     if missing:
         raise DeploymentInspectionError(
             "missing required Qt6 libraries: " + ", ".join(missing)
         )
+
+
+def _validate_qt_library_locations(
+    app_root: Path, qt_root: Path, qt_libraries: dict[str, list[str]]
+) -> None:
     misplaced = [
         path for paths in qt_libraries.values() for path in paths
         if not path.startswith(_relative(qt_root / "bin", app_root) + "/")
