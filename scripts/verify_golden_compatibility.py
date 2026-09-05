@@ -53,6 +53,8 @@ JsonValue: TypeAlias = (
     None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 )
 JsonObject: TypeAlias = dict[str, JsonValue]
+TextSections: TypeAlias = dict[str, str]
+NumericSections: TypeAlias = dict[str, JsonObject]
 
 
 class GoldenArtifact(TypedDict):
@@ -65,8 +67,8 @@ class GoldenArtifact(TypedDict):
 class GoldenCase(TypedDict, total=False):
     id: str
     status: str
-    texts: JsonObject
-    outputs: JsonObject
+    texts: TextSections
+    outputs: NumericSections
     artifacts: list[GoldenArtifact]
     numeric_tolerance_policy: JsonObject
 
@@ -101,9 +103,15 @@ class NumericContract(TypedDict, total=False):
     schema_version: int
     contract: str
     oracle_sha256: str
-    cases: list[JsonObject]
+    cases: list["NumericCase"]
     tolerance_policy: JsonObject
     coverage: dict[str, JsonObject]
+
+
+class NumericCase(TypedDict):
+    id: str
+    sections: NumericSections
+    nonnumeric_omissions: list[JsonObject]
 
 
 class CaptureManifest(TypedDict, total=False):
@@ -114,8 +122,11 @@ class ExceptionManifest(TypedDict, total=False):
     exceptions: list[JsonObject]
 
 
-class GoldenCapture(TypedDict):
+class GoldenCaptureBase(TypedDict):
     curated_golden_set: list[JsonObject]
+
+
+class GoldenCapture(GoldenCaptureBase):
     passed: bool
 
 
@@ -218,11 +229,7 @@ def _load_numeric_contract_record(path: Path) -> NumericContract:
     coverage = record.get("coverage")
     if not isinstance(cases, list) or not isinstance(tolerance, dict) or not isinstance(coverage, dict):
         raise ValueError("numeric contract has invalid record shapes")
-    case_records: list[JsonObject] = []
-    for case in cases:
-        if not isinstance(case, dict):
-            raise ValueError("numeric contract cases must contain objects")
-        case_records.append(case)
+    case_records: list[NumericCase] = [_numeric_case(case) for case in cases]
     coverage_records: dict[str, JsonObject] = {}
     for name, value in coverage.items():
         if not isinstance(value, dict):
@@ -254,6 +261,24 @@ def _load_capture_manifest(path: Path) -> CaptureManifest:
     if not isinstance(cases, list) or not all(isinstance(case, str) for case in cases):
         raise ValueError("capture manifest cases must contain strings")
     return {"curated_golden_set": cases}
+
+
+def _numeric_case(value: JsonValue) -> NumericCase:
+    record = _json_object(value, "numeric contract case must contain an object")
+    case_id = record.get("id")
+    omissions = record.get("nonnumeric_omissions")
+    if not isinstance(case_id, str) or not isinstance(omissions, list):
+        raise ValueError("numeric contract case has invalid fields")
+    omission_records: list[JsonObject] = []
+    for omission in omissions:
+        if not isinstance(omission, dict):
+            raise ValueError("numeric contract omissions must contain objects")
+        omission_records.append(omission)
+    return {
+        "id": case_id,
+        "sections": _numeric_sections(record.get("sections")),
+        "nonnumeric_omissions": omission_records,
+    }
 
 
 def _load_exception_manifest(path: Path) -> ExceptionManifest:
@@ -387,19 +412,44 @@ def _validate_internal_manifest(reference: JsonValue) -> FrozenGoldenReference:
         ):
             raise ValueError("frozen case id is unsafe")
         ids.append(row_id)
-        texts = raw_row.get("texts")
-        if not isinstance(texts, dict) or len(texts) > 16:
+        texts = _text_sections(raw_row.get("texts"))
+        if len(texts) > 16:
             raise ValueError("frozen text contract is malformed")
-        outputs = raw_row.get("outputs")
-        if not isinstance(outputs, dict) or len(outputs) > 16:
+        outputs = _numeric_sections(raw_row.get("outputs"))
+        if len(outputs) > 16:
             raise ValueError("frozen numeric contract is malformed")
         artifacts = _validate_golden_artifacts(raw_row.get("artifacts"))
         if len(artifacts) > 4:
             raise ValueError("frozen artifact contract is malformed")
-        typed_rows.append(cast(GoldenCase, {**raw_row, "artifacts": artifacts}))
+        typed_rows.append(
+            cast(
+                GoldenCase,
+                {**raw_row, "texts": texts, "outputs": outputs, "artifacts": artifacts},
+            )
+        )
     if len(set(ids)) != len(ids):
         raise ValueError("frozen case ids are duplicated")
     return {"baseline": "comprehensive-golden", "curated_golden_set": typed_rows}
+
+
+def _text_sections(value: JsonValue | None) -> TextSections:
+    if not isinstance(value, dict) or not all(
+        isinstance(name, str) and isinstance(text, str)
+        for name, text in value.items()
+    ):
+        raise ValueError("frozen text contract is malformed")
+    return value
+
+
+def _numeric_sections(value: JsonValue | None) -> NumericSections:
+    if not isinstance(value, dict):
+        raise ValueError("frozen numeric contract is malformed")
+    sections: NumericSections = {}
+    for name, metrics in value.items():
+        if not isinstance(name, str) or not isinstance(metrics, dict):
+            raise ValueError("frozen numeric contract is malformed")
+        sections[name] = metrics
+    return sections
 
 
 def _validate_golden_artifacts(value: JsonValue | None) -> list[GoldenArtifact]:
@@ -582,6 +632,10 @@ def _copy_json_object(value: JsonValue) -> JsonObject:
     return copy.deepcopy(value)
 
 
+def _copy_numeric_sections(value: JsonValue) -> NumericSections:
+    return copy.deepcopy(_numeric_sections(value))
+
+
 def _load_numeric_contract(
     root: Path, archive_path: Path, reference: FrozenGoldenReference
 ) -> NumericContract:
@@ -708,7 +762,7 @@ def _reference_with_numeric_contract(
     expected = copy.deepcopy(reference)
     by_id = {case["id"]: case for case in contract["cases"]}
     for row in expected["curated_golden_set"]:
-        row["outputs"] = _copy_json_object(by_id[row["id"]]["sections"])
+        row["outputs"] = _copy_numeric_sections(by_id[row["id"]]["sections"])
         row["numeric_tolerance_policy"] = _copy_json_object(
             contract["tolerance_policy"]
         )
@@ -742,7 +796,7 @@ def _validate_rpy2_identities(root: Path) -> dict[str, str]:
 
 
 def _compare_plot_descriptors(
-    contract: PlotDescriptorContract, current: GoldenCapture
+    contract: PlotDescriptorContract, current: GoldenCaptureBase
 ) -> list[JsonObject]:
     rows = []
     current_by_id: dict[str, JsonObject] = {}
@@ -811,7 +865,7 @@ def _compare_plot_descriptors(
 
 
 def _validate_current_rpy2_identities(
-    current: GoldenCapture, expected: dict[str, str]
+    current: GoldenCaptureBase, expected: dict[str, str]
 ) -> None:
     for case in current.get("curated_golden_set", []):
         case_id = case.get("id", "<unknown>")
@@ -836,7 +890,7 @@ def _validate_current_rpy2_identities(
 
 
 def _validate_case_contract(
-    reference: FrozenGoldenReference, current: GoldenCapture, root: Path
+    reference: FrozenGoldenReference, current: GoldenCaptureBase, root: Path
 ) -> None:
     committed = _load_capture_manifest(
         root / "tests/analysis_regression/baseline/capture-manifest.json"
