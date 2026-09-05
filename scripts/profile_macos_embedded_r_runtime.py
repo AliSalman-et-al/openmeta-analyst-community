@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Apply RC MetaStudio's explicit non-X11 product profile to CRAN R.framework.
 
 The official macOS R distribution contains optional Tcl/Tk and X11 loadable

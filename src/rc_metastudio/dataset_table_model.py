@@ -259,8 +259,6 @@ class DatasetTableModel(QAbstractTableModel):
         self.view_state = workspace_editing.WorkspaceViewState()
 
         self.editing_service = workspace_editing.WorkspaceEditingService()
-        # Kept as a module-level compatibility seam for existing test and
-        # plugin code. Calculations go through ``editing_service`` below.
         self.confidence_level = self.set_confidence_level(DEFAULT_CONFIDENCE_LEVEL)
 
         self.dataset = dataset if dataset is not None else Dataset()

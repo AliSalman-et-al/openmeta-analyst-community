@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Compare current real-R results with the frozen behavior baseline."""
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from pathlib import PurePosixPath
 import shutil
 import stat
 import sys
-from typing import Any
+from typing import Any, TypeAlias, TypedDict, cast
 import zipfile
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -47,8 +49,222 @@ REQUIRED_RPY2_IDENTITIES = {
 }
 
 
-def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+JsonValue: TypeAlias = (
+    None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
+)
+JsonObject: TypeAlias = dict[str, JsonValue]
+
+
+class GoldenArtifact(TypedDict):
+    bundle_path: str
+    path: str
+    sha256: str
+    label: str
+
+
+class GoldenCase(TypedDict, total=False):
+    id: str
+    status: str
+    texts: JsonObject
+    outputs: JsonObject
+    artifacts: list[GoldenArtifact]
+    numeric_tolerance_policy: JsonObject
+
+
+class FrozenGoldenReference(TypedDict):
+    baseline: str
+    curated_golden_set: list[GoldenCase]
+
+
+class ManifestEntry(TypedDict, total=False):
+    path: str
+    sha256: str
+    size: int
+
+
+class RepositoryManifest(TypedDict, total=False):
+    schema_version: int
+    observed_golden_analysis_bundle: ManifestEntry
+    golden_plot_descriptor_contract: ManifestEntry
+    golden_numeric_contract: ManifestEntry
+    runtime_identities: dict[str, str]
+
+
+class PlotDescriptorContract(TypedDict, total=False):
+    schema_version: int
+    contract: str
+    oracle_sha256: str
+    rows: list[JsonObject]
+
+
+class NumericContract(TypedDict, total=False):
+    schema_version: int
+    contract: str
+    oracle_sha256: str
+    cases: list[JsonObject]
+    tolerance_policy: JsonObject
+    coverage: dict[str, JsonObject]
+
+
+class CaptureManifest(TypedDict, total=False):
+    curated_golden_set: list[str]
+
+
+class ExceptionManifest(TypedDict, total=False):
+    exceptions: list[JsonObject]
+
+
+def _load_json(path: Path) -> JsonValue:
+    return _narrow_json(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _narrow_json(value: object) -> JsonValue:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, list):
+        return [_narrow_json(item) for item in value]
+    if isinstance(value, dict):
+        result: JsonObject = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("JSON object keys must be strings")
+            result[key] = _narrow_json(item)
+        return result
+    raise ValueError("JSON contains an unsupported value")
+
+
+def _load_manifest(path: Path) -> RepositoryManifest:
+    value = _load_json(path)
+    record = _json_object(value, "JSON manifest must contain an object")
+    result: RepositoryManifest = {}
+    schema_version = record.get("schema_version")
+    if schema_version is not None:
+        if not isinstance(schema_version, int) or isinstance(schema_version, bool):
+            raise ValueError("JSON manifest schema version must be an integer")
+        result["schema_version"] = schema_version
+    for field in (
+        "observed_golden_analysis_bundle",
+        "golden_plot_descriptor_contract",
+        "golden_numeric_contract",
+    ):
+        if field in record:
+            result[field] = _manifest_entry(record[field])
+    identities = record.get("runtime_identities")
+    if identities is not None:
+        identity_record = _json_object(
+            identities, "runtime identities must contain an object"
+        )
+        result["runtime_identities"] = {
+            name: identity
+            for name, identity in identity_record.items()
+            if isinstance(identity, str)
+        }
+        if len(result["runtime_identities"]) != len(identity_record):
+            raise ValueError("runtime identities must contain only strings")
+    return result
+
+
+def _load_plot_contract(path: Path) -> PlotDescriptorContract:
+    record = _json_object(_load_json(path), "plot descriptor contract must contain an object")
+    rows = record.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("plot descriptor contract rows must contain objects")
+    row_records: list[JsonObject] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("plot descriptor contract rows must contain objects")
+        row_records.append(row)
+    result: PlotDescriptorContract = {"rows": row_records}
+    for field in ("schema_version", "contract", "oracle_sha256"):
+        value = record.get(field)
+        if field == "schema_version" and isinstance(value, int):
+            result[field] = value
+        elif field != "schema_version" and isinstance(value, str):
+            result[field] = value
+        else:
+            raise ValueError("plot descriptor contract has an invalid field")
+    return result
+
+
+def _load_numeric_contract_record(path: Path) -> NumericContract:
+    record = _json_object(_load_json(path), "numeric contract must contain an object")
+    cases = record.get("cases")
+    tolerance = record.get("tolerance_policy")
+    coverage = record.get("coverage")
+    if not isinstance(cases, list) or not isinstance(tolerance, dict) or not isinstance(coverage, dict):
+        raise ValueError("numeric contract has invalid record shapes")
+    case_records: list[JsonObject] = []
+    for case in cases:
+        if not isinstance(case, dict):
+            raise ValueError("numeric contract cases must contain objects")
+        case_records.append(case)
+    coverage_records: dict[str, JsonObject] = {}
+    for name, value in coverage.items():
+        if not isinstance(value, dict):
+            raise ValueError("numeric contract coverage must contain objects")
+        coverage_records[name] = value
+    schema_version = record.get("schema_version")
+    contract_name = record.get("contract")
+    oracle_sha256 = record.get("oracle_sha256")
+    if (
+        not isinstance(schema_version, int)
+        or isinstance(schema_version, bool)
+        or not isinstance(contract_name, str)
+        or not isinstance(oracle_sha256, str)
+    ):
+        raise ValueError("numeric contract has invalid identity fields")
+    return {
+        "schema_version": schema_version,
+        "contract": contract_name,
+        "oracle_sha256": oracle_sha256,
+        "cases": case_records,
+        "tolerance_policy": tolerance,
+        "coverage": coverage_records,
+    }
+
+
+def _load_capture_manifest(path: Path) -> CaptureManifest:
+    record = _json_object(_load_json(path), "capture manifest must contain an object")
+    cases = record.get("curated_golden_set")
+    if not isinstance(cases, list) or not all(isinstance(case, str) for case in cases):
+        raise ValueError("capture manifest cases must contain strings")
+    return {"curated_golden_set": cases}
+
+
+def _load_exception_manifest(path: Path) -> ExceptionManifest:
+    record = _json_object(
+        _load_json(path), "exception manifest must contain an object"
+    )
+    exceptions = record.get("exceptions", [])
+    if not isinstance(exceptions, list):
+        raise ValueError("exception manifest entries must contain objects")
+    exception_records: list[JsonObject] = []
+    for exception in exceptions:
+        if not isinstance(exception, dict):
+            raise ValueError("exception manifest entries must contain objects")
+        exception_records.append(exception)
+    return {"exceptions": exception_records}
+
+
+def _json_object(value: JsonValue | None, message: str) -> JsonObject:
+    if not isinstance(value, dict):
+        raise ValueError(message)
+    return value
+
+
+def _manifest_entry(value: JsonValue) -> ManifestEntry:
+    record = _json_object(value, "manifest entry must contain an object")
+    path = record.get("path")
+    sha256 = record.get("sha256")
+    size = record.get("size")
+    if (
+        not isinstance(path, str)
+        or not isinstance(sha256, str)
+        or not isinstance(size, int)
+        or isinstance(size, bool)
+    ):
+        raise ValueError("manifest entry has invalid fields")
+    return {"path": path, "sha256": sha256, "size": size}
 
 
 def _sha256(path: Path) -> str:
@@ -119,20 +335,25 @@ def _prepare_output_root(root: Path, requested: Path) -> Path:
     return output_root
 
 
-def _validate_internal_manifest(reference: Any) -> dict[str, Any]:
-    if (
-        not isinstance(reference, dict)
-        or reference.get("baseline") != "comprehensive-golden"
-    ):
+def _validate_internal_manifest(reference: object) -> FrozenGoldenReference:
+    if not isinstance(reference, dict):
         raise ValueError("frozen internal manifest has the wrong schema")
-    rows = reference.get("curated_golden_set")
+    record = cast(dict[str, object], reference)
+    if record.get("baseline") != "comprehensive-golden":
+        raise ValueError("frozen internal manifest has the wrong schema")
+    rows = record.get("curated_golden_set")
     if not isinstance(rows, list) or len(rows) != 11:
         raise ValueError("frozen internal manifest must contain exactly 11 cases")
     ids = []
-    for row in rows:
-        if not isinstance(row, dict) or row.get("status") != "success":
+    typed_rows: list[GoldenCase] = []
+    for raw_row in rows:
+        if not isinstance(raw_row, dict):
             raise ValueError("frozen case is malformed or unsuccessful")
-        row_id = row.get("id")
+        raw_row = cast(JsonObject, raw_row)
+        status = raw_row.get("status")
+        if status != "success":
+            raise ValueError("frozen case is malformed or unsuccessful")
+        row_id = raw_row.get("id")
         if (
             not isinstance(row_id, str)
             or not row_id
@@ -143,15 +364,46 @@ def _validate_internal_manifest(reference: Any) -> dict[str, Any]:
         ):
             raise ValueError("frozen case id is unsafe")
         ids.append(row_id)
-        if not isinstance(row.get("texts"), dict) or len(row["texts"]) > 16:
+        texts = raw_row.get("texts")
+        if not isinstance(texts, dict) or len(texts) > 16:
             raise ValueError("frozen text contract is malformed")
-        if not isinstance(row.get("outputs"), dict) or len(row["outputs"]) > 16:
+        outputs = raw_row.get("outputs")
+        if not isinstance(outputs, dict) or len(outputs) > 16:
             raise ValueError("frozen numeric contract is malformed")
-        if not isinstance(row.get("artifacts"), list) or len(row["artifacts"]) > 4:
+        artifacts = _validate_golden_artifacts(raw_row.get("artifacts"))
+        if len(artifacts) > 4:
             raise ValueError("frozen artifact contract is malformed")
+        typed_rows.append(cast(GoldenCase, {**raw_row, "artifacts": artifacts}))
     if len(set(ids)) != len(ids):
         raise ValueError("frozen case ids are duplicated")
-    return reference
+    return {"baseline": "comprehensive-golden", "curated_golden_set": typed_rows}
+
+
+def _validate_golden_artifacts(value: JsonValue | None) -> list[GoldenArtifact]:
+    if not isinstance(value, list):
+        raise ValueError("frozen artifact contract is malformed")
+    artifacts: list[GoldenArtifact] = []
+    for raw_artifact in value:
+        if not isinstance(raw_artifact, dict):
+            raise ValueError("frozen artifact contract is malformed")
+        bundle_path = raw_artifact.get("bundle_path")
+        path = raw_artifact.get("path")
+        sha256 = raw_artifact.get("sha256")
+        label = raw_artifact.get("label")
+        if not all(
+            isinstance(field, str) and field
+            for field in (bundle_path, path, sha256, label)
+        ):
+            raise ValueError("frozen artifact contract is malformed")
+        artifacts.append(
+            {
+                "bundle_path": bundle_path,
+                "path": path,
+                "sha256": sha256,
+                "label": label,
+            }
+        )
+    return artifacts
 
 
 def _validate_member_name(name: str) -> None:
@@ -167,7 +419,7 @@ def _validate_member_name(name: str) -> None:
         raise ValueError("unsafe frozen ZIP member name: %s" % name)
 
 
-def _read_validated_zip(archive_path: Path) -> dict[str, Any]:
+def _read_validated_zip(archive_path: Path) -> FrozenGoldenReference:
     with zipfile.ZipFile(archive_path) as archive:
         infos = archive.infolist()
         if not infos or len(infos) > MAX_MEMBER_COUNT:
@@ -215,9 +467,9 @@ def _read_validated_zip(archive_path: Path) -> dict[str, Any]:
         return reference
 
 
-def _load_frozen_reference(root: Path) -> tuple[Path, dict[str, Any]]:
+def _load_frozen_reference(root: Path) -> tuple[Path, FrozenGoldenReference]:
     outer_path = (root / OUTER_MANIFEST_RELATIVE_PATH).resolve(strict=True)
-    outer = _load_json(outer_path)
+    outer = _load_manifest(outer_path)
     entry = outer.get("observed_golden_analysis_bundle")
     if (
         outer.get("schema_version") != 1
@@ -242,9 +494,9 @@ def _load_frozen_reference(root: Path) -> tuple[Path, dict[str, Any]]:
 
 
 def _load_plot_descriptor_contract(
-    root: Path, archive_path: Path, reference: dict[str, Any]
-) -> dict[str, Any]:
-    outer = _load_json(root / OUTER_MANIFEST_RELATIVE_PATH)
+    root: Path, archive_path: Path, reference: FrozenGoldenReference
+) -> PlotDescriptorContract:
+    outer = _load_manifest(root / OUTER_MANIFEST_RELATIVE_PATH)
     entry = outer.get("golden_plot_descriptor_contract")
     expected_relative = "tests/analysis_regression/baseline/plot-descriptors.json"
     if (
@@ -262,7 +514,7 @@ def _load_plot_descriptor_contract(
     _assert_plain_path(path)
     if path.stat().st_size != entry["size"] or _sha256(path) != entry["sha256"]:
         raise ValueError("plot descriptor contract failed size or hash verification")
-    contract = _load_json(path)
+    contract = _load_plot_contract(path)
     rows = contract.get("rows")
     if (
         contract.get("schema_version") != 1
@@ -302,9 +554,9 @@ def _canonical_json_bytes(value: Any) -> bytes:
 
 
 def _load_numeric_contract(
-    root: Path, archive_path: Path, reference: dict[str, Any]
-) -> dict[str, Any]:
-    outer = _load_json(root / OUTER_MANIFEST_RELATIVE_PATH)
+    root: Path, archive_path: Path, reference: FrozenGoldenReference
+) -> NumericContract:
+    outer = _load_manifest(root / OUTER_MANIFEST_RELATIVE_PATH)
     entry = outer.get("golden_numeric_contract")
     if (
         not isinstance(entry, dict)
@@ -323,7 +575,7 @@ def _load_numeric_contract(
     if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
         raise ValueError("numeric contract failed size or hash verification")
     try:
-        contract = json.loads(raw.decode("utf-8"))
+        contract = _load_numeric_contract_record(path)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("numeric contract is not canonical UTF-8 JSON") from exc
     if raw != _canonical_json_bytes(contract):
@@ -422,18 +674,18 @@ def _load_numeric_contract(
 
 
 def _reference_with_numeric_contract(
-    reference: dict[str, Any], contract: dict[str, Any]
-) -> dict[str, Any]:
+    reference: FrozenGoldenReference, contract: NumericContract
+) -> FrozenGoldenReference:
     expected = copy.deepcopy(reference)
     by_id = {case["id"]: case for case in contract["cases"]}
     for row in expected["curated_golden_set"]:
-        row["outputs"] = copy.deepcopy(by_id[row["id"]]["sections"])
+        row["outputs"] = cast(JsonObject, copy.deepcopy(by_id[row["id"]]["sections"]))
         row["numeric_tolerance_policy"] = copy.deepcopy(contract["tolerance_policy"])
     return expected
 
 
 def _validate_rpy2_identities(root: Path) -> dict[str, str]:
-    outer = _load_json(root / OUTER_MANIFEST_RELATIVE_PATH)
+    outer = _load_manifest(root / OUTER_MANIFEST_RELATIVE_PATH)
     committed = outer.get("runtime_identities", {})
     expected = {
         distribution: committed.get(distribution)
@@ -459,7 +711,7 @@ def _validate_rpy2_identities(root: Path) -> dict[str, str]:
 
 
 def _compare_plot_descriptors(
-    contract: dict[str, Any], current: dict[str, Any]
+    contract: PlotDescriptorContract, current: dict[str, Any]
 ) -> list[dict[str, Any]]:
     rows = []
     current_by_id = {row["id"]: row for row in current["curated_golden_set"]}
@@ -533,9 +785,9 @@ def _validate_current_rpy2_identities(
 
 
 def _validate_case_contract(
-    reference: dict[str, Any], current: dict[str, Any], root: Path
+    reference: FrozenGoldenReference, current: dict[str, Any], root: Path
 ) -> None:
-    committed = _load_json(
+    committed = _load_capture_manifest(
         root / "tests/analysis_regression/baseline/capture-manifest.json"
     )
     expected_ids = committed["curated_golden_set"]
@@ -550,6 +802,18 @@ def _validate_case_contract(
             "curated Golden coverage must contain the same ordered 11 cases in "
             "the committed contract, frozen baseline, and current capture"
         )
+
+
+def _numeric_metric_count(contract: NumericContract) -> int:
+    count = 0
+    for case in contract["cases"]:
+        sections = case.get("sections")
+        if not isinstance(sections, dict):
+            continue
+        count += sum(
+            len(metrics) for metrics in sections.values() if isinstance(metrics, dict)
+        )
+    return count
 
 
 def verify(root: Path, output_root: Path) -> dict[str, Any]:
@@ -568,10 +832,10 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
     comparison = compare_golden_baseline(
         comparison_reference,
         current,
-        exceptions=_load_json(
+        exceptions=_load_exception_manifest(
             root / "tests/analysis_regression/baseline/exceptions.json"
         ).get("exceptions", []),
-        manifest=_load_json(
+        manifest=_load_capture_manifest(
             root / "tests/analysis_regression/baseline/capture-manifest.json"
         ),
     )
@@ -589,11 +853,7 @@ def verify(root: Path, output_root: Path) -> dict[str, Any]:
         "numeric_contract": {
             "path": NUMERIC_CONTRACT_RELATIVE_PATH,
             "sha256": _sha256(root / NUMERIC_CONTRACT_RELATIVE_PATH),
-            "metric_count": sum(
-                len(metrics)
-                for case in numeric_contract["cases"]
-                for metrics in case["sections"].values()
-            ),
+            "metric_count": _numeric_metric_count(numeric_contract),
         },
         "rpy2_identities": rpy2_identities,
         "passed": current.get("passed") is True and comparison["passed"] is True,

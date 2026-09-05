@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Run and validate the pre-codemod native macOS Qt6 feasibility proof."""
 
 from __future__ import annotations

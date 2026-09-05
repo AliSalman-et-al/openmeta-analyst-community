@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 import hashlib
 import importlib.util
 import json
@@ -12,6 +14,7 @@ import tomllib
 import pytest
 
 from scripts import qt6_build_impl as qt6_build
+from scripts import qt6_macos_feasibility_impl as macos_feasibility
 from rc_metastudio import qt6_resources
 
 
@@ -173,9 +176,7 @@ def test_rcc_wrong_version_is_rejected(official_rcc):
         qt6_build.validate_rcc(official_rcc, expected_version="6.11.0")
 
 
-def test_macos_official_rcc_requires_pinned_version_and_host_slice(
-    tmp_path, monkeypatch
-):
+def test_macos_official_rcc_requires_pinned_version_and_host_slice(tmp_path):
     rcc = tmp_path / "Qt SDK" / "libexec" / "rcc"
     rcc.parent.mkdir(parents=True)
     rcc.write_bytes(b"official macOS rcc fixture")
@@ -184,7 +185,9 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
         "architectures": "arm64",
     }
 
-    def completed(command, **_kwargs):
+    def completed(
+        command: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         stdout = (
             responses["architectures"]
             if str(command[0]).endswith("lipo")
@@ -192,19 +195,22 @@ def test_macos_official_rcc_requires_pinned_version_and_host_slice(
         )
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr(qt6_build.subprocess, "run", completed)
-    monkeypatch.setattr(qt6_build.platform, "machine", lambda: "arm64")
-
-    qt6_build.validate_macos_rcc(rcc)
+    macos_feasibility.validate_macos_rcc(
+        rcc, command_runner=completed, host_machine=lambda: "arm64"
+    )
 
     responses["version"] = "rcc 6.11.0"
     with pytest.raises(RuntimeError, match="version mismatch"):
-        qt6_build.validate_macos_rcc(rcc)
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
 
     responses["version"] = "rcc 6.11.1"
     responses["architectures"] = "x86_64"
     with pytest.raises(RuntimeError, match="invalid architecture slices"):
-        qt6_build.validate_macos_rcc(rcc)
+        macos_feasibility.validate_macos_rcc(
+            rcc, command_runner=completed, host_machine=lambda: "arm64"
+        )
 
 
 class _DownloadResponse:

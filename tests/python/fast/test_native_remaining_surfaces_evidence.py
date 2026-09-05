@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Behavioral contracts for native Qt surface evidence."""
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ from pathlib import Path
 
 import pytest
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -355,7 +356,7 @@ def test_focus_observer_does_not_accept_programmatic_fallback_after_consumed_tab
     qapp.processEvents()
     try:
         observation = native_smoke._observe_focus_traversal(
-            qapp, dialog, QtCore, QtGui, QtWidgets
+            qapp, dialog
         )
     finally:
         dialog.close()
@@ -376,9 +377,6 @@ def test_wizard_action_observer_uses_fresh_factory_choice_timing_and_return(qapp
         qapp,
         lambda: main_wizard.MainWizard(path="new_dataset"),
         "main-wizard",
-        QtCore,
-        QtWidgets,
-        QTest,
     )
 
     assert actions == {

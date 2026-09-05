@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Explicit test capability used only by developer-facing native smoke scripts."""
 
 from __future__ import annotations

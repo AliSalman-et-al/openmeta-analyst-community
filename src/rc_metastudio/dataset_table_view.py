@@ -500,24 +500,15 @@ class DatasetTableView(QtWidgets.QTableView):
             # dispatch on the data type
             form = None
             study_index = row
-            # Preserve the analysis unit so cancellation can restore it.
             analysis_unit = copy.deepcopy(
                 self.model().get_current_analysis_unit_for_study(study_index)
             )
-            old_analysis_unit = copy.deepcopy(analysis_unit)
             current_groups = self.model().current_groups
             current_effect = self.model().current_effect
             group_comparison = self.model().get_current_group_comparison()
             data_type = self.model().get_current_outcome_type()
 
-            # Preserve raw data so undo can restore it after editing.
             if data_type == "binary":
-                cur_raw_data_dict = {}
-                for group in current_groups:
-                    cur_raw_data_dict[group] = list(
-                        analysis_unit.get_raw_data_for_group(group)
-                    )
-
                 form = binary_data_dialog.BinaryDataDialog(
                     analysis_unit,
                     current_groups,
@@ -535,12 +526,6 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.synchronize_column_widths()
                     self.dataDirtied.emit()
             elif data_type == "continuous":
-                cur_raw_data_dict = {}
-                for group_name in current_groups:
-                    cur_raw_data_dict[group_name] = list(
-                        analysis_unit.get_raw_data_for_group(group_name)
-                    )
-
                 form = continuous_data_dialog.ContinuousDataDialog(
                     analysis_unit,
                     current_groups,
@@ -558,13 +543,6 @@ class DatasetTableView(QtWidgets.QTableView):
                     self.synchronize_column_widths()
                     self.dataDirtied.emit()
             else:
-                # then this is diagnostic data
-                cur_raw_data_dict = {}
-                for group in current_groups:
-                    cur_raw_data_dict[group] = list(
-                        analysis_unit.get_raw_data_for_group(group)
-                    )
-
                 form = diagnostic_data_dialog.DiagnosticDataDialog(
                     analysis_unit,
                     current_groups,

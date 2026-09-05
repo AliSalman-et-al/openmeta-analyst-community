@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build and exercise the first native Qt6 vertical slice.
 
 The generated form and binary resource live below ``build/``.  They are build
@@ -22,9 +24,7 @@ import urllib.request
 
 import py7zr
 from PyQt6 import QtCore, QtGui, QtWidgets
-from scripts.qt6_macos_feasibility_impl import (
-    validate_macos_rcc as _validate_macos_rcc,
-)
+from scripts import qt6_macos_feasibility_impl
 from rc_metastudio.ui_form_manifest import CANONICAL_FORMS
 
 
@@ -50,18 +50,6 @@ QT_RCC_PACKAGE_SHA256 = (
 QT_RCC_SHA256 = "912f4565e9486243200517be9e7e8dddc76ea63cd426278e944ba36ad8ff14e7"
 QT_RCC_CORE_SHA256 = "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
 WINDOWS_X64_PE_MACHINE = 0x8664
-
-
-def validate_macos_rcc(
-    rcc: Path, *, expected_version: str = QT_RCC_VERSION
-) -> list[str]:
-    """Compatibility re-export using this module's historically patched seams."""
-    return _validate_macos_rcc(
-        rcc,
-        expected_version=expected_version,
-        command_runner=subprocess.run,
-        host_machine=platform.machine,
-    )
 
 
 def validate_form_manifest(
@@ -270,7 +258,7 @@ def _resolve_rcc() -> Path:
         if not rcc.is_file():
             raise RuntimeError(f"RCMS_QT6_RCC does not name a file: {rcc}")
         if sys.platform == "darwin":
-            validate_macos_rcc(rcc)
+            qt6_macos_feasibility_impl.validate_macos_rcc(rcc)
         else:
             validate_rcc(rcc)
         return rcc

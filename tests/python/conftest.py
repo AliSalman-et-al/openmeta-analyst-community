@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Local boundary doubles for Python application tests.
 
 The real R bridge is exercised by ``tests/r_stack``.  Application tests inject

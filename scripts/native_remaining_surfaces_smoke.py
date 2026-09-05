@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture and validate the remaining native Qt6 top-level surfaces."""
 
 from __future__ import annotations
@@ -762,7 +764,6 @@ def _widget_identity(window: QtWidgets.QWidget, widget: QtWidgets.QWidget | None
 def _observe_focus_traversal(
     app: QtWidgets.QApplication,
     window: QtWidgets.QWidget,
-    *_legacy_qt_modules: object,
 ) -> dict[str, object]:
     focusables = _focusable_widgets(window)
     if not focusables:
@@ -1105,7 +1106,6 @@ def _observe_actions(
     app: QtWidgets.QApplication,
     factory: SurfaceFactory,
     surface_id: str,
-    *_legacy_qt_modules: object,
 ) -> dict[str, object]:
     contract = ACTION_CONTRACTS[surface_id]
     if contract == "none":
