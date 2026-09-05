@@ -102,10 +102,10 @@ def test_both_native_packages_use_the_positional_startup_transition():
     trust = (ROOT / "scripts/sign-notarize-macos-artifact.sh").read_text(
         encoding="utf-8"
     )
-    assert "--automation-startup-wizard-smoke" not in build
+    assert "startup-wizard-smoke" not in build
     assert 'qualify_signed_app "developer-id"' in trust
     assert 'qualify_signed_app "notarized"' in trust
-    assert "--automation-startup-wizard-smoke" not in trust
+    assert "startup-wizard-smoke" not in trust
 
 
 def test_source_r_packages_link_against_the_private_staged_runtime():

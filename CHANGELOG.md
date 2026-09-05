@@ -18,6 +18,7 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 ### Fixed
 
+- Removed the obsolete startup-wizard record from the macOS archive contract after qualification moved to normal project startup.
 - Captured the initial macOS packaged workflow logs and initialized its hang trace before provenance assembly.
 - Kept macOS packaged evidence assembly on the same bundled-R and Qt runtime contract as the probes it repeats.
 - Made normal macOS app-entry evidence record the validated Cocoa process and post-close state.
