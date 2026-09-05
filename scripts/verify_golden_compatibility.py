@@ -170,56 +170,54 @@ def _narrow_json(value: object) -> JsonValue:
 
 
 def _load_manifest(path: Path) -> RepositoryManifest:
-    value = _load_json(path)
-    record = _json_object(value, "JSON manifest must contain an object")
+    record = _json_object(_load_json(path), "JSON manifest must contain an object")
     result: RepositoryManifest = {}
+    _load_manifest_schema(record, result)
+    _load_manifest_entries(record, result)
+    _load_manifest_identities(record, result)
+    return result
+
+
+def _load_manifest_schema(record: JsonObject, result: RepositoryManifest) -> None:
     schema_version = record.get("schema_version")
-    if schema_version is not None:
-        if not isinstance(schema_version, int) or isinstance(schema_version, bool):
-            raise ValueError("JSON manifest schema version must be an integer")
-        result["schema_version"] = schema_version
+    if schema_version is None:
+        return
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool):
+        raise ValueError("JSON manifest schema version must be an integer")
+    result["schema_version"] = schema_version
+
+
+def _load_manifest_entries(record: JsonObject, result: RepositoryManifest) -> None:
     for field in (
         "observed_golden_analysis_bundle",
         "golden_plot_descriptor_contract",
         "golden_numeric_contract",
     ):
-        if field in record:
-            result[field] = _manifest_entry(record[field])
+        value = record.get(field)
+        if value is not None:
+            result[field] = _manifest_entry(value)
+
+
+def _load_manifest_identities(record: JsonObject, result: RepositoryManifest) -> None:
     identities = record.get("runtime_identities")
-    if identities is not None:
-        identity_record = _json_object(
-            identities, "runtime identities must contain an object"
-        )
-        result["runtime_identities"] = {
-            name: identity
-            for name, identity in identity_record.items()
-            if isinstance(identity, str)
-        }
-        if len(result["runtime_identities"]) != len(identity_record):
-            raise ValueError("runtime identities must contain only strings")
-    return result
+    if identities is None:
+        return
+    identity_record = _json_object(identities, "runtime identities must contain an object")
+    if not all(isinstance(identity, str) for identity in identity_record.values()):
+        raise ValueError("runtime identities must contain only strings")
+    result["runtime_identities"] = {
+        name: identity for name, identity in identity_record.items() if isinstance(identity, str)
+    }
 
 
 def _load_plot_contract(path: Path) -> PlotDescriptorContract:
     record = _json_object(_load_json(path), "plot descriptor contract must contain an object")
-    rows = record.get("rows")
-    if not isinstance(rows, list):
-        raise ValueError("plot descriptor contract rows must contain objects")
-    row_records: list[JsonObject] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            raise ValueError("plot descriptor contract rows must contain objects")
-        row_records.append(row)
-    result: PlotDescriptorContract = {"rows": row_records}
-    for field in ("schema_version", "contract", "oracle_sha256"):
-        value = record.get(field)
-        if field == "schema_version" and isinstance(value, int):
-            result[field] = value
-        elif field != "schema_version" and isinstance(value, str):
-            result[field] = value
-        else:
-            raise ValueError("plot descriptor contract has an invalid field")
-    return result
+    return {
+        "rows": _json_object_list(record.get("rows"), "plot descriptor contract rows must contain objects"),
+        "schema_version": _required_int(record, "schema_version", "plot descriptor contract has an invalid field"),
+        "contract": _required_string(record, "contract", "plot descriptor contract has an invalid field"),
+        "oracle_sha256": _required_string(record, "oracle_sha256", "plot descriptor contract has an invalid field"),
+    }
 
 
 def _load_numeric_contract_record(path: Path) -> NumericContract:
@@ -229,30 +227,40 @@ def _load_numeric_contract_record(path: Path) -> NumericContract:
     coverage = record.get("coverage")
     if not isinstance(cases, list) or not isinstance(tolerance, dict) or not isinstance(coverage, dict):
         raise ValueError("numeric contract has invalid record shapes")
-    case_records: list[NumericCase] = [_numeric_case(case) for case in cases]
-    coverage_records: dict[str, JsonObject] = {}
-    for name, value in coverage.items():
-        if not isinstance(value, dict):
-            raise ValueError("numeric contract coverage must contain objects")
-        coverage_records[name] = value
-    schema_version = record.get("schema_version")
-    contract_name = record.get("contract")
-    oracle_sha256 = record.get("oracle_sha256")
-    if (
-        not isinstance(schema_version, int)
-        or isinstance(schema_version, bool)
-        or not isinstance(contract_name, str)
-        or not isinstance(oracle_sha256, str)
-    ):
-        raise ValueError("numeric contract has invalid identity fields")
     return {
-        "schema_version": schema_version,
-        "contract": contract_name,
-        "oracle_sha256": oracle_sha256,
-        "cases": case_records,
+        "schema_version": _required_int(record, "schema_version", "numeric contract has invalid identity fields"),
+        "contract": _required_string(record, "contract", "numeric contract has invalid identity fields"),
+        "oracle_sha256": _required_string(record, "oracle_sha256", "numeric contract has invalid identity fields"),
+        "cases": [_numeric_case(case) for case in cases],
         "tolerance_policy": tolerance,
-        "coverage": coverage_records,
+        "coverage": _json_object_map(coverage, "numeric contract coverage must contain objects"),
     }
+
+
+def _required_int(record: JsonObject, name: str, message: str) -> int:
+    value = record.get(name)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(message)
+    return value
+
+
+def _required_string(record: JsonObject, name: str, message: str) -> str:
+    value = record.get(name)
+    if not isinstance(value, str):
+        raise ValueError(message)
+    return value
+
+
+def _json_object_list(value: JsonValue | None, message: str) -> list[JsonObject]:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(message)
+    return value
+
+
+def _json_object_map(value: JsonValue, message: str) -> dict[str, JsonObject]:
+    if not isinstance(value, dict) or not all(isinstance(item, dict) for item in value.values()):
+        raise ValueError(message)
+    return value
 
 
 def _load_capture_manifest(path: Path) -> CaptureManifest:
@@ -386,50 +394,43 @@ def _prepare_output_root(root: Path, requested: Path) -> Path:
 
 
 def _validate_internal_manifest(reference: JsonValue) -> FrozenGoldenReference:
-    if not isinstance(reference, dict):
+    record = _json_object(reference, "frozen internal manifest has the wrong schema")
+    if record.get("baseline") != "comprehensive-golden":
         raise ValueError("frozen internal manifest has the wrong schema")
-    if reference.get("baseline") != "comprehensive-golden":
-        raise ValueError("frozen internal manifest has the wrong schema")
-    rows = reference.get("curated_golden_set")
+    rows = record.get("curated_golden_set")
     if not isinstance(rows, list) or len(rows) != 11:
         raise ValueError("frozen internal manifest must contain exactly 11 cases")
-    ids = []
-    typed_rows: list[GoldenCase] = []
-    for raw_row in rows:
-        if not isinstance(raw_row, dict):
-            raise ValueError("frozen case is malformed or unsuccessful")
-        status = raw_row.get("status")
-        if status != "success":
-            raise ValueError("frozen case is malformed or unsuccessful")
-        row_id = raw_row.get("id")
-        if (
-            not isinstance(row_id, str)
-            or not row_id
-            or any(
-                character not in "abcdefghijklmnopqrstuvwxyz0123456789-"
-                for character in row_id
-            )
-        ):
-            raise ValueError("frozen case id is unsafe")
-        ids.append(row_id)
-        texts = _text_sections(raw_row.get("texts"))
-        if len(texts) > 16:
-            raise ValueError("frozen text contract is malformed")
-        outputs = _numeric_sections(raw_row.get("outputs"))
-        if len(outputs) > 16:
-            raise ValueError("frozen numeric contract is malformed")
-        artifacts = _validate_golden_artifacts(raw_row.get("artifacts"))
-        if len(artifacts) > 4:
-            raise ValueError("frozen artifact contract is malformed")
-        typed_rows.append(
-            cast(
-                GoldenCase,
-                {**raw_row, "texts": texts, "outputs": outputs, "artifacts": artifacts},
-            )
-        )
+    typed_rows = [_validate_internal_case(raw_row) for raw_row in rows]
+    ids = [row["id"] for row in typed_rows]
     if len(set(ids)) != len(ids):
         raise ValueError("frozen case ids are duplicated")
     return {"baseline": "comprehensive-golden", "curated_golden_set": typed_rows}
+
+
+def _validate_internal_case(value: JsonValue) -> GoldenCase:
+    row = _json_object(value, "frozen case is malformed or unsuccessful")
+    if row.get("status") != "success":
+        raise ValueError("frozen case is malformed or unsuccessful")
+    row_id = row.get("id")
+    if not isinstance(row_id, str) or not row_id or not _safe_case_id(row_id):
+        raise ValueError("frozen case id is unsafe")
+    texts = _text_sections(row.get("texts"))
+    outputs = _numeric_sections(row.get("outputs"))
+    artifacts = _validate_golden_artifacts(row.get("artifacts"))
+    if len(texts) > 16:
+        raise ValueError("frozen text contract is malformed")
+    if len(outputs) > 16:
+        raise ValueError("frozen numeric contract is malformed")
+    if len(artifacts) > 4:
+        raise ValueError("frozen artifact contract is malformed")
+    return cast(
+        GoldenCase,
+        {**row, "texts": texts, "outputs": outputs, "artifacts": artifacts},
+    )
+
+
+def _safe_case_id(value: str) -> bool:
+    return all(character in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in value)
 
 
 def _text_sections(value: JsonValue | None) -> TextSections:
@@ -494,71 +495,92 @@ def _validate_member_name(name: str) -> None:
 
 def _read_validated_zip(archive_path: Path) -> FrozenGoldenReference:
     with zipfile.ZipFile(archive_path) as archive:
-        infos = archive.infolist()
-        if not infos or len(infos) > MAX_MEMBER_COUNT:
-            raise ValueError("frozen ZIP member count is outside the allowed bounds")
-        names = []
-        total = 0
-        for info in infos:
-            _validate_member_name(info.filename)
-            if info.is_dir() or info.flag_bits & 0x1:
-                raise ValueError("frozen ZIP contains a directory or encrypted member")
-            if info.file_size > MAX_MEMBER_BYTES:
-                raise ValueError("frozen ZIP member exceeds the size bound")
-            total += info.file_size
-            names.append(info.filename)
-        if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
-            raise ValueError("frozen ZIP exceeds the uncompressed size bound")
-        if len(set(name.casefold() for name in names)) != len(names):
-            raise ValueError("frozen ZIP contains duplicate member names")
-        if "manifest.json" not in names:
-            raise ValueError("frozen ZIP has no internal manifest")
-        reference = _validate_internal_manifest(
-            _parse_json_bytes(archive.read("manifest.json"))
-        )
-        expected_members = {"manifest.json"}
-        for row in reference["curated_golden_set"]:
-            capture_member = "captures/%s.json" % row["id"]
-            expected_members.add(capture_member)
-            if capture_member not in names:
-                raise ValueError("frozen case capture is missing")
-            if _parse_json_bytes(archive.read(capture_member)) != row:
-                raise ValueError("frozen internal manifest and case capture disagree")
-            for artifact in row["artifacts"]:
-                basename = Path(
-                    str(artifact.get("bundle_path") or artifact.get("path"))
-                ).name
-                member = "artifacts/%s/%s" % (row["id"], basename)
-                expected_members.add(member)
-                if member not in names:
-                    raise ValueError("frozen artifact is missing: %s" % member)
-                observed = hashlib.sha256(archive.read(member)).hexdigest()
-                if observed != artifact.get("sha256"):
-                    raise ValueError("frozen artifact hash mismatch: %s" % member)
+        names = _validated_zip_names(archive.infolist())
+        reference = _validate_zip_manifest(archive, names)
+        expected_members = _validate_zip_cases(archive, names, reference)
         if set(names) != expected_members:
             raise ValueError("frozen ZIP contains missing or unexpected members")
         return reference
 
 
+def _validated_zip_names(infos: list[zipfile.ZipInfo]) -> list[str]:
+    if not infos or len(infos) > MAX_MEMBER_COUNT:
+        raise ValueError("frozen ZIP member count is outside the allowed bounds")
+    names = []
+    total = 0
+    for info in infos:
+        _validate_zip_info(info)
+        names.append(info.filename)
+        total += info.file_size
+    if total > MAX_TOTAL_UNCOMPRESSED_BYTES:
+        raise ValueError("frozen ZIP exceeds the uncompressed size bound")
+    if len({name.casefold() for name in names}) != len(names):
+        raise ValueError("frozen ZIP contains duplicate member names")
+    return names
+
+
+def _validate_zip_info(info: zipfile.ZipInfo) -> None:
+    _validate_member_name(info.filename)
+    if info.is_dir() or info.flag_bits & 0x1:
+        raise ValueError("frozen ZIP contains a directory or encrypted member")
+    if info.file_size > MAX_MEMBER_BYTES:
+        raise ValueError("frozen ZIP member exceeds the size bound")
+
+
+def _validate_zip_manifest(
+    archive: zipfile.ZipFile, names: list[str]
+) -> FrozenGoldenReference:
+    if "manifest.json" not in names:
+        raise ValueError("frozen ZIP has no internal manifest")
+    return _validate_internal_manifest(_parse_json_bytes(archive.read("manifest.json")))
+
+
+def _validate_zip_cases(
+    archive: zipfile.ZipFile, names: list[str], reference: FrozenGoldenReference
+) -> set[str]:
+    expected_members = {"manifest.json"}
+    for row in reference["curated_golden_set"]:
+        _validate_zip_capture(archive, names, row)
+        expected_members.add("captures/%s.json" % row["id"])
+        for artifact in row["artifacts"]:
+            expected_members.add(_validate_zip_artifact(archive, names, row, artifact))
+    return expected_members
+
+
+def _validate_zip_capture(
+    archive: zipfile.ZipFile, names: list[str], row: GoldenCase
+) -> None:
+    member = "captures/%s.json" % row["id"]
+    if member not in names:
+        raise ValueError("frozen case capture is missing")
+    if _parse_json_bytes(archive.read(member)) != row:
+        raise ValueError("frozen internal manifest and case capture disagree")
+
+
+def _validate_zip_artifact(
+    archive: zipfile.ZipFile,
+    names: list[str],
+    row: GoldenCase,
+    artifact: GoldenArtifact,
+) -> str:
+    basename = Path(artifact["bundle_path"] or artifact["path"]).name
+    member = "artifacts/%s/%s" % (row["id"], basename)
+    if member not in names:
+        raise ValueError("frozen artifact is missing: %s" % member)
+    observed = hashlib.sha256(archive.read(member)).hexdigest()
+    if observed != artifact["sha256"]:
+        raise ValueError("frozen artifact hash mismatch: %s" % member)
+    return member
+
+
 def _load_frozen_reference(root: Path) -> tuple[Path, FrozenGoldenReference]:
     outer_path = (root / OUTER_MANIFEST_RELATIVE_PATH).resolve(strict=True)
     outer = _load_manifest(outer_path)
-    entry = outer.get("observed_golden_analysis_bundle")
-    if (
-        outer.get("schema_version") != 1
-        or not isinstance(entry, dict)
-        or entry.get("path") != str(ARCHIVE_RELATIVE_PATH)
-        or not isinstance(entry.get("size"), int)
-        or not 0 < entry["size"] <= MAX_ARCHIVE_BYTES
-        or not isinstance(entry.get("sha256"), str)
-        or len(entry["sha256"]) != 64
-    ):
+    if outer.get("schema_version") != 1:
         raise ValueError("outer Golden manifest contract is malformed")
-    archive_path = (root / Path(*ARCHIVE_RELATIVE_PATH.parts)).resolve(strict=True)
-    expected_path = (root / Path(*ARCHIVE_RELATIVE_PATH.parts)).absolute()
-    if archive_path != expected_path or not archive_path.is_file():
-        raise ValueError("frozen archive is not the exact committed regular file")
-    _assert_plain_path(archive_path)
+    entry = _required_manifest_entry(outer, "observed_golden_analysis_bundle")
+    _validate_archive_entry(entry)
+    archive_path = _exact_committed_path(root, entry["path"], "frozen archive")
     if archive_path.stat().st_size != entry["size"]:
         raise ValueError("frozen archive size does not match the outer manifest")
     if _sha256(archive_path) != entry["sha256"]:
@@ -566,58 +588,83 @@ def _load_frozen_reference(root: Path) -> tuple[Path, FrozenGoldenReference]:
     return archive_path, _read_validated_zip(archive_path)
 
 
+def _required_manifest_entry(manifest: RepositoryManifest, name: str) -> ManifestEntry:
+    entry = manifest.get(name)
+    if not isinstance(entry, dict):
+        raise ValueError("outer Golden manifest contract is malformed")
+    return entry
+
+
+def _validate_archive_entry(entry: ManifestEntry) -> None:
+    if (
+        entry.get("path") != str(ARCHIVE_RELATIVE_PATH)
+        or not 0 < entry["size"] <= MAX_ARCHIVE_BYTES
+        or len(entry["sha256"]) != 64
+    ):
+        raise ValueError("outer Golden manifest contract is malformed")
+
+
+def _exact_committed_path(root: Path, relative: str, label: str) -> Path:
+    path = (root / relative).resolve(strict=True)
+    if path != (root / relative).absolute() or not path.is_file():
+        raise ValueError("%s is not the exact committed regular file" % label)
+    _assert_plain_path(path)
+    return path
+
+
 def _load_plot_descriptor_contract(
     root: Path, archive_path: Path, reference: FrozenGoldenReference
 ) -> PlotDescriptorContract:
     outer = _load_manifest(root / OUTER_MANIFEST_RELATIVE_PATH)
-    entry = outer.get("golden_plot_descriptor_contract")
     expected_relative = "tests/analysis_regression/baseline/plot-descriptors.json"
-    if (
-        not isinstance(entry, dict)
-        or entry.get("path") != expected_relative
-        or not isinstance(entry.get("size"), int)
-        or not 0 < entry["size"] < 65536
-        or not isinstance(entry.get("sha256"), str)
-        or len(entry["sha256"]) != 64
-    ):
-        raise ValueError("plot descriptor outer contract is malformed")
-    path = (root / expected_relative).resolve(strict=True)
-    if path != (root / expected_relative).absolute() or not path.is_file():
-        raise ValueError("plot descriptor contract is not the exact committed file")
-    _assert_plain_path(path)
+    entry = _required_manifest_entry(outer, "golden_plot_descriptor_contract")
+    _validate_plot_entry(entry, expected_relative)
+    path = _exact_committed_path(root, expected_relative, "plot descriptor contract")
     if path.stat().st_size != entry["size"] or _sha256(path) != entry["sha256"]:
         raise ValueError("plot descriptor contract failed size or hash verification")
     contract = _load_plot_contract(path)
-    rows = contract.get("rows")
-    if (
-        contract.get("schema_version") != 1
-        or contract.get("contract") != "golden-plot-descriptors"
-        or contract.get("oracle_sha256") != _sha256(archive_path)
-        or not isinstance(rows, list)
-        or len(rows) != 11
-    ):
+    rows = contract["rows"]
+    if contract["schema_version"] != 1 or contract["contract"] != "golden-plot-descriptors":
         raise ValueError("plot descriptor contract schema or oracle binding is invalid")
+    if contract["oracle_sha256"] != _sha256(archive_path) or len(rows) != 11:
+        raise ValueError("plot descriptor contract schema or oracle binding is invalid")
+    _validate_plot_descriptor_rows(rows, reference)
+    return contract
+
+
+def _validate_plot_entry(entry: ManifestEntry, expected_relative: str) -> None:
+    if (
+        entry["path"] != expected_relative
+        or not 0 < entry["size"] < 65536
+        or len(entry["sha256"]) != 64
+    ):
+        raise ValueError("plot descriptor outer contract is malformed")
+
+
+def _validate_plot_descriptor_rows(
+    rows: list[JsonObject], reference: FrozenGoldenReference
+) -> None:
     reference_by_id = {row["id"]: row for row in reference["curated_golden_set"]}
     seen = set()
     for row in rows:
-        row_id = row.get("id")
-        if row_id in seen or row_id not in reference_by_id:
-            raise ValueError("plot descriptor contract case set is invalid")
-        seen.add(row_id)
-        artifacts = {
-            artifact["label"]: artifact
-            for artifact in reference_by_id[row_id]["artifacts"]
-        }
-        label = row.get("artifact_label")
-        if label not in artifacts or row.get("artifact_oracle_sha256") != artifacts[
-            label
-        ].get("sha256"):
-            raise ValueError(
-                "plot descriptor is not tied to its frozen artifact oracle"
-            )
+        _validate_plot_descriptor_row(row, reference_by_id, seen)
     if seen != set(reference_by_id):
         raise ValueError("plot descriptor contract is missing cases")
-    return contract
+
+
+def _validate_plot_descriptor_row(
+    row: JsonObject, reference_by_id: dict[str, GoldenCase], seen: set[str]
+) -> None:
+    row_id = row.get("id")
+    if not isinstance(row_id, str) or row_id in seen or row_id not in reference_by_id:
+        raise ValueError("plot descriptor contract case set is invalid")
+    seen.add(row_id)
+    artifacts = {artifact["label"]: artifact for artifact in reference_by_id[row_id]["artifacts"]}
+    label = row.get("artifact_label")
+    if not isinstance(label, str) or label not in artifacts:
+        raise ValueError("plot descriptor is not tied to its frozen artifact oracle")
+    if row.get("artifact_oracle_sha256") != artifacts[label]["sha256"]:
+        raise ValueError("plot descriptor is not tied to its frozen artifact oracle")
 
 
 def _canonical_json_bytes(value: object) -> bytes:
@@ -640,20 +687,9 @@ def _load_numeric_contract(
     root: Path, archive_path: Path, reference: FrozenGoldenReference
 ) -> NumericContract:
     outer = _load_manifest(root / OUTER_MANIFEST_RELATIVE_PATH)
-    entry = outer.get("golden_numeric_contract")
-    if (
-        not isinstance(entry, dict)
-        or entry.get("path") != NUMERIC_CONTRACT_RELATIVE_PATH
-        or not isinstance(entry.get("size"), int)
-        or not 0 < entry["size"] <= MAX_NUMERIC_CONTRACT_BYTES
-        or not isinstance(entry.get("sha256"), str)
-        or len(entry["sha256"]) != 64
-    ):
-        raise ValueError("numeric outer contract is malformed")
-    path = (root / NUMERIC_CONTRACT_RELATIVE_PATH).resolve(strict=True)
-    if path != (root / NUMERIC_CONTRACT_RELATIVE_PATH).absolute() or not path.is_file():
-        raise ValueError("numeric contract is not the exact committed file")
-    _assert_plain_path(path)
+    entry = _required_manifest_entry(outer, "golden_numeric_contract")
+    _validate_numeric_entry(entry)
+    path = _exact_committed_path(root, NUMERIC_CONTRACT_RELATIVE_PATH, "numeric contract")
     raw = path.read_bytes()
     if len(raw) != entry["size"] or hashlib.sha256(raw).hexdigest() != entry["sha256"]:
         raise ValueError("numeric contract failed size or hash verification")
@@ -664,18 +700,35 @@ def _load_numeric_contract(
     if raw != _canonical_json_bytes(contract):
         raise ValueError("numeric contract is not canonically serialized")
 
-    cases = contract.get("cases")
-    tolerance = contract.get("tolerance_policy")
+    _validate_numeric_identity(contract, archive_path)
+    _validate_numeric_tolerance(contract["tolerance_policy"])
+    _validate_numeric_cases(contract, reference)
+    return contract
+
+
+def _validate_numeric_entry(entry: ManifestEntry) -> None:
     if (
-        contract.get("schema_version") != 1
-        or contract.get("contract") != "golden-numeric-results"
-        or contract.get("oracle_sha256") != _sha256(archive_path)
-        or not isinstance(cases, list)
-        or len(cases) != 11
-        or not isinstance(tolerance, dict)
-        or set(tolerance) != {"absolute", "relative", "rule"}
-        or tolerance.get("rule") != "max(absolute, relative * abs(expected))"
+        entry["path"] != NUMERIC_CONTRACT_RELATIVE_PATH
+        or not 0 < entry["size"] <= MAX_NUMERIC_CONTRACT_BYTES
+        or len(entry["sha256"]) != 64
     ):
+        raise ValueError("numeric outer contract is malformed")
+
+
+def _validate_numeric_identity(contract: NumericContract, archive_path: Path) -> None:
+    if (
+        contract["schema_version"] != 1
+        or contract["contract"] != "golden-numeric-results"
+        or contract["oracle_sha256"] != _sha256(archive_path)
+        or len(contract["cases"]) != 11
+    ):
+        raise ValueError("numeric contract schema or oracle binding is invalid")
+
+
+def _validate_numeric_tolerance(tolerance: JsonObject) -> None:
+    if set(tolerance) != {"absolute", "relative", "rule"} or tolerance.get(
+        "rule"
+    ) != "max(absolute, relative * abs(expected))":
         raise ValueError("numeric contract schema or oracle binding is invalid")
     for name in ("absolute", "relative"):
         value = tolerance.get(name)
@@ -687,73 +740,95 @@ def _load_numeric_contract(
         ):
             raise ValueError("numeric tolerance policy is invalid")
 
+
+def _validate_numeric_cases(
+    contract: NumericContract, reference: FrozenGoldenReference
+) -> None:
     reference_rows = reference["curated_golden_set"]
     expected_ids = [row["id"] for row in reference_rows]
-    if [case.get("id") for case in cases] != expected_ids:
+    cases = contract["cases"]
+    if [case["id"] for case in cases] != expected_ids:
         raise ValueError("numeric contract case order or coverage is invalid")
-    coverage = contract.get("coverage")
-    if not isinstance(coverage, dict) or set(coverage) != set(expected_ids):
+    coverage = contract.get("coverage", {})
+    if set(coverage) != set(expected_ids):
         raise ValueError("numeric contract coverage map is invalid")
     for case, frozen in zip(cases, reference_rows):
-        sections = case.get("sections")
-        omissions = case.get("nonnumeric_omissions")
-        if (
-            not isinstance(sections, dict)
-            or not sections
-            or len(sections) > 8
-            or not isinstance(omissions, list)
-            or not omissions
-            or len(omissions) > 8
-        ):
-            raise ValueError("numeric case sections or omissions are malformed")
-        derived_coverage = {}
-        for section, metrics in sections.items():
-            if (
-                not isinstance(section, str)
-                or not section
-                or section not in frozen["texts"]
-                or not isinstance(metrics, dict)
-                or not metrics
-                or len(metrics) > 256
-            ):
-                raise ValueError("numeric section coverage is invalid")
-            metric_names = []
-            for metric, value in metrics.items():
-                if (
-                    not isinstance(metric, str)
-                    or not metric
-                    or len(metric) > 128
-                    or any(
-                        character not in "abcdefghijklmnopqrstuvwxyz0123456789_."
-                        for character in metric
-                    )
-                    or isinstance(value, bool)
-                    or not isinstance(value, (int, float))
-                    or not math.isfinite(value)
-                    or abs(value) > 1_000_000
-                ):
-                    raise ValueError("numeric metric contract is invalid")
-                metric_names.append(metric)
-            derived_coverage[section] = sorted(metric_names)
-        if coverage[case["id"]] != derived_coverage:
-            raise ValueError("numeric case-section-metric coverage drifted")
-        omitted_sections = set()
-        for omission in omissions:
-            if (
-                not isinstance(omission, dict)
-                or set(omission) != {"reason", "section", "target"}
-                or omission.get("section") not in frozen["texts"]
-                or not isinstance(omission.get("target"), str)
-                or not omission["target"]
-                or not isinstance(omission.get("reason"), str)
-                or not 10 <= len(omission["reason"]) <= 300
-            ):
-                raise ValueError("nonnumeric omission is not explicit or justified")
-            if omission["target"] == "entire_section":
-                omitted_sections.add(omission["section"])
-        if set(frozen["texts"]) != set(sections) | omitted_sections:
-            raise ValueError("numeric contract does not account for every text section")
-    return contract
+        _validate_numeric_case(case, frozen, coverage[case["id"]])
+
+
+def _validate_numeric_case(
+    case: NumericCase, frozen: GoldenCase, expected_coverage: JsonObject
+) -> None:
+    sections = case["sections"]
+    omissions = case["nonnumeric_omissions"]
+    if not sections or len(sections) > 8 or not omissions or len(omissions) > 8:
+        raise ValueError("numeric case sections or omissions are malformed")
+    derived_coverage = _numeric_case_coverage(sections, frozen)
+    if expected_coverage != derived_coverage:
+        raise ValueError("numeric case-section-metric coverage drifted")
+    omitted_sections = _numeric_omitted_sections(omissions, frozen)
+    if set(frozen["texts"]) != set(sections) | omitted_sections:
+        raise ValueError("numeric contract does not account for every text section")
+
+
+def _numeric_case_coverage(
+    sections: NumericSections, frozen: GoldenCase
+) -> JsonObject:
+    coverage: JsonObject = {}
+    for section, metrics in sections.items():
+        _validate_numeric_section(section, metrics, frozen)
+        coverage[section] = sorted(metrics)
+    return coverage
+
+
+def _validate_numeric_section(
+    section: str, metrics: JsonObject, frozen: GoldenCase
+) -> None:
+    if not section or section not in frozen["texts"] or not metrics or len(metrics) > 256:
+        raise ValueError("numeric section coverage is invalid")
+    for metric, value in metrics.items():
+        if not _valid_numeric_metric(metric, value):
+            raise ValueError("numeric metric contract is invalid")
+
+
+def _valid_numeric_metric(metric: str, value: JsonValue) -> bool:
+    return (
+        bool(metric)
+        and len(metric) <= 128
+        and all(character in "abcdefghijklmnopqrstuvwxyz0123456789_." for character in metric)
+        and not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(value)
+        and abs(value) <= 1_000_000
+    )
+
+
+def _numeric_omitted_sections(
+    omissions: list[JsonObject], frozen: GoldenCase
+) -> set[str]:
+    omitted_sections: set[str] = set()
+    for omission in omissions:
+        _validate_numeric_omission(omission, frozen)
+        section = omission["section"]
+        if omission["target"] == "entire_section" and isinstance(section, str):
+            omitted_sections.add(section)
+    return omitted_sections
+
+
+def _validate_numeric_omission(omission: JsonObject, frozen: GoldenCase) -> None:
+    section = omission.get("section")
+    target = omission.get("target")
+    reason = omission.get("reason")
+    if (
+        set(omission) != {"reason", "section", "target"}
+        or section not in frozen["texts"]
+        or not isinstance(section, str)
+        or not isinstance(target, str)
+        or not target
+        or not isinstance(reason, str)
+        or not 10 <= len(reason) <= 300
+    ):
+        raise ValueError("nonnumeric omission is not explicit or justified")
 
 
 def _reference_with_numeric_contract(
@@ -798,70 +873,84 @@ def _validate_rpy2_identities(root: Path) -> dict[str, str]:
 def _compare_plot_descriptors(
     contract: PlotDescriptorContract, current: GoldenCaptureBase
 ) -> list[JsonObject]:
-    rows = []
-    current_by_id: dict[str, JsonObject] = {}
+    current_by_id = _current_cases_by_id(current)
+    return [_compare_plot_row(expected, current_by_id) for expected in contract["rows"]]
+
+
+def _current_cases_by_id(current: GoldenCaptureBase) -> dict[str, JsonObject]:
+    result: dict[str, JsonObject] = {}
     for row in current["curated_golden_set"]:
         case_id = row.get("id")
         if isinstance(case_id, str):
-            current_by_id[case_id] = row
-    for expected in contract["rows"]:
-        case_id = expected.get("id")
-        if not isinstance(case_id, str):
-            raise ValueError("plot descriptor contract case id is malformed")
-        current_case = current_by_id.get(case_id, {})
-        actual_descriptors = current_case.get("plot_descriptors", [])
-        if not isinstance(actual_descriptors, list):
-            actual_descriptors = []
-        actual_by_label = {
-            descriptor["artifact_label"]: descriptor
-            for descriptor in actual_descriptors
-            if isinstance(descriptor, dict)
-            and isinstance(descriptor.get("artifact_label"), str)
-        }
-        expected_label = expected.get("artifact_label")
-        if not isinstance(expected_label, str):
-            raise ValueError("plot descriptor contract artifact label is malformed")
-        actual = actual_by_label.get(expected_label)
-        passed = actual is not None
-        detail = "Plot descriptor matched the committed oracle-bound contract."
-        if actual is None:
-            detail = "Required plot descriptor is missing."
-        else:
-            display = actual.get("display")
-            if not isinstance(display, dict):
-                display = {}
-            projected_display = {
-                "content_required": bool(display.get("sha256")),
-                "identity": display.get("identity"),
-                "name": display.get("name"),
-                "type": display.get("type"),
-            }
-            sha256 = display.get("sha256")
-            passed = (
-                projected_display == expected.get("display")
-                and actual.get("capability") == expected.get("capability")
-                and isinstance(sha256, str)
-                and len(sha256) == 64
-                and all(character in "0123456789abcdef" for character in sha256)
-            )
-            if not passed:
-                detail = "Display identity/content or plot capability metadata drifted."
-        if len(actual_descriptors) != len(actual_by_label) or set(actual_by_label) - {
-            expected_label
-        }:
-            passed = False
-            detail = "Unexpected plot descriptors were produced."
-        rows.append(
-            {
-                "classification": "pass" if passed else "text_artifact_drift",
-                "dataset": current_case.get("dataset"),
-                "detail": detail,
-                "id": case_id,
-                "method": current_case.get("method"),
-                "metric": current_case.get("metric"),
-            }
-        )
-    return rows
+            result[case_id] = row
+    return result
+
+
+def _compare_plot_row(
+    expected: JsonObject, current_by_id: dict[str, JsonObject]
+) -> JsonObject:
+    case_id = expected.get("id")
+    if not isinstance(case_id, str):
+        raise ValueError("plot descriptor contract case id is malformed")
+    current_case = current_by_id.get(case_id, {})
+    expected_label = expected.get("artifact_label")
+    if not isinstance(expected_label, str):
+        raise ValueError("plot descriptor contract artifact label is malformed")
+    actual_descriptors = _plot_descriptors(current_case)
+    actual_by_label = _descriptors_by_label(actual_descriptors)
+    passed, detail = _plot_observation(expected, expected_label, actual_by_label)
+    if len(actual_descriptors) != len(actual_by_label) or set(actual_by_label) - {expected_label}:
+        passed, detail = False, "Unexpected plot descriptors were produced."
+    return {
+        "classification": "pass" if passed else "text_artifact_drift",
+        "dataset": current_case.get("dataset"),
+        "detail": detail,
+        "id": case_id,
+        "method": current_case.get("method"),
+        "metric": current_case.get("metric"),
+    }
+
+
+def _plot_descriptors(current_case: JsonObject) -> list[JsonObject]:
+    value = current_case.get("plot_descriptors", [])
+    return value if isinstance(value, list) and all(isinstance(item, dict) for item in value) else []
+
+
+def _descriptors_by_label(descriptors: list[JsonObject]) -> dict[str, JsonObject]:
+    return {
+        label: descriptor
+        for descriptor in descriptors
+        if isinstance((label := descriptor.get("artifact_label")), str)
+    }
+
+
+def _plot_observation(
+    expected: JsonObject,
+    expected_label: str,
+    actual_by_label: dict[str, JsonObject],
+) -> tuple[bool, str]:
+    actual = actual_by_label.get(expected_label)
+    if actual is None:
+        return False, "Required plot descriptor is missing."
+    display = actual.get("display")
+    display = display if isinstance(display, dict) else {}
+    projected_display = {
+        "content_required": bool(display.get("sha256")),
+        "identity": display.get("identity"),
+        "name": display.get("name"),
+        "type": display.get("type"),
+    }
+    sha256 = display.get("sha256")
+    valid_hash = (
+        isinstance(sha256, str)
+        and len(sha256) == 64
+        and all(character in "0123456789abcdef" for character in sha256)
+    )
+    passed = projected_display == expected.get("display") and actual.get("capability") == expected.get("capability") and valid_hash
+    detail = "Plot descriptor matched the committed oracle-bound contract."
+    if not passed:
+        detail = "Display identity/content or plot capability metadata drifted."
+    return passed, detail
 
 
 def _validate_current_rpy2_identities(
