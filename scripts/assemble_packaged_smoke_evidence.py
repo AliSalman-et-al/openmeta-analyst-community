@@ -17,6 +17,10 @@ from pathlib import Path
 from rc_metastudio.result_text_identity import normalize_packaged_summary_identity
 
 
+PACKAGED_EDIT_VALUE = "Packaged Smoke – München"
+PACKAGED_ANALYSIS_METHOD = "binary.random"
+
+
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -58,10 +62,10 @@ def capture_workflow_observations(
     operation_dir = output.with_suffix(".operations")
     operation_dir.mkdir(parents=True, exist_ok=True)
     commands = {
-        "edit": ("edit",),
-        "analysis_en": ("analysis", "en_US"),
-        "analysis_de": ("locale", "de_DE"),
-        "save_reopen": ("save-reopen-analysis",),
+        "edit": ("edit", PACKAGED_EDIT_VALUE),
+        "analysis_en": ("analysis", "en_US", PACKAGED_ANALYSIS_METHOD),
+        "analysis_de": ("locale", "de_DE", PACKAGED_ANALYSIS_METHOD),
+        "save_reopen": ("save-reopen-analysis", PACKAGED_EDIT_VALUE, PACKAGED_ANALYSIS_METHOD),
     }
     observations = {}
     for name, operation in commands.items():
@@ -77,10 +81,16 @@ def capture_workflow_observations(
     output.write_text(json.dumps({
         "summary": analysis["summary"],
         "svg_paths": analysis["svg_paths"],
-        "edit_observed": observations["edit"]["observed"],
-        "analysis_observed": analysis["observed"],
-        "reopen_observed": observations["save_reopen"]["observed"],
-        "analysis_after_reopen_observed": observations["save_reopen"].get("analysis_after_reopen_observed", False),
+        "edit_observed": observations["edit"]["edited"],
+        "analysis_observed": bool(analysis["edited"] and analysis["canonical_valid"] and analysis["summary"]),
+        "reopen_observed": bool(
+            observations["save_reopen"]["saved"]
+            and observations["save_reopen"]["reopened"]
+        ),
+        "analysis_after_reopen_observed": bool(
+            observations["save_reopen"]["reopened"]
+            and observations["save_reopen"]["summary"]
+        ),
         "locale_inputs": [
             {"operation": analysis["operation"], **{key: analysis[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},
             {"operation": locale["operation"], **{key: locale[key] for key in ("locale", "decimal_point", "input", "canonical_value", "summary", "svg_paths")}},

@@ -26,9 +26,9 @@ import pytest
             ("wizard.json", "sample.rcms"),
         ),
         (
-            ["RCMetaStudio", "--automation-package-operation", "operation.json", "sample.rcms", "analysis", "de_DE"],
+            ["RCMetaStudio", "--automation-package-operation", "operation.json", "sample.rcms", "analysis", "de_DE", "binary.random"],
             "start_package_operation",
-            ("operation.json", "sample.rcms", "analysis", "de_DE"),
+            ("operation.json", "sample.rcms", "analysis", "de_DE", "", "binary.random"),
         ),
     ],
 )
@@ -144,10 +144,20 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
 
 def test_frozen_hook_contains_no_scenario_or_result_comparison_logic():
     source = Path("src/rc_metastudio/automation.py").read_text(encoding="utf-8")
-    for marker in ("locale_variants", "expected_normalized_summary_sha256", "normalize_packaged_summary_identity", "raw_summary_sha256"):
+    for marker in (
+        "locale_variants",
+        "expected_normalized_summary_sha256",
+        "normalize_packaged_summary_identity",
+        "raw_summary_sha256",
+        "Packaged Smoke",
+        "binary.random",
+    ):
         assert marker not in source
     assert "QLocale.setDefault" in source
     assert 'os.environ.get("RCMS_PACKAGE_LOCALE")' in source
+    assert "importlib.import_module" not in source
+    assert "from rpy2" not in source
+    assert "packaged_runtime_observation" in source
 
 
 def test_package_pipelines_assemble_atomic_observations_before_validation():

@@ -827,8 +827,8 @@ import sys
 evidence = json.load(open(sys.argv[1], encoding="utf-8"))
 if evidence.get("platform_plugin") != "cocoa":
     raise SystemExit("Startup wizard smoke did not use the Cocoa platform plugin.")
-if not evidence.get("passed"):
-    raise SystemExit("Startup wizard smoke failed: %s" % evidence.get("failures"))
+if not evidence.get("opened") or not evidence.get("visible"):
+    raise SystemExit("Startup wizard smoke did not open an exposed workspace.")
 frame = evidence.get("frame", [0, 0, 0, 0])
 if evidence.get("rows", 0) < 1 or len(frame) != 4 or min(frame[2:]) <= 0:
     raise SystemExit("Startup wizard smoke produced incomplete workspace evidence.")

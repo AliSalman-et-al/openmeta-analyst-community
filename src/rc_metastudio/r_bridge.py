@@ -2,13 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """R bridge for RCMetaR calls through rpy2."""
 
+import hashlib
+import importlib
+import importlib.metadata
 import locale
 import math
 import os
 import re
 import sys
-from collections.abc import Mapping
-from typing import Callable, Literal, overload
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Callable, Literal, cast, overload
 
 from rc_metastudio import r_runtime
 from rc_metastudio.analysis_method_labels import (
@@ -84,6 +88,73 @@ if sys.platform == "win32":
 
 
 _RFunction = Callable[..., object]
+
+
+@serialized_r_call
+def packaged_runtime_observation(*, include_macos_profile: bool = False) -> dict[str, object]:
+    """Return raw facts about the initialized rpy2/R runtime.
+
+    Runtime qualification needs these facts from the exact frozen process, but
+    rpy2's native modules belong behind this bridge rather than in the shipped
+    automation dispatcher.
+    """
+    from rpy2.rinterface_lib import openrlib
+
+    api_bridge = importlib.import_module("_rinterface_cffi_api")
+    r_home = str(_first_dynamic(_r_eval("normalizePath(R.home(), winslash='/', mustWork=TRUE)")))
+    r_version = str(_first_dynamic(_r_eval("as.character(getRversion())")))
+    r_library_paths = [
+        str(item)
+        for item in cast(
+            Sequence[object],
+            _r_eval("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)"),
+        )
+    ]
+    api_bridge_path = Path(str(api_bridge.__file__)).resolve()
+    macos_profile = None
+    if include_macos_profile:
+        png_path = Path(
+            str(
+                _first_dynamic(
+                    _r_eval(
+                        "output <- tempfile(fileext='.png'); "
+                        "grDevices::png(output); graphics::plot(1, 1); "
+                        "grDevices::dev.off(); output"
+                    )
+                )
+            )
+        )
+        macos_profile = {
+            "tcltk_available": bool(
+                _first_dynamic(_r_eval("isTRUE(requireNamespace('tcltk', quietly=TRUE))"))
+            ),
+            "tcltk_loaded": bool(
+                _first_dynamic(_r_eval("'tcltk' %in% loadedNamespaces()"))
+            ),
+            "aqua": bool(_first_dynamic(_r_eval("capabilities('aqua')"))),
+            "bitmap_type": str(_first_dynamic(_r_eval("getOption('bitmapType')"))),
+            "default_png": {
+                "size": png_path.stat().st_size,
+                "sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
+            },
+        }
+        png_path.unlink(missing_ok=True)
+    return {
+        "r_home": r_home,
+        "r_version": r_version,
+        "r_library_paths": r_library_paths,
+        "macos_product_profile": macos_profile,
+        "rpy2": {
+            "distribution_version": importlib.metadata.version("rpy2"),
+            "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"),
+            "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"),
+            "cffi_mode": os.environ.get("RPY2_CFFI_MODE"),
+            "loaded_cffi_mode": openrlib.cffi_mode.name,
+            "api_bridge_loaded": openrlib.cffi_mode.name == "API",
+            "api_bridge_path": str(api_bridge_path),
+            "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest(),
+        },
+    }
 
 
 def _r_function(function_name: str) -> _RFunction:

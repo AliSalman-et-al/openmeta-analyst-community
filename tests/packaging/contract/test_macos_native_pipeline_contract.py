@@ -96,7 +96,7 @@ def test_both_native_packages_gate_the_real_wizard_to_cocoa_workspace_transition
         in build
     )
     assert 'evidence.get("platform_plugin") != "cocoa"' in build
-    assert 'not evidence.get("passed")' in build
+    assert 'not evidence.get("opened") or not evidence.get("visible")' in build
     assert "handle.isExposed()" in automation_source
     assert "geometry.width() <= 0 or geometry.height() <= 0" in automation_source
     assert '"rows": model.rowCount() if model is not None else 0' in automation_source

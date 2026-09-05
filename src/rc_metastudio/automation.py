@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
-import importlib.metadata
 import json
 import os
 import platform
 import sys
 import tempfile
-from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
 
 from rc_metastudio import app_error_handler, qt6_resources, settings
 from rc_metastudio.cocoa_accessibility import find_accessibility_element
@@ -98,13 +94,22 @@ def start_automation_smoke(
         _log("packaged-workflow:post-close")
 
 
-def start_package_operation(output_path: str, sample_path: str, operation: str, locale_name: str = "en_US") -> int:
+def start_package_operation(
+    output_path: str,
+    sample_path: str,
+    operation: str,
+    locale_name: str,
+    edit_value: str,
+    analysis_method: str | None = None,
+) -> int:
     """Perform one ordinary packaged-project operation for developer tooling."""
     app, window = start_automation()
     try:
         if not window.open(os.path.abspath(sample_path), raise_on_error=True):
             raise RuntimeError("packaged workflow observation could not open project")
-        observation = _package_operation_observation(window, operation, locale_name)
+        observation = _package_operation_observation(
+            window, operation, locale_name, edit_value, analysis_method
+        )
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -117,19 +122,27 @@ def start_package_operation(output_path: str, sample_path: str, operation: str, 
         app.quit()
 
 
-def _package_operation_observation(window, operation: str, locale_name: str) -> dict:
+def _package_operation_observation(
+    window, operation: str, locale_name: str, edit_value: str, analysis_method: str | None
+) -> dict:
     if operation == "edit":
         model = window.tableView.model()
-        observed = model.setData(model.index(0, model.NAME), "Packaged Smoke – München")
-        return {"operation": operation, "observed": bool(observed)}
+        edited = model.setData(model.index(0, model.NAME), edit_value)
+        return {"operation": operation, "edited": bool(edited)}
     if operation in {"analysis", "locale"}:
-        return _observe_locale_analysis(window, operation, locale_name)
+        if not analysis_method:
+            raise ValueError("analysis operation requires an analysis method")
+        return _observe_locale_analysis(window, operation, locale_name, analysis_method)
     if operation in {"save-reopen", "save-reopen-analysis"}:
-        return _observe_save_reopen(window, operation)
+        if operation == "save-reopen-analysis" and not analysis_method:
+            raise ValueError("save-reopen-analysis requires an analysis method")
+        return _observe_save_reopen(window, operation, edit_value, analysis_method)
     raise ValueError(f"unknown packaged operation: {operation}")
 
 
-def _observe_locale_analysis(window, operation: str, locale_name: str) -> dict:
+def _observe_locale_analysis(
+    window, operation: str, locale_name: str, analysis_method: str
+) -> dict:
     from PyQt6 import QtCore
     from rc_metastudio import main_window, qt_text
 
@@ -143,54 +156,56 @@ def _observe_locale_analysis(window, operation: str, locale_name: str) -> dict:
     numeric_text = format(raw_value, ".1f").replace(".", locale.decimalPoint())
     edited = model.setData(raw_index, numeric_text)
     canonical_value, canonical_valid = qt_text.parse_decimal(model.data(raw_index, QtCore.Qt.ItemDataRole.DisplayRole))
-    result = _run_binary_analysis(window, main_window)
+    result = _run_analysis(window, main_window, analysis_method)
     if result is None:
         raise RuntimeError("packaged analysis operation produced no result")
-    observed = edited and canonical_valid and canonical_value == raw_value and bool(result.texts.get("Summary"))
-    return {"operation": operation, "observed": bool(observed), "locale": locale.name(), "decimal_point": locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
+    return {"operation": operation, "edited": bool(edited), "canonical_valid": bool(canonical_valid), "locale": locale.name(), "decimal_point": locale.decimalPoint(), "input": numeric_text, "canonical_value": canonical_value, "summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
 
 
-def _observe_save_reopen(window, operation: str) -> dict:
+def _observe_save_reopen(
+    window, operation: str, edit_value: str, analysis_method: str | None
+) -> dict:
     from rc_metastudio import main_window
 
     model = window.tableView.model()
-    edited = model.setData(model.index(0, model.NAME), "Packaged Smoke – München")
+    edited = model.setData(model.index(0, model.NAME), edit_value)
     handle, raw_destination = tempfile.mkstemp(suffix=".rcms")
     os.close(handle)
     destination = Path(raw_destination)
     destination.unlink()
     try:
         window.out_path = str(destination)
-        reopened = _save_and_reopen(window, destination, edited)
-        result = _analysis_after_reopen(window, operation, reopened, main_window)
-        observed = _save_reopen_observed(operation, reopened, result)
-        return {"operation": operation, "observed": bool(observed), "analysis_after_reopen_observed": _analysis_after_reopen_observed(operation, observed), **_analysis_artifacts(result)}
+        saved, reopened = _save_and_reopen(window, destination, edited)
+        result = _analysis_after_reopen(
+            window, operation, reopened, main_window, analysis_method
+        )
+        return {
+            "operation": operation,
+            "edited": bool(edited),
+            "saved": saved,
+            "reopened": reopened,
+            **_analysis_artifacts(result),
+        }
     finally:
         destination.unlink(missing_ok=True)
 
 
-def _save_and_reopen(window, destination: Path, edited: bool) -> bool:
+def _save_and_reopen(window, destination: Path, edited: bool) -> tuple[bool, bool]:
     if not edited:
-        return False
-    return window.save() is True and window.open(str(destination), raise_on_error=True)
+        return False, False
+    saved = window.save() is True
+    reopened = saved and window.open(str(destination), raise_on_error=True)
+    return saved, bool(reopened)
 
 
-def _analysis_after_reopen(window, operation: str, reopened: bool, main_window):
+def _analysis_after_reopen(
+    window, operation: str, reopened: bool, main_window, analysis_method: str | None
+):
     if not reopened or operation != "save-reopen-analysis":
         return None
-    return _run_binary_analysis(window, main_window)
-
-
-def _save_reopen_observed(operation: str, reopened: bool, result) -> bool:
-    if not reopened:
-        return False
-    if operation == "save-reopen":
-        return True
-    return result is not None and bool(result.texts.get("Summary"))
-
-
-def _analysis_after_reopen_observed(operation: str, observed: bool) -> bool:
-    return operation == "save-reopen-analysis" and bool(observed)
+    if not analysis_method:
+        raise ValueError("save-reopen-analysis requires an analysis method")
+    return _run_analysis(window, main_window, analysis_method)
 
 
 def _analysis_artifacts(result) -> dict:
@@ -199,12 +214,12 @@ def _analysis_artifacts(result) -> dict:
     return {"summary": result.texts.get("Summary", ""), "svg_paths": dict(result.display_images)}
 
 
-def _run_binary_analysis(window, main_window):
+def _run_analysis(window, main_window, analysis_method: str):
     captured = {}
     dialog = main_window.analysis_setup_dialog.AnalysisSetupDialog(window.model, parent=window, confidence_level=window.model.get_confidence_level())
     original = window.analysis
     try:
-        dialog.current_method = "binary.random"
+        dialog.current_method = analysis_method
         dialog.current_param_vals = {}
         dialog.setup_params()
         dialog.current_param_vals.update(dialog.current_defaults)
@@ -233,14 +248,11 @@ def _write_json(path: str, value: dict) -> None:
 def start_package_runtime_probe(output_path: str) -> int:
     """Observe the concrete runtime loaded by the packaged executable."""
     from PyQt6 import QtCore, sip
-    from rc_metastudio import project_format, r_runtime
+    from rc_metastudio import project_format, r_bridge, r_runtime
 
     for member in ("manifest.json", "project.json", "state.json"):
         project_format._schema(1, member)
     configured = r_runtime.configure_bundled_r_environment()
-    api_bridge = importlib.import_module("_rinterface_cffi_api")
-    from rpy2 import robjects
-    from rpy2.rinterface_lib import openrlib
 
     app = app_error_handler.get_or_create_application(sys.argv)
     _configure_application(app)
@@ -248,15 +260,9 @@ def start_package_runtime_probe(output_path: str) -> int:
     if primary is None:
         raise SystemExit("Packaged runtime probe found no primary screen.")
 
-    def evaluate(expression: str) -> Sequence[object]:
-        return cast(Sequence[object], robjects.r(expression))
-
-    r_home = str(evaluate("normalizePath(R.home(), winslash='/', mustWork=TRUE)")[0])
-    r_version = str(evaluate("as.character(getRversion())")[0])
-    r_library_paths = [
-        str(item) for item in evaluate("normalizePath(.libPaths(), winslash='/', mustWork=TRUE)")
-    ]
-    api_bridge_path = Path(str(api_bridge.__file__)).resolve()
+    runtime = r_bridge.packaged_runtime_observation(
+        include_macos_profile=sys.platform == "darwin"
+    )
     shared_path = Path(configured.get("R_HOME", "")) / "bin" / "x64" / "R.dll"
     if sys.platform == "darwin":
         shared_path = Path(configured.get("R_HOME", "")) / "lib" / "libR.dylib"
@@ -264,9 +270,7 @@ def start_package_runtime_probe(output_path: str) -> int:
         raise RuntimeError("Packaged runtime has no private R shared library.")
     macos_profile = None
     if sys.platform == "darwin":
-        png_path = Path(str(evaluate("output <- tempfile(fileext='.png'); grDevices::png(output); graphics::plot(1, 1); grDevices::dev.off(); output")[0]))
-        macos_profile = {"tcltk_available": bool(evaluate("isTRUE(requireNamespace('tcltk', quietly=TRUE))")[0]), "tcltk_loaded": bool(evaluate("'tcltk' %in% loadedNamespaces()")[0]), "aqua": bool(evaluate("capabilities('aqua')")[0]), "bitmap_type": str(evaluate("getOption('bitmapType')")[0]), "default_png": {"size": png_path.stat().st_size, "sha256": hashlib.sha256(png_path.read_bytes()).hexdigest()}}
-        png_path.unlink(missing_ok=True)
+        macos_profile = runtime["macos_product_profile"]
     probe = {
             "schema_version": 1,
             "frozen": bool(getattr(sys, "frozen", False)),
@@ -283,9 +287,9 @@ def start_package_runtime_probe(output_path: str) -> int:
                 "baseline_device_pixel_ratio": float(primary.devicePixelRatio()),
                 "baseline_logical_dpi": float(primary.logicalDotsPerInch()),
             },
-            "rpy2": {"distribution_version": importlib.metadata.version("rpy2"), "rinterface_distribution_version": importlib.metadata.version("rpy2-rinterface"), "robjects_distribution_version": importlib.metadata.version("rpy2-robjects"), "cffi_mode": os.environ.get("RPY2_CFFI_MODE"), "loaded_cffi_mode": openrlib.cffi_mode.name, "api_bridge_loaded": openrlib.cffi_mode.name == "API", "api_bridge_path": str(api_bridge_path), "api_bridge_sha256": hashlib.sha256(api_bridge_path.read_bytes()).hexdigest()},
+            "rpy2": runtime["rpy2"],
             "project_schemas": {"version": 1, "validated_members": ["manifest.json", "project.json", "state.json"]},
-            "r": {"version": r_version, "home": r_home, "library_paths": r_library_paths, "configured_home": configured.get("R_HOME"), "configured_library": configured.get("R_LIBS"), "macos_product_profile": macos_profile, "shared_library_path": str(shared_path.resolve()), "shared_library_sha256": hashlib.sha256(shared_path.read_bytes()).hexdigest(), "direct_spike": configured.get("direct_spike") is True, "lc_numeric": os.environ.get("LC_NUMERIC")},
+            "r": {"version": runtime["r_version"], "home": runtime["r_home"], "library_paths": runtime["r_library_paths"], "configured_home": configured.get("R_HOME"), "configured_library": configured.get("R_LIBS"), "macos_product_profile": macos_profile, "shared_library_path": str(shared_path.resolve()), "shared_library_sha256": hashlib.sha256(shared_path.read_bytes()).hexdigest(), "direct_spike": configured.get("direct_spike") is True, "lc_numeric": os.environ.get("LC_NUMERIC")},
     }
     if configured.get("kit_sha256") is not None:
         probe["r"]["kit_sha256"] = configured["kit_sha256"]
@@ -304,13 +308,13 @@ def start_package_surface_smoke(evidence_path: str, expected_scale: str) -> int:
     _configure_application(app)
     qt6_resources.ensure_application_resources()
     platform_name = app.platformName().lower()
-    _require_surface_platform(platform_name)
-    primary = _verify_surface_basics(app, QtGui)
+    primary, clipboard_ok, binary_resources = _observe_surface_basics(app, QtGui)
     window, menu_bar, menu, control = _build_surface_window(QtWidgets)
     focus_before, focus_after = _observe_surface_focus(app, window, control)
     record = _surface_record(
         QtCore, QtGui, QtNetwork, QtWidgets, platform_name, expected_scale,
-        primary, window, menu_bar, menu, control, focus_before, focus_after,
+        primary, clipboard_ok, binary_resources, window, menu_bar, menu, control,
+        focus_before, focus_after,
     )
     _write_json(evidence_path, record)
     _log("packaged-surface:scale-%s-passed" % expected_scale)
@@ -325,23 +329,13 @@ def _configure_surface_locale(QtCore) -> None:
         QtCore.QLocale.setDefault(QtCore.QLocale(configured_locale))
 
 
-def _require_surface_platform(platform_name: str) -> None:
-    expected = {"win32": "windows", "darwin": "cocoa"}.get(sys.platform)
-    if expected is not None and platform_name != expected:
-        raise SystemExit("Package surface smoke loaded the wrong Qt platform plugin.")
-
-
-def _verify_surface_basics(app, QtGui):
+def _observe_surface_basics(app, QtGui):
     clipboard_text = "RC MetaStudio clipboard – München – 1,25"
     app.clipboard().setText(clipboard_text)
-    if app.clipboard().text() != clipboard_text:
-        raise SystemExit("Package surface smoke clipboard round-trip failed.")
-    if QtGui.QPixmap(":/misc/meta.png").isNull():
-        raise SystemExit("Package surface smoke could not load binary resources.")
+    clipboard_ok = app.clipboard().text() == clipboard_text
+    binary_resources = not QtGui.QPixmap(":/misc/meta.png").isNull()
     primary = app.primaryScreen()
-    if primary is None:
-        raise SystemExit("Package surface smoke found no primary screen.")
-    return primary
+    return primary, clipboard_ok, binary_resources
 
 
 def _build_surface_window(QtWidgets):
@@ -374,22 +368,24 @@ def _observe_surface_focus(app, window, control):
     return focus_before, app.focusWidget()
 
 
-def _surface_record(QtCore, QtGui, QtNetwork, QtWidgets, platform_name, expected_scale, primary, window, menu_bar, menu, control, focus_before, focus_after):
+def _surface_record(QtCore, QtGui, QtNetwork, QtWidgets, platform_name, expected_scale, primary, clipboard_ok, binary_resources, window, menu_bar, menu, control, focus_before, focus_after):
     actual_locale = QtCore.QLocale()
     accessibility = {"focus_before": focus_before.objectName() if focus_before else None, "focus_after_tab": focus_after.objectName() if focus_after else None, "accessible_name": control.accessibleName(), "accessible_description": control.accessibleDescription(), "native": {}}
     if sys.platform == "darwin":
         accessibility["native"] = _observe_cocoa_accessibility(control)
-    baseline = float(os.environ.get("RCMS_PACKAGE_BASELINE_DPR", primary.devicePixelRatio()))
+    actual_dpr = float(primary.devicePixelRatio()) if primary is not None else None
+    baseline_value = os.environ.get("RCMS_PACKAGE_BASELINE_DPR")
+    baseline = float(baseline_value) if baseline_value is not None else actual_dpr
     return {
         "requested": expected_scale,
         "qt_scale_factor": os.environ.get("QT_SCALE_FACTOR"),
-        "device_pixel_ratio": float(primary.devicePixelRatio()),
+        "device_pixel_ratio": actual_dpr,
         "baseline_device_pixel_ratio": baseline,
-        "expected_device_pixel_ratio": baseline * float(expected_scale),
+        "expected_device_pixel_ratio": baseline * float(expected_scale) if baseline is not None else None,
         "dpr_tolerance": 0.05,
         "logical_dpi": float(primary.logicalDotsPerInch()),
-        "clipboard": True,
-        "binary_resources": True,
+        "clipboard": clipboard_ok,
+        "binary_resources": binary_resources,
         "native_menu": {"is_native": bool(menu_bar.isNativeMenuBar()), "menu_count": len(menu_bar.actions()), "action_count": len(menu.actions())},
         "accessibility": accessibility,
         "tls_backends": list(QtNetwork.QSslSocket.availableBackends()),
@@ -516,6 +512,7 @@ def start_startup_wizard_smoke(evidence_path: str, sample_path: str) -> int:
             "schema_version": 1,
             "platform_plugin": app.platformName().lower(),
             "project": Path(sample_path).name,
+            "opened": opened,
             "visible": window.isVisible(),
             "active": window.isActiveWindow(),
             "minimized": window.isMinimized(),
@@ -523,10 +520,8 @@ def start_startup_wizard_smoke(evidence_path: str, sample_path: str) -> int:
             "frame": [frame.x(), frame.y(), frame.width(), frame.height()],
             "rows": window.tableView.model().rowCount(),
         }
-        evidence["passed"] = opened and evidence["visible"] and evidence["rows"] >= 1
-        evidence["failures"] = [] if evidence["passed"] else ["startup project smoke failed"]
         _write_json(evidence_path, evidence)
-        return 0 if evidence["passed"] else 1
+        return 0
     finally:
         _mark_workspace_saved(window)
         window.close()
@@ -585,10 +580,35 @@ def dispatch(startup_argv: list[str]) -> int:
             raise SystemExit("--automation-package-runtime-probe requires an output path.")
         return _run_automation_smoke(lambda: start_package_runtime_probe(startup_argv[2]))
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-operation":
-        if len(startup_argv) not in {5, 6}:
-            raise SystemExit("--automation-package-operation requires output, project, operation, and optional locale.")
-        locale = startup_argv[5] if len(startup_argv) == 6 else "en_US"
-        return _run_automation_smoke(lambda: start_package_operation(startup_argv[2], startup_argv[3], startup_argv[4], locale))
+        if len(startup_argv) < 6:
+            raise SystemExit(
+                "--automation-package-operation requires output, project, operation, and operation parameters."
+            )
+        operation_args = startup_argv[5:]
+        if startup_argv[4] in {"analysis", "locale"} and len(operation_args) != 2:
+            raise SystemExit(
+                "analysis package operations require locale and analysis method."
+            )
+        if startup_argv[4] == "save-reopen-analysis" and len(operation_args) != 2:
+            raise SystemExit(
+                "save-reopen-analysis requires an edit value and analysis method."
+            )
+        if startup_argv[4] in {"edit", "save-reopen"} and len(operation_args) != 1:
+            raise SystemExit(
+                "edit and save-reopen operations require an edit value."
+            )
+        locale, edit_value, analysis_method = "en_US", operation_args[0], None
+        if startup_argv[4] in {"analysis", "locale"}:
+            locale, analysis_method = operation_args
+            edit_value = ""
+        elif startup_argv[4] == "save-reopen-analysis":
+            edit_value, analysis_method = operation_args
+        return _run_automation_smoke(
+            lambda: start_package_operation(
+                startup_argv[2], startup_argv[3], startup_argv[4],
+                locale, edit_value, analysis_method
+            )
+        )
     if len(startup_argv) > 1 and startup_argv[1] == "--automation-package-surface-smoke":
         if len(startup_argv) != 4:
             raise SystemExit("--automation-package-surface-smoke requires an evidence path and scale.")
