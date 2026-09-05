@@ -17,6 +17,7 @@ from scripts.code_health import (
     load_config,
     python_metrics,
     runtime_changed_function_keys,
+    typing_measurement,
 )
 
 
@@ -70,8 +71,19 @@ def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) 
     assert set(payload["files"][0]["churn"]) == {"30", "90", "180"}
     assert "hotspot_score" in payload["files"][0]
     assert {"coupling", "cycles", "cognitive_complexity", "maintainability", "defect_history", "gate"} <= payload.keys()
-    assert payload["typing"]["tool"] == "ty"
-    assert payload["typing"]["passed"] is True
+    assert payload["typing"]["tool"] == "ast"
+    assert payload["typing"]["revision"] == "HEAD"
+    assert {
+        "total_parameters",
+        "total_functions",
+        "annotated_parameters",
+        "annotated_returns",
+        "parameter_coverage",
+        "return_coverage",
+        "any_annotations",
+        "type_ignore_directives",
+        "cast_to_any",
+    } <= payload["typing"].keys()
     assert payload["dependency_tooling"]["tool"] == "grimp"
     assert "Code health" in report.read_text(encoding="utf-8")
     assert "Code health" in result.stdout
@@ -89,7 +101,17 @@ def test_baseline_comparison_uses_recorded_artifact_measurements() -> None:
             "cognitive_complexity": {"total": 2, "maximum": 2},
             "maintainability": {"mean_function_lines": 4.0},
             "defect_history": {"commits": 1},
-            "typing": {"passed": True, "diagnostic_count": 0},
+            "typing": {
+                "total_parameters": 1,
+                "total_functions": 1,
+                "annotated_parameters": 1,
+                "annotated_returns": 1,
+                "parameter_coverage": 1.0,
+                "return_coverage": 1.0,
+                "any_annotations": 0,
+                "type_ignore_directives": 0,
+                "cast_to_any": 0,
+            },
         }
 
     comparison = compare_to_baseline(
@@ -150,6 +172,31 @@ def test_python_metrics_uses_complexipy_at_each_revision(tmp_path: Path) -> None
     assert baseline_metric.cognitive == code_complexity(baseline_source).functions[0].complexity
     assert head_metric.cognitive == code_complexity(head_source).functions[0].complexity
     assert head_metric.cognitive > baseline_metric.cognitive
+
+
+def test_typing_measurement_reads_the_named_revision(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "src").mkdir()
+    source = tmp_path / "src/pkg.py"
+    source.write_text("def measure(value):\n    return value\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "Add source", "2025-01-01T00:00:00+00:00")
+    source.write_text(
+        "from typing import Any, cast\n\n"
+        "def measure(value: Any) -> Any:  # type: ignore\n"
+        "    return cast(Any, value)\n",
+        encoding="utf-8",
+    )
+    head = _commit(tmp_path, "Add typing signals", "2025-01-02T00:00:00+00:00")
+
+    before = typing_measurement(tmp_path, ["src/pkg.py"], baseline)
+    after = typing_measurement(tmp_path, ["src/pkg.py"], head)
+
+    assert before["annotated_parameters"] == 0
+    assert after["annotated_parameters"] == 1
+    assert after["annotated_returns"] == 1
+    assert after["any_annotations"] == 2
+    assert after["type_ignore_directives"] == 1
+    assert after["cast_to_any"] == 1
 
 
 def test_gate_ignores_annotation_only_function_changes(tmp_path: Path) -> None:

@@ -49,8 +49,11 @@ baseline, rather than relying on a branch name or an implicit merge base.
 Use the same commit for `--base` and `--head` to capture a baseline snapshot.
 The report records rename-aware 30-, 90-, and 180-day line churn. Hotspots are
 ranked as normalized 180-day churn multiplied by cyclomatic complexity density;
-coupling, cycles, cognitive complexity, maintainability, and defect history are
-reported independently.
+coupling, cycles, cognitive complexity, maintainability, defect history, and
+revision-bound typing indicators are reported independently. The typing
+indicators report annotated-parameter and annotated-return coverage plus
+`Any` annotations, `type: ignore` directives, and casts to `Any`; repository-wide strict `ty`
+verification remains part of the Qt6 verification lane.
 
 Add `--sync` when the environment may be stale. Add `--require-r-evidence` when R is required, or `--skip-r-evidence` when a separate full R run owns that evidence.
 

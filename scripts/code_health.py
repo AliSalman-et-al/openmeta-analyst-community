@@ -14,11 +14,12 @@ import copy
 import fnmatch
 import io
 import json
-import shutil
+import re
 import subprocess
 import sys
 import tarfile
 import tempfile
+import tokenize
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -321,35 +322,104 @@ def python_metrics(root: Path, paths: Iterable[str], revision: str | None = None
     return metrics
 
 
-def strict_typing_evidence(root: Path) -> dict[str, object]:
-    """Run the locked strict type checker for the code-health command itself."""
-    if shutil.which("ty") is None:
-        raise CodeHealthError("strict typing requires the locked 'ty' executable")
-    command = ["ty", "check", "--output-format", "concise", "scripts/code_health.py"]
-    result = subprocess.run(
-        command,
-        cwd=root,
-        capture_output=True,
-        text=True,
-        check=False,
+def _typing_aliases(tree: ast.AST) -> tuple[set[str], set[str], set[str]]:
+    any_names = {"Any"}
+    cast_names = {"cast"}
+    typing_names = {"typing", "typing_extensions"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in typing_names:
+                    typing_names.add(alias.asname or alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module in typing_names:
+            for alias in node.names:
+                if alias.name == "Any":
+                    any_names.add(alias.asname or alias.name)
+                elif alias.name == "cast":
+                    cast_names.add(alias.asname or alias.name)
+    return any_names, cast_names, typing_names
+
+
+def _is_any_annotation(node: ast.AST, any_names: set[str], typing_names: set[str]) -> bool:
+    return any(
+        isinstance(child, ast.Name) and child.id in any_names
+        or (
+            isinstance(child, ast.Attribute)
+            and child.attr == "Any"
+            and isinstance(child.value, ast.Name)
+            and child.value.id in typing_names
+        )
+        for child in ast.walk(node)
     )
-    diagnostics = (
-        [
-            line
-            for stream in (result.stdout, result.stderr)
-            for line in stream.splitlines()
-            if line.strip()
-        ]
-        if result.returncode
-        else []
+
+
+def _type_ignore_count(source: str) -> int:
+    return sum(
+        token.type == tokenize.COMMENT
+        and re.match(r"#\s*type:\s*ignore\b", token.string) is not None
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
     )
+
+
+def typing_measurement(root: Path, paths: Iterable[str], revision: str) -> dict[str, object]:
+    """Measure typing signals from the exact Python snapshot being analyzed."""
+    annotated_parameters = 0
+    annotated_returns = 0
+    any_annotations = 0
+    type_ignore_directives = 0
+    cast_to_any = 0
+    total_parameters = 0
+    total_functions = 0
+    files = 0
+    for relative in paths:
+        if not relative.endswith(".py"):
+            continue
+        source = _source_at_revision(root, relative, revision)
+        if source is None:
+            raise CodeHealthError(f"cannot read {relative} at {revision}")
+        try:
+            tree = ast.parse(source, filename=relative)
+        except SyntaxError as exc:
+            raise CodeHealthError(f"cannot parse {relative}") from exc
+        files += 1
+        any_names, cast_names, typing_names = _typing_aliases(tree)
+        type_ignore_directives += _type_ignore_count(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                total_functions += 1
+                parameters = (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
+                parameters += (node.args.vararg, node.args.kwarg)
+                total_parameters += len(parameters)
+                for parameter in parameters:
+                    if parameter is not None and parameter.annotation is not None:
+                        annotated_parameters += 1
+                        any_annotations += _is_any_annotation(parameter.annotation, any_names, typing_names)
+                if node.returns is not None:
+                    annotated_returns += 1
+                    any_annotations += _is_any_annotation(node.returns, any_names, typing_names)
+            elif isinstance(node, ast.Call):
+                function = node.func
+                is_cast = isinstance(function, ast.Name) and function.id in cast_names or (
+                    isinstance(function, ast.Attribute)
+                    and function.attr == "cast"
+                    and isinstance(function.value, ast.Name)
+                    and function.value.id in typing_names
+                )
+                if is_cast and node.args and _is_any_annotation(node.args[0], any_names, typing_names):
+                    cast_to_any += 1
     return {
-        "tool": "ty",
-        "command": " ".join(command),
-        "passed": result.returncode == 0,
-        "exit_code": result.returncode,
-        "diagnostic_count": len(diagnostics),
-        "diagnostics": diagnostics,
+        "tool": "ast",
+        "revision": revision,
+        "files": files,
+        "total_parameters": total_parameters,
+        "total_functions": total_functions,
+        "annotated_parameters": annotated_parameters,
+        "annotated_returns": annotated_returns,
+        "parameter_coverage": annotated_parameters / max(total_parameters, 1),
+        "return_coverage": annotated_returns / max(total_functions, 1),
+        "any_annotations": any_annotations,
+        "type_ignore_directives": type_ignore_directives,
+        "cast_to_any": cast_to_any,
     }
 
 
@@ -849,7 +919,6 @@ def gate(
     forbidden: list[str],
     baseline_forbidden: list[str],
     runtime_changed: set[tuple[str, str, int, int]] | None = None,
-    typing: dict[str, object] | None = None,
 ) -> dict[str, object]:
     limits = config["gates"]
     changed_functions = [metric for metric in metrics if any(metric.line <= line <= metric.end_line for line in changed.get(metric.path, set()))]
@@ -873,8 +942,6 @@ def gate(
         failures.append("forbidden imports")
     if violations:
         failures.append("changed-code complexity")
-    if typing is not None and not bool(typing["passed"]):
-        failures.append("strict typing")
     return {
         "passed": not failures,
         "failures": failures,
@@ -907,8 +974,15 @@ def _comparison_metrics(evidence: dict[str, object]) -> dict[str, object]:
         "cognitive_complexity.maximum": cognitive["maximum"],
         "maintainability.mean_function_lines": maintainability["mean_function_lines"],
         "defect_history.commits": defects["commits"],
-        "typing.passed": typing["passed"],
-        "typing.diagnostic_count": typing["diagnostic_count"],
+        "typing.total_parameters": typing["total_parameters"],
+        "typing.total_functions": typing["total_functions"],
+        "typing.annotated_parameters": typing["annotated_parameters"],
+        "typing.annotated_returns": typing["annotated_returns"],
+        "typing.parameter_coverage": typing["parameter_coverage"],
+        "typing.return_coverage": typing["return_coverage"],
+        "typing.any_annotations": typing["any_annotations"],
+        "typing.type_ignore_directives": typing["type_ignore_directives"],
+        "typing.cast_to_any": typing["cast_to_any"],
         "hotspots.top5": [
             {"path": item["path"], "score": item["hotspot_score"]}
             for item in files[:5]
@@ -997,7 +1071,7 @@ def build_evidence(
         })
     file_metrics.sort(key=lambda item: (-item["hotspot_score"], item["path"]))
     tooling = grimp_evidence(root, head_revision)
-    typing = strict_typing_evidence(root)
+    typing = typing_measurement(root, paths, head)
     changed = changed_lines(root, base, head)
     runtime_changed = runtime_changed_function_keys(root, base, head, functions, changed)
     evidence: dict[str, object] = {
@@ -1024,7 +1098,6 @@ def build_evidence(
             forbidden,
             gate_baseline_forbidden,
             runtime_changed,
-            typing,
         ),
     }
     if baseline_data is not None:
@@ -1053,8 +1126,12 @@ def text_report(evidence: dict[str, object]) -> str:
     lines.append(f"Coupling: {coupling['modules']} modules, {coupling['edges']} edges")
     lines.append(f"Cycles: {len(cycles_found)}; cognitive complexity total/max: {cognitive['total']}/{cognitive['maximum']}")
     lines.append(
-        f"Strict typing: {'PASS' if typing['passed'] else 'FAIL'} "
-        f"({typing['diagnostic_count']} diagnostics via {typing['tool']})"
+        f"Typing: {typing['annotated_parameters']}/{typing['total_parameters']} "
+        f"parameters ({cast(float, typing['parameter_coverage']):.1%}), "
+        f"{typing['annotated_returns']}/{typing['total_functions']} returns "
+        f"({cast(float, typing['return_coverage']):.1%}), {typing['any_annotations']} Any "
+        f"annotations, {typing['type_ignore_directives']} type: ignores, "
+        f"{typing['cast_to_any']} casts to Any ({typing['revision']})"
     )
     lines.append(f"Defect history: {defects['commits']} matching commits across {defects['files_with_defect_fixes']} files")
     comparison = evidence.get("baseline_comparison")
