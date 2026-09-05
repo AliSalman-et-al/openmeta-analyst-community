@@ -275,21 +275,26 @@ def start_package_surface_smoke(evidence_path: str, requested_scale: str) -> int
 
     _configure_surface_locale(QtCore)
     app, window = start_automation()
+    close_attempted = False
     try:
         record = _surface_record(
             QtCore, QtGui, QtNetwork, QtWidgets, app, window, requested_scale
         )
+        _mark_workspace_saved(window)
         closed = window.close()
+        close_attempted = True
+        window_visible = window.isVisible()
         app.processEvents()
         record["cleanup"] = {
             "close_accepted": bool(closed),
-            "window_visible": window.isVisible(),
+            "window_visible": window_visible,
         }
         _write_json(evidence_path, record)
         return 0
     finally:
-        _mark_workspace_saved(window)
-        window.close()
+        if not close_attempted:
+            _mark_workspace_saved(window)
+            window.close()
         app.processEvents()
         dispose_qobjects(app, (window,))
         app.quit()

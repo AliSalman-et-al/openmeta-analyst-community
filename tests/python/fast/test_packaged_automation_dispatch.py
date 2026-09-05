@@ -68,9 +68,12 @@ def test_surface_hook_observes_and_closes_the_composed_main_window(monkeypatch):
         def __init__(self):
             self.process_events = 0
             self.quit_called = False
+            self.delete_target = None
 
         def processEvents(self):
             self.process_events += 1
+            if self.delete_target is not None:
+                self.delete_target.deleted = True
 
         def quit(self):
             self.quit_called = True
@@ -79,15 +82,19 @@ def test_surface_hook_observes_and_closes_the_composed_main_window(monkeypatch):
         def __init__(self):
             self.close_calls = 0
             self.visible = False
+            self.deleted = False
 
         def close(self):
             self.close_calls += 1
             return True
 
         def isVisible(self):
+            if self.deleted:
+                raise RuntimeError("wrapped C/C++ object has been deleted")
             return self.visible
 
     app, window = App(), Window()
+    app.delete_target = window
     written = {}
     monkeypatch.setattr(automation, "start_automation", lambda: (app, window))
     monkeypatch.setattr(
@@ -104,7 +111,7 @@ def test_surface_hook_observes_and_closes_the_composed_main_window(monkeypatch):
         "close_accepted": True,
         "window_visible": False,
     }
-    assert window.close_calls == 2
+    assert window.close_calls == 1
     assert app.quit_called is True
 
 
