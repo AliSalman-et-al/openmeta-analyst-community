@@ -1,10 +1,10 @@
 {
   "contract": "golden-plot-descriptors",
-  "oracle_sha256": "85627378aa20cf6e9b599ab762d1e63d787960300829332848969c593bd9d1ce",
+  "oracle_sha256": "24e05b437c34fb3daf2ffb2725c80ae6c512d1ca95dc60bcff90479658077bcf",
   "rows": [
     {
       "artifact_label": "Forest Plot",
-      "artifact_oracle_sha256": "68a07a25747ed30d0821a627a591a5935e9af6d3455afe3acf51a3da2cc2ede8",
+      "artifact_oracle_sha256": "078f9170ff85cf00246a6c4c9487b7dc8feb52f97455c63e35606affb5a3d9d2",
       "capability": {
         "composition": "single",
         "editable": true,
@@ -22,7 +22,7 @@
     },
     {
       "artifact_label": "Forest Plot",
-      "artifact_oracle_sha256": "6010783fa0ed826f1331acebc076a39cebca98be15d869e1eabfd2c2a5111c17",
+      "artifact_oracle_sha256": "4f8ad28d988aba4c0d0943370b5b644b1f04d571b7fd7301dfa639ec8f982c00",
       "capability": {
         "composition": "single",
         "editable": true,
@@ -40,7 +40,7 @@
     },
     {
       "artifact_label": "Odds Ratio Forest Plot",
-      "artifact_oracle_sha256": "3337181ccac496dbf0664bfae5031d769cb1096e555a3cf5dee40b1bb20074af",
+      "artifact_oracle_sha256": "6071d29e9b42d594c6e06d065e391fe8e65d7ba874d27f51f9fa91ed5228a750",
       "capability": {
         "composition": "single",
         "editable": true,
@@ -130,7 +130,7 @@
     },
     {
       "artifact_label": "Regression Plot",
-      "artifact_oracle_sha256": "0a19afbb9289048e032ef491b36d44d914c23ec4c228dbdf7019d942b29b3f69",
+      "artifact_oracle_sha256": "965c6e07398ccb043757fac9ab0dadf74e9f8c978c552e392c69297e3b9db03b",
       "capability": {
         "composition": "single",
         "editable": true,
@@ -148,7 +148,7 @@
     },
     {
       "artifact_label": "Regression Plot",
-      "artifact_oracle_sha256": "78e932fb84ffce04c72602adad56cdb18a13659248852d8859886ba075f96437",
+      "artifact_oracle_sha256": "acb7d8ca2746e7a7b1d1fdbaef0e930a55011e3187e43e6f4ffd5f34de554bf6",
       "capability": {
         "composition": "single",
         "editable": true,
