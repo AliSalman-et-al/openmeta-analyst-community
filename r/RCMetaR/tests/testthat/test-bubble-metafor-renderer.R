@@ -221,3 +221,27 @@ test_that("Bubble Plot moderator ticks adapt to observed values and honor overri
   bundle$params$bp_xticks <- c(12, 24, 48)
   expect_equal(rcmetar.bubble.x.ticks(bundle), c(12, 24, 48))
 })
+
+test_that("meta-regression ratio axes label the exponentiated display scale", {
+  params <- list(measure = "OR")
+  bundle <- list(
+    params = params,
+    effects = list(ES = log(c(0.25, 1, 2)))
+  )
+
+  expect_equal(
+    rcmetar.bubble.default.ylabel(params),
+    "Odds Ratio (log scale)"
+  )
+  for (metric in c("OR", "RR", "PLR", "NLR", "DOR")) {
+    expect_equal(
+      rcmetar.bubble.default.ylabel(list(measure = metric)),
+      paste0(pretty.metric.name(metric), " (log scale)")
+    )
+  }
+
+  ticks <- rcmetar.bubble.axis.ticks(bundle, log(c(0.25, 2)))
+  expect_equal(exp(ticks), c(0.25, 0.5, 1, 2))
+  expect_equal(exp(rcmetar.bubble.refline(bundle, log(c(0.25, 2)))), 1)
+  expect_identical(rcmetar.bubble.atransf(bundle), exp)
+})

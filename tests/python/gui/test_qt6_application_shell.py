@@ -650,6 +650,58 @@ def test_wizard_created_projects_save_as_latest_structured_containers(
         _close_shell(app, window)
 
 
+def test_new_dataset_clears_previous_project_destination_and_starts_dirty(
+    qapp, tmp_path, monkeypatch
+):
+    app, window = automation.start_automation()
+    previous_project = tmp_path / "previous.rcms"
+    try:
+        assert window.open(str(ROOT / "sample_projects" / "lymph.rcms")) is True
+        monkeypatch.setattr(
+            QtWidgets.QFileDialog,
+            "getSaveFileName",
+            lambda **_kwargs: (str(previous_project), ""),
+        )
+        assert window.save_as() is True
+        assert window.out_path == str(previous_project)
+        assert window.workspace.path == previous_project
+        assert not window.workspace.is_dirty
+
+        window._handle_wizard_results(
+            {
+                "path": "new_dataset",
+                "outcome_info": {
+                    "arms": "one",
+                    "data_type": "continuous",
+                    "sub_type": "generic_effect",
+                    "effect": "TX Mean",
+                    "metric_choices": ["TX Mean"],
+                    "name": "QA generic",
+                },
+                "selected_dataset": None,
+            }
+        )
+
+        assert window.out_path is None
+        assert window.workspace.path is None
+        assert window.workspace.is_dirty
+        assert not window.workspace.can_undo
+        assert "Open Project" not in window.dataset_file_lbl.text()
+        assert "isn't saved yet" in window.dataset_file_lbl.text()
+
+        save_dialog_calls = []
+        monkeypatch.setattr(
+            QtWidgets.QFileDialog,
+            "getSaveFileName",
+            lambda **kwargs: save_dialog_calls.append(kwargs) or ("", ""),
+        )
+        assert window.save() is None
+        assert save_dialog_calls
+        assert previous_project.is_file()
+    finally:
+        _close_shell(app, window)
+
+
 def test_cancelled_save_as_blocks_new_open_recent_and_import_for_unsaved_wizards(
     qapp, monkeypatch
 ):

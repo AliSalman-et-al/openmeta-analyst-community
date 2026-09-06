@@ -1268,6 +1268,19 @@ test_that("journal display labels do not duplicate publication years", {
   )
 })
 
+test_that("generic plot labels tolerate missing publication years", {
+  fixture <- metafor_continuous_fixture(studies = 2)
+  fixture$data@years <- as.integer(c(NA, NA))
+  res <- rma.uni(yi=fixture$data@y, sei=fixture$data@SE, method="REML")
+
+  plot.data <- create.plot.data.generic(fixture$data, fixture$params, res)
+
+  expect_equal(
+    plot.data$label[2:3],
+    fixture$data@study.names
+  )
+})
+
 test_that("subgroup model labels preserve readable word spacing", {
   result <- list(QE=1.2, k=3, p=1, QEp=0.2, I2=30, tau2=0.1)
   label <- rcmetar.default.model.label("RE Model for Subgroup", result)
@@ -1276,6 +1289,39 @@ test_that("subgroup model labels preserve readable word spacing", {
   expect_match(label, "Subgroup (Q =", fixed=TRUE)
   expect_match(label, "I² = 30.0%", fixed=TRUE)
   expect_match(label, "τ² = 0.10", fixed=TRUE)
+})
+
+test_that("default forest heterogeneity labels reflect the fitted model", {
+  fixture <- metafor_continuous_fixture(studies = 5)
+  fit <- function(method) {
+    rma.uni(
+      yi=fixture$data@y,
+      sei=fixture$data@SE,
+      method=method,
+      level=fixture$params$conf.level,
+      digits=fixture$params$digits
+    )
+  }
+
+  fixed.bundle <- rcmetar.regenerate.plot.data(fixture$data, fit("FE"), fixture$params)
+  random.bundle <- rcmetar.regenerate.plot.data(fixture$data, fit("REML"), fixture$params)
+
+  expect_match(
+    rcmetar.metafor.heterogeneity.measure.label(fixed.bundle),
+    "^FE Model \\(Q =",
+    perl=TRUE
+  )
+  expect_match(
+    rcmetar.metafor.heterogeneity.measure.label(random.bundle),
+    "^RE Model \\(Q =",
+    perl=TRUE
+  )
+
+  svg.path <- tempfile(fileext=".svg")
+  rcmetar.draw.forest.plot(fixed.bundle, svg.path)
+  rendered <- paste(readLines(svg.path, warn=FALSE), collapse="\n")
+  expect_match(rendered, "FE Model", fixed=TRUE)
+  expect_false(grepl("RE Model", rendered, fixed=TRUE))
 })
 
 test_that("raster plot exports default to publication-grade resolution", {

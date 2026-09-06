@@ -204,8 +204,10 @@ rcmetar.default.heterogeneity.measure.label <- function(bundle) {
         return("")
     }
     res <- bundle$res
+    model.label <- if (identical(as.character(res$method), "FE")) "FE Model" else "RE Model"
     paste0(
-        "RE Model (Q = ", round.display(res$QE, 2),
+        model.label, " (Q = ",
+        round.display(res$QE, 2),
         ", df = ", res$k - res$p, ", ",
         rcmetar.default.p.value.label(res$QEp), "; I\u00b2 = ",
         round.display(res$I2, 1), "%, tau\u00b2 = ",
@@ -441,8 +443,9 @@ rcmetar.draw.default.heterogeneity <- function(bundle, x, cex) {
         return(invisible(NULL))
     }
     res <- bundle$res
+    model.label <- if (identical(as.character(res$method), "FE")) "FE Model" else "RE Model"
     label <- bquote(paste(
-        "RE Model (Q = ", .(round.display(res$QE, 2)),
+        .(model.label), " (Q = ", .(round.display(res$QE, 2)),
         ", df = ", .(res$k - res$p), ", ",
         .(rcmetar.default.p.value.label(res$QEp)), "; ",
         I^2, " = ", .(round.display(res$I2, 1)), "%, ",

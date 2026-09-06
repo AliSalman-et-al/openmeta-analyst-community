@@ -285,6 +285,19 @@ class WorkspaceSession:
         self._saved_digest = self._runtime_digest()
         self._forced_dirty = False
 
+    def start_new_document(self) -> None:
+        """Start an unnamed document while preserving the live runtime identity."""
+        if self._runtime is None:
+            raise ValueError("cannot start a new document in an empty workspace")
+        if self._transaction_depth:
+            raise RuntimeError("cannot start a new document during a transaction")
+        self._path = None
+        self._history.clear()
+        self._redo.clear()
+        self._checkpoint = _copy_runtime(self._runtime)
+        self._saved_digest = None
+        self._forced_dirty = False
+
     def save(
         self,
         path: str | Path | None = None,

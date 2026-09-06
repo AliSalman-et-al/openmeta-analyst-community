@@ -81,3 +81,49 @@ test_that("SVG normalization reads declared UTF-8 independently of the native lo
   expect_equal(xml2::xml_text(xml2::xml_find_first(document, "//*[local-name()='text']")),
                "Between-study τ² and I²")
 })
+
+test_that("TIFF exports retain the requested publication resolution", {
+  svg.path <- tempfile(fileext=".svg")
+  tiff.path <- tempfile(fileext=".tiff")
+  writeLines(c(
+    "<svg xmlns='http://www.w3.org/2000/svg' width='1in' height='.5in'>",
+    "<rect width='1' height='.5' fill='white'/>",
+    "</svg>"
+  ), svg.path)
+
+  rcmetar.export.svg_render(
+    svg.path,
+    tiff.path,
+    list(width=1, height=.5, dpi=300)
+  )
+
+  image <- tiff::readTIFF(tiff.path)
+  expect_equal(unname(dim(image)[1:2]), c(150L, 300L))
+
+  bytes <- readBin(tiff.path, what="raw", n=file.info(tiff.path)$size)
+  endian <- if (rawToChar(bytes[1:2]) == "II") "little" else "big"
+  read.integer <- function(offset, size) {
+    readBin(bytes[(offset + 1):(offset + size)], "integer", n=1, size=size,
+            endian=endian, signed=if (size <= 2) FALSE else TRUE)
+  }
+  ifd.offset <- read.integer(4, 4)
+  entries <- read.integer(ifd.offset, 2)
+  tags <- list()
+  for (index in seq_len(entries)) {
+    entry.offset <- ifd.offset + 2 + (index - 1) * 12
+    tag <- read.integer(entry.offset, 2)
+    type <- read.integer(entry.offset + 2, 2)
+    count <- read.integer(entry.offset + 4, 4)
+    if (type == 5L && count == 1L && tag %in% c(282L, 283L)) {
+      value.offset <- read.integer(entry.offset + 8, 4)
+      numerator <- read.integer(value.offset, 4)
+      denominator <- read.integer(value.offset + 4, 4)
+      tags[[as.character(tag)]] <- numerator / denominator
+    } else if (type == 3L && count == 1L && tag == 296L) {
+      tags[[as.character(tag)]] <- read.integer(entry.offset + 8, 2)
+    }
+  }
+  expect_equal(tags[["282"]], 300)
+  expect_equal(tags[["283"]], 300)
+  expect_equal(tags[["296"]], 2)
+})

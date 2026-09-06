@@ -296,11 +296,6 @@ g.meta.regression <- function(
 
 		plot.data$xlabel <- cov.name
 
-		scale.str <- g.get.scale(measure)
-		if ((scale.str=="standard") || (scale.str=="arcsine")) {
-			scale.str <- ""
-		}
-		plot.data$ylabel <- paste(scale.str, " ", pretty.metric.name(as.character(measure)), sep="")
 		meta.regression.plot(plot.data, plot.path)
 
 		plot.params <- list(
@@ -658,11 +653,6 @@ meta.regression <- function(reg.data, params, cond.means.data=NULL, stop.at.rma=
             plot.data <- create.plot.data.reg(reg.data, params, fitted.line, res=res)
 
             plot.data$xlabel <- reg.data@covariates[[1]]@cov.name
-            scale.str <- get.scale(params)
-            if ((scale.str=="standard") || (scale.str=="arcsine")) {
-                scale.str <- ""
-            }
-            plot.data$ylabel <- paste(scale.str, " ", pretty.metric.name(as.character(params$measure)), sep="")
             meta.regression.plot(plot.data, plot.path)
 
             plot.data.path <- save.data(reg.data, res, params, plot.data)

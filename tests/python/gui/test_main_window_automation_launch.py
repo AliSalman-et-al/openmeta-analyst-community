@@ -4442,6 +4442,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     }
     request = calls[1][1]
     assert request["workflow"] == "meta-regression"
+    assert request["method"] == "meta.regression"
     assert request["metric"] == "OR"
     assert request["params"]["rm.method"] == "FE"
     assert request["params"]["conf.level"] == 90.0

@@ -652,6 +652,13 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
                     parent=self,
                     confidence_multiplier=self.confidence_multiplier,
                     ci_param=ci_param,
+                    source=calc_fncs.calculator_effect_source(
+                        self.analysis_unit,
+                        self.current_groups,
+                        self.current_effect,
+                        self.group_comparison,
+                        self.confidence_multiplier,
+                    ),
                     **options,
                 )
         except Exception:
@@ -821,6 +828,13 @@ class DiagnosticDataDialog(QDialog, _ui_diagnostic_data_dialog.Ui_DiagnosticData
             group_comparison=self.group_comparison,
             data_type="diagnostic",
             confidence_multiplier=self.confidence_multiplier,
+            source=calc_fncs.calculator_effect_source(
+                self.analysis_unit,
+                self.current_groups,
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
+            ),
         )
 
     def _update_data_table(self):

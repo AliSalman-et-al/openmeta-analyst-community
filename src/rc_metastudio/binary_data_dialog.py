@@ -567,6 +567,13 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
             group_comparison=self.group_comparison,
             data_type="binary",
             confidence_multiplier=self.confidence_multiplier,
+            source=calc_fncs.calculator_effect_source(
+                self.analysis_unit,
+                self.current_groups,
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
+            ),
         )
 
         self.change_row_color_according_to_metric()
@@ -621,6 +628,13 @@ class BinaryDataDialog(QDialog, _ui_binary_data_dialog.Ui_BinaryDataDialog):
                     parent=self,
                     confidence_multiplier=self.confidence_multiplier,
                     ci_param=ci_param,
+                    source=calc_fncs.calculator_effect_source(
+                        self.analysis_unit,
+                        self.current_groups,
+                        self.current_effect,
+                        self.group_comparison,
+                        self.confidence_multiplier,
+                    ),
                 )
         except Exception:
             return False, False

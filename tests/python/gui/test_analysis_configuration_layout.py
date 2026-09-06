@@ -1139,7 +1139,7 @@ def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
     request = analysis_adapter.make_analysis_request(
         data_type="continuous",
         workflow="meta-regression",
-        method="meta_regression",
+        method="meta.regression",
         metric="SMD",
         parameters=parameters,
     )
@@ -1171,3 +1171,29 @@ def test_meta_regression_backend_execution_uses_frozen_request(monkeypatch):
     assert "SMD" in rendered
     assert isinstance(calls[0][1]["studies"][0], analysis_dataset.Study)
     assert isinstance(calls[0][1]["covs_to_include"][0], analysis_dataset.Covariate)
+
+
+@pytest.mark.parametrize(
+    ("data_type", "metric"),
+    (("binary", "OR"), ("continuous", "SMD")),
+    ids=("binary", "continuous"),
+)
+def test_meta_regression_dialog_uses_shared_rcmetar_method(
+    monkeypatch, qapp, data_type, metric
+):
+    from rc_metastudio import analysis_setup_dialog
+
+    covariate = SimpleNamespace(name="latitude", data_type=0)
+    model = _AnalysisModel(data_type, (covariate,))
+    model.current_effect = metric
+    _install_analysis_backend(monkeypatch, analysis_setup_dialog)
+    dialog = analysis_setup_dialog.AnalysisSetupDialog(
+        model, analysis_type="meta-regression", confidence_level=95.0
+    )
+    try:
+        request = dialog._meta_regression_request()
+        assert request.data_type == data_type
+        assert request.workflow == "meta-regression"
+        assert request.method == "meta.regression"
+    finally:
+        dialog.close()

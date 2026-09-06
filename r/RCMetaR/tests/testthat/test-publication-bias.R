@@ -259,6 +259,43 @@ test_that("ordinary and contour funnels persist their prepared geometry", {
   }
 })
 
+test_that("contour OR funnels use back-transformed axis labels", {
+  testthat::skip_if_not_installed("metafor")
+
+  settings <- RCMetaR:::.small.study.funnel.settings(list(
+    metric="OR", funnel.kind="contour"
+  ))
+  captured <- NULL
+  device.before <- grDevices::dev.cur()
+  output <- tempfile(fileext=".pdf")
+  grDevices::pdf(output)
+  on.exit({
+    while (!identical(grDevices::dev.cur(), device.before)) grDevices::dev.off()
+    unlink(output)
+  }, add=TRUE)
+
+  testthat::with_mocked_bindings(
+    funnel=function(model, ...) {
+      captured <<- list(...)
+      plot.new()
+      plot.window(xlim=c(-3, 3), ylim=c(1, 0))
+    },
+    .package="metafor",
+    RCMetaR:::.small.study.draw.contour.funnel(
+      NULL,
+      structure(list(), class="rma"),
+      list(metric="OR", funnel.center=0, funnel.contour.levels="90,95,99"),
+      settings,
+      c(-0.2, 0.1),
+      c(0.1, 0.2),
+      c(TRUE, TRUE)
+    )
+  )
+
+  expect_true(is.function(captured$atransf))
+  expect_equal(captured$atransf(log(c(0.14, 1, 2.72))), c(0.14, 1, 2.72))
+})
+
 test_that("references follow the methods and plots that produced the result", {
   testthat::skip_if_not_installed("meta")
   testthat::skip_if_not_installed("metafor")

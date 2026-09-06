@@ -243,6 +243,17 @@ def _configure_r_libraries(root, r_home, frozen):
 
 
 def _set_r_environment():
+    if sys.platform == "win32":
+        for name in (
+            "LC_ALL",
+            "LC_COLLATE",
+            "LC_CTYPE",
+            "LC_MONETARY",
+            "LC_TIME",
+            "LANG",
+        ):
+            if os.environ.get(name, "").lower() in {"c.utf-8", "c.utf8"}:
+                os.environ.pop(name, None)
     os.environ["RPY2_CFFI_MODE"] = "API"
     os.environ["R_ENVIRON_USER"] = os.devnull
     os.environ["R_PROFILE_USER"] = os.devnull

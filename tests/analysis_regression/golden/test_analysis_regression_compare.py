@@ -1326,6 +1326,7 @@ def test_headless_analysis_dispatches_meta_regression_with_selected_covariates(
         assert data_call[1]["covs_to_include"][0].name == "golden_year"
         added_covariate = next(call[1] for call in calls if call[0] == "covariate")
         assert data_call[1]["covs_to_include"][0] is added_covariate
+        assert backend_requests[0]["method"] == "meta.regression"
         assert backend_requests[0]["params"]["to"] == "only0"
         assert backend_requests[0]["params"]["adjust"] == 0.5
 

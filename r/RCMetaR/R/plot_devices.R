@@ -214,7 +214,20 @@ rcmetar.export.svg_render <- function(svg.path, outpath, size) {
         if (length(dim(bitmap)) == 3 && dim(bitmap)[[3]] == 4) {
             bitmap <- bitmap[, , 1:3]
         }
-        tiff::writeTIFF(bitmap, outpath, compression="LZW")
+        pixels <- dim(bitmap)
+        grDevices::tiff(
+            filename=outpath,
+            width=pixels[[2]],
+            height=pixels[[1]],
+            units="px",
+            res=rcmetar.plot.export.dpi(size),
+            compression="lzw",
+            bg="white"
+        )
+        tryCatch(
+            grid::grid.raster(bitmap, interpolate=FALSE),
+            finally=grDevices::dev.off()
+        )
         return(invisible(ext))
     }
     rsvg::rsvg_pdf(svg.path, outpath)

@@ -33,6 +33,9 @@ class FakeContinuousAnalysisUnit:
     def get_raw_data_for_group(self, group):
         return self.raw_data[group]
 
+    def set_raw_data_for_group(self, group, values):
+        self.raw_data[group] = list(values)
+
     def get_raw_data_for_groups(self, groups):
         return [value for group in groups for value in self.raw_data[group]]
 
@@ -513,6 +516,9 @@ def test_continuous_major_variant_behavior_matrix(monkeypatch, variant):
             assert dialog.correlation_pre_post.text() == "0.5"
             assert any(
                 payload[0].get("mean.A") == 95 for payload in recorder["pre_post"]
+            )
+            assert any(
+                payload[0].get("metric") == "SMD" for payload in recorder["pre_post"]
             )
         else:
             dialog.simple_table.setCurrentCell(0, 1)

@@ -259,6 +259,19 @@ def test_adapter_derives_repeatable_identities_for_legacy_projects() -> None:
     assert identities(first) == identities(second)
 
 
+def test_adding_follow_up_after_legacy_reopen_preserves_follow_up_order() -> None:
+    dataset = project_adapter.project_to_dataset(_multi_arm_project("binary"))
+
+    dataset.add_follow_up_to_outcome("Outcome", "week 4")
+
+    assert dataset.get_follow_up_names_for_outcome("Outcome") == ["first", "week 4"]
+    follow_ups = next(iter(dataset.follow_ups_by_outcome_id.values()))
+    follow_up_values = list(follow_ups.values())
+    assert [follow_up.label for follow_up in follow_up_values] == ["first", "week 4"]
+    assert follow_up_values[0].ordinal is None
+    assert follow_up_values[-1].ordinal == 1
+
+
 def test_document_to_runtime_project_reconstructs_state_and_selection() -> None:
     project = _multi_arm_project("binary")
     state: JsonObject = {

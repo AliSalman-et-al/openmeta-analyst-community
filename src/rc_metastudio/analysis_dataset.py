@@ -128,7 +128,9 @@ class Dataset:
                 unit.follow_up_id = follow_up_id
                 ordinal = max(
                     (
-                        getattr(follow_up, "ordinal", index)
+                        index
+                        if getattr(follow_up, "ordinal", None) is None
+                        else follow_up.ordinal
                         for index, follow_up in enumerate(follow_ups.values())
                     ),
                     default=-1,
@@ -345,7 +347,9 @@ class Dataset:
         )
         next_ordinal = max(
             (
-                getattr(follow_up, "ordinal", index)
+                index
+                if getattr(follow_up, "ordinal", None) is None
+                else follow_up.ordinal
                 for index, follow_up in enumerate(follow_ups.values())
             ),
             default=-1,

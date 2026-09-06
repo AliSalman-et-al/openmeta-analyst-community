@@ -448,6 +448,7 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 )
             )
         self.out_path = None
+        self._notify_user_that_data_is_unsaved()
 
     def _notify_user_that_data_is_unsaved(self):
         if self.out_path is None:
@@ -1808,6 +1809,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
             self.open(file_path=wizard_data["selected_dataset"])
         elif path == "new_dataset":
             self._make_new_dataset_and_setup_spreadsheet(dataset_info)
+            self.workspace.start_new_document()
+            self.out_path = None
+            self._notify_user_that_data_is_unsaved()
 
         elif path == "csv_import":
             csv_data = wizard_data["csv_data"]
@@ -1822,6 +1826,9 @@ class MainWindow(QtWidgets.QMainWindow, _ui_main_window.Ui_MainWindow):
                 ).redo()
 
             self._commit_model_operation(import_csv)
+            self.workspace.start_new_document()
+            self.out_path = None
+            self._notify_user_that_data_is_unsaved()
 
 
 class ImportCsvCommand:

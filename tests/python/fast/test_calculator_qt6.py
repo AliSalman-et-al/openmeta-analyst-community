@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 os.environ.setdefault("RCMS_QT6_BUILD_ROOT", str(ROOT / "build" / "qt6-verification"))
 
 from rc_metastudio.qt6_ui import prepare_generated_ui_imports
-from rc_metastudio import calculator_service
+from rc_metastudio import calculator_service, meta_globals
 
 prepare_generated_ui_imports()
 
@@ -517,6 +517,37 @@ def test_field_edit_command_replays_captured_states_once(qapp):
     assert restored == [("old", 1), ("new", 2)]
 
 
+def test_continuous_imputation_accepts_r_input_pattern_metadata(monkeypatch):
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_continuous_data",
+        lambda _data, _alpha: {
+            "succeeded": False,
+            "input.pattern": [True, True, False, False, True, True, True, False],
+            "comment": "not enough data",
+        },
+    )
+
+    result = calculator_service.CalculatorService().impute_continuous_data(
+        {"n": 10}, 0.05
+    )
+
+    assert result == {"succeeded": False, "comment": "not enough data"}
+
+
+def test_continuous_imputation_still_rejects_unknown_result_fields(monkeypatch):
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_continuous_data",
+        lambda _data, _alpha: {"succeeded": False, "unexpected": True},
+    )
+
+    with pytest.raises(ValueError, match="unexpected fields: \\['unexpected'\\]"):
+        calculator_service.CalculatorService().impute_continuous_data(
+            {"n": 10}, 0.05
+        )
+
+
 def test_continuous_imputation_uses_r_keys_not_visible_headers(qapp, monkeypatch):
     from rc_metastudio import continuous_data_dialog
 
@@ -715,6 +746,335 @@ def test_binary_calculator_uses_table_headers_and_friendly_two_arm_metric_labels
         form.effect_combo_box.itemText(index)
         for index in range(form.effect_combo_box.count())
     ]
+
+
+def test_binary_raw_edit_refreshes_derived_preview_fields(qapp, monkeypatch):
+    from rc_metastudio import analysis_dataset, binary_data_dialog, meta_globals
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda conf: 1.96,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "binary_convert_scale",
+        lambda value, *args, **kwargs: value,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_binary_data",
+        lambda data: {"FAIL": True},
+    )
+
+    def effect_for_study(e1, *args, **kwargs):
+        assert e1 == 7
+        return {"calc_scale": (0.489, 0.17, 0.808)}
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge, "effect_for_study", effect_for_study
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "effect_triplet",
+        lambda effect, scale, metric=None: effect[scale],
+    )
+
+    unit = analysis_dataset.AnalysisUnit(
+        analysis_dataset.Outcome("Outcome", meta_globals.BINARY),
+        raw_data=[[6, 20], [8, 22]],
+        group_names=["Group 1", "Group 2"],
+    )
+    unit.set_effect_for_source(
+        "entered", "OR", "Group 1-Group 2", 0.3911, 0.1212, 0.661
+    )
+    unit.set_effect_for_source(
+        "derived_preview", "OR", "Group 1-Group 2", 0.3911, 0.1212, 0.661
+    )
+    form = binary_data_dialog.BinaryDataDialog(
+        unit,
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "OR",
+        confidence_level=95.0,
+    )
+
+    assert form.effect_text_box.text() == "0.3911"
+    form.current_item_data = 6
+    form.raw_data_table.item(0, 0).setText("7")
+    qapp.processEvents()
+
+    assert form.effect_text_box.text() == "0.489"
+    assert form.lower_text_box.text() == "0.17"
+    assert form.upper_text_box.text() == "0.808"
+    assert {
+        key: unit.entered_effects["OR"]["Group 1-Group 2"][key]
+        for key in ("est", "lower", "upper", "SE")
+    } == {
+        "est": 0.3911,
+        "lower": 0.1212,
+        "upper": 0.661,
+        "SE": None,
+    }
+
+
+def test_continuous_metric_switch_does_not_reuse_effect_se_as_arm_se(
+    qapp, monkeypatch
+):
+    from rc_metastudio import analysis_dataset, continuous_data_dialog
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _confidence_level: 1.96,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "continuous_convert_scale",
+        lambda value, *_args, **_kwargs: value,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_continuous_data",
+        lambda _data, _alpha: {"succeeded": False, "comment": "stub"},
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "back_calculate_continuous_data",
+        lambda *_args, **_kwargs: {"FAIL": True},
+    )
+    calls = []
+
+    def continuous_effect_for_study(*args, **kwargs):
+        calls.append((args, kwargs))
+        return {"calc_scale": (2.0, 1.0, 3.0)}
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "continuous_effect_for_study",
+        continuous_effect_for_study,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "effect_triplet",
+        lambda result, scale, metric=None: result[scale],
+    )
+
+    unit = analysis_dataset.AnalysisUnit(
+        analysis_dataset.Outcome("Outcome", meta_globals.CONTINUOUS),
+        raw_data=[[60, 94, 22], [60, 92, 20]],
+        group_names=["Group 1", "Group 2"],
+    )
+    unit.set_effect_for_source(
+        "entered", "SMD", "Group 1-Group 2", 0.1, -0.1, 0.3,
+        standard_error=0.1827,
+    )
+    dialog = continuous_data_dialog.ContinuousDataDialog(
+        unit,
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "SMD",
+        confidence_level=95.0,
+    )
+    assert _table_item(dialog.simple_table, 0, 3).text() == ""
+    assert _table_item(dialog.simple_table, 1, 3).text() == ""
+
+    dialog.effect_combo_box.setCurrentIndex(dialog.effect_combo_box.findData("MD"))
+    qapp.processEvents()
+
+    assert calls
+    args, kwargs = calls[-1]
+    assert kwargs["metric"] == "MD"
+    assert args[3] is None
+    assert args[7] is None
+    dialog.close()
+
+
+def test_continuous_prepost_only_publishes_complete_differences(qapp, monkeypatch):
+    from rc_metastudio import analysis_dataset, continuous_data_dialog, meta_globals
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "get_confidence_multiplier_from_r",
+        lambda _confidence_level: 1.96,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "continuous_convert_scale",
+        lambda value, *_args, **_kwargs: value,
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_continuous_data",
+        lambda _data, _alpha: {"succeeded": False, "comment": "stub"},
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "back_calculate_continuous_data",
+        lambda *_args, **_kwargs: {"FAIL": True},
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "continuous_effect_for_study",
+        lambda *_args, **_kwargs: {"calc_scale": (-0.5, -1.0, 0.0)},
+    )
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "effect_triplet",
+        lambda result, scale, metric=None: result[scale],
+    )
+
+    def values(n=None, mean=None, sd=None):
+        return {
+            "n": n,
+            "mean": mean,
+            "sd": sd,
+            "se": None,
+            "var": None,
+            "low": None,
+            "high": None,
+            "pval": None,
+        }
+
+    def prepost(data, _correlation, _alpha):
+        complete = all(
+            data.get(field) is not None
+            for field in ("n.A", "mean.A", "sd.A", "n.B", "mean.B", "sd.B")
+        )
+        if not complete:
+            return {
+                "succeeded": True,
+                "output": values(),
+                "pre": values(),
+                "post": values(),
+            }
+        return {
+            "succeeded": True,
+            "output": values(60, -2, 29.7321),
+            "pre": values(60, 94, 22),
+            "post": values(60, 92, 20),
+        }
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge, "impute_pre_post_continuous_data", prepost
+    )
+    unit = analysis_dataset.AnalysisUnit(
+        analysis_dataset.Outcome("Outcome", meta_globals.CONTINUOUS),
+        raw_data=[[None, None, None], [60, 92, 20]],
+        group_names=["Group 1", "Group 2"],
+    )
+    unit.set_effect_for_source(
+        "entered", "SMD", "Group 1-Group 2", 0.0945, -0.1, 0.29
+    )
+    dialog = continuous_data_dialog.ContinuousDataDialog(
+        unit,
+        ["Group 1", "Group 2"],
+        "Group 1-Group 2",
+        "SMD",
+        confidence_level=95.0,
+    )
+    for row, values_for_row in enumerate(((60, 94, 22), (60, 92, 20))):
+        for column, value in enumerate(values_for_row):
+            dialog._set_val(row, column, value, dialog.g1_pre_post_table)
+
+    dialog.impute_pre_post_data(dialog.g1_pre_post_table, 0)
+
+    assert unit.get_raw_data_for_group("Group 1") == [60, -2, 29.7321]
+    assert unit.get_raw_data_for_group("Group 2") == [60, 92, 20]
+    assert dialog.effect_text_box.text() == "-0.5"
+
+    dialog.impute_pre_post_data(dialog.g2_pre_post_table, 1)
+    assert unit.get_raw_data_for_group("Group 2") == [60, 92, 20]
+
+    assert unit.derived_effect_previews
+    dialog._set_val(0, 1, None, dialog.simple_table)
+    dialog._copy_raw_data_from_table_to_analysis_unit()
+    assert not unit.derived_effect_previews
+
+    dialog._set_val(0, 1, -2, dialog.simple_table)
+    dialog._copy_raw_data_from_table_to_analysis_unit()
+    original_raw = unit.get_raw_data_for_groups(["Group 1", "Group 2"])
+    calls = []
+
+    def failing_second_group(data, correlation, alpha):
+        calls.append(data)
+        if len(calls) == 2:
+            raise RuntimeError("second group failed")
+        return prepost(data, correlation, alpha)
+
+    monkeypatch.setattr(
+        calculator_service.r_bridge,
+        "impute_pre_post_continuous_data",
+        failing_second_group,
+    )
+    dialog.correlation_pre_post.setText("0.5")
+    with pytest.raises(RuntimeError, match="second group failed"):
+        dialog.val_changed("correlation_pre_post")
+
+    assert len(calls) == 2
+    assert unit.get_raw_data_for_groups(["Group 1", "Group 2"]) == original_raw
+    assert dialog.correlation_pre_post.text() == "0.0"
+    dialog.close()
+
+
+@pytest.mark.parametrize(
+    ("data_type", "groups", "raw_data", "metric", "group_comparison", "partial"),
+    [
+        (
+            meta_globals.BINARY,
+            ["Group 1", "Group 2"],
+            [[6, 20], [8, 22]],
+            "OR",
+            "Group 1-Group 2",
+            [6, ""],
+        ),
+        (
+            meta_globals.CONTINUOUS,
+            ["Group 1", "Group 2"],
+            [[10, 5, 1], [12, 4, 1.5]],
+            "MD",
+            "Group 1-Group 2",
+            [10, 5, ""],
+        ),
+        (
+            meta_globals.DIAGNOSTIC,
+            ["test 1"],
+            [[1, 2, 3, 4]],
+            "Sens",
+            "test 1",
+            [1, 2, 3, ""],
+        ),
+    ],
+    ids=["binary", "continuous", "diagnostic"],
+)
+def test_calculator_effect_source_preserves_entered_partial_and_empty_data(
+    data_type, groups, raw_data, metric, group_comparison, partial
+):
+    from rc_metastudio import analysis_dataset, calculator_routines
+
+    unit = analysis_dataset.AnalysisUnit(
+        analysis_dataset.Outcome("Outcome", data_type),
+        raw_data=raw_data,
+        group_names=groups,
+    )
+    args = (unit, groups, metric, group_comparison, 1.96)
+
+    unit.set_effect_for_source("entered", metric, group_comparison, 0.5, 0.4, 0.6)
+    assert calculator_routines.calculator_effect_source(*args) == "entered"
+
+    unit.set_effect_for_source(
+        "derived_preview", metric, group_comparison, 0.6, 0.5, 0.7
+    )
+    assert calculator_routines.calculator_effect_source(*args) == "derived_preview"
+
+    unit.set_raw_data_for_group(groups[0], partial)
+    unit.set_effect_for_source(
+        "derived_preview", metric, group_comparison, 0.6, 0.5, 0.7
+    )
+    assert calculator_routines.calculator_effect_source(*args) == "entered"
+
+    unit.set_raw_data_for_groups(groups, [[""] * len(values) for values in raw_data])
+    assert calculator_routines.calculator_effect_source(*args) == "entered"
 
 
 def test_binary_calculator_table_layout_uses_real_headers_and_visible_total_row(
@@ -1172,6 +1532,9 @@ class FakeDiagnosticAnalysisUnit:
     def get_raw_data_for_group(self, group):
         return self.raw_data
 
+    def get_raw_data_for_groups(self, groups):
+        return self.raw_data
+
     def get_effect_and_ci(self, metric, group_comparison, confidence_multiplier):
         return None, None, None
 
@@ -1351,6 +1714,9 @@ class FakeContinuousAnalysisUnit:
 
     def get_raw_data_for_group(self, group):
         return self.raw_data[group]
+
+    def set_raw_data_for_group(self, group, values):
+        self.raw_data[group] = list(values)
 
     def get_raw_data_for_groups(self, groups):
         values = []

@@ -148,7 +148,7 @@ def run_headless_analysis(case):
     request = analysis_adapter.make_analysis_request(
         data_type=family,
         workflow=workflow,
-        method=case.method or "meta_regression",
+        method=case.method or "meta.regression",
         metric=effective_metric,
         parameters=effective_parameters,
     )
