@@ -618,7 +618,7 @@ def test_direct_manifest_binds_archived_inputs_and_runner(tmp_path):
             )
 
 
-def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tmp_path):
+def test_smoke_finalizer_requires_atomic_completion_surface_and_launch(tmp_path):
     inspector = load_inspector()
     validated_scales = []
     inspector.validate_macos_surface_records = lambda records: validated_scales.extend(
@@ -676,14 +676,13 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         encoding="utf-8",
     )
     markers = (
-        "packaged-workflow:teardown:close:start",
-        "packaged-workflow:teardown:close:return",
-        "packaged-workflow:teardown:deferred-delete:complete",
-        "packaged-workflow:teardown:top-level-windows:none",
-        "packaged-workflow:teardown:app-quit:start",
-        "packaged-workflow:teardown:app-quit:return",
+        "packaged-runtime-probe:passed",
+        "packaged-surface:scale-1.25-passed",
+        "packaged-surface:scale-1.50-passed",
+        "packaged-surface:scale-1.75-passed",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:evidence-written",
         "packaged-workflow:post-close",
-        "packaged-workflow:return",
         "packaged-workflow:process-exit:0",
     )
     log.write_text("\n".join(markers) + "\n", encoding="utf-8")
@@ -700,7 +699,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         encoding="utf-8",
     )
     finalized = inspector.finalize_smoke_evidence(
-        evidence, log, marker, require_direct_teardown=True, persist=False
+        evidence, log, marker, require_atomic_completion=True, persist=False
     )
     execution = finalized["execution"]
     assert execution["surface_scale_exit_codes"] == {
@@ -709,6 +708,7 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         "1.75": 0,
     }
     assert "positional_user_entry_exit_code" not in execution
+    assert execution["atomic_completion_trace"] is True
     assert "execution" not in json.loads(evidence.read_text(encoding="utf-8"))
     assert [record["requested"] for record in validated_scales] == [
         "1.25",
@@ -716,10 +716,42 @@ def test_direct_smoke_finalizer_requires_executed_teardown_surface_and_launch(tm
         "1.75",
     ]
     log.write_text("\n".join(markers[:-1]) + "\n", encoding="utf-8")
-    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="teardown"):
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="completion"):
         inspector.finalize_smoke_evidence(
-            evidence, log, marker, require_direct_teardown=True
+            evidence, log, marker, require_atomic_completion=True
         )
+
+
+def test_macos_surface_validator_parses_recorded_scale_strings():
+    inspector = load_inspector()
+    records = [
+        {
+            "requested": scale,
+            "qt_scale_factor": scale,
+            "device_pixel_ratio": float(scale),
+            "baseline_device_pixel_ratio": 1.0,
+            "platform_plugin": "cocoa",
+            "locale": "de_DE",
+            "binary_resources": True,
+            "native_menu": {
+                "is_native": True,
+                "menu_count": 6,
+                "action_count": 27,
+            },
+            "accessibility": {"focus_widget": ""},
+            "cleanup": {"close_accepted": True, "window_visible": False},
+            "available_styles": ["macOS"],
+            "active_style": "macos",
+            "tls_backends": ["securetransport"],
+            "image_formats": ["jpeg", "svg"],
+        }
+        for scale in ("1.25", "1.50", "1.75")
+    ]
+
+    inspector.validate_macos_surface_records(records)
+    records[0]["qt_scale_factor"] = "invalid"
+    with pytest.raises(inspector.MacOSDeploymentInspectionError, match="1.25"):
+        inspector.validate_macos_surface_records(records)
 
 
 @pytest.mark.skipif(
@@ -731,5 +763,3 @@ def test_pyinstaller_preserves_miniature_cran_framework_toc():
         / "scripts/verify_macos_r_pyinstaller_toc.py"
     )
     subprocess.run([sys.executable, str(script)], check=True)
-
-

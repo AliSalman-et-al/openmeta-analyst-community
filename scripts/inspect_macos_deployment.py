@@ -7,27 +7,26 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import plistlib
 import stat
 import subprocess
 import sys
-from typing import TypeGuard, cast
 import unicodedata
 import zipfile
+from pathlib import Path
+from typing import TypeGuard, cast
 
 from rc_metastudio.macos_macho import (
     MachOError,
     architectures,
     is_macho_candidate,
 )
-from rc_metastudio.r_runtime import macos_r_framework_version
 from rc_metastudio.macos_r_profile_schema import (
     ProfileSchemaError,
     validate_profile_evidence,
 )
-
+from rc_metastudio.r_runtime import macos_r_framework_version
 
 EXPECTED_VERSIONS = {
     "python": "3.11.9",
@@ -1664,7 +1663,7 @@ def finalize_smoke_evidence(
     log_path: Path,
     launchservices_marker: Path | None = None,
     *,
-    require_direct_teardown: bool = False,
+    require_atomic_completion: bool = False,
     persist: bool = True,
 ) -> dict:
     evidence = json.loads(path.read_text(encoding="utf-8"))
@@ -1672,23 +1671,25 @@ def finalize_smoke_evidence(
     _validate_smoke_basics(evidence, log_text)
     _validate_launchservices_marker(launchservices_marker)
     validate_packaged_workflow_evidence(evidence)
-    _validate_teardown_trace(log_text, require_direct_teardown)
+    _validate_atomic_completion_trace(log_text, require_atomic_completion)
     scale_records = evidence.get("scales", [])
     executed_scales = [
         str(record.get("requested"))
         for record in scale_records
         if isinstance(record, dict)
     ]
-    if require_direct_teardown:
+    if require_atomic_completion:
         validate_macos_surface_records(scale_records)
-    _validate_surface_gate(executed_scales, launchservices_marker, require_direct_teardown)
+    _validate_surface_gate(
+        executed_scales, launchservices_marker, require_atomic_completion
+    )
     evidence["execution"] = {
         "automation_exit_code": 0,
         "surface_scale_exit_codes": {scale: 0 for scale in executed_scales},
         "post_close_marker": True,
         "launchservices_completion_marker": launchservices_marker is not None,
         "clean_exit": True,
-        "direct_teardown_trace": require_direct_teardown,
+        "atomic_completion_trace": require_atomic_completion,
     }
     if persist:
         path.write_text(
@@ -1725,24 +1726,23 @@ def _validate_launchservices_marker(marker_path: Path | None) -> None:
         )
 
 
-def _validate_teardown_trace(log_text: str, required: bool) -> None:
+def _validate_atomic_completion_trace(log_text: str, required: bool) -> None:
     if not required:
         return
     markers = (
-        "packaged-workflow:teardown:close:start",
-        "packaged-workflow:teardown:close:return",
-        "packaged-workflow:teardown:deferred-delete:complete",
-        "packaged-workflow:teardown:top-level-windows:none",
-        "packaged-workflow:teardown:app-quit:start",
-        "packaged-workflow:teardown:app-quit:return",
+        "packaged-runtime-probe:passed",
+        "packaged-surface:scale-1.25-passed",
+        "packaged-surface:scale-1.50-passed",
+        "packaged-surface:scale-1.75-passed",
+        "packaged-workflow:project-exercise:complete",
+        "packaged-workflow:evidence-written",
         "packaged-workflow:post-close",
-        "packaged-workflow:return",
         "packaged-workflow:process-exit:0",
     )
     positions = [log_text.find(marker) for marker in markers]
     if any(position < 0 for position in positions) or positions != sorted(positions):
         raise MacOSDeploymentInspectionError(
-            "direct packaged automation lacks an ordered clean-teardown trace"
+            "packaged automation lacks an ordered atomic-completion trace"
         )
 
 
@@ -1767,7 +1767,7 @@ def validate_packaged_workflow_evidence(evidence: dict) -> None:
     )
     valid = (
         _workflow_header_valid(evidence, workflows, expected_summary)
-        and _workflow_locale_valid(workflows, locale_variants, expected_summary)
+        and _workflow_locale_valid(locale_variants)
         and _workflow_samples_valid(sample_projects, sample_records)
     )
     if not valid:
@@ -1802,12 +1802,10 @@ def _workflow_header_valid(
     )
 
 
-def _workflow_locale_valid(
-    workflows: dict, locale_variants: list, expected_summary: str | None
-) -> bool:
+def _workflow_locale_valid(locale_variants: list) -> bool:
     return (
         _locale_inputs_valid(locale_variants)
-        and _locale_identity_valid(workflows, locale_variants, expected_summary)
+        and _locale_identity_valid(locale_variants)
     )
 
 
@@ -1824,18 +1822,15 @@ def _locale_inputs_valid(locale_variants: list) -> bool:
     )
 
 
-def _locale_identity_valid(
-    workflows: dict, locale_variants: list, expected_summary: str | None
-) -> bool:
+def _locale_identity_valid(locale_variants: list) -> bool:
     en, de = locale_variants
     return (
-        en.get("svg_sha256") == de.get("svg_sha256")
-        and en.get("svg_sha256") == workflows.get("svg_sha256")
-        and all(
-            item.get("normalized_summary_sha256") == expected_summary
-            and item.get("raw_summary_sha256") == workflows.get("raw_summary_sha256")
-            for item in locale_variants
-        )
+        en.get("normalized_summary_sha256") == de.get("normalized_summary_sha256")
+        and _valid_sha256(en.get("normalized_summary_sha256"))
+        and en.get("raw_summary_sha256") == de.get("raw_summary_sha256")
+        and _valid_sha256(en.get("raw_summary_sha256"))
+        and en.get("svg_sha256") == de.get("svg_sha256")
+        and _valid_sha256_map(en.get("svg_sha256"))
     )
 
 
@@ -2624,9 +2619,22 @@ def _surface_accessibility(accessibility: dict[str, object]) -> bool:
     return "focus_widget" in accessibility
 
 
+def _recorded_scale(value: object) -> float | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
 def _surface_scale_values(item: dict[str, object]) -> bool:
     cleanup = _mapping_or_empty(item.get("cleanup", {}))
     image_formats = _strings_or_empty(item.get("image_formats", []))
+    requested = _recorded_scale(item.get("requested"))
+    qt_scale_factor = _recorded_scale(item.get("qt_scale_factor"))
+    if requested is None or qt_scale_factor is None:
+        return False
     return all(
         (
             cleanup.get("close_accepted") is True,
@@ -2635,13 +2643,12 @@ def _surface_scale_values(item: dict[str, object]) -> bool:
             bool(item.get("active_style")),
             bool(item.get("tls_backends")),
             {"jpeg", "svg"} <= set(image_formats),
-            abs(_float_or_default(item.get("qt_scale_factor"), 0) - _float_or_default(item.get("requested"), -1))
-            < 1e-9,
+            abs(qt_scale_factor - requested) < 1e-9,
             _float_or_default(item.get("baseline_device_pixel_ratio"), 0) > 0,
             abs(
                 _float_or_default(item.get("device_pixel_ratio"), 0)
                 - _float_or_default(item.get("baseline_device_pixel_ratio"), -1)
-                * _float_or_default(item.get("requested"), -1)
+                * requested
             )
             <= 0.05,
         )
@@ -2664,7 +2671,7 @@ def _validate_extracted_qualification(
         extracted_smoke_path,
         extracted_smoke_log,
         extracted_marker,
-        require_direct_teardown=True,
+        require_atomic_completion=True,
         persist=False,
     )
     complete = (
@@ -2865,7 +2872,7 @@ def write_qualification_evidence(
         smoke_evidence,
         smoke_log,
         launchservices_marker,
-        require_direct_teardown=True,
+        require_atomic_completion=True,
         persist=False,
     )
     archive_report = json.loads(archive_inspection.read_text(encoding="utf-8"))
@@ -3010,7 +3017,7 @@ def _build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--smoke-evidence", type=Path, required=True)
     finalize.add_argument("--smoke-log", type=Path, required=True)
     finalize.add_argument("--launchservices-marker", type=Path)
-    finalize.add_argument("--require-direct-teardown", action="store_true")
+    finalize.add_argument("--require-atomic-completion", action="store_true")
     archive = commands.add_parser("archive")
     archive.add_argument("--archive", type=Path, required=True)
     archive.add_argument("--archive-root-name", required=True)
@@ -3102,7 +3109,7 @@ def _dispatch_finalize(args: argparse.Namespace) -> None:
         args.smoke_evidence,
         args.smoke_log,
         args.launchservices_marker,
-        require_direct_teardown=args.require_direct_teardown,
+        require_atomic_completion=args.require_atomic_completion,
     )
 
 

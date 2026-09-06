@@ -832,7 +832,13 @@ PY
 
   step "Assembling packaged qualification evidence outside the application"
   mkdir -p "$surface_records_path"
-  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+  : > "$hang_trace_path"
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=API \
+    RCMS_R_HOME="$r_home" \
+    RCMS_R_LIBS="$r_lib" \
+    "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
     --workflow-observation "$workflow_observation_path" \
     --surface-records "$surface_records_path" \
     --sample-observations "$sample_observations_path" \
@@ -840,7 +846,8 @@ PY
     --sample-path "$sample_path" \
     --executable "$app_root/RCMetaStudio" --runtime-probe "$runtime_probe_path" \
     --surface-directory "$surface_records_path" --log-path "$smoke_log_path" \
-    --output "$smoke_evidence_path"
+    --output "$smoke_evidence_path" \
+    > "$smoke_stdout_path" 2> "$smoke_stderr_path"
 
   step "Opening the converted sample through the normal LaunchServices app entry point"
   rm -f "$launchservices_marker_path" "$launchservices_pid_path"
@@ -947,7 +954,6 @@ expected_links = {
 required.extend(expected_links)
 if not skip_smoke:
     required.extend([
-        f"{archive_root_name}/qualification/startup-wizard-smoke.json",
         f"{archive_root_name}/qualification/packaged-smoke.json",
         f"{archive_root_name}/qualification/packaged-smoke.log",
         f"{archive_root_name}/qualification/launchservices-completion.json",
@@ -1035,7 +1041,12 @@ if [ "$skip_smoke" -eq 0 ]; then
       run_extracted "$extracted_app/Contents/MacOS/RCMetaStudio" --automation-package-surface-smoke "$extracted_surfaces/surface-$scale.json" "$scale"
   done
   mkdir -p "$extracted_surfaces"
-  "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
+  env -u QT_QPA_PLATFORM \
+    RCMS_REQUIRE_IN_PROCESS_RPY2=1 \
+    RPY2_CFFI_MODE=API \
+    RCMS_R_HOME="$extracted_r_home" \
+    RCMS_R_LIBS="$extracted_r_lib" \
+    "$python_exe" "$repo_root/scripts/assemble_packaged_smoke_evidence.py" \
     --workflow-observation "$extracted_workflow" \
     --surface-records "$extracted_surfaces" \
     --sample-observations "$extracted_samples" \
@@ -1056,7 +1067,7 @@ if [ "$skip_smoke" -eq 0 ]; then
         --automation-smoke-log "$extracted_smoke_log" "$extracted_app/Contents/Resources/sample_projects/BCG.rcms"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" finalize-smoke \
     --smoke-evidence "$extracted_smoke" --smoke-log "$extracted_smoke_log" --launchservices-marker "$extracted_marker" \
-    --require-direct-teardown
+    --require-atomic-completion
   rm -f "$extracted_pid"
   "$python_exe" "$repo_root/scripts/inspect_macos_deployment.py" inspect \
     --target "macos-$architecture" --app-root "$extracted_app" \

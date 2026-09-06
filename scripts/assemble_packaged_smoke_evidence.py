@@ -122,17 +122,40 @@ def _capture_workflow_operations(
     )
     observations["edit"] = json.loads(edit_path.read_text(encoding="utf-8"))
 
+    base_analysis_path = operation_dir / "analysis-base.json"
+    _run_packaged(
+        executable,
+        ["--automation-package-analyze", str(base_analysis_path), str(sample),
+         PACKAGED_ANALYSIS_METHOD],
+        environment=environment,
+    )
+    observations["analysis_base"] = json.loads(
+        base_analysis_path.read_text(encoding="utf-8")
+    )
+
+    english_edit_path = operation_dir / "locale-edit-en.json"
+    english_project = operation_dir / "locale-en.rcms"
+    _run_packaged(
+        executable,
+        ["--automation-package-edit-save", str(english_edit_path), str(sample),
+         str(english_project), "raw-data-0", "6.0"],
+        environment=environment,
+    )
+    observations["locale_edit_en"] = json.loads(
+        english_edit_path.read_text(encoding="utf-8")
+    )
+
     analysis_path = operation_dir / "analysis-en.json"
     _run_packaged(
         executable,
-        ["--automation-package-analyze", str(analysis_path), str(sample),
+        ["--automation-package-analyze", str(analysis_path), str(english_project),
          PACKAGED_ANALYSIS_METHOD],
         environment=environment,
     )
     observations["analysis_en"] = json.loads(analysis_path.read_text(encoding="utf-8"))
 
-    locale_edit_path = operation_dir / "locale-edit.json"
-    locale_project = operation_dir / "locale.rcms"
+    locale_edit_path = operation_dir / "locale-edit-de.json"
+    locale_project = operation_dir / "locale-de.rcms"
     locale_environment = dict(environment, RCMS_PACKAGE_LOCALE="de_DE")
     _run_packaged(
         executable,
@@ -163,7 +186,8 @@ def _capture_workflow_operations(
 
 
 def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
-    analysis = observations["analysis_en"]
+    analysis = observations["analysis_base"]
+    english = observations["analysis_en"]
     locale = observations["analysis_de"]
     analysis_summary = analysis["texts"].get("Summary", "")
     locale_summary = locale["texts"].get("Summary", "")
@@ -175,7 +199,7 @@ def _workflow_observation_payload(observations: dict[str, dict]) -> dict:
         "reopen_observed": bool(observations["save_reopen"].get("opened")),
         "analysis_after_reopen_observed": bool(observations["save_reopen"]["texts"].get("Summary", "")),
         "locale_inputs": [
-            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "6.0", "canonical_value": 6.0, "summary": analysis_summary, "svg_paths": analysis["display_images"]},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "6.0", "canonical_value": 6.0, "summary": english["texts"].get("Summary", ""), "svg_paths": english["display_images"]},
             {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "6,0", "canonical_value": 6.0, "summary": locale_summary, "svg_paths": locale["display_images"]},
         ],
     }

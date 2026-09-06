@@ -191,12 +191,13 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
 
     digest = "a" * 64
     workflow_path = tmp_path / "workflow.json"
+    locale_svg = tmp_path / "locale-forest.svg"
     workflow_path.write_text(json.dumps({
         "summary": "Binary Random-Effects Model\nEstimate 1",
         "svg_paths": {"forest": str(tmp_path / "forest.svg")},
         "locale_inputs": [
-            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
-            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 1", "svg_paths": {"forest": str(tmp_path / "forest.svg")}},
+            {"operation": "analysis", "locale": "en_US", "decimal_point": ".", "input": "1.2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 2", "svg_paths": {"forest": str(locale_svg)}},
+            {"operation": "locale", "locale": "de_DE", "decimal_point": ",", "input": "1,2", "canonical_value": 1.2, "summary": "Binary Random-Effects Model\nEstimate 2", "svg_paths": {"forest": str(locale_svg)}},
         ],
         "edit_observed": True,
         "analysis_observed": True,
@@ -204,6 +205,7 @@ def test_developer_assembly_emits_evidence_accepted_by_both_inspectors(
         "analysis_after_reopen_observed": True,
     }), encoding="utf-8")
     (tmp_path / "forest.svg").write_text("<svg />", encoding="utf-8")
+    locale_svg.write_text("<svg>locale</svg>", encoding="utf-8")
     surfaces_path = tmp_path / "surfaces.json"
     surfaces_path.write_text("[]", encoding="utf-8")
     samples_path = tmp_path / "samples.json"
@@ -349,11 +351,46 @@ def test_assembler_runs_surface_probes_with_requested_scale_and_locale():
     assert 'environment["QT_SCALE_FACTOR"] = scale' in source
     assert 'environment["RCMS_PACKAGE_BASELINE_DPR"] = baseline' in source
     assert 'environment["RCMS_PACKAGE_LOCALE"] = "de_DE"' in source
-    assert '"raw-data-0", "6,0"' in source
-    assert '"input": "6.0", "canonical_value": 6.0' in source
-    assert '"input": "6,0", "canonical_value": 6.0' in source
     assert source.count("subprocess.run(") == 1
     assert "timeout=PACKAGED_PROCESS_TIMEOUT_SECONDS" in source
+
+
+def test_assembler_analyzes_equivalent_locale_edits(monkeypatch, tmp_path):
+    from scripts import assemble_packaged_smoke_evidence as assembler
+
+    calls = []
+
+    def fake_run(_executable, arguments, *, environment, **_kwargs):
+        calls.append((arguments, environment["RCMS_PACKAGE_LOCALE"]))
+        Path(arguments[1]).write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(assembler, "_run_packaged", fake_run)
+    operation_dir = tmp_path / "operations"
+    operation_dir.mkdir()
+    assembler._capture_workflow_operations(
+        tmp_path / "RCMetaStudio", tmp_path / "BCG.rcms", operation_dir
+    )
+
+    locale_edits = [
+        (arguments[5], locale, Path(arguments[3]).name)
+        for arguments, locale in calls
+        if arguments[0] == "--automation-package-edit-save"
+        and arguments[4] == "raw-data-0"
+    ]
+    locale_analyses = [
+        (locale, Path(arguments[2]).name)
+        for arguments, locale in calls
+        if arguments[0] == "--automation-package-analyze"
+        and Path(arguments[2]).name.startswith("locale-")
+    ]
+    assert locale_edits == [
+        ("6.0", "en_US", "locale-en.rcms"),
+        ("6,0", "de_DE", "locale-de.rcms"),
+    ]
+    assert locale_analyses == [
+        ("en_US", "locale-en.rcms"),
+        ("de_DE", "locale-de.rcms"),
+    ]
 
 
 def test_assembler_runtime_probe_is_neutral_under_scale_smoke(monkeypatch, tmp_path):
