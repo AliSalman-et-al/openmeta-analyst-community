@@ -801,7 +801,9 @@ def test_binary_raw_edit_refreshes_derived_preview_fields(qapp, monkeypatch):
 
     assert form.effect_text_box.text() == "0.3911"
     form.current_item_data = 6
-    form.raw_data_table.item(0, 0).setText("7")
+    raw_item = form.raw_data_table.item(0, 0)
+    assert raw_item is not None
+    raw_item.setText("7")
     qapp.processEvents()
 
     assert form.effect_text_box.text() == "0.489"

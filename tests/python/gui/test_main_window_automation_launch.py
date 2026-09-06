@@ -1173,7 +1173,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert marker == {
         "schema_version": 1,
         "pid": os.getpid(),
-        "platform_plugin": app.platformName().lower(),
+        "platform_plugin": QtWidgets.QApplication.platformName().lower(),
         "project": "amino.rcms",
         "post_close": True,
     }

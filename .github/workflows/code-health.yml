@@ -16,11 +16,13 @@ jobs:
     env:
       # Keep the trend snapshot anchored to a durable rewrite-era commit. The
       # PR/push base below remains the independent changed-code comparison.
-      STABLE_BASELINE: 8b7796b
+      STABLE_BASELINE: 8b7796bcc840c3505c5fb0a1328cdd7682880e48
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+      - name: Fetch pre-squash baseline
+        run: git fetch origin "$STABLE_BASELINE"
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
