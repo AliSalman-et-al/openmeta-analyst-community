@@ -12,7 +12,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QSizePolicy, QStyle
 
 from rc_metastudio.meta_globals import (
+    BINARY_ONE_ARM_METRICS,
     CALC_NUM_DIGITS,
+    CONTINUOUS_ONE_ARM_METRICS,
     EMPTY_VALS,
     ERROR_COLOR,
     OK_COLOR,
@@ -23,6 +25,10 @@ from rc_metastudio.runtime_types import required
 
 
 _EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
+_ONE_ARM_REQUIRED_DATA = {
+    **dict.fromkeys(BINARY_ONE_ARM_METRICS, 2),
+    **dict.fromkeys(CONTINUOUS_ONE_ARM_METRICS, 3),
+}
 
 
 def cell_text_is_blank(value):
@@ -364,6 +370,27 @@ def diagnostic_effect_display_samples(metric, digits=CALC_NUM_DIGITS):
     return (precision, "9999." + ("9" * digits))
 
 
+def calculator_effect_source(
+    analysis_unit, groups, effect, group_comparison, confidence_multiplier
+):
+    """Return the active calculator effect authority.
+
+    A partial raw-data edit does not produce a preview. Keep showing an
+    entered effect in that state so back-calculation and direct editing remain
+    usable; switch to the preview only after the active metric has one.
+    """
+    raw_data = analysis_unit.get_raw_data_for_groups(groups)
+    if not any(value not in EMPTY_VALS for value in raw_data):
+        return "entered"
+    required_data = _ONE_ARM_REQUIRED_DATA.get(effect, len(raw_data))
+    if any(value in EMPTY_VALS for value in raw_data[:required_data]):
+        return "entered"
+    preview = analysis_unit.get_effect_and_ci_for_source(
+        "derived_preview", effect, group_comparison, confidence_multiplier
+    )
+    return "derived_preview" if any(value is not None for value in preview) else "entered"
+
+
 def set_current_effect_from_value(
     analysis_unit,
     txt_boxes,
@@ -371,6 +398,8 @@ def set_current_effect_from_value(
     group_comparison,
     data_type,
     confidence_multiplier=None,
+    *,
+    source="entered",
 ):
     """Populate calculator fields from an analysis unit."""
     if confidence_multiplier is None:
@@ -393,7 +422,7 @@ def set_current_effect_from_value(
     ]
 
     (est, lower, upper) = analysis_unit.get_effect_and_ci_for_source(
-        "entered", current_effect, group_comparison, confidence_multiplier
+        source, current_effect, group_comparison, confidence_multiplier
     )
     (display_estimate, display_lower, display_upper) = [
         conv_to_disp_scale(x) for x in (est, lower, upper)
@@ -597,6 +626,8 @@ def evaluate(
     opt_cmp_fn=None,
     opt_cmp_msg=None,
     confidence_multiplier=None,
+    *,
+    source="entered",
 ):
     """opt_cmp_fn i.e. 'Optional Compare Function' should return True when the
     desired condition is met and False otherwise. It is a function of new_text:
@@ -606,7 +637,7 @@ def evaluate(
         raise ValueError("confidence multiplier must be specified")
 
     est, lower, upper = analysis_unit.get_effect_and_ci_for_source(
-        "entered", current_effect, group_comparison, confidence_multiplier
+        source, current_effect, group_comparison, confidence_multiplier
     )  # calc scale
     display_estimate, display_lower, display_upper = [
         conv_to_disp_scale(x) for x in (est, lower, upper)

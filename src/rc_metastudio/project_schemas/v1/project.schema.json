@@ -111,7 +111,7 @@
     "effect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["display_est", "display_lower", "display_upper", "est", "lower", "upper"],
+      "minProperties": 1,
       "properties": {
         "SE": {"type": "number"},
         "display_conf_level": {"type": "number"},

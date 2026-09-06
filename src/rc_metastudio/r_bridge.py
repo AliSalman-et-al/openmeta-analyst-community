@@ -356,7 +356,14 @@ def _r_singleton_to_scalar(singleton):
 
 
 def _r_na_to_none(value):
-    return None if str(value) == "NA" else value
+    # R uses both NA and NaN for unavailable numeric results.  Treat both as
+    # missing at the bridge; infinities remain values and are rejected by the
+    # typed calculator boundary.
+    if str(value) == "NA":
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
 
 
 def _is_r_iterable(value, exclude_strings=True):

@@ -533,6 +533,13 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     parent=self,
                     confidence_multiplier=self.confidence_multiplier,
                     ci_param=ci_param,
+                    source=calc_fncs.calculator_effect_source(
+                        self.analysis_unit,
+                        self.current_groups,
+                        self.current_effect,
+                        self.group_comparison,
+                        self.confidence_multiplier,
+                    ),
                     **options,
                 )
         except Exception:
@@ -608,8 +615,20 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             )
         elif val_str == "correlation_pre_post":
             # Recompute the estimates
-            self.impute_pre_post_data(self.g1_pre_post_table, 0)
-            self.impute_pre_post_data(self.g2_pre_post_table, 1)
+            try:
+                succeeded = self.impute_pre_post_data(
+                    self.g1_pre_post_table, 0
+                ) and self.impute_pre_post_data(self.g2_pre_post_table, 1)
+            except Exception:
+                self.restore_analysis_unit_and_tables(
+                    old_analysis_unit, old_tables_data, old_correlation
+                )
+                raise
+            if not succeeded:
+                self.restore_analysis_unit_and_tables(
+                    old_analysis_unit, old_tables_data, old_correlation
+                )
+                return
 
         self.impute_data()
 
@@ -659,6 +678,13 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
             group_comparison=self.group_comparison,
             data_type="continuous",
             confidence_multiplier=self.confidence_multiplier,
+            source=calc_fncs.calculator_effect_source(
+                self.analysis_unit,
+                self.current_groups,
+                self.current_effect,
+                self.group_comparison,
+                self.confidence_multiplier,
+            ),
         )
 
         self.change_row_color_according_to_metric()
@@ -677,15 +703,6 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     self._set_val(
                         row_index, col, group_raw_data[col], self.simple_table
                     )
-                # Insert standard errors when available.
-                se_col = 3
-                se = self.analysis_unit.get_se(
-                    "entered",
-                    self.current_effect,
-                    self.group_comparison,
-                    self.confidence_multiplier,
-                )
-                self._set_val(row_index, se_col, se, self.simple_table)
         self.impute_data()
 
     def _cell_data_not_valid(self, celldata_string, cell_header=None):
@@ -823,12 +840,13 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
 
     def _copy_raw_data_from_table_to_analysis_unit(self):
         for row_index, group_name in enumerate(self.current_groups):
-            group_raw_data = self.analysis_unit.get_raw_data_for_group(group_name)
-            for col_index in range(len(group_raw_data)):
-                current_value = self._get_float(row_index, col_index)
-                self.analysis_unit.get_raw_data_for_group(group_name)[col_index] = (
-                    current_value
+            current_values = [
+                self._get_float(row_index, col_index)
+                for col_index in range(
+                    len(self.analysis_unit.get_raw_data_for_group(group_name))
                 )
+            ]
+            self.analysis_unit.set_raw_data_for_group(group_name, current_values)
 
     def restore_analysis_unit(self, old_analysis_unit):
         """Restores the analysis_unit data and resets the form"""
@@ -957,7 +975,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 self.restore_analysis_unit_and_tables(
                     old_analysis_unit, old_tables_data, old_correlation
                 )
-                return None
+                return False
 
         group_name = self.current_groups[group_index]
         var_names = self.get_column_header_strs_pre_post()
@@ -969,7 +987,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     params_dict[
                         "%s.%s" % (self._imputation_field_name(var_name), a_b_name)
                     ] = var_value
-        params_dict["metric"] = "'%s'" % self.current_effect
+        params_dict["metric"] = self.current_effect
 
         results_from_r = self.calculator.impute_pre_post_continuous_data(
             params_dict,
@@ -987,20 +1005,31 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     old_analysis_unit, old_tables_data, old_correlation
                 )
             self._fit_tables_to_contents()
-            return None
+            return False
 
         computed_vals = cast(ContinuousValues, results_from_r["output"])
 
-        for var_index, var_name in enumerate(self.get_column_header_strs()):
+        output_is_complete = not any(
+            computed_vals[field_name] is None
+            for field_name in ("n", "mean", "sd")
+        )
+        if output_is_complete:
+            for var_index, var_name in enumerate(self.get_column_header_strs()):
+                field_name = self._imputation_field_name(var_name)
+                val = computed_vals[field_name]
+                self._set_val(group_index, var_index, val)
+
+        # also update the pre/post tables
+        pre_vals = cast(ContinuousValues, results_from_r["pre"])
+        post_vals = cast(ContinuousValues, results_from_r["post"])
+        for var_index, var_name in enumerate(var_names):
             field_name = self._imputation_field_name(var_name)
-            val = computed_vals[field_name]
-            self._set_val(group_index, var_index, val)
+            pre_val = pre_vals[field_name]
+            post_val = post_vals[field_name]
+            self._set_val(0, var_index, pre_val, table)
+            self._set_val(1, var_index, post_val, table)
 
-            if var_index < 3:
-                self.analysis_unit.get_raw_data_for_group(group_name)[var_index] = (
-                    computed_vals[field_name]
-                )
-
+        self._copy_raw_data_from_table_to_analysis_unit()
         try:
             self.update_effect_from_raw_data()
         except Exception as e:
@@ -1014,20 +1043,8 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 self.restore_analysis_unit_and_tables(
                     old_analysis_unit, old_tables_data, old_correlation
                 )
-                return
+                return False
             raise
-
-        # also update the pre/post tables
-        pre_vals = cast(ContinuousValues, results_from_r["pre"])
-        post_vals = cast(ContinuousValues, results_from_r["post"])
-        for var_index, var_name in enumerate(var_names):
-            field_name = self._imputation_field_name(var_name)
-            pre_val = pre_vals[field_name]
-            post_val = post_vals[field_name]
-            self._set_val(0, var_index, pre_val, table)
-            self._set_val(1, var_index, post_val, table)
-
-        self._copy_raw_data_from_table_to_analysis_unit()
         self.update_clear_button_color()
         self._fit_tables_to_contents()
 
@@ -1053,6 +1070,7 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                 old_state=(old_analysis_unit, old_tables_data, old_correlation),
                 new_state=(new_analysis_unit, new_tables_data, new_correlation),
             )
+        return True
 
     def float_to_str(self, float_val):
         float_str = ""
@@ -1128,11 +1146,12 @@ class ContinuousDataDialog(QDialog, _ui_continuous_data_dialog.Ui_ContinuousData
                     n1,
                     m1,
                     sd1,
-                    se1=se1,
+                    # Use SE only to reconstruct a missing SD; SE cells may be derived.
+                    se1=se1 if self._is_empty_value(sd1) else None,
                     n2=n2,
                     m2=m2,
                     sd2=sd2,
-                    se2=se2,
+                    se2=se2 if self._is_empty_value(sd2) else None,
                     metric=self.current_effect,
                     confidence_level=self.confidence_level,
                 )

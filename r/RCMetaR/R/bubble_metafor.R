@@ -59,11 +59,12 @@ rcmetar.create.metafor.bubble.bundle <- function(
 }
 
 rcmetar.bubble.default.ylabel <- function(params) {
+    metric <- pretty.metric.name(as.character(params$measure))
     scale.str <- get.scale(params)
-    if (scale.str %in% c("standard", "arcsine")) {
-        scale.str <- ""
+    if (scale.str %in% c("log", "logit")) {
+        return(paste0(metric, " (", scale.str, " scale)"))
     }
-    paste(scale.str, " ", pretty.metric.name(as.character(params$measure)), sep="")
+    metric
 }
 
 rcmetar.bubble.accent.color <- function(bundle) {

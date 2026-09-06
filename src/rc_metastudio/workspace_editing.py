@@ -158,7 +158,7 @@ class WorkspaceEditingService:
 
     @staticmethod
     def _effect_is_complete(effect, data_type, outcome_subtype) -> bool:
-        if data_type == "continuous" and outcome_subtype == "generic_effect":
+        if data_type == CONTINUOUS and outcome_subtype == "generic_effect":
             return all(_effect_value(effect, key) is not None for key in ("est", "SE"))
         return all(
             _effect_value(effect, key) is not None
@@ -278,7 +278,7 @@ class WorkspaceEditingService:
             or context.outcome_name is None
             or context.data_type == DIAGNOSTIC
             or target.column == context.include_column
-            or import_csv
+            or (import_csv and not raw_data_is_empty(self._raw_data(dataset, study, context)))
         ):
             return
         unit = self._analysis_unit(dataset, study, context)

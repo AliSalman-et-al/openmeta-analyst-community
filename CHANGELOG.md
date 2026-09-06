@@ -18,6 +18,8 @@ All notable RC MetaStudio changes will be recorded in this file.
 
 ### Fixed
 
+- Preserved incomplete entered effects and estimate/SE pairs through undo and project saving, and allowed one-arm workspaces to retain their selectable groups.
+- Included complete entered-effect CSV rows consistently, including the first row, while preserving raw-data import inclusion rules.
 - Parsed recorded macOS Qt scale strings before validating device-pixel ratios.
 - Updated macOS qualification to validate the current atomic workflow completion trace instead of deleted monolithic teardown markers.
 - Removed the obsolete startup-wizard record from the macOS archive contract after qualification moved to normal project startup.

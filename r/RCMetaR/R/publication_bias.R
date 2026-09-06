@@ -1435,10 +1435,10 @@ rcmetar.run.small.study.effects <- function(om.data, params=list()) {
     levels <- as.numeric(strsplit(as.character(raw), ",", fixed=TRUE)[[1L]])
     levels <- levels[is.finite(levels) & levels > 0 & levels < 100]
     if (!length(levels)) levels <- c(90, 95, 99)
-    args <- .small.study.funnel.args(settings, center)
+    ratio <- as.character(params$metric %||% "") %in% c("OR", "RR")
+    args <- .small.study.funnel.args(settings, center, ratio)
     args$refline <- if (settings$show.reference) 0 else NULL
     args$level <- levels
-    args$atransf <- NULL
     args$shade <- settings$region.color
     args$colci <- settings$reference.color
     do.call(metafor::funnel, c(list(model), args))

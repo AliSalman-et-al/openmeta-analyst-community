@@ -73,9 +73,7 @@ create.plot.data.generic <- function(om.data, params, res, selected.cov=NULL){
     QEp <- forest.plot.p.value.label(res$QEp, params$digits)
 
     overall <- paste("Overall", forest.plot.heterogeneity.suffix(I2, QEp), sep="")
-    study.names <- om.data@study.names
-    years <- om.data@years
-    study.names[years != 0] <- paste(study.names[years != 0], years[years != 0], sep=" ")
+    study.names <- rcmetar.study.labels(om.data)
     plot.data <- list(label = c(rcmetar.forest.study.header.label(params$fp_col1_str), study.names, overall),
                       types = c(3, rep(0, length(om.data@study.names)), 2),
                       scale = scale.str,

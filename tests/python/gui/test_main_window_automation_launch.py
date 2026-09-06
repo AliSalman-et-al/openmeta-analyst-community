@@ -1059,6 +1059,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     sample_project = _sample_project_path("amino.rcms")
     completion_marker = tmp_path / "launchservices-completion.json"
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    platform_plugin = QtWidgets.QApplication.platformName().lower()
     opened = []
     started = []
     closed = []
@@ -1173,7 +1174,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert marker == {
         "schema_version": 1,
         "pid": os.getpid(),
-        "platform_plugin": app.platformName().lower(),
+        "platform_plugin": platform_plugin,
         "project": "amino.rcms",
         "post_close": True,
     }
@@ -4449,6 +4450,7 @@ def test_meta_regression_acceptance_passes_all_dialog_choices_to_adapter(monkeyp
     }
     request = calls[1][1]
     assert request["workflow"] == "meta-regression"
+    assert request["method"] == "meta.regression"
     assert request["metric"] == "OR"
     assert request["params"]["rm.method"] == "FE"
     assert request["params"]["conf.level"] == 90.0

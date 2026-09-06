@@ -107,6 +107,16 @@ def _continuous_values(value: object, operation: str) -> ContinuousValues:
     }
 
 
+def _input_pattern(value: object, operation: str) -> None:
+    """Validate RCMetaR's raw-input provenance metadata and discard it."""
+    if isinstance(value, Mapping):
+        for item in _mapping(value, operation).values():
+            _input_pattern(item, operation)
+        return
+    if not isinstance(value, (list, tuple)) or any(type(item) is not bool for item in value):
+        raise _boundary_error(operation, "input.pattern must contain boolean sequences")
+
+
 def _binary_result(value: object, operation: str) -> BinaryImputationResult:
     result: dict[str, BinaryImputationOption | Scalar | bool] = {}
     for key, item in _mapping(value, operation).items():
@@ -126,28 +136,34 @@ def _binary_result(value: object, operation: str) -> BinaryImputationResult:
 
 def _continuous_result(value: object, operation: str) -> ContinuousImputationResult:
     raw = _mapping(value, operation)
-    unknown = set(raw) - {"succeeded", "output", "comment"}
-    if unknown:
-        raise _boundary_error(operation, f"unexpected fields: {sorted(unknown)}")
+    _check_result_fields(
+        raw, {"succeeded", "input.pattern", "output", "comment"}, operation
+    )
+    if "input.pattern" in raw:
+        _input_pattern(raw["input.pattern"], operation)
     succeeded = raw.get("succeeded")
     if type(succeeded) is not bool:
         raise _boundary_error(operation, "succeeded must be boolean")
     result: ContinuousImputationResult = {"succeeded": succeeded}
-    if "output" in raw:
-        result["output"] = _continuous_values(raw["output"], operation)
-    if "comment" in raw:
-        comment = raw["comment"]
-        if not isinstance(comment, str):
-            raise _boundary_error(operation, "comment must be text")
-        result["comment"] = comment
-    if succeeded and "output" not in result:
-        raise _boundary_error(operation, "succeeded results require output")
+    result.update(_optional_continuous_fields(raw, ("output",), operation))
+    result.update(_optional_comment(raw, operation))
+    _require_success_fields(
+        succeeded, result, {"output"}, operation, "succeeded results require output"
+    )
     return result
 
 
 def _pre_post_result(value: object, operation: str) -> PrePostImputationResult:
     raw = _mapping(value, operation)
-    _check_result_fields(raw, {"succeeded", "output", "pre", "post", "comment"}, operation)
+    _check_result_fields(
+        raw,
+        {"succeeded", "input.pattern", "output", "pre", "post", "comment", "correlation"},
+        operation,
+    )
+    if "input.pattern" in raw:
+        _input_pattern(raw["input.pattern"], operation)
+    if "correlation" in raw:
+        _numeric(raw["correlation"], operation)
     succeeded = raw.get("succeeded")
     if type(succeeded) is not bool:
         raise _boundary_error(operation, "succeeded must be boolean")

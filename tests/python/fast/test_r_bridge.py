@@ -1,7 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Ali Salman and RC MetaStudio contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 from rc_metastudio.analysis_results import parse_analysis_result
-from rc_metastudio.r_bridge import _apply_text_value_keys, _text_section_metadata
+from rc_metastudio.r_bridge import (
+    _apply_text_value_keys,
+    _r_na_to_none,
+    _text_section_metadata,
+)
+
+
+def test_r_nan_is_normalized_to_missing_like_r_na():
+    assert _r_na_to_none("NA") is None
+    assert _r_na_to_none("NaN") == "NaN"
+    assert _r_na_to_none("nan") == "nan"
+    assert _r_na_to_none("na") == "na"
+    assert _r_na_to_none(float("nan")) is None
+    assert _r_na_to_none(float("inf")) == float("inf")
 
 
 def test_expanded_summary_sections_keep_metadata_but_point_to_child_values():

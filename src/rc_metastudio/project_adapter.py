@@ -107,14 +107,6 @@ def _entered_effects(
     effects: Mapping[str, Mapping[str, Mapping[str, object]]],
 ) -> JsonObject:
     result: JsonObject = {}
-    required = {
-        "est",
-        "lower",
-        "upper",
-        "display_est",
-        "display_lower",
-        "display_upper",
-    }
     for metric, comparisons in effects.items():
         kept_comparisons: JsonObject = {}
         for comparison, values in comparisons.items():
@@ -123,9 +115,7 @@ def _entered_effects(
                 for key, value in values.items()
                 if value not in (None, "")
             }
-            # Partially calculated display caches are transient, not durable
-            # artifact metadata. The v1 contract stores only complete effects.
-            if required.issubset(kept):
+            if any(key in kept for key in ("est", "lower", "upper", "SE")):
                 kept_comparisons[str(comparison)] = kept
         if kept_comparisons:
             result[str(metric)] = kept_comparisons

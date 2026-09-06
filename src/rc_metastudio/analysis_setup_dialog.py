@@ -580,7 +580,7 @@ class AnalysisSetupDialog(QDialog, Ui_AnalysisSetupDialog):
         method = (
             "diagnostic.reitsma"
             if self.data_type == "diagnostic"
-            else "meta_regression"
+            else "meta.regression"
         )
         return self.analysis_service.make_request(
             data_type=self.data_type,
