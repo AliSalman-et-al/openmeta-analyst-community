@@ -14,7 +14,7 @@ The release pipeline builds Windows x64 and Apple silicon macOS artifacts once, 
 
 Run the `Build Immutable Candidate` workflow with:
 
-- `version`: the repository version
+- `version`: the full RC version, such as `0.4.0-rc.1`; its base must match the repository version
 - `source_sha`: the full commit SHA on `master`
 - `trust_profile`: `macos-trusted` for the normal signed macOS release path, or `unsigned-community` for an explicitly unsigned candidate
 
@@ -22,7 +22,7 @@ The workflow builds both supported native targets and uploads a release-set mani
 
 ## Publish a release candidate
 
-For the normal release path, run `Publish macOS-Trusted Release Candidate` with the candidate run ID, an RC version such as `0.2.4-rc.1`, and the same source SHA. This workflow signs and notarizes both macOS applications, creates DMGs, verifies the mounted applications, checks Gatekeeper acceptance, and publishes an immutable prerelease.
+For the normal release path, run `Publish macOS-Trusted Release Candidate` with the candidate run ID, the same RC version, and the same source SHA. This workflow signs and notarizes both macOS applications, creates DMGs, verifies the mounted applications, checks Gatekeeper acceptance, and publishes an immutable prerelease.
 
 Use `Publish Unsigned Community Release Candidate` only when both artifacts are intentionally unsigned.
 

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Repository version to build.
+        description: RC version to build, for example 0.4.0-rc.1.
         required: true
         type: string
       source_sha:

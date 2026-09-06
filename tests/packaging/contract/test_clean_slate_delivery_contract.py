@@ -31,6 +31,22 @@ def workflow_step(workflow, job_name: str, step_name: str):
     )
 
 
+def test_candidate_requires_an_rc_version(tmp_path):
+    delivery = load_delivery()
+
+    with pytest.raises(ValueError, match="candidate version must be an RC version"):
+        delivery.init_release(
+            argparse.Namespace(
+                version=delivery.repository_version(),
+                commit="a" * 40,
+                repository="AliSalman-et-al/rc-metastudio",
+                trust_profile="macos-trusted",
+                target=["windows-x64", "macos-arm64"],
+                output=str(tmp_path / "release-set.json"),
+            )
+        )
+
+
 def test_clean_slate_delivery_state_machine(tmp_path):
     delivery = load_delivery()
     manifest_path = tmp_path / "release-set.json"

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -113,10 +114,15 @@ def assert_commit(commit: str) -> None:
 
 def init_release(args: argparse.Namespace) -> None:
     assert_commit(args.commit)
-    requested_base = args.version.split("-rc.", 1)[0]
-    if requested_base != repository_version():
+    version_match = re.fullmatch(
+        r"(?P<base>[0-9]+\.[0-9]+\.[0-9]+)-rc\.[0-9]+", args.version
+    )
+    if version_match is None:
+        raise ValueError("candidate version must be an RC version such as 0.4.0-rc.1")
+    current_version = repository_version()
+    if version_match.group("base") != current_version:
         raise ValueError(
-            f"requested version {args.version} does not match repository version {repository_version()}"
+            f"requested version {args.version} does not match repository version {current_version}"
         )
     selected_targets = list(dict.fromkeys(getattr(args, "target", None) or targets()))
     unsupported = sorted(set(selected_targets) - set(targets()))
