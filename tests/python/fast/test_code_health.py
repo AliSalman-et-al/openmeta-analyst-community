@@ -55,7 +55,7 @@ def test_code_health_emits_machine_readable_evidence_and_report(tmp_path: Path) 
             sys.executable,
             "scripts/code_health.py",
             "--base",
-            "4aa0740",
+            "HEAD",
             "--head",
             "HEAD",
             "--output",

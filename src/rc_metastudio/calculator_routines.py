@@ -25,6 +25,10 @@ from rc_metastudio.runtime_types import required
 
 
 _EFFECT_CI_BASE_MINIMUM_WIDTHS = WeakKeyDictionary()
+_ONE_ARM_REQUIRED_DATA = {
+    **dict.fromkeys(BINARY_ONE_ARM_METRICS, 2),
+    **dict.fromkeys(CONTINUOUS_ONE_ARM_METRICS, 3),
+}
 
 
 def cell_text_is_blank(value):
@@ -378,12 +382,7 @@ def calculator_effect_source(
     raw_data = analysis_unit.get_raw_data_for_groups(groups)
     if not any(value not in EMPTY_VALS for value in raw_data):
         return "entered"
-    if effect in BINARY_ONE_ARM_METRICS:
-        required_data = 2
-    elif effect in CONTINUOUS_ONE_ARM_METRICS:
-        required_data = 3
-    else:
-        required_data = len(raw_data)
+    required_data = _ONE_ARM_REQUIRED_DATA.get(effect, len(raw_data))
     if any(value in EMPTY_VALS for value in raw_data[:required_data]):
         return "entered"
     preview = analysis_unit.get_effect_and_ci_for_source(

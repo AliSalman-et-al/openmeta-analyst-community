@@ -32,6 +32,16 @@ def _cmp(left, right):
     return (left > right) - (left < right)
 
 
+def _next_follow_up_ordinal(follow_ups):
+    return max(
+        (
+            index if getattr(follow_up, "ordinal", None) is None else follow_up.ordinal
+            for index, follow_up in enumerate(follow_ups.values())
+        ),
+        default=-1,
+    ) + 1
+
+
 class Dataset:
     def __len__(self):
         return len(self.studies)
@@ -126,15 +136,7 @@ class Dataset:
                     continue
                 follow_up_id = unit.follow_up_id or _new_stable_id()
                 unit.follow_up_id = follow_up_id
-                ordinal = max(
-                    (
-                        index
-                        if getattr(follow_up, "ordinal", None) is None
-                        else follow_up.ordinal
-                        for index, follow_up in enumerate(follow_ups.values())
-                    ),
-                    default=-1,
-                ) + 1
+                ordinal = _next_follow_up_ordinal(follow_ups)
                 follow_ups.setdefault(
                     follow_up_id,
                     FollowUp(follow_up_id, unit.follow_up_label, ordinal=ordinal),
@@ -345,15 +347,7 @@ class Dataset:
         follow_ups = self._follow_ups_by_outcome_id.setdefault(
             outcome.stable_id, {}
         )
-        next_ordinal = max(
-            (
-                index
-                if getattr(follow_up, "ordinal", None) is None
-                else follow_up.ordinal
-                for index, follow_up in enumerate(follow_ups.values())
-            ),
-            default=-1,
-        ) + 1
+        next_ordinal = _next_follow_up_ordinal(follow_ups)
         follow_ups[follow_up_id] = FollowUp(
             follow_up_id, follow_up_name, ordinal=next_ordinal
         )

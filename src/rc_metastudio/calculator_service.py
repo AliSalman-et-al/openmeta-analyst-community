@@ -136,24 +136,20 @@ def _binary_result(value: object, operation: str) -> BinaryImputationResult:
 
 def _continuous_result(value: object, operation: str) -> ContinuousImputationResult:
     raw = _mapping(value, operation)
-    unknown = set(raw) - {"succeeded", "input.pattern", "output", "comment"}
-    if unknown:
-        raise _boundary_error(operation, f"unexpected fields: {sorted(unknown)}")
+    _check_result_fields(
+        raw, {"succeeded", "input.pattern", "output", "comment"}, operation
+    )
     if "input.pattern" in raw:
         _input_pattern(raw["input.pattern"], operation)
     succeeded = raw.get("succeeded")
     if type(succeeded) is not bool:
         raise _boundary_error(operation, "succeeded must be boolean")
     result: ContinuousImputationResult = {"succeeded": succeeded}
-    if "output" in raw:
-        result["output"] = _continuous_values(raw["output"], operation)
-    if "comment" in raw:
-        comment = raw["comment"]
-        if not isinstance(comment, str):
-            raise _boundary_error(operation, "comment must be text")
-        result["comment"] = comment
-    if succeeded and "output" not in result:
-        raise _boundary_error(operation, "succeeded results require output")
+    result.update(_optional_continuous_fields(raw, ("output",), operation))
+    result.update(_optional_comment(raw, operation))
+    _require_success_fields(
+        succeeded, result, {"output"}, operation, "succeeded results require output"
+    )
     return result
 
 

@@ -1059,6 +1059,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     sample_project = _sample_project_path("amino.rcms")
     completion_marker = tmp_path / "launchservices-completion.json"
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    platform_plugin = QtWidgets.QApplication.platformName().lower()
     opened = []
     started = []
     closed = []
@@ -1173,7 +1174,7 @@ def test_startup_smoke_opens_positional_project_without_wizard(monkeypatch, tmp_
     assert marker == {
         "schema_version": 1,
         "pid": os.getpid(),
-        "platform_plugin": QtWidgets.QApplication.platformName().lower(),
+        "platform_plugin": platform_plugin,
         "project": "amino.rcms",
         "post_close": True,
     }
